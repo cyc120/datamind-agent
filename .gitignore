@@ -15,6 +15,7 @@ __pycache__/
 # ===== 系统文件 =====
 .DS_Store
 Thumbs.db
+.repo-state/
 
 # ===== 上游仓库自身的 git 元数据（防止误嵌套提交） =====
 */.git/
@@ -25,3 +26,11 @@ Thumbs.db
 # ===== 临时提取文件 =====
 saiti_text.txt
 spec_text.txt
+
+# ===== gateway（New API 接入基座）本地私有文件 =====
+/gateway/.env
+/gateway/secrets/
+/gateway/backups/
+/gateway/logs/
+/gateway/source/AGENTS.md
+/gateway/source/.agents/

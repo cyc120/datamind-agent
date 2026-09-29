@@ -1,0 +1,30 @@
+name: new-api
+
+services:
+  new-api:
+    image: calciumion/new-api@sha256:37c0f99a76ed0a5d5b376b8486173415efd1ec416042b392bd564eb0ae6a55ef
+    container_name: new-api-local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4000:3000"
+    environment:
+      TZ: Asia/Shanghai
+      SESSION_SECRET: ${NEW_API_SESSION_SECRET:?Set NEW_API_SESSION_SECRET in .env}
+      TRUSTED_PROXIES: none
+      TASK_PLUGIN_ENABLED: "false"
+      UPDATE_TASK: "false"
+      CHANNEL_UPSTREAM_MODEL_UPDATE_TASK_ENABLED: "false"
+      BATCH_UPDATE_ENABLED: "false"
+    volumes:
+      - new_api_data:/data
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3000/api/status"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  new_api_data:
+    name: datamind-new-api-data
+    external: true

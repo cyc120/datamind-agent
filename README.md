@@ -1,8 +1,15 @@
-# DataMind Agent — 基础数据库搭建（赛题八）
+# DataMind Agent — 多模态数据驱动的可解释精准问数/问答智能体
 
-多模态数据驱动的可解释精准问数/问答智能体的**数据底座**：结构化业务库 + 非结构化知识库 + 元数据基础设施 + 评测集，全部可重置、可复现。
+赛题八（"中国电子杯"高校 ICT 产教融合创新大赛 · 中电云计算技术有限公司命题）项目仓库。
 
-## 一、总体架构
+本仓库包含两大部分：
+
+1. **`gateway/` — 大模型接入基座**：基于 New API 的模型网关，赛题代码通过 `/v1/models` 和 `/v1/chat/completions` 接入大模型。详见 [gateway/README.md](gateway/README.md)。当前 `deepseek-flash` 已通过真实请求验收。
+2. **`deploy/` `db/` `ingestion/` `scripts/` `data/` — 基础数据库底座**（本 README 主体）：结构化业务库 + 非结构化知识库 + 元数据基础设施 + 评测集，全部可重置、可复现。
+
+`赛题/` 和 `技术文档/` 为项目资料，不参与网关运行。
+
+## 一、数据库总体架构
 
 ```
 ┌────────────────────── Docker Compose (deploy/compose.yaml) ──────────────────────┐
@@ -19,6 +26,7 @@
 ## 二、目录结构
 
 ```
+├── gateway/                    # 大模型接入基座（New API，见 gateway/README.md）
 ├── deploy/
 │   ├── compose.yaml            # PostgreSQL + Qdrant（MinIO 注释保留）
 │   ├── .env / .env.example
@@ -27,6 +35,7 @@
 │       ├── 02_metadata.sql     #   元数据底座 17 张表（§8.1 全部对象）
 │       └── 03_demo_retail.sql  #   零售演示库 DDL + 只读授权
 ├── db/
+│   ├── chinook/                # Chinook 加载 SQL（随仓库附带，上游 MIT 协议）
 │   ├── seed_demo_retail.py     # 零售库种子数据（固定随机种子，可重复）
 │   ├── build_catalog.py        # Introspection → SchemaSnapshot/词表/指标/别名
 │   └── seed_eval_cases.py      # 评测集: 14 NL2SQL + 12 RAG + 4 鲁棒 = 30 条
@@ -41,7 +50,8 @@
 │   ├── knowledge_base/         # 12 份演示 PDF + manifest + native_counterparts
 │   ├── ohr_bench_samples/      # OHR-Bench 样张(gt_text + noise_text)
 │   └── object_store/           # 页面截图（证据定位用）
-└── OHR-Bench/ chinook-database/   # 赛题推荐数据集（原始仓库）
+├── 赛题/ 技术文档/              # 项目资料
+└── OHR-Bench/ chinook-database/   # 原始数据集（本地下载，不入库）
 ```
 
 ## 三、元数据底座（datamind_meta，对应技术说明书 §8.1）
@@ -87,7 +97,6 @@
 
 ```bash
 # OHR-Bench（约 200MB，含 parquet；非必需，仅影响 OHR-Bench 抽样语料）
-git clone https://github.com/opendatalab/OHR-Bench  # 或
 curl -L -O https://hf-mirror.com/datasets/opendatalab/OHR-Bench/resolve/main/OHR-Bench_v2.parquet
 mkdir -p OHR-Bench && mv OHR-Bench_v2.parquet OHR-Bench/
 ```
@@ -109,7 +118,7 @@ py -3.13 ingestion/ingest.py --reset
 ## 七、环境依赖
 
 - Docker Desktop；Python 3.13
-- `py -3.13 -m pip install psycopg2-binary pymupdf fastembed qdrant-client pillow reportlab matplotlib img2pdf pyarrow numpy`（见 requirements.txt）
+- `py -3.13 -m pip install -r requirements.txt`
 - Embedding 模型 BAAI/bge-small-zh-v1.5 经 hf-mirror.com 自动下载（约 100MB，本地缓存后离线可用）
 
 ## 八、已知边界与后续工作
