@@ -1,0 +1,11 @@
+.DS_Store
+.repo-state/
+
+/gateway/.env
+/gateway/secrets/
+/gateway/backups/
+/gateway/logs/
+
+# Local agent instructions and helper notes.
+/gateway/source/AGENTS.md
+/gateway/source/.agents/
