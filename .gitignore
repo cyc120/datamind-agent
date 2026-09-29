@@ -1,0 +1,27 @@
+# ===== 超大原始数据集（GitHub 100MB 上限；下载方式见 README 第六节） =====
+OHR-Bench/
+chinook-database/
+
+# ===== 环境与密钥 =====
+deploy/.env
+.env
+*.key
+
+# ===== Python =====
+__pycache__/
+*.pyc
+.venv/
+
+# ===== 系统文件 =====
+.DS_Store
+Thumbs.db
+
+# ===== 上游仓库自身的 git 元数据（防止误嵌套提交） =====
+*/.git/
+
+# ===== 竞赛资料（非数据库内容，暂不入库） =====
+/*.pdf
+
+# ===== 临时提取文件 =====
+saiti_text.txt
+spec_text.txt

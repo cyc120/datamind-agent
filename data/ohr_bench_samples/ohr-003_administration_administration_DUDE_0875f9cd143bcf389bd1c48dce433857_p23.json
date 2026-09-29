@@ -1,0 +1,10 @@
+{
+ "sample_id": "ohr-003",
+ "source": "OHR-Bench_v2",
+ "domain": "administration",
+ "doc_name": "administration/DUDE_0875f9cd143bcf389bd1c48dce433857",
+ "page_idx": 23,
+ "license": "CC-BY-4.0",
+ "gt_text": "THIS ENDORSEMENT CHANGES THE POLICY. PLEASE READ IT CAREFULLY. INCLUDE TREASURERS OR TAX COLLECTORS AS EMPLOYEES\n\n\nThis endorsement modifies insurance provided under the following:\nGOVERNMENT CRIME COVERAGE FORM\nGOVERNMENT CRIME POLICY\nGOVERNMENT EMPLOYEE THEFT AND FORGERY POLICY\nSCHEDULE\n\\begin{tabular}{|l|}\n  Treasurers Or Tax Collectors \\\\\n  ALL TREASURERS OR TAX COLLECTORS \\\\\n  \\\\\n  Information required to complete this Schedule, if not shown above, will be shown in the Declarations. \\\\\n \n\\end{tabular}\n1. The definition of \"employee\" is amended to include your treasurers or tax collectors shown in the Schedule.\n2. Exclusion D.2.d. Treasurers Or Tax Collectors is deleted.",
+ "noise_text": "\\textbf{THIS} ENDORSEMENT \n CHANGES \n THE \n POLICY. \n PLEASE \n READ IT CAREFULLY. INCLUDE TREASURERS OR TAX \n COLLECTORS AS \n EMPLOYEES \n \\textit{This endorsement} modifies \n insurance \\textit{provided under the} \n following: GOVERNMENT CRIME \n COVERAGE \n FORM GOVERNMENT \n CRIME \\textit{POLICY GOVERNMENT} EMPLOYEE ## THEFT \n AND \n FORGERY \\textit{POLICY SCHEDULE}\\underline{\\begin{tabular}{l}}\n  Treasurers Or Tax Collectors \\\\\n  ALL TREASURERS OR TAX COLLECTORS \\\\\n  \\\\\n  \\textbf{Information required to complete this Schedule, if not shown above, will be shown in the Declarations.} \\\\\n \n\\end{tabular}1. The definition of \n \"employee\" \n is \n amended __to include__ your \n treasurers \\textbf{or tax} \n collectors shown in \n the \n Schedule. 2. \n Exclusion \n D.2.d. \n *Treasurers \\textbf{Or Tax}* Collectors is *deleted.*"
+}

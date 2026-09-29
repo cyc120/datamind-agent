@@ -1,0 +1,54 @@
+name: datamind-db
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: datamind-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-datamind_dev}
+      # 元数据底座库（Catalog / Document / Eval / Trace）
+      POSTGRES_DB: ${META_DB:-datamind_meta}
+      TZ: Asia/Shanghai
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pg_meta_data:/var/lib/postgresql/data
+      # 首次启动自动执行：角色 → 元数据 DDL → 演示库 DDL
+      - ./init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${META_DB:-datamind_meta}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  qdrant:
+    image: qdrant/qdrant:v1.12.4
+    container_name: datamind-qdrant
+    restart: unless-stopped
+    ports:
+      - "${QDRANT_PORT:-6333}:6333"   # REST
+      - "6334:6334"                   # gRPC
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__HTTP_PORT: 6333
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/6333' || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # 对象存储说明：
+  # MinIO 官方镜像已于 2025 年从 Docker Hub / quay.io 下架（需企业订阅授权），
+  # 按技术说明书 §8.2 允许的替代项，Demo 阶段使用本地文件卷 data/object_store/。
+  # 如需 S3 兼容存储，可恢复以下配置或自建 S3 后修改 ingestion/storage 配置。
+  #
+  # minio:
+  #   image: minio/minio:latest   # 需自备可用镜像源
+  #   ...
+
+volumes:
+  pg_meta_data:
+  qdrant_data:

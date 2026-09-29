@@ -1,0 +1,10 @@
+{
+ "sample_id": "ohr-010",
+ "source": "OHR-Bench_v2",
+ "domain": "manual",
+ "doc_name": "manual/guojixueshengshenghuozhinanyingwen9.1",
+ "page_idx": 36,
+ "license": "CC-BY-4.0",
+ "gt_text": "Account Type\nAccount Name and QR Code\nIntroduction to Account\n\nCampus Life\n\nEntertainment\n\nStudent Associations\n\nTsinghua's\nInternationalization\n35\n\nThe official account of Schwarzman College. Provides information on the latest events held at the college.\nSchwarzmanScholars\n回 ${ }^{\\text {ly }}$\n3yi.io $\\square$\n百\nan\narion\n$\\square$\n$\\square$\n4,\nriphin\nXinqinghuaxuetang\n\nOfficial account of the New Tsinghua Xuetang. Publishes information on upcoming performances and movies held at Tsinghua.\n\nOfficial account for the Student Associations Department. Shares information on the 200+ student associations at Tsinghua, including their events and stories.\nshetuan_THU\n$\\square$\n叞\nA\n早\n40\nOHSt\n口\n704\nTsinghua, including their events and stories.\n方\n\\$\n■\n■\n3\nAicethu2005",
+ "noise_text": "Account \n Type \n Account Name and QR Code \n Introduction \n __to Account Campus__ \n Life \n Entertainment Student \n Associations Tsinghua's Internationalization 35 \n The \\textit{official account} \n of \n Schwarzman College. Provides \n information \\textbf{on the} \n \\textbf{latest events # held at} \n the college. SchwarzmanScholars \n \\textit{回} $$ { }^{\\text {ly }}$$\n3yi.io $\\s\\\\q\\quadu%a%re $ 百 an \n \\textit{arion}  \\square\n$\\square $ 4, **riphin Xinqinghuaxuetang Official account** \n of the New Tsinghua \n Xuetang. Publishes information \n on upcoming performances \n \\textbf{and} movies held \n at \n __Tsinghua. Official__ account \n \\textbf{for \n the} \n Student \n Associations \n Department. Shares information on \n the 200+ student \n associations at Tsinghua, \\textit{including their} \n events \n and stories. \n shetuan_THU $ \\squar\\hspace{square\\phanto\\:m{squ\\text{square}are}}e $ 叞 A 早 \n 40 OHSt 口 704 Tsinghua, \n including their \n events and \n stories. # \n 方 \n \\$ \\textit{■ ■} \n 3 \n \\textit{Aicethu2005}"
+}
