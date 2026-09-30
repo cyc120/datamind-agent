@@ -82,8 +82,8 @@ RETAIL_RELATIONS = [
     ("order_items", ["order_id"], "orders", ["order_id"], "n:1", "foreign_key", True, "明细归属订单"),
     ("order_items", ["product_id"], "products", ["product_id"], "n:1", "foreign_key", True, "明细对应产品"),
     ("refunds", ["order_item_id"], "order_items", ["order_item_id"], "n:1", "foreign_key", True, "退款对应明细"),
-    ("refunds", ["order_item_id"], "orders", ["order_id"], "n:1", "business", True,
-     "退款→明细→订单（派生路径，用于按订单/时间汇总退款）"),
+    ("refunds", ["order_item_id"], "orders", ["order_id"], "n:1", "business", False,
+     "禁止直连：退款→明细→订单须经过 order_items.order_id"),
 ]
 
 RETAIL_METRICS = [
@@ -264,7 +264,9 @@ def main():
 
         tables = sorted({r[0] for r in cols})
         snapshot_id = f"snap-{db_name}-{md5(db_name + SNAPSHOT_TIME.isoformat())}"
-        catalog_version = 1
+        mcur.execute("SELECT COALESCE(MAX(catalog_version), 0) + 1 FROM schema_snapshots WHERE source_id=%s",
+                     (db_name,))
+        catalog_version = mcur.fetchone()[0]
 
         # data_sources
         mcur.execute("""
@@ -277,7 +279,6 @@ def main():
              "DataMind Agent 结构化演示数据源（只读）"))
 
         # snapshot
-        mcur.execute("DELETE FROM schema_snapshots WHERE source_id = %s", (db_name,))
         mcur.execute("""
             INSERT INTO schema_snapshots(snapshot_id, source_id, catalog_version, table_count, column_count, notes)
             VALUES (%s,%s,%s,%s,%s,%s)""",
@@ -314,14 +315,14 @@ def main():
                 INSERT INTO schema_relations(relation_id, snapshot_id, from_table, from_columns,
                     to_table, to_columns, cardinality, relation_kind, approved, description)
                 VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-                (f"rel-{db_name}-{md5(str(rel))}", snapshot_id, ft, fc, tt, tc, card, kind, approved, desc))
+                (f"rel-{db_name}-v{catalog_version}-{md5(str(rel))}", snapshot_id, ft, fc, tt, tc, card, kind, approved, desc))
         for ft, fcols, tt, tcols in fks:
             if (ft, tuple(fcols), tt) not in seen:
                 mcur.execute("""
                     INSERT INTO schema_relations(relation_id, snapshot_id, from_table, from_columns,
                         to_table, to_columns, cardinality, relation_kind, approved, description)
                     VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-                    (f"rel-{db_name}-{md5(ft+str(fcols)+tt)}", snapshot_id, ft, fcols, tt, tcols,
+                    (f"rel-{db_name}-v{catalog_version}-{md5(ft+str(fcols)+tt)}", snapshot_id, ft, fcols, tt, tcols,
                      "n:1", "foreign_key", True, "introspection 外键（自动登记）"))
 
         # business_metrics
@@ -354,7 +355,9 @@ def main():
         SELECT ds.source_id, s.table_count, s.column_count,
                (SELECT count(*) FROM schema_relations r WHERE r.snapshot_id = s.snapshot_id) rels,
                (SELECT count(*) FROM business_metrics bm WHERE bm.source_id = ds.source_id) metrics
-        FROM data_sources ds JOIN schema_snapshots s ON s.source_id = ds.source_id""")
+        FROM data_sources ds JOIN schema_snapshots s ON s.source_id = ds.source_id
+        WHERE s.catalog_version = (SELECT MAX(s2.catalog_version) FROM schema_snapshots s2
+                                   WHERE s2.source_id = ds.source_id)""")
     for row in mcur.fetchall():
         print("catalog:", row)
     mcur.execute("SELECT count(*) FROM entity_aliases")

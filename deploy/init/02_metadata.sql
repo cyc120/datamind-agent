@@ -291,6 +291,14 @@ CREATE TABLE IF NOT EXISTS ingest_jobs (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- ---------- 11. 应用设置（模型接入配置，仅应用账号可读写） ----------
+CREATE TABLE IF NOT EXISTS app_settings (
+    setting_key     VARCHAR(64) PRIMARY KEY,
+    value           JSONB NOT NULL,
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+COMMENT ON TABLE app_settings IS '页面「模型接入」保存的运行时配置；密钥只存于此表，readonly_user 无权限';
+
 -- 权限授予（元数据库: datamind_app 全权，readonly_user 只读核心表）
 GRANT CONNECT ON DATABASE datamind_meta TO datamind_app, readonly_user;
 GRANT USAGE, CREATE ON SCHEMA public TO datamind_app;
@@ -303,3 +311,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
     GRANT ALL ON SEQUENCES TO datamind_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
     GRANT SELECT ON TABLES TO readonly_user;
+
+-- 模型密钥表对问数只读账号完全关闭（上面的默认授权不适用于本表）
+REVOKE ALL ON app_settings FROM readonly_user;

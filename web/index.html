@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>DataMind Agent · 问数控制台</title>
+  <link rel="stylesheet" href="/assets/style.css">
+  <script src="/assets/app.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="logo">DM</span>
+      <div><strong>DataMind Agent</strong><small>结构化问数 · 本地演示</small></div>
+    </div>
+    <nav class="nav">
+      <button class="nav-item active" data-view="chat"><span class="ico">◎</span>问数</button>
+      <button class="nav-item" data-view="model"><span class="ico">⚙</span>模型接入<span class="badge" id="navModelBadge">未配置</span></button>
+      <button class="nav-item" data-view="runs"><span class="ico">↺</span>运行记录</button>
+    </nav>
+    <div class="side-foot">
+      <div class="pulse warn" id="pulseModel"><span class="dot"></span>模型 <span id="pulseModelText">检测中…</span></div>
+      <div class="pulse" id="pulseDb"><span class="dot"></span>数据库 <span id="pulseDbText">检测中…</span></div>
+      <p class="side-note">支持 OpenAI 兼容与 Anthropic 两套协议；密钥存于元数据库，页面只显示掩码。</p>
+    </div>
+  </aside>
+
+  <main>
+    <!-- ============ 问数 ============ -->
+    <section class="view active" data-view="chat">
+      <div class="page-head">
+        <div class="eyebrow">DataMind Agent / Local Demo</div>
+        <h1>结构化问数测试台</h1>
+        <p>Agent 规划 · SQL 安全校验 · 只读执行 · 证据与运行轨迹</p>
+      </div>
+      <div class="grid">
+        <section class="card">
+          <h2>提出数据库问题</h2>
+          <div class="controls">
+            <div><label for="question">自然语言问题</label><textarea id="question">2024年一共有多少笔订单？</textarea></div>
+            <div><label for="source">数据源</label><select id="source"><option value="demo_retail">零售演示库</option><option value="chinook">Chinook 音乐库</option></select></div>
+          </div>
+          <div class="chips">
+            <button class="chip" data-q="2025年销售额最高的前三个产品是什么？">销售额前三产品</button>
+            <button class="chip" data-q="VIP客户有多少人？">VIP 客户数</button>
+            <button class="chip" data-q="2024年每个大区的销售额分别是多少？">各大区销售额</button>
+          </div>
+          <div class="actions">
+            <button id="send">运行 Agent</button>
+            <button class="secondary" id="diagnostic">测试数据库链路（不调用模型）</button>
+          </div>
+          <p class="muted">仅使用演示数据。当前使用的模型配置显示在左侧状态灯；密钥无效或未配置时会在「模型接入」给出明确提示。</p>
+        </section>
+        <section class="card">
+          <h2>Agent 回答</h2>
+          <span id="status" class="status wait">等待问题</span>
+          <div id="answer" class="answer">运行后将在这里显示经过验证的结果。</div>
+          <div class="runline"><span id="runid">暂无运行 ID</span><span id="confidence"></span></div>
+        </section>
+        <section class="card"><h2>执行轨迹</h2><ul id="trace" class="trace"><li class="muted">事件会按实际执行顺序显示。</li></ul></section>
+        <section class="card"><h2>SQL 与证据</h2><div class="mini" id="meta">等待查询</div><pre id="sql">—</pre></section>
+        <section class="card wide"><h2>查询结果</h2><div class="tablewrap" id="result"><div class="muted" style="padding:15px">暂无结果</div></div></section>
+      </div>
+    </section>
+
+    <!-- ============ 模型接入 ============ -->
+    <section class="view" data-view="model">
+      <div class="page-head">
+        <div class="eyebrow">Model Access</div>
+        <h1>模型接入</h1>
+        <p>保存多套接入配置、一键切换当前启用；OpenAI 兼容与 Anthropic 协议都支持，改完立即对问数生效。</p>
+      </div>
+      <div class="grid">
+        <section class="card">
+          <h2>接入配置</h2>
+          <div id="profileList" class="profile-list"><p class="muted">载入中…</p></div>
+          <div class="actions" style="margin-top:14px">
+            <button id="newProfile">+ 新增配置</button>
+            <button class="ghost" id="exportProfiles">导出</button>
+            <button class="ghost" id="importProfiles">导入</button>
+            <input type="file" id="importFile" accept="application/json,.json" hidden>
+          </div>
+          <div class="notice hidden" id="modelNotice"></div>
+          <div class="model-list" id="modelPicks"></div>
+        </section>
+
+        <section class="card">
+          <h2 id="editorTitle">新增配置</h2>
+          <div class="preset-list" id="presets"></div>
+          <div class="form-grid">
+            <div>
+              <label for="profileName">配置名称</label>
+              <input id="profileName" placeholder="例如 DeepSeek 官方" autocomplete="off">
+            </div>
+            <div>
+              <label for="protocol">协议</label>
+              <select id="protocol">
+                <option value="openai">OpenAI 兼容（/chat/completions）</option>
+                <option value="anthropic">Anthropic Messages（/v1/messages）</option>
+              </select>
+            </div>
+            <div class="full">
+              <label for="baseUrl">接口地址（Base URL）</label>
+              <input id="baseUrl" placeholder="https://api.deepseek.com/v1" autocomplete="off">
+              <p class="field-hint" id="baseHint">OpenAI 兼容地址；填到 <code>/v1</code> 即可，粘贴完整端点也会自动截断。</p>
+            </div>
+            <div>
+              <label for="modelName">模型名称</label>
+              <input id="modelName" list="modelOptions" placeholder="deepseek-chat" autocomplete="off">
+              <datalist id="modelOptions"></datalist>
+            </div>
+            <div>
+              <label for="apiKey">API 密钥</label>
+              <div class="key-row">
+                <input id="apiKey" type="password" placeholder="留空表示保持当前密钥" autocomplete="off">
+                <button class="ghost" id="toggleKey" type="button">显示</button>
+              </div>
+            </div>
+            <div>
+              <label for="authStyle">鉴权方式</label>
+              <select id="authStyle">
+                <option value="both">自动（x-api-key + Bearer）</option>
+                <option value="x-api-key">仅 x-api-key（Anthropic 官方）</option>
+                <option value="bearer">仅 Bearer（多数中转站）</option>
+              </select>
+            </div>
+            <div>
+              <label for="maxTokens">最大输出 tokens</label>
+              <input id="maxTokens" type="number" min="0" step="256" placeholder="0 = 不限制">
+            </div>
+            <div>
+              <label for="timeoutS">超时（秒）</label>
+              <input id="timeoutS" type="number" min="0" step="5" placeholder="默认 75，0 = 默认">
+            </div>
+            <div class="full">
+              <label for="proxy">代理（可选）</label>
+              <input id="proxy" placeholder="留空 = 本机直连，远端跟随系统代理；例：http://127.0.0.1:7897" autocomplete="off">
+              <p class="field-hint">本机地址（localhost / 127.0.0.1）始终直连，避免系统代理劫持本地网关。</p>
+            </div>
+            <div class="full">
+              <label for="extraHeaders">额外请求头（JSON，可选）</label>
+              <input id="extraHeaders" placeholder='{"X-Api-Version": "2024-01-01"}' autocomplete="off">
+            </div>
+          </div>
+          <div class="actions" style="margin-top:16px">
+            <button id="saveProfile">保存</button>
+            <button class="secondary" id="saveActivate">保存并启用</button>
+            <button class="secondary" id="testConfig">测试连接</button>
+            <button class="secondary" id="fetchModels">拉取模型列表</button>
+            <button class="ghost" id="resetForm">清空表单</button>
+          </div>
+        </section>
+
+        <section class="card wide">
+          <h2>当前启用</h2>
+          <dl class="kv" id="configView">
+            <dt>配置</dt><dd id="cfgName">读取中…</dd>
+            <dt>协议</dt><dd id="cfgProtocol">—</dd>
+            <dt>接口地址</dt><dd id="cfgBase">—</dd>
+            <dt>模型</dt><dd id="cfgModel">—</dd>
+            <dt>密钥</dt><dd id="cfgKey">—</dd>
+            <dt>更新时间</dt><dd id="cfgUpdated">—</dd>
+          </dl>
+          <h3>最近一次探测</h3>
+          <div class="notice info" id="probeResult">尚未探测。建议先「拉取模型列表」确认密钥可用，再「测试连接」验证模型可对话。</div>
+        </section>
+      </div>
+    </section>
+
+    <!-- ============ 运行记录 ============ -->
+    <section class="view" data-view="runs">
+      <div class="page-head">
+        <div class="eyebrow">Runs &amp; Replay</div>
+        <h1>运行记录</h1>
+        <p>每次问数都会落库；刷新页面后可凭运行 ID 回放事件、SQL 证据与结果。</p>
+      </div>
+      <div class="grid">
+        <section class="card wide">
+          <h2>按运行 ID 恢复</h2>
+          <div class="replay"><input id="replayId" placeholder="输入 run-... 运行 ID"><button id="replay">读取 Trace</button></div>
+          <p class="muted">回放会读取 <code>/v1/runs/{id}</code>、事件流与证据图，并在「问数」视图还原当时的答案、SQL 和结果表。</p>
+        </section>
+        <section class="card wide">
+          <h2>最近运行</h2>
+          <div class="tablewrap" id="runList"><div class="muted" style="padding:15px">载入中…</div></div>
+        </section>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

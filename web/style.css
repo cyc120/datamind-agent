@@ -1,0 +1,121 @@
+:root{font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif;color:#18312d;background:#f4f7f4}
+*{box-sizing:border-box}
+body{margin:0;display:grid;grid-template-columns:252px minmax(0,1fr);min-height:100vh}
+
+/* ---------- 侧边栏 ---------- */
+.sidebar{position:sticky;top:0;height:100vh;background:#102c28;color:#eaf6f0;display:flex;flex-direction:column;gap:20px;padding:22px 16px;overflow:auto}
+.brand{display:flex;gap:11px;align-items:center}
+.brand .logo{width:38px;height:38px;border-radius:11px;background:#1c8b6b;display:grid;place-items:center;font-weight:800;font-size:15px;color:#f2fbf6}
+.brand strong{display:block;font-size:15px;letter-spacing:.01em}
+.brand small{color:#8fb8ab;font-size:11.5px}
+.nav{display:flex;flex-direction:column;gap:6px}
+.nav-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:transparent;color:#cfe6dc;border:1px solid transparent;border-radius:11px;padding:11px 12px;font:inherit;font-weight:600;cursor:pointer}
+.nav-item:hover{background:#173a34;color:#fff}
+.nav-item.active{background:#1c8b6b;color:#fff}
+.nav-item .ico{width:18px;text-align:center;font-size:14px;opacity:.9}
+.nav-item .badge{margin-left:auto;font-size:10.5px;font-weight:700;background:#0d3b31;color:#8fd9bd;border-radius:99px;padding:2px 7px}
+.nav-item.active .badge{background:#0e6a51;color:#e8fff5}
+.side-foot{margin-top:auto;display:flex;flex-direction:column;gap:9px;border-top:1px solid #1d453d;padding-top:15px}
+.pulse{display:flex;align-items:center;gap:8px;font-size:12px;color:#a9cbc0}
+.pulse .dot{width:8px;height:8px;border-radius:50%;background:#5c7d73;flex:0 0 auto}
+.pulse.ok .dot{background:#3fdc9b;box-shadow:0 0 0 3px #3fdc9b22}
+.pulse.warn .dot{background:#f0b846;box-shadow:0 0 0 3px #f0b84622}
+.pulse.bad .dot{background:#e2704d;box-shadow:0 0 0 3px #e2704d22}
+.pulse span{color:#7fa79b}
+.side-note{font-size:11px;color:#7fa79b;line-height:1.6}
+
+/* ---------- 主区域 ---------- */
+main{padding:26px 30px 60px;max-width:1180px;min-width:0}
+.view{display:none}
+.view.active{display:block}
+.page-head{margin-bottom:20px}
+.page-head h1{font-size:23px;margin:2px 0 6px}
+.page-head p{margin:0;color:#5d7d72;font-size:13.5px}
+.eyebrow{color:#2f9c78;font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:700}
+.grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(300px,.85fr);gap:18px}
+.card{background:#fff;border:1px solid #deebe4;border-radius:16px;box-shadow:0 6px 28px #102c280a;padding:22px;min-width:0}
+.wide{grid-column:1/-1}
+h2{font-size:16px;margin:0 0 16px}
+h3{font-size:13.5px;margin:18px 0 10px;color:#38544c}
+label{display:block;font-size:13px;font-weight:700;margin:0 0 7px;color:#38544c}
+textarea,select,input{width:100%;border:1px solid #cbdcd3;border-radius:10px;background:#fcfefd;font:inherit;color:#19342d;padding:11px 12px}
+textarea{min-height:95px;resize:vertical;line-height:1.55}
+textarea:focus,select:focus,input:focus{outline:2px solid #6bbfa3;outline-offset:1px}
+.controls{display:grid;grid-template-columns:1fr 180px;gap:14px;margin-bottom:14px}
+button{border:0;border-radius:10px;background:#138262;color:white;padding:11px 16px;font:inherit;font-weight:700;cursor:pointer}
+button:hover{background:#0d6b51}button:disabled{opacity:.55;cursor:wait}
+.actions{display:flex;gap:9px;flex-wrap:wrap}
+.secondary{background:#315e50}.secondary:hover{background:#244d40}
+.ghost{background:#eef6f1;color:#27624d}.ghost:hover{background:#dcece3}
+.danger{background:#b4482a}.danger:hover{background:#94391f}
+.muted{color:#668077;font-size:13px;line-height:1.6}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 17px}
+.chip{background:#ecf6f0;color:#27624d;padding:7px 10px;font-size:12px;border:1px solid #d5ebdd;font-weight:500}
+.chip:hover{background:#d9efe1}
+.status{display:inline-flex;align-items:center;gap:7px;border-radius:99px;background:#e8f4ef;color:#20634b;padding:6px 10px;font-size:12px;font-weight:700}
+.status.fail{background:#fff0e9;color:#a74428}.status.wait{background:#fff5dd;color:#866018}
+.answer{min-height:74px;white-space:pre-wrap;line-height:1.7;font-size:17px;padding:12px 0}
+.runline{display:flex;justify-content:space-between;gap:10px;align-items:center;border-top:1px solid #e7efea;padding-top:13px;color:#668077;font-size:12px;word-break:break-all}
+code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+pre{margin:0;background:#102c28;color:#ddf7e9;border-radius:11px;padding:15px;overflow:auto;white-space:pre-wrap;line-height:1.55;font-size:12px;min-height:70px}
+.tablewrap{overflow:auto;max-height:340px;border:1px solid #e2ebe6;border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #edf2ef;white-space:nowrap}
+th{background:#f3f8f5;color:#3b5e50;position:sticky;top:0}tr:last-child td{border-bottom:0}
+.trace{list-style:none;padding:0;margin:0;max-height:390px;overflow:auto}
+.trace li{padding:11px 2px 11px 18px;border-left:2px solid #cde2d5;position:relative;font-size:13px}
+.trace li:before{content:"";position:absolute;left:-5px;top:17px;width:8px;height:8px;border-radius:50%;background:#58ac88}
+.trace .event{font-weight:700}
+.trace .detail{color:#6e867a;margin-top:4px;font-size:12px;word-break:break-all}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.mini{color:#5a756a;font-size:13px;margin:6px 0}
+.replay{display:flex;gap:8px}.replay input{min-width:0}.replay button{white-space:nowrap;background:#315e50}
+
+/* ---------- 模型接入 ---------- */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-grid .full{grid-column:1/-1}
+.field-hint{font-size:12px;color:#7a9288;margin:6px 0 0}
+.key-row{display:flex;gap:8px}
+.key-row input{flex:1}
+.key-row button{white-space:nowrap;background:#315e50;color:#fff}
+.preset-list{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 14px}
+.preset{background:#f1f7f4;border:1px solid #dcebe3;color:#2c5c4c;font-size:12px;font-weight:600;padding:6px 10px;border-radius:99px;cursor:pointer}
+.preset:hover{background:#e2f0e8}
+.preset.active{background:#138262;border-color:#138262;color:#fff}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:7px 14px;font-size:13px;margin:0}
+.kv dt{color:#668077}.kv dd{margin:0;word-break:break-all}
+.notice{border-radius:11px;padding:12px 14px;font-size:13px;line-height:1.6;margin:14px 0 0;border:1px solid transparent}
+.notice.ok{background:#eaf7f0;border-color:#c9e7d8;color:#1d6147}
+.notice.bad{background:#fdf0eb;border-color:#f4d6c9;color:#8f3b21}
+.notice.info{background:#f2f6f9;border-color:#dbe6ee;color:#2f5165}
+.notice.hidden{display:none}
+.model-list{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.model-pick{background:#eef4f8;border:1px solid #d8e5ee;color:#2b5468;font-size:12px;padding:6px 10px;border-radius:8px;cursor:pointer}
+.model-pick:hover{background:#e0ebf3}
+.step{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:#4a6a5f;margin:9px 0}
+.step b{color:#18312d}
+.num{flex:0 0 auto;width:20px;height:20px;border-radius:50%;background:#e8f4ef;color:#20634b;font-size:11px;font-weight:800;display:grid;place-items:center;margin-top:1px}
+
+@media(max-width:900px){
+  body{grid-template-columns:1fr}
+  .sidebar{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;gap:12px;padding:14px 16px}
+  .nav{flex-direction:row;flex-wrap:wrap}
+  .side-foot{margin:0 0 0 auto;flex-direction:row;border:0;padding:0}
+  .side-note{display:none}
+  main{padding:20px 16px 48px}
+  .grid,.two,.form-grid,.controls{grid-template-columns:1fr}
+  .wide,.form-grid .full{grid-column:1}
+}
+/* ---------- 接入配置列表 ---------- */
+.profile-list{display:flex;flex-direction:column;gap:11px}
+.profile-card{border:1px solid #e0ebe5;border-radius:13px;padding:13px 15px;background:#fbfdfc}
+.profile-card.active{border-color:#8fcfb4;background:#f2faf5;box-shadow:0 0 0 3px #13826212}
+.profile-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.profile-head strong{font-size:14px}
+.pill{font-size:11px;font-weight:700;border-radius:99px;padding:3px 9px;background:#eef4f1;color:#4b6b60}
+.pill.on{background:#138262;color:#fff}
+.profile-meta{color:#6d867c;font-size:12px;word-break:break-all;line-height:1.65}
+.profile-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.profile-actions button{padding:6px 11px;font-size:12px;border-radius:8px}
+.danger-text{background:#fdeee9;color:#a54224}
+.danger-text:hover{background:#f9ded4}
