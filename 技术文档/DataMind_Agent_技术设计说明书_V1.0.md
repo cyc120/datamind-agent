@@ -1,7 +1,7 @@
 # DataMind Agent 技术设计说明书
 ## 面向赛题八：多模态数据驱动的可解释精准问数/问答智能体
 
-版本：V1.0  
+版本：V1.0（设计基线；实施进度更新于 2026 年 9 月 30 日）
 日期：2026年9月28日  
 用途：竞赛方案设计、系统研发、测试验收与答辩演示
 
@@ -32,6 +32,7 @@
 15. 六周研发路线图（每 3 天一个里程碑）  
 16. 风险、治理与答辩证据  
 17. 参考资料
+18. 实施进度与下一步验收（2026 年 9 月 30 日）
 
 # 1. 项目定位与赛题映射
 
@@ -761,3 +762,135 @@ datamind-agent/
 10. pgvector 项目文档：https://github.com/pgvector/pgvector
 
 > 依赖版本、模型服务和赛事部署要求应在正式实现时通过兼容性测试锁定；本说明书不假定任何组件版本在赛期始终不变。
+
+# 18. 实施进度与下一步验收（2026 年 9 月 30 日）
+
+本节记录当前工作区的实现状态，不改写前文的目标值。工作区包含尚未提交的模块一代码；状态判断以仓库代码和本节列出的核查结果为依据，不代表比赛验收完成。复现入口见仓库根目录 `README.md`。
+
+## 18.1 阶段状态
+
+| 对应里程碑 | 当前状态 | 已有证据 | 尚缺的验收 |
+|---|---|---|---|
+| M1–M2：数据与元数据底座 | 基础设施已建 | PostgreSQL 的 `demo_retail`、`chinook`、`datamind_meta`；Qdrant 摄取脚本、文档语料和 30 条种子评测用例（14 NL2SQL、12 RAG、4 鲁棒）已入仓库；`db/build_catalog.py` 生成递增版本快照 | 赛题评分条款的最终核对、完整环境重建与数据版本冻结记录 |
+| M3：Schema Linking / Join Graph | 部分实现 | `datamind/catalog.py` 读取最新快照，使用词法、中文别名、枚举值、指标依赖召回；仅用已审核关系求 Join Path；错误的退款直连关系已标记为未审核 | 向量召回、权重调参、带人工 gold ID 的 Recall@5 与 Join Path 正确率报告 |
+| M4：Query Frame / SQL 生成与静态校验 | 部分实现 | `datamind/sql_engine.py` 支持来源选择、部分时间表达归一、基础澄清、简化问题帧和网关模型生成；`datamind/sql_guard.py` 使用 SQLGlot 限制单条只读查询、表列权限、敏感列、JOIN、函数、结果行数并绑定条件常量 | 完整的结构化查询计划、指标/实体消歧覆盖、`EXPLAIN` 资源门禁及更广的 SQL 安全对抗集 |
+| M5：执行、校验与修复 | 部分实现 | `readonly_user` 只读事务执行，设置 statement/lock timeout；销售额公式、订单状态和部分时间字段有规则检查；可修复的数据库错误最多再试 2 次；提供 `scripts/ask_sql.py` 与 `scripts/eval_sql.py` | 有效模型凭据下逐例运行 14 条 NL2SQL 集，记录准确率、失败分类、修复次数和运行版本；扩展结果语义校验 |
+| M6–M7：文档摄取与索引 | 数据与摄取底座已建 | 原生 PDF、扫描版对照材料、OHR-Bench 样张、页面截图、切片和 Qdrant 索引路径已有实现 | 真正的扫描件 OCR、质量路由校准、混合检索及 RAG Recall@5 实测；RAG 问答链路尚未实现 |
+| M8–M14：RAG 答案、编排、跨源、V-CAR、前端与交付 | 待实现 | 元数据表预留了 Run/Trace/Evidence 等对象 | 运行时事件生产、HTTP API、可视化、跨源证据闭环与端到端验收 |
+
+## 18.2 本次核查结果与统计边界
+
+- 2026 年 9 月 30 日运行 `.venv/bin/python -m unittest discover -s tests -v`：9 项测试通过。覆盖 SQL 禁写、敏感列、未审核 JOIN、参数顺序、只读执行、澄清、时间范围和销售额口径门禁。这是组件回归结果，不是 NL2SQL Execution Accuracy。
+- 同日对“2024年一共有多少笔订单？”发起一次真实模型调用：返回 `MODEL_AUTH_FAILED`，未产生查询行。因此目前没有可报告的模型端到端正确率，也不能把 gold SQL 执行或注入式 generator 测试计入模型成绩。
+- `scripts/eval_sql.py` 已能按用例比较执行结果并输出逐例 JSON；正式指标需在有效凭据、固定模型/提示词/快照/评测集版本下运行，保留失败例及分母。RAG、跨源、V-CAR 和性能指标均未实测。
+
+## 18.3 下一步执行顺序与完成条件
+
+1. **打通模型评测**：配置可用的网关凭据，在 14 条 NL2SQL 集上运行 `scripts/eval_sql.py`；保存逐例状态、SQL 哈希、快照 ID、模型和提示词版本，先形成真实基线，再按失败类型修复。完成条件是所有用例都有可复核记录，包括失败与澄清用例。
+2. **收紧模块一**：补全问题帧与指标消歧；为复杂 JOIN、子查询、时间/粒度和结果口径增添回归样例；量化 Schema Linking 与修复效果。完成条件是 §4.6 的指标有明确分母和数据版本，安全回归保持通过。
+3. **推进 RAG 闭环**：先实现带页码和版本的检索、引用及拒答，再接 OCR 与质量路由；用现有 12 条 RAG 用例逐条报告召回和答案证据。完成条件是答案中的关键事实能够回到文档块和原页。
+4. **接通编排与可解释性**：在 SQL 与 RAG 两条单源路径稳定后，实现 DB→RAG 的真实依赖、Run/Trace 写入、证据校验和前端回放，再做 V-CAR 消融。完成条件是跨源结论、失败和修复均有可重放证据链。
+
+## 18.4 SQL Agent 本地联调补充（2026 年 9 月 30 日）
+
+已新增 SQL 单源 Agent 状态机、FastAPI/SSE 接口与浏览器测试页。`POST /v1/chat/stream` 会产生并持久化 Query Understanding、Plan、SQL 工具、Verify 和最终事件；`GET /v1/runs/{id}`、`/events`、`/evidence` 可按运行 ID 回放。成功路径将参数化 SQL、结果行和已验证 Claim 关联为证据；文档或跨源问题明确返回 `ROUTE_UNSUPPORTED`。
+
+本地集成回归共 13 项通过，含 Agent 持久化、SSE、范围限制、固定数据库链路自检和原有 SQL Guard 测试。浏览器中的固定自检查询经过 Agent、Guard 和只读数据库后返回 2024 年订单数 997，并能按运行 ID 回放 SQL 与证据；此自检不调用模型。自然语言模型问数仍显示 `MODEL_AUTH_FAILED` 及对应 Trace；当前网关令牌返回 401，因此尚无模型问数成功或 NL2SQL 准确率成绩。服务限本机演示，尚未接入身份认证、RAG Agent、跨源推理和 V-CAR 完整闭环。
+
+## 18.5 模型接入改为页面配置（2026 年 9 月 30 日）
+
+本节取代 §18.2 中「模型凭据不可用、尚无正确率」的结论，并废止「应用通过本地密令文件调用模型」的旧路径。
+
+**变更内容**
+
+1. **取消密令文件调用**：`datamind/sql_engine.py` 不再读取 `gateway/secrets/datamind-api.env`；该文件已退役至 `gateway/backups/`。配置来源改为「页面配置（`datamind_meta.app_settings`）→ 环境变量 `NEW_API_*` → 内置默认值」三级，页面配置优先。
+2. **新增页面「模型接入」（侧边栏）**：服务商预设、接口地址、模型名、API 密钥四个输入，配 `保存配置`、`测试连接`、`拉取模型列表`、`清除密钥` 四步操作；侧边栏底部常驻「模型 / 数据库」状态灯与当前模型名。
+3. **新增接口**：`GET|PUT|DELETE /v1/model/config`、`POST /v1/model/config/models`（拉取上游模型列表）、`POST /v1/model/config/test`（最小真实对话探活）、`GET /v1/runs`（运行记录列表）；页面拆分为 `web/index.html` + `web/app.js` + `web/style.css`，经 `/assets` 提供。
+4. **密钥治理**：密钥只存 `app_settings`，HTTP 接口仅返回掩码（如 `sk-Mpw…p5CQ`），`readonly_user` 对该表 `SELECT` 权限实测为 `false`；`deploy/init/02_metadata.sql` 已加入建表与 `REVOKE`。
+5. **错误码**：新增 `MODEL_KEY_MISSING`、`MODEL_BALANCE_EMPTY`、`MODEL_RATE_LIMITED`、`MODEL_TIMEOUT`、`MODEL_UNREACHABLE`、`MODEL_NOT_FOUND`、`MODEL_EMPTY_RESPONSE`；前端在出现配置类错误时自动跳转到「模型接入」并显示原因。
+
+**核查结果**
+
+- 回归测试 22 项全部通过（原有 13 项 + 模型配置 9 项），覆盖掩码不回显明文、空密钥保存不清空、探活错误分类、未配置密钥返回 `MODEL_KEY_MISSING`、运行记录接口。
+- 真实模型基线：14 条 NL2SQL 用例执行一致率 **13/14**（92.9%，模型 `deepseek-flash`，经本地网关；报告见 `reports/nl2sql.json`）。唯一失败项 `nl2sql-010`（同比）为时间校验规则与 CASE 分支绑定参数不匹配所致，属已知缺陷，已记录待修。
+- 网关令牌额度已改为无限，计费落到钱包；此为本地演示配置，不代表生产可用性。
+
+**尚未完成**：模型配置接口没有鉴权（服务只监听 127.0.0.1，仅限本机演示）；多密钥/多模型切换与用量统计未做；上游额度不足时尚未做自动降级。
+## 18.6 多协议接入与配置管理（2026 年 9 月 30 日）
+
+在 §18.5「页面配置」基础上，把模型接入从「一套配置」升级为「协议适配 + 多配置管理」，对齐 ccswitch 的使用习惯，全部落在本项目既有结构内（元数据表 + FastAPI + 侧边栏页面）。
+
+**协议层（新增 `datamind/providers.py`）**
+
+- 协议：`openai`（`/chat/completions`，`Authorization: Bearer`）与 `anthropic`（`/v1/messages`，`x-api-key` + `anthropic-version: 2023-06-01`，`max_tokens` 必填，system 作为顶层字段）。
+- 地址拼接：已带版本段（`/v1`、`/api/paas/v4`、`/api/v3`）时直接拼资源路径，否则补 `/v1`；粘贴完整端点会被自动截断。
+- 鉴权方式可选：自动（`x-api-key` + `Bearer` 同时发送）、仅 `x-api-key`（Anthropic 官方）、仅 `Bearer`（多数中转站）；另支持自定义额外请求头 JSON。
+- 传输层由 urllib 改为 httpx，统一超时（默认 75s，可配），错误分类统一为 `MODEL_AUTH_FAILED`、`MODEL_BALANCE_EMPTY`、`MODEL_RATE_LIMITED`、`MODEL_TIMEOUT`、`MODEL_UNREACHABLE`、`MODEL_NOT_FOUND`、`MODEL_EMPTY_RESPONSE` 等稳定错误码。
+
+**配置管理**
+
+- 存储结构：`app_settings` 中的 `model.profiles`（`{active, items[]}`），旧版单配置行 `model.gateway` 首次读取时自动迁移为「迁移配置」。
+- 接口：配置增删改查、启用切换、导出（默认剔除密钥）、导入（一律新建，避免覆盖）。
+- 页面：左侧为配置卡片列表（协议徽标、启用状态、地址/模型/密钥掩码、启用/编辑/测试/删除），右侧为编辑表单（名称、协议、地址、模型、密钥、鉴权方式、最大输出、超时、额外请求头）；协议切换时提示与鉴权项联动。
+- 运行记录新增 `versions.protocol` 与 `versions.profile`，便于回溯「这次问数用的是哪套配置」。
+
+**核查结果**
+
+- 回归测试 28 项全部通过（协议拼接、Anthropic 载荷与请求头、两条协议的响应解析、状态码分类、配置 CRUD 与掩码、启用切换、导出导入、缺钥路径、运行记录）。
+- 用本地 Anthropic 协议模拟服务（强制校验 `x-api-key`、`anthropic-version`、`max_tokens`、messages 结构）做端到端验收：模型列表、测试连接、错误密钥返回 `MODEL_AUTH_FAILED`，以及一次完整问数均通过，返回 2024 年订单数 997。
+- 真实上游回归（OpenAI 协议经本地网关）：`2025年销售额最高的前三个产品是什么？` 与 `Chinook库里哪个国家客户最多？` 均 COMPLETED，后者返回 `ORDER BY customer_count DESC LIMIT 1`（此前评测中的失败例已消失）。
+
+**尚未完成**：配置接口仍未鉴权（服务只监听 127.0.0.1）；未做多配置并发压测与用量统计；Anthropic 流式与工具调用（tool use）未接入，仅用其 Messages 基本对话能力。
+## 18.7 两处缺陷修复与评测复核（2026 年 9 月 30 日）
+
+§18.5 记录的两个已知缺陷已修复，NL2SQL 评测由 12–13/14 提升到 **14/14**。
+
+**缺陷一：比较字面量绑定不完整（对应 `nl2sql-010` 同比失败）**
+
+- 现象：模型给出的同比 SQL 语义正确（单次扫描 + `CASE WHEN created_at >= DATE '2024-01-01' ...`），却被 `_semantic_findings` 判为 `TIME_FILTER_MISMATCH`，重写三次后 `REPAIR_BUDGET_EXHAUSTED`。
+- 根因：`sql_guard.guard_sql` 只绑定 `WHERE`/`HAVING` 子句中的字面量，CASE 分支与 JOIN ON 里的日期字面量未参数化，校验器在参数列表中找不到 2025-01-01。
+- 修复：绑定规则改为「任何参与比较的字面量」（`EQ/NEQ/GT/GTE/LT/LTE/LIKE/ILIKE/IN/BETWEEN` 的操作数子树，覆盖 WHERE、HAVING、JOIN ON、CASE WHEN），结构性字面量（`LIMIT`、`OFFSET`、`GROUP BY 1`、`ORDER BY 2`、`INTERVAL`）保持原样。
+- 效果：同比 SQL 的 11 个常量全部参数化（含 `CAST(%s AS DATE)`），时间口径校验通过。
+
+**缺陷二：策略拦截一律硬停，不给重写机会**
+
+- 现象：同一题在不同轮次时对时错，失败轮次的模型草稿被 Guard 拦下后直接返回 `SQL_POLICY_BLOCKED`，没有重写机会（评测中的 `nl2sql-009` 即此类波动）。
+- 修复：仅对「试图写库或调用危险能力」的原因保持硬停（`SELECT_ONLY`、`MUTATION_OR_COMMAND`、`DANGEROUS_FUNCTION`、`RECURSIVE_CTE_NOT_ALLOWED`）；其余策略原因（`SELECT_STAR`、`UNAPPROVED_JOIN`、`COLUMN_NOT_ALLOWED` 等）带原因反馈重写，次数仍受既有 `max_repair=2` 约束。每次重写都要重新过 Guard，安全边界不因重写而放宽。
+
+**核查结果**
+
+- 回归测试 34 项全部通过（新增 6 项：CASE/JOIN 字面量绑定、结构字面量不被参数化、同比时间口径校验、策略失败后可重写、写库草稿硬停、重写预算耗尽）。
+- 修复后首轮 NL2SQL 得 14/14；但紧接着的复跑只有 12/14，说明当时仍存在未被识别的外部干扰（见 §18.8 的系统代理缺陷）。因此本节的 14/14 只代表「这两处缺陷修好后的单轮结果」，不作为稳定基线；稳定基线以 §18.8 为准。
+
+**边界说明**：14/14 是当前 14 条 NL2SQL 用例 + 当前提示词/快照下的实测值，不是模型能力的普适结论；用例规模仍小，扩样后需重跑。RAG、跨源与 V-CAR 指标仍未实测。
+
+## 18.8 系统代理劫持与评测基线（2026 年 9 月 30 日）
+
+§18.7 修复两处缺陷后，评测仍出现「一轮 14/14、下一轮 12/14」的抖动，且出现整轮挂起。本节记录真正的根因、修复与重新建立的基线。
+
+**根因：httpx 通过 urllib 读取 macOS 系统代理，把 localhost 也塞进代理**
+
+- 现象：评测进程长时间无输出，`lsof` 显示它与 `127.0.0.1:7897`（系统代理）保持 ESTABLISHED 且阻塞在 `sock_recv`；同一批次里出现 `MODEL_UPSTREAM_ERROR`、`MODEL_TIMEOUT`，单次调用耗时 25 秒级；而数据库会话处于 idle，并非数据库阻塞。
+- 定位：`httpx/_utils.py` 的 `get_environment_proxies()` 调用 `urllib.request.getproxies()`；在 macOS 上该函数**回落到系统网络配置**，而 httpx 只解析 `no_proxy` 环境变量，**不识别 macOS 的「忽略代理列表」**。于是 `http://localhost:4000/v1` 被送进系统代理，代理对本地回环地址时好时坏。
+- 修复：`providers.make_client()` 统一构造客户端——本机地址（`localhost`/`127.0.0.1`/`::1`/`*.local`）一律 `trust_env=False` 直连；远端地址继续尊重系统/环境代理；新增每套配置的 `proxy` 字段可显式覆盖；连接超时拆为 connect 10s / read = 配置值。
+- 效果：同一问句经本机网关的调用由 **24.9 秒超时失败** 变为 **0.91 秒成功**，进程挂起消失。
+
+**评测集修订（retail-v2）与提示词 v2**
+
+- 抖动过程中发现评测集自身的投影歧义：如「家电类有哪些产品？」的 gold 为 `[product_name, list_price]`，而模型返回 `[product_id, product_name]` 同样合理，判为不匹配属于题目没有规定答案形状，不是模型答错。
+- 修订：为 5 条存在投影歧义的问题补上显式投影要求（nl2sql-002/008/010/011/012），gold 不变，`data_version` 由 `retail-v1` 升为 `retail-v2`；越权用例 rb-003 显式标注 `clarification_label=needed`。
+- 空结果用例改为语义判定：0 行或整行 NULL 均算通过，但必须由系统显式给出 `EMPTY_RESULT` 标记——考核点是「系统能说明数据为空」，而非投影形状恰好相同。
+- 提示词升级为 `sql-v2`：新增「只 SELECT 问题所需列」「唯一答案类问句用 `ORDER BY ... LIMIT 1`」，并在运行记录的 `versions.prompt` 中留痕。
+
+**重新建立的基线**
+
+| 项 | 结果 | 条件 |
+|---|---|---|
+| NL2SQL 执行一致率 | **14/14，连续三轮（A/B/C）** | `retail-v2` + 提示词 `sql-v2` + 代理修复后；`deepseek-flash` 经本地网关；快照 `snap-demo_retail-e9495c660cd1` |
+| 鲁棒性 | **4/4** | 错别字、口语简称、越权拒答、空结果（`--suite robustness`） |
+| 回归测试 | **35 项通过** | 新增：CASE/JOIN 字面量绑定、结构字面量不参数化、策略失败可重写、写库硬停、本机地址绕过系统代理 |
+
+报告：`reports/nl2sql.json`（逐例含生成 SQL、gold SQL、尝试记录与结果预览，便于复核失败例）、`reports/robustness.json`。
+
+**边界说明**：以上为 14+4 条自建用例、单一模型与单一快照下的实测值，样本量小，不能外推为通用能力；评测脚本已支持 `--suite` 切换，扩样后需重跑。RAG、跨源与 V-CAR 指标仍未实测。
+

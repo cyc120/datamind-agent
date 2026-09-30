@@ -17,7 +17,7 @@ NL2SQL = [
      "有多少个客户注册了大区信息？",
      "SELECT count(*) FROM customers WHERE region_id IS NOT NULL", None),
     ("nl2sql-002", "单表过滤", "easy",
-     "家电类有哪些产品？",
+     "家电类产品有哪些？请给出产品名称和价格。",
      "SELECT product_name, list_price FROM products WHERE category = '家电'", None),
     ("nl2sql-003", "时间范围", "easy",
      "2024年一共有多少笔订单？",
@@ -41,7 +41,7 @@ NL2SQL = [
      "WHERE o.order_status IN ('completed','shipped','refunded') "
      "AND o.created_at >= '2024-01-01' AND o.created_at < '2025-01-01' GROUP BY r.region_name", None),
     ("nl2sql-008", "排序Top-k", "medium",
-     "2025年销售额最高的前三个产品是什么？",
+     "2025年销售额最高的前三个产品是什么？请给出产品名称和销售额。",
      "SELECT p.product_name, sum(oi.quantity * oi.unit_price * (1 - oi.discount)) AS sales_amount "
      "FROM order_items oi JOIN orders o ON oi.order_id = o.order_id "
      "JOIN products p ON oi.product_id = p.product_id "
@@ -53,7 +53,7 @@ NL2SQL = [
      "SELECT f.reason, sum(f.refund_amount) FROM refunds f "
      "WHERE f.refunded_at >= '2025-01-01' AND f.refunded_at < '2026-01-01' GROUP BY f.reason", None),
     ("nl2sql-010", "同比", "hard",
-     "2025年销售额比2024年增长了多少？",
+     "2025年销售额比2024年增长了多少？请给出增长金额。",
      "WITH y AS ("
      " SELECT sum(oi.quantity * oi.unit_price * (1 - oi.discount)) amt,"
      " extract(year from o.created_at) yr"
@@ -62,10 +62,10 @@ NL2SQL = [
      " AND extract(year from o.created_at) IN (2024, 2025) GROUP BY 2)"
      "SELECT (SELECT amt FROM y WHERE yr=2025) - (SELECT amt FROM y WHERE yr=2024) AS yoy_diff", None),
     ("nl2sql-011", "跨库-Chinook", "medium",
-     "Chinook库里哪个国家客户最多？",
+     "Chinook库里哪个国家客户最多？请给出国家名称和客户数。",
      "SELECT country, count(*) FROM customer GROUP BY country ORDER BY count(*) DESC LIMIT 1", None),
     ("nl2sql-012", "跨库-Chinook JOIN", "hard",
-     "Chinook里销量最高的歌手是谁？",
+     "Chinook里销量最高的歌手是谁？请给出歌手名称和销量。",
      "SELECT ar.name, sum(il.quantity) AS sold FROM invoice_line il "
      "JOIN track t ON il.track_id = t.track_id "
      "JOIN album al ON t.album_id = al.album_id "
@@ -151,6 +151,11 @@ ROBUST_SQL = {
 }
 
 
+# 越权请求应被拒绝（澄清/拒答），而不是当作可执行问题；
+# 其余鲁棒用例按错别字、口语和时间指代改写后执行。
+ROBUST_CLARIFY = {"rb-003": "needed"}
+
+
 def main():
     conn = psycopg2.connect(**PG)
     cur = conn.cursor()
@@ -160,7 +165,7 @@ def main():
         cur.execute("""
             INSERT INTO evaluation_cases(case_id, suite, category, difficulty, question,
                 expected_route, gold_sql, clarification_label, data_version)
-            VALUES (%s,'nl2sql',%s,%s,%s,%s,%s,%s,'retail-v1')""",
+            VALUES (%s,'nl2sql',%s,%s,%s,%s,%s,%s,'retail-v2')""",
             (cid, cat, diff, q, "clarify" if clarify else "sql",
              sql, clarify or "none"))
 
@@ -178,9 +183,9 @@ def main():
     for cid, cat, q, sql, note in ROBUSTNESS:
         cur.execute("""
             INSERT INTO evaluation_cases(case_id, suite, category, difficulty, question,
-                expected_route, gold_sql, failure_category, data_version)
-            VALUES (%s,'robustness',%s,'hard',%s,'auto',%s,%s,'retail-v1')""",
-            (cid, cat, q, ROBUST_SQL.get(cid), note))
+                expected_route, gold_sql, failure_category, clarification_label, data_version)
+            VALUES (%s,'robustness',%s,'hard',%s,'auto',%s,%s,%s,'retail-v2')""",
+            (cid, cat, q, ROBUST_SQL.get(cid), note, ROBUST_CLARIFY.get(cid, "none")))
 
     conn.commit()
     cur.execute("SELECT suite, count(*) FROM evaluation_cases GROUP BY suite ORDER BY suite")
