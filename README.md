@@ -10,6 +10,8 @@
 
 `赛题/` 和 `技术文档/` 为项目资料，不参与网关运行。
 
+技术设计说明书已于 **2026 年 10 月 1 日修订为 V1.2**（文件名同步为 V1.2）：依据[复杂文件分类与解析参考 MD](<技术文档/复杂非结构化文件分类与解析技术文档.md>)，完善分类/Adapter、结构关系、跨格式原生定位、工业字段/CAD/冲突与国产小模型方案，区分核心与后续格式。状态/顺序见[技术说明书 §18](技术文档/DataMind_Agent_技术设计说明书_V1.2.md#18-实施进度与下一步验收2026-年-10-月-1-日)，本次整合见 §18.11。新增能力均待实现，现有可运行问答仍为 SQL 单源。
+
 ## 模块一：结构化数据与精准问数
 
 `datamind/` 已实现技术说明书 §4 的首个可运行闭环：版本化 Catalog 读取、中文别名/枚举召回、审核关系的 Join Path、结构化问题帧、模型生成 SQL、SQLGlot AST Guard、参数绑定、只读事务执行、指标口径检查和最多两次数据库错误修复。命令行入口：
@@ -30,6 +32,7 @@ docker exec datamind-postgres psql -U postgres -d chinook -q -c 'GRANT CONNECT O
 .venv/bin/python -m unittest discover -s tests -v
 .venv/bin/python scripts/eval_sql.py --output reports/nl2sql.json
 .venv/bin/python scripts/eval_sql.py --suite robustness --output reports/robustness.json
+.venv/bin/python scripts/eval_schema.py --output reports/schema_linking.json
 .venv/bin/uvicorn datamind.api:app --host 127.0.0.1 --port 8000
 # 浏览器打开 http://127.0.0.1:8000
 ```
@@ -41,6 +44,8 @@ docker exec datamind-postgres psql -U postgres -d chinook -q -c 'GRANT CONNECT O
 测试页另有“测试数据库链路（不调用模型）”按钮：它只运行一条固定的 2024 年订单数查询，经过同一 Agent、Guard 和只读数据库连接，可在模型令牌不可用时验证前端、数据库、Trace 与回放。此按钮的结果不计入 NL2SQL 模型准确率。
 
 当前 Schema 召回采用词法、业务别名、枚举值和已审核 Join Graph；向量召回及其权重调参尚未接入。
+
+Schema Linking 的独立验收入口是 `.venv/bin/python scripts/eval_schema.py`。`data/evaluation/schema_linking_v1.json` 固定了 12 条 NL2SQL 问题及 6 条扩展问题的人工核对 gold 表、语义锚点列、指标和连接路径。脚本使用 SQL Agent 实际的 8 候选预算，分别计算表/列/指标的 Top-5 微平均召回与 Join Graph 路径准确率；报告记录逐题漏召回、Catalog 快照及检索代码哈希。当前结果见 `reports/schema_linking.json`：表 **31/31**、列 **28/28**、指标 **4/4**、路径 **6/6**。这是小规模自建样本上的元数据召回成绩，不等同于复杂问题的端到端 SQL 准确率；向量召回尚未接入。
 
 **当前实测基线（2026-09-30，模型 `deepseek-flash` 经本地网关，快照 `snap-demo_retail-e9495c660cd1`，评测集 `retail-v2` + 提示词 `sql-v2`）**：NL2SQL 执行一致率 **14/14，连续三轮**；鲁棒性用例 **4/4**（错别字、口语简称、越权拒答、空结果）。逐例报告含生成 SQL、gold SQL、修复尝试与结果预览，见 `reports/nl2sql.json`、`reports/robustness.json`。样本量小，不能外推为通用准确率；技术说明书 §4.6 的 Recall@5 仍需在扩样后的固定评测集上实测。
 
@@ -160,5 +165,5 @@ py -3.13 ingestion/ingest.py --reset
 
 1. **扫描件 OCR 为演示代理**：以原生对照版文本层代替真实 OCR（置信度标 0.85 并记录于 quality_detail）；正式 OCR 接入 PaddleOCR 是后续里程碑（M6 完整版）。
 2. **MinIO 缺位**：官方镜像已下架；如需 S3 语义可自备镜像恢复 compose 中注释段。
-3. **公式块**：公式以图片存在，LaTeX 结构化识别（中级任务 6b）待接入公式识别模型。
-4. **知识库写回**、trace 事件生产者、V-CAR 编排均属应用层，不在"基础数据库"范围。
+3. **公式块**：公式以图片存在，LaTeX 结构化识别待接入；当前优先工艺/质检字段与二维 CAD，专项编号需对照官方清单。
+4. **应用层状态**：SQL Trace/HTTP/SSE/证据回放已实现；真实 OCR、单文档 RAG、工业事实/CAD 与跨源 V-CAR 待实现。知识库自动写回不列入首版目标。

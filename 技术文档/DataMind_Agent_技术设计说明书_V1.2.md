@@ -1,0 +1,1226 @@
+# DataMind Agent 技术设计说明书
+
+## 面向赛题八：多模态数据驱动的可解释精准问数/问答智能体
+
+版本：V1.2（依据复杂文件分类与解析参考文档优化；状态截至 2026 年 10 月 1 日）
+初版日期：2026 年 9 月 28 日；修订日期：2026 年 10 月 1 日\
+用途：竞赛方案设计、系统研发、测试验收与答辩演示
+
+> **方案摘要**：面向结构化与非结构化混合数据，建设可解释的精准问数/问答智能体。保留已实现的零售/Chinook SQL 基线，新增工业复杂数据主场景：工艺文件、质检报告和二维 CAD 图纸。研发重点是复杂多表关联聚合、文件分类与原生/OCR 适配、非标准结构及对象关系恢复、业务事实提取、跨格式证据定位、实体/版本对齐及冲突检测与消解。高级创新聚焦 **V-CAR（可验证跨源智能体推理）** 中的“可追溯事实提取与冲突驱动局部重识别”，以工具执行、规则计算和原始证据构成可审计闭环。
+
+## 文档使用说明
+
+本次修订以用户于 2026 年 10 月 1 日提供的赛题方向为需求依据：基础任务为单表查询与单文档检索 Demo；中级任务从官方指定的九个难题中，初赛至少攻克一项，决赛攻克三项以上；高级任务提交突破与创新性自述。必须采用国产模型，允许使用公开或自建数据，鼓励 CAD 图纸、工艺文件等复杂数据。初赛交付设计报告、技术实验说明书、可运行软件压缩包；决赛现场演示可运行智能体，同等效果下模型参数越小、处理数据越复杂越有优势。
+
+本版删除旧稿中未经当前赛题依据确认的具体分值、满分线和中级任务编号。§1.2 的专项代号是项目内部追踪项，不等同于官方九项编号；正式提交前须对照官方最新完整清单逐项确认，不能把自设功能直接计为已完成的中级任务。文中准确率、样本量和性能数字除 §18 中有报告依据的记录外，均是研发目标，不代表赛题硬性门槛或已经取得的成绩。
+
+**阅读顺序**：§18.1 是当前能力状态总表，§18.11 是本次参考文档整合记录，§18.3 是下一步完成条件；§18.2、§18.4–§18.9 保留为历史核查记录，其中旧故障和待办应按后续记录理解。§1–§17 为目标设计，接口、对象、部署和里程碑不能据此推定全部已实现。本次只更新文档，不实现 OCR、CAD 或跨源功能，也不重新运行模型基准。正文版本为 V1.2，文件名同步更新为 `DataMind_Agent_技术设计说明书_V1.2.md`，README 和参考文档链接已更新。
+
+
+**本版参考输入**：[复杂非结构化文件分类与解析技术文档](<复杂非结构化文件分类与解析技术文档.md>)。该文档提供普通办公文件与工程数据的分类、结构恢复目标和解析架构；本说明书将其转化为有范围、有契约、有验收的项目设计。参考文档中的技术清单是候选，不表示本项目已接入所有格式或模型。CAD/IFC、日志、GIS 和点云可以包含原生结构，按结构化、半结构化与视觉内容混合处理，不统一退化为 OCR 文本。
+
+## 目录
+
+1. 项目定位与赛题映射
+2. 目标、范围与设计原则
+3. 总体架构与运行主链路
+4. 模块一：结构化数据与精准问数引擎
+5. 模块二：RAG 与多模态知识库
+6. 模块三：多 Agent 编排与跨源推理
+7. 模块四：全链路可解释与可视化
+8. Metadata / Knowledge Infrastructure
+9. Evaluation System
+10. 接口契约与关键数据结构
+11. Demo 设计与验收脚本
+12. 技术选型与国产模型要求
+13. 前后端与部署方案
+14. 现有仓库的增量实现位置
+15. 研发路线图与赛题交付顺序
+16. 风险、治理与答辩证据
+17. 参考资料
+18. 实施进度与下一步验收（2026 年 10 月 1 日）
+
+# 1. 项目定位与赛题映射
+
+## 1.1 项目定义
+
+**项目名称：DataMind Agent**\
+**项目定位：多模态数据驱动的可解释精准问数/问答智能体。**
+
+系统目标是统一连接结构化业务库与非结构化知识库，识别问题中的指标、实体、时间、版本和约束；通过 SQL 查询、文档检索、业务字段提取和规则核验，形成带出处的答案。工业主场景以零件编号、工序号、生产批次和适用版本串联图纸、工艺与质检证据。当前可运行能力是 SQL 单源闭环，工业混合数据路径待实现，详见 §18。
+
+### 关键能力
+
+- 用业务术语、字段别名和表关系图完成 Schema Linking，生成可执行且只读的 SQL。
+- 对 PDF、扫描件、工艺卡、质检报告和二维 CAD 实行按页/区域解析，恢复表格、技术要求、尺寸标注及来源定位。
+- 将非结构化内容提取为带原文证据、单位、适用条件和版本的业务事实；用国产小模型处理疑难区域。
+- 对单源、跨源和多跳问题形成显式任务 DAG，受限调用 SQL、RAG、公式计算等工具。
+- 对关键数值、文档引用、跨源实体映射和逻辑一致性执行规则化验证。
+- 在失败时按错误类别重规划、修复并重试；超过预算则澄清或说明无法验证。
+- 展示真实工具调用、SQL、检索证据、校验结果、耗时与重试记录；不展示模型私有逐字思维链。
+
+## 1.2 基础任务、中级任务、高级创新
+
+| 级别/内部专项 | 竞赛目标或项目重点 | 目标实现范围 | 验收证据 |
+|---|---|---|---|
+| 基础任务 | 单表查询与单文档检索 Demo | 国产模型；只读 SQL；单文档检索问答；答案与 SQL 行/文档块绑定；可启动软件 | 单表与单文档成功/无答案用例；启动说明；原文出处 |
+| 专项 T1：复杂多表问数 | 复杂业务关联与聚合 | Schema Linking、审核 Join Graph、连接基数/粒度、分组聚合、子查询、语义校验和有界修复 | 固定 gold 结果、连接/聚合困难子集、错误分类；已有 SQL 基线见 §18 |
+| 专项 T2：非标准文档识别 | 工艺文件、质检报告、二维 CAD | 真实 OCR、阅读顺序、跨页表格、工艺字段、标题栏/尺寸标注及对象关联、证据定位 | 字段级标签、表格结构、尺寸关联、引用位置及复杂度分层结果 |
+| 专项 T3：混合数据冲突 | 结构化与非结构化数据冲突检测与消解 | 实体/批次/工序对齐、单位标准化、适用版本、权威规则、未消解冲突展示 | 冲突精确率/召回率、正确消解率、未消解原因、双方证据与规则 ID |
+| 配套能力：质量路由与澄清 | 支持上述专项稳定运行 | 低清/倾斜检测、局部重识别、实体与指标消歧、缺失证据拒答 | 质量风险召回、重识别增益、误修复率、澄清/拒答正确率 |
+| 高级创新：V-CAR | 可追溯事实提取与冲突驱动局部重识别 | Plan → Execute → Verify → Repair；按冲突根因重识别、重新对齐或规则消解；国产小模型级联 | 消融对照、证据覆盖、修复前后差异、耗时/参数量/资源与失败样例 |
+
+初赛先完成基础任务，再从 T1/T2/T3 中选择与官方九项清单对应且有充分证据的一项作为专项突破；已有 T1 积累可复用。决赛围绕 T1/T2/T3 形成三个专项的完整演示和评测，再核对官方认定口径。质量路由、澄清、公式识别属于支撑能力，未核对前不额外计算官方专项数量。
+
+## 1.3 评分约束到工程证据的映射
+
+| 评分关注点 | 工程设计对应项 | 可提交证据 |
+|---|---|---|
+| NL2SQL 准确率 | Schema Linking、Join Graph、SQL AST 校验、执行反馈修复 | 固定测试集、SQL/结果对照、错误分类和版本差异 |
+| RAG 忠实度与多模态能力 | 结构解析、Hybrid Search、重排、引用校验 | 原文页图、解析 JSON、Recall@K、引用支持率、困难样例 |
+| 跨源融合与多跳 | Planner DAG、实体映射、子任务依赖和 Evidence Graph | SQL 结果到文档检索的实体传递轨迹；反向路径测试 |
+| 鲁棒性与效率 | 降级、缓存、索引、并发、超时预算 | 固定工业复杂度/硬件/模型的 p50/p95、资源、级联/缓存与失败率对照 |
+| 可解释与产品完成度 | Trace API、流式事件、前端执行图和证据详情 | 现场可重放案例、导出 trace、来源定位及可读错误 |
+| 国产模型与参数效率 | 国产来源登记、小模型区域级联、版本锁定 | 模型卡/权重来源、全参数与激活参数、量化配置、级联调用比例、同集效果与资源对比 |
+| 复杂工业数据 | 工艺/质检/二维 CAD 与生产库关联 | 自建数据契约、模板/版本/质量分层、真实识别输出和原始证据 |
+| 高级创新 | V-CAR 冲突驱动重识别与规则消解 | 消融对照、冲突根因、重试前后差异、失败终止说明 |
+
+## 1.4 参考 MD 到项目设计的映射
+
+| 参考文档内容 | 本项目吸收方式 | 对应章节 |
+|---|---|---|
+| §2–§4：普通复杂文件分类 | 格式/载体/业务三层分类，A/B/C 范围 | §5.1.1 |
+| §5、§9：统一解析/子模块 | Router/Adapter → Block/Locator → 关系 → 事实/索引 | §5.1.2、§14 |
+| §7：问数/问答/多模态融合 | 摄取/查询分离，重排先于融合，SQL/规则确定性 | §5.3、§6 |
+| §8：完整性与可追溯 | 分层门禁、结构切片、按类型定位 | §5.2、§5.4–§5.5、§9 |
+| §10：工程数据/关系 | 二维机械 CAD 核心；拓扑扩展；模型/空间/音视频后置 | §5.1.1、§5.7、§12 |
+
+参考分类不是官方任务编号或成绩依据；B/C 类有数据、Adapter、定位和评测后才能进入实际支持清单。
+
+# 2. 目标、范围与设计原则
+
+## 2.1 MVP 与比赛增强范围
+
+**基础 Demo**：可重置的演示数据库；国产模型驱动的单表查询；原生 PDF 与真实扫描件解析；单文档检索问答；SQL/文档证据定位；运行记录与最小评测。当前 SQL 单源路径可运行，单文档问答和真实 OCR 待接入。
+
+**初赛专项闭环**：在基础 Demo 上复用复杂多表 SQL 积累；新增“工艺文件字段 → 生产批次查询 → 规则核验 → 原文证据”的工业路径。先保证工艺卡和质检报告的真实解析，再扩展二维 CAD；自建样例清晰标注模拟来源。
+
+**决赛增强**：二维图纸专项识别、跨页表格、跨源冲突检测/消解、冲突驱动局部重识别、国产小模型级联与消融对照。通用公式问答、大规模压测、多协议扩展与前端框架迁移降为后续项，不抢占主路径。
+
+**首版边界**：二维机械图纸先覆盖标题栏、技术要求和选定尺寸/公差；不承诺任意 CAD 格式或完整三维几何理解。业务核验输出可复核辅助结论，不直接执行生产控制。模型训练、知识自动写回和多 Agent 微服务化不列入核心交付。
+
+## 2.2 设计原则
+
+1. **可验证优先**：每个事实断言至少映射到 SQL 行/聚合结果、文档片段、计算过程之一；证据不足就降低置信或拒答。
+2. **确定性工具优先**：关系连接、数值计算、时间边界、权限和格式校验写成可测规则；LLM 做语义解释与候选生成。
+3. **能力解耦、流程统一**：SQL 与 RAG 是工具能力；Orchestrator 管任务生命周期；Evidence/Trace 是统一产物。
+4. **所有恢复都有上限**：修复最多 2 次；整个运行有时间、token、SQL 行数和检索上下文预算。
+5. **只读与最小权限**：问数连接只授予只读账号；上传文档按租户隔离；日志中脱敏敏感内容。
+6. **可重复评估**：模型、提示词、元数据、索引、语料版本和测试集版本共同写入 run manifest。
+
+# 3. 总体架构与运行主链路
+
+## 3.1 逻辑架构
+
+| 交互层 | 核心能力层 | 基础设施层 | 运行支撑 |
+|---|---|---|---|
+| 复用现有 web 问数/模型配置/回放，新增识别/原页高亮/冲突面板 | ① 多表问数；② 文档/工艺/CAD 事实；③ 跨源核验/冲突消解；④ 证据与受控重识别 | Catalog/审核关系、事实/版本索引、文件卷、PostgreSQL、Qdrant；worker 按需 | 固定工业评测、应用 Trace、模型 manifest、配置/密钥；监控服务后续 |
+
+## 3.2 主链路
+
+```text
+用户问题
+  → Query Understanding（实体、指标、时间、范围、歧义）
+  → Planner 产出受 JSON Schema 约束的 Task DAG
+  → Router 选择 SQL / 文档检索 / 工业事实提取→SQL核对 / 冲突局部重识别
+  → SQL Agent 和/或 RAG Agent 执行有界工具调用
+  → Fusion Agent 合并结果并建立 Evidence Graph
+  → Verifier 检查数值、引用、映射、逻辑和权限
+  → PASS：生成带来源的答案；FAIL：修复/重规划，最多 2 次
+  → Trace 事件实时推送，运行和证据持久化
+```
+
+## 3.3 工业混合数据示例路径（待实现）
+
+问题：“2026 年 9 月 A102 零件哪些批次的保温温度不符合适用工艺要求？生产记录和质检报告是否一致？”
+
+1. 抽取 `part_id=A102`、问题期间、`operation_no` 和核验指标；缺工序且存在多项要求时先澄清。
+2. 检索工艺文件，提取温度区间、单位、适用零件/工序、审批状态及生效/失效时间，保存原文证据；按每个批次发生时间选择适用版本。
+3. SQL 查询生产批次、工序实测记录和质量记录，保持指标粒度与连接基数，避免重复聚合；检索并对齐同批次质检报告。
+4. 确定性代码换算单位、比较实测值与工艺区间，再比较数据库与报告中同口径的实测值和结论。
+5. 将“实测超出规范”与“两个来源对同一事实记载矛盾”分别报告。发现疑似 OCR 数字错误时重识别局部区域，重新执行依赖核验；真实冲突按显式权威规则裁决，缺依据则标记未消解。
+6. 展示批次列表、适用工艺版本、SQL 行、报告/工艺原页位置、规则计算与冲突处理记录。该路径属于新设计，不计入既有零售 SQL 成绩。
+
+# 4. 模块一：结构化数据与精准问数引擎
+
+## 4.1 子组件与数据流
+
+| 子组件 | 输入 | 处理 | 输出 |
+|---|---|---|---|
+| Connector / Introspector | 只读连接配置、数据库 | 读取表、列、类型、主外键、注释、样例值；按 allowlist 限定 schema | `SchemaSnapshot` |
+| Semantic Metadata Service | `SchemaSnapshot`、业务词表 | 维护中文名、别名、单位、口径、枚举映射、敏感级别、有效时间 | `SemanticCatalog` |
+| Schema Retriever | 问题解析结果、元数据 | 词法召回 + 向量召回 + 业务约束重排 | Top-k 表/列/关系候选及分数 |
+| Schema Graph / Join Planner | 候选表、主外键图 | 受限最短路径/代价路径；排除禁用关系和多义连接 | `JoinPlan` |
+| SQL Planner / Generator | 问题语义帧、候选 Schema、JoinPlan、数据库方言 | 先生成结构化查询计划，再生成 SQL；关键字段绑定元数据 ID | `SQLDraft` |
+| SQL Guard / Validator | SQL AST、allowlist、执行策略 | 只允许 SELECT/CTE；检查表列权限、笛卡尔积、limit、聚合和时间范围 | 校验通过/阻断及原因码 |
+| Read-only Executor | 通过验证 SQL、参数、预算 | 只读事务、statement timeout、行数限制、取消信号 | 列定义、结果行、耗时、行数 |
+| Result Validator / Repair | SQL 错误或结果摘要 | 错误分类；基于 Schema 与数据库反馈局部修复；最多 2 次 | 有证据的结果或可解释失败 |
+
+## 4.2 元数据设计与 Schema Linking
+
+单个字段记录：`source_id`、`schema_name`、`table_name`、`column_name`、`data_type`、`comment`、`business_name`、`aliases[]`、`sample_values[]`、`unit`、`semantic_role`、`sensitivity`、`is_nullable`、`primary_key`、`foreign_keys[]`、`freshness`、`catalog_version`。
+
+候选分数建议：
+
+`Score = 0.30·lexical + 0.25·dense + 0.20·alias + 0.15·value_match + 0.10·graph_compatibility`
+
+该权重仅为可调初值；以验证集的 Top-k 命中和误链接率网格搜索，不把相似度直接解释成概率。字段召回后必须结合表关系、指标口径和查询语境做二次排序。对“销售额”同时命中下单金额、退款金额、含税金额的场景，必须依据指标定义或向用户澄清。
+
+Join Graph 节点是表，边是经过审核的外键/业务关系，边属性包括连接字段、基数、方向、有效状态、语义说明、更新时间。路径代价可定义为：`cost(edge)=1 + ambiguity_penalty + fanout_penalty + privacy_penalty`。仅允许 Catalog 中已批准的路径，不允许模型凭字段名自行拼接未经登记的 JOIN。
+
+## 4.3 NL2SQL 算法步骤
+
+1. 解析问题：意图、时间、指标、维度、实体、排序/排名、比较、输出粒度、限定条件。
+2. 时间标准化：结合显式时区与赛事数据日期解析“去年/本季度”；未提供时间时不自行假设。
+3. Schema 召回：表、列、枚举值与指标定义分别召回并显示候选理由。
+4. 语义消歧：候选口径存在实质差异时提问；否则按业务 Catalog 中唯一活跃口径处理。
+5. 查询计划：`select[] / metrics[] / filters[] / group_by[] / joins[] / order_by[] / limit / expected_grain`。
+6. 生成 SQL：指定方言；常量采用参数绑定；标注每个 projection/filter 对应的业务语义 ID。
+7. AST 与执行前检查：用 SQLGlot 解析 AST，拒绝 DDL/DML、系统目录、未授权 schema、无上限大结果、危险函数和无关系 JOIN；用 `EXPLAIN`/超时保护作为资源门禁。
+8. 只读执行与结果校验：检查空值比例、重复粒度、单位、数值范围和预期聚合列；生成数据时间/查询参数摘要。
+9. 失败修复：按错误码重取 schema、修复列名/方言/聚合歧义；任何修复都重新经过 Guard，禁止“直接改字符串后重跑”。
+10. 输出数字证据：结果摘要、SQL 哈希、脱敏 SQL、执行时间、行数、数据源版本、可复现参数。
+
+## 4.4 关键结构
+
+```json
+{
+  "intent": "rank_entities",
+  "metrics": [{"metric_id":"sales_amount","aggregation":"sum","unit":"CNY"}],
+  "dimensions": [{"field_id":"product.name"}],
+  "time_filter": {"field_id":"orders.created_at","from":"2025-01-01","to":"2026-01-01","timezone":"Asia/Shanghai"},
+  "filters": [],
+  "sort": [{"field":"sales_amount","direction":"desc"}],
+  "limit": 1,
+  "ambiguities": [],
+  "needs_clarification": false
+}
+```
+
+`SQLExecutionResult` 至少含 `run_id`、`query_id`、`sql_hash`、`redacted_sql`、`bound_params_redacted`、`columns[]`、`rows[]`、`row_count`、`elapsed_ms`、`source_snapshot_id`、`validator_findings[]`、`status`。
+
+## 4.5 失败处理
+
+- 元数据缺失：不给 SQL 生成器虚构列；返回“需要补充指标/字段口径”，并在 Catalog 中创建待维护项。
+- 多义指标：展示候选口径、单位和计算定义，优先发起单轮澄清；未获回复时不输出单一确定数字。
+- SQL AST 不通过：阻断并记录规则命中；提示安全原因，不尝试绕过 Guard。
+- 查询超时/资源超限：取消语句，尝试增加过滤、限制结果或改用摘要查询；仍失败时解释范围与预算限制。
+- 空结果/异常值：标为数据为空或结果异常，不把零值当作真实值；可建议缩小时间范围或确认筛选条件。
+- 修复耗尽：保留错误类别、尝试次数、候选修复差异，终止并转人工确认。
+
+## 4.6 模块验收指标
+
+研发目标：表/列 Schema Linking Recall@5 ≥ 0.90；Join Path 正确率 ≥ 0.90；初赛测试集 NL2SQL Execution Accuracy ≥ 0.80 并逐周提升；决赛复杂多表子集目标 ≥ 0.90；只读策略违规执行数 = 0；SQL 修复成功率按错误类别统计而非混成单一总分。所有目标须由版本化测试集实测确认。
+
+# 5. 模块二：RAG 与多模态知识库
+
+## 5.1 文件分类、路由与质量感知解析
+
+### 5.1.1 分类维度与交付范围
+
+采用三层分类：**物理格式**（PDF/DOCX/DXF 等）、**内容载体**（原生文本、扫描、混合页面、图元、单元格等）、**业务语义**（工艺规范、质检实测、图纸技术要求等）。PDF 后缀不能区分扫描工艺卡与矢量机械图纸，文件分类须深入页/区域；一个文件可同时命中多条解析路径。
+
+下表是范围与规划，不是当前格式支持清单。A 为近期核心，B 为核心闭环后扩展，C 为远期研究。当前实现依据统一见 §18.1。
+
+| 数据类别 | 代表输入 | 应恢复的内容 | 范围/状态 |
+|---|---|---|---|
+| 工程文档 | 原生/扫描/混合 PDF 工艺卡、质检报告、技术规范 | 文字、标题、阅读顺序、表头/单元格、图注、版本与业务字段 | A；原生 PDF 底座已有，真实 OCR/问答/字段待实现 |
+| 工程图纸 | 二维 DXF、图纸 PDF/扫描图；DWG 单独转换 | 图层/图元、图号/版次、材料、选定尺寸/公差及对象关联 | A；限定二维机械范围，全部待实现 |
+| 现场图片与老旧档案 | 表单、设备截图、蓝图、污损/盖章扫描 | 文本/符号、区域、图文关系、不可辨内容与证据 | A；先覆盖核心工艺/质检/图纸，不承诺缺陷诊断 |
+| Word | DOCX 标题、表格、图片、文本框、批注/修订 | 章节、图表/正文、批注/脚注与原生对象位置 | B；待实现；DOC 转换单独登记 |
+| PPT | PPTX 文本框、连接线、图表、备注 | 幻灯片/对象、空间关系、流程方向与备注 | B；待实现；PPT 转换单独登记 |
+| 复杂报表 | XLSX 多区域/合并/多级表头、公式/图表 | 表区、表头路径、单元格、公式/缓存值/跨表引用 | B；待实现；CSV 不携带上述版面语义 |
+| 关系图 | 工艺流程图、P&ID、电气图 | 节点、连线、端口、设备编号、方向与关系类型 | B；待实现，另建符号/拓扑标签，不等同机械尺寸识别 |
+| 网络与通信内容 | HTML、邮件及附件 | 正文/引用、线程、附件关系与来源快照 | C；待实现，不接入外部账号或自动采集 |
+| 模型与空间数据 | BIM/IFC、三维 CAD、GIS、点云 | 构件/装配/坐标/几何/空间关系 | C；专业适配与几何处理未实现，不列首版验收 |
+| 时间与运行数据 | 音视频、日志、报警、仿真结果 | 时间轴、说话人/帧、事件、条件/单位/数值 | C；待实现；有原生数值结构时保留结构 |
+
+优先“工艺/质检 PDF＋二维 CAD＋生产库”的完整链路；Word/PPT/Excel 的原生结构适配按样本需求推进。参考文档的通用六类文件建议作为长期兼容路线，不能扩大本次赛题核心交付边界。
+
+### 5.1.2 类型识别与 Parser Adapter 契约（待实现）
+
+`FileClassification` 至少记录 `declared_extension`、`detected_media_type`、`container_type`、`content_profiles[]`、`semantic_candidates[]`、`classification_evidence[]`、`selected_adapter`、`routing_reason`、`status`。类型根据文件签名、容器结构及抽样页/对象判断；扩展名和 MIME 不一致时先验证，不以改后缀解决格式错误。未知格式、密码保护、损坏文件、转换失败单列，不返回空解析成功。
+
+Adapter 登记可读格式/内容画像、是否需转换、输出定位能力、模型依赖/国产来源、能力限制和版本。原生解析优先，扫描或疑难区域再走 OCR/视觉；Office 不默认截图 OCR，CAD 不默认丢弃图元和单位。格式声明、读取器兼容性和样本验收须同时成立才列为支持。
+
+摄取与查询分开：摄取先形成版本化资产和索引；查询消费已就绪版本，只有质量/冲突检查触发时才受控重解析。
+
+```mermaid
+flowchart TD
+    A[文件与来源元数据] --> B[格式/容器/内容分类与质量体检]
+    B --> C[原生解析]
+    B --> D[页面/区域 OCR 与版面解析]
+    B --> E[图元/对象及疑难视觉解析]
+    C --> F[统一 Block 与 SourceLocator]
+    D --> F
+    E --> F
+    F --> G[阅读顺序/标题/表格/图文/对象关系恢复]
+    G --> H[业务事实抽取与规则核验]
+    H --> I[文档片段/事实/关系索引]
+    I --> J[运行时检索/重排与 SQL 工具]
+    J --> K[证据融合/跨源冲突核验/带来源回答]
+    K -->|疑似识别错误且预算允许| D
+```
+
+统一 `ParseResult` 包含资产/源版本、分类/路由记录、`blocks[]`、`relations[]`、原始/转换产物引用、质量发现、能力缺口、逐页/逐对象状态、解析器/模型版本与 `parse_status`。文档规范的业务版次和文件 hash 对应的源版本、解析重试版本分开记录；同一文件重识别不等于工艺规范升级。
+
+状态建议为 `parsed`、`partial`、`needs_review`、`failed`、`unsupported`。`parsed` 仅表示声明范围解析完成，不等于所有事实已验证；已解析/失败范围和缺口必须可查。只发布通过结构校验且满足定位要求的块/事实，保留失败部分，不静默丢弃整页或对象。
+
+### 5.1.3 页/区域策略
+
+| 输入画像 | 解析策略 | 必须保留的证据 |
+|---|---|---|
+| 可用文本层 | PyMuPDF 文本/坐标；检查乱码、缺字、覆盖 | 原始字串、阅读顺序与页位置 |
+| 扫描/照片 | 方向校正、纠偏/必要去噪，PaddleOCR/PP-StructureV3 | 原图/处理图、文字候选、区域与质量发现 |
+| 多栏/图文混排 | 布局分区、栏内顺序、图注/脚注关联 | 块位置、关系与不确定候选 |
+| 表格/跨页续表 | 表区、单元格/合并、表头/单位/脚注恢复 | 二维结构、单元格出处与续表合并依据 |
+| 图纸/疑难局部 | 原生图元或重叠裁剪＋国产视觉 | 图层/句柄或原页区域、对象/标注关联 |
+
+PP-StructureV3 提供版面、表格、公式和阅读顺序等能力；工业符号/关联效果仍需自建验证。[官方文档](https://github.com/PaddlePaddle/PaddleOCR/blob/main/docs/version3.x/pipeline_usage/PP-StructureV3.md)
+
+解析图和预览图分开设置。当前预览页图不能直接证明细小标注可识别；按样本比较 OCR 分辨率/裁剪尺度，记录裁剪、缩放、旋转变换并还原原页坐标。扫描增强图只作解析输入，引用仍可访问原始图像。
+
+### 5.1.4 质量与修复边界
+
+诊断清晰度、倾斜、字符覆盖、阅读顺序、表格完整性与关键字段合法性。缺页只在页码连续性/目录/清单有依据时判断；模型未输出可解释分数时保存 `null`/未校准，不填固定概率。综合质量分按文档类型在人工验证集校准，规则通过不等于识别必然正确。
+
+失败恢复定位到页/区域/对象，在统一修复预算内调整解析策略；仍不通过保留候选并标为待核验。当前 `ocr_proxy`、OHR-Bench `gt_text` 只用于演示/评测对照，禁止进入真实 OCR 测试输入。不可辨文字、连接关系或单位不由模型补造。
+
+## 5.2 统一结构、关系与来源定位契约（待扩展）
+
+### 5.2.1 Block、Relation 与 Chunk
+
+| 对象 | 主要字段 | 契约要求 |
+|---|---|---|
+| `DocumentBlock` | block/document/source_version、类型、原文、原生属性、reading_order、质量发现、parser/model_version、`source_locator` | PDF 当前已有基础字段；Office/CAD 原生对象与统一定位待扩展 |
+| `BlockRelation` | relation_id、src/dst_ref、relation_type、scope、evidence_refs、method、verification_status | 结构恢复产物，不以正文摘要替代关系；未知关系留候选 |
+| `Chunk` | chunk/document/source_version、section_path、block/related_refs、embedding_text、exact_text、table/image/formula_ref、ACL、content_hash | 原文和生成摘要分开；多块仍保持逐块出处，禁止跨源版次/访问域拼接 |
+| `DocumentFact`/`DrawingFeature` | 业务实体、值/单位/条件、规范版次、结构/关系引用、原文定位 | 字段提取须回原始块/图元；详见 §5.6–§5.7 |
+
+常用关系为 `precedes`（顺序）、`contains`（层级）、`caption_of`（图注）、`continuation_of`（续页）、`header_of`（表头）、`annotates`（标注对象）、`connected_to`（连接）、`flows_to`（有证据方向的流程）、`references`（原生引用）。跨文件对象对齐另存实体映射，与页内结构关系分开。图纸连接和流程方向需有明确来源，不靠实体名称或距离猜测。
+
+现有 `page_no/bbox/table_cells/heading_level` 可通过 Adapter 归一到目标契约；当前数据库没有上述统一关系/定位对象，需增量迁移。正文切片当前按字符预算，目标可比较字符/token/结构粒度；同一报告必须说明实际采用的度量。
+
+### 5.2.2 SourceLocator 类型
+
+所有 locator 带 `document_id` 与不可变 `source_version`，再按类型保留原生位置；业务 `document_version`、`parse_version` 单独记录。适配器必须能解析 locator 并显示证据，禁止用生成摘要替代定位。
+
+| locator_kind | 原生定位字段 | 使用边界 |
+|---|---|---|
+| `pdf_region` / `image_region` | 实际页序号/图 ID、bbox、坐标系/页面大小、变换链 | 印刷页码与 PDF 页序号分开 |
+| `office_object` | part/object_id、paragraph/table/cell 或 slide/shape、render_ref? | DOCX 默认以原生对象为锚；渲染页码依赖环境，不能补造固定页码 |
+| `sheet_range` | sheet_name、cell/range、表区、公式/缓存值来源 | 保留单元格与合并关系，后续报表适配 |
+| `cad_entity` | layout/view、entity_handle、layer、模型坐标系/单位、render_ref | 句柄须绑定源版本；实体坐标不与像素混用 |
+| `temporal_segment` | start/end 时间、speaker/frame_ref | 音视频后续适配；目前不支持 |
+| `model_spatial_object` | 原生对象 ID、模型/坐标参考、视图或几何产物 | BIM/空间后续设计，当前不支持 |
+
+拟议的 PDF 来源例（只示范定位契约）：
+
+```json
+{
+  "locator_kind": "pdf_region",
+  "document_id": "doc-demo",
+  "source_version": "sha256-demo",
+  "page_no": 3,
+  "bbox": [40, 80, 300, 150],
+  "coordinate_system": "pdf_points",
+  "page_size": [595, 842],
+  "printed_page_label": "2",
+  "render_ref": "source-page-003"
+}
+```
+
+### 5.2.3 结构感知切片
+
+段落与标题路径配对；跨页段落仅在顺序/版次明确时合并。表格按表区或行组切分，携带完整表头路径、单位、脚注和单元格定位；跨页续表保留每页片段与合并关系。图片与图注联合召回；公式与符号定义/适用条件成组；流程节点携带已验证关系片段，不把节点名单当流程。原生 CAD 属性/关系进入事实或关系索引，生成文本仅用于召回。
+
+## 5.3 混合检索、重排与证据融合
+
+运行时先识别问题需要的是文字事实、精确数值、对象属性或关系路径，再选择工具：文档文字走词法＋向量；工艺/质检字段按实体/工序/批次/版本过滤；数量/范围/合规走 SQL/确定性工具；对象连接路径仅在相关关系已核验后查询。
+
+文档召回链路：权限/源版次/适用时间过滤 → 词法与 Dense 召回 → RRF → 文档证据候选重排 → 邻接结构补全/去重 → 上下文裁剪。可用 Top-30/Top-20/Top-5～8 作为初值，以验证集调参；当前运行时链路待实现。重排位于文档证据融合前，不能用相关性分数改写 SQL 数值、决定来源权威或替代冲突裁决。
+
+统一答案证据链：文档/事实/关系证据＋SQL 执行结果 → 实体与版本对齐 → 规则/冲突核验 → Claim 绑定 → 回答。每条事实引用稳定证据 ID，保留原文、SourceLocator、源/业务/解析版本和质量发现。未核验的视觉描述明确标为候选；不作为已验证关系写入正式索引。
+
+关系首版用 PostgreSQL 关系表/JSONB 与内存遍历，和 Qdrant 文本索引并行；工程关系图与回答支持证据图分别建模。不因参考文档提到 Knowledge Graph 就新增独立图数据库。
+
+## 5.4 非标准结构恢复规则与适配边界
+
+| 结构 | 恢复动作 | 防止的错误 |
+|---|---|---|
+| 多栏、标题、页眉/脚注 | 布局分区、层级/顺序、重复区域标记 | y/x 排序串栏；把脚注例外/版本号当噪声删除 |
+| 跨页段落/表格 | 顺序/表头/列语义/单位/脚注核验，保存续接边 | 跨版本、跨不同表区误合并 |
+| 图片/图注/公式 | 原生引用或位置候选＋上下文校验 | 最近段落不必为图注；公式不可缺符号/条件 |
+| Word 结构（B） | 标题/表格/文本框/图片、批注/脚注/修订分别保存 | 将批注/删除文本当生效正文；假页码 |
+| PPT 流程（B） | slide/shape、连接线端点/方向、图表数据和备注 | 文本框顺序不等于流程；备注不等于页面正文 |
+| Excel 表区（B） | 多区域分割、合并/表头路径、公式/值/依赖及隐藏标记 | 盲目填充合并格；混用公式与过期缓存值；把隐藏内容静默删除 |
+| 工程拓扑（B） | 符号/设备 ID、端口、连线/方向及专业类型 | 线相交不自动代表连通；物料流与控制关系不混用 |
+
+Office/P&ID 等规则为后续 Adapter 设计，不代表当前能解析这些输入。工程符号的含义须有规范/图例或经审核词典；多候选关系保留 `candidate/needs_review`。通用公式问答后置，仅为工业参数核验所需的确定表达式优先补足，计算输入/单位/舍入与原文有证据。
+
+## 5.5 质量门禁、失败处理与验收
+
+采用五类检查：格式/转换可读；内容覆盖与字符候选；结构/关系/表格完整；字段/单位/版本合法；引用可解析。每个失败记录影响范围、规则 ID、可恢复动作和预算；阶段指标分开，不能以高 OCR 字符正确率替代字段/关系/问答正确率。
+
+| 验收层 | 指标/用例 | 统计边界 |
+|---|---|---|
+| 分类/转换 | 路由正确率、误路由、失败/不支持状态 | 混合 PDF、假后缀、损坏/加密、转换缺失/警告均纳入 |
+| 原文/结构 | CER、标题/顺序、单元格/表头、图注/续接关系 Precision/Recall | 按载体/模板/质量分层；不可辨样本单列 |
+| 业务/工程 | 字段值/单位/范围、适用版次、尺寸—对象关联/拓扑边 | 工艺规范、实测和报告结论分别评测 |
+| 来源定位 | Locator 成功解析率、原页/对象命中率 | bbox/页码、原生对象 ID、单元格或句柄按类型评测 |
+| 检索/回答 | Recall@5、MRR、忠实度、引用支持、拒答 | 与解析组件指标分开；关系/精确数值不能只评词相似 |
+
+沿用项目研发目标：Recall@5 ≥ 0.85、MRR@10 ≥ 0.80、回答忠实度 ≥ 0.90、PDF 正确页码率 ≥ 0.95、质量风险召回 ≥ 0.90、多文档/多模态正确率 ≥ 0.90。它们不是官方满分线，也不是实测成绩。其他结构/关系指标先建人工 gold 与基线，再确定阶段门槛；新增格式必须增加定位和失败用例才可标“已验证”。
+
+格式不支持返回 `unsupported`，关键结构/字段不明返回待核验；检索空结果可在同权限范围改写一次，证据不足拒答。保留部分成功与失败范围，整体结论必须声明证据缺口；统一重识别预算见 §5.8 和 §6.7。
+
+## 5.6 工艺文件与质检报告的业务事实提取（新增，待实现）
+
+工艺文件提取零件/工艺编号、工序号、设备、材料、温度/压力/时间、允许范围、前置工序、例外条件、适用范围和版本有效期；质检报告提取批次、检测项目、实测值、单位、检测时间、报告结论和来源位置。工艺要求与实测值分别存储，禁止把规范值当成生产实测值。
+
+每条 `DocumentFact` 保存原始表达与标准化值，字段至少为 `fact_id`、`entity_type`、`entity_id`、`operation_no`、`batch_id?`、`metric`、`fact_kind`（requirement/measurement/conclusion）、`raw_value`、`normalized_value/range`、`raw_unit/normalized_unit`、`conditions`、`source_version`、`document_version`、`parse_version`、`valid_from/to`、`approval_status`、`evidence_refs[]`、`extraction_method`、`verification_status`。版本/条件不明时保持缺失状态，不能从文件名或上传时间补造。
+
+示例仅为拟议契约，不表示当前已有该文档或表：
+
+```json
+{
+  "fact_id": "fact-demo-001",
+  "entity_id": "A102",
+  "operation_no": "30",
+  "metric": "holding_temperature",
+  "fact_kind": "requirement",
+  "raw_value": "850±10℃",
+  "normalized_range": {"min": 840, "max": 860, "min_inclusive": true, "max_inclusive": true},
+  "normalized_unit": "℃",
+  "conditions": {"duration_minutes": 120},
+  "source_version": "sha256-demo",
+  "document_version": "V2",
+  "parse_version": "parse-demo-001",
+  "valid_from": "2026-09-01",
+  "valid_to": null,
+  "approval_status": "approved",
+  "evidence_refs": [{"block_id": "block-demo", "source_locator": {"locator_kind": "pdf_region", "document_id": "doc-demo", "source_version": "sha256-demo", "page_no": 3, "bbox": [40, 80, 300, 150], "coordinate_system": "pdf_points", "page_size": [595, 842]}}],
+  "verification_status": "candidate"
+}
+```
+
+模型负责字段候选和语义关联；确定性代码负责 JSON 契约、编号/枚举、单位、范围和时间检查。单位换算须处理偏移型单位，公差须区分对称/非对称和未指明公差；未知单位/符号保留原文并标记待核验。结构合法、规则通过、人工核验是不同状态，保留抽取版本和修订历史。
+
+检索采用“原文切片＋事实索引”：Qdrant 召回相关内容，PostgreSQL 按零件/工序/批次/版本筛选事实，并支持与生产记录的受控核对。语义检索相似度不能代替唯一编号匹配；关系计算走确定性工具，不把整批数值交给模型心算。
+
+## 5.7 二维 CAD 专项识别（新增，待实现）
+
+首版范围为二维机械图纸的标题栏、技术要求和选定尺寸/公差；图号、零件号、材料、版本优先，其后扩展粗糙度等特征。不承诺完整三维模型、任意工程符号或任意 DWG 兼容性。
+
+- **DXF 原生路径**：通过 `ezdxf` 读取文字、块属性、图层、尺寸实体及句柄，保留标注文本、数值候选、单位配置、视图/局部上下文与原始实体引用；尺寸覆盖文本与实体测量值不一致时登记差异，不能静默选择。
+- **PDF/扫描图路径**：识别标题栏、技术要求和尺寸密集区域，采用重叠裁剪/放大后 OCR 或国产视觉模型；去重并映射至原始页面，保留引线、端点及视图关联候选。
+- **DWG 路径**：建立单独的、经测试的 DWG→DXF/图纸 PDF 转换步骤；记录工具版本、布局、字体与转换警告。`ezdxf` 不是 DWG 转换器，相关限制见[官方说明](https://ezdxf.readthedocs.io/en/stable/introduction.html)。转换失败或不支持时明确返回边界，不能当空文件成功摄取。
+
+`DrawingFeature` 保存 `drawing_id/revision`、`part_id`、`feature_type`、`annotation_raw`、`nominal_value`、`tolerance_upper/lower`、`unit`、`entity_handle?`、`layer?`、`view_id?`、`target_refs[]`、`source_locator` 和 `association_status`。识别到尺寸文字不等于确定尺寸对应哪个对象；多个可能视图/对象时保留候选或转复核。PDF 图纸优先采用明确标注值，不根据页面像素长度或打印比例推定制造尺寸。
+
+分别评测文字/符号、字段值、公差区间和标注—对象关联，不能只用 OCR 字符准确率声称图纸理解完成。DXF 证据需提供实体句柄与对应渲染视图；扫描图证据使用页码/bbox。
+
+## 5.8 国产小模型级联与局部重识别（新增，待实现）
+
+常规页走原生解析或轻量 OCR，复杂表格/图纸局部才调用国产视觉模型。先评测 Qwen3-VL-2B/4B 候选，失败后在同一总预算内切换裁剪尺度或批准的较大国产模型；不以扩大模型自动替代证据不足。Qwen 官方提供文档解析、OCR 与定位示例，但没有据此承诺本项目工业图纸准确率。[官方仓库](https://github.com/QwenLM/Qwen3-VL)
+
+记录每次路由原因、裁剪区域、模型版本、参数量、视觉输入预算、耗时、显存与级联比例；使用内容 hash、区域和解析版本做缓存。必须先按质量/规则/冲突诊断选择动作，禁止对真实冲突反复重识别直到出现想要的数值。API 当前只有文本对话载荷，视觉图片输入与视觉配置选择需在 `datamind/providers.py` 和配置契约中新增实现，现有协议适配不等于具备多模态能力。
+
+参数效率以同一独立测试集、相同数据复杂度和硬件条件比较“轻量 OCR＋2B”“轻量 OCR＋4B”“全页视觉模型”等方案，报告效果与资源差异。OCR/Embedding/Reranker 与语言/视觉模型的参数分别登记；MoE 全参数和激活参数分别报告，量化位宽不等于参数量减少。只能验证 API 别名时声明具体规模未核验，不能宣称最小模型优势。
+
+# 6. 模块三：多 Agent 编排与跨源推理
+
+## 6.1 Agent 角色与职责边界
+
+| Agent / 服务 | 允许职责 | 不允许职责 | 典型输入/输出 |
+|---|---|---|---|
+| Query Understanding | 意图、实体、时间、歧义抽取；提出澄清 | 直接执行 SQL 或自行编造答案 | `UserQuery → QueryFrame` |
+| Planner / Orchestrator | 建立任务 DAG、预算和数据源路由 | 越过工具权限直接访问数据库 | `QueryFrame → TaskPlan` |
+| SQL Agent | Schema Linking、SQL 计划生成、只读执行请求、修复建议 | 绕过 Validator；执行写操作 | `SQLTask → SQLExecutionResult` |
+| RAG Agent | 检索、重排、证据抽取、引用定位 | 将无证据内容当成已验证事实 | `RAGTask → EvidenceBundle` |
+| Fusion Agent | 基于 ID/规范实体合并跨源结果，组织答案主张 | 隐去来源冲突或凭空推断因果 | `Subresults → ClaimSet` |
+| Verification Agent | 数值、引用、实体、时间、逻辑、安全检查 | 用不可复现的“自信分”覆盖明确错误 | `ClaimSet + Evidence → VerificationReport` |
+
+建议首版用 Python 显式状态机/有类型 DAG 实现，降低不可见控制流；若后续采用 LangGraph 等编排库，仍须保持任务状态、节点输入输出和工具边界可导出。Agent 是具有受限职责的流程节点，不以 Agent 数量作为创新指标。
+
+## 6.2 TaskPlan 与执行状态
+
+```json
+{
+  "plan_id":"p-...",
+  "goal":"核验 A102 批次温度与适用工艺，并检查质检报告一致性",
+  "budget":{"max_steps":12,"max_repair":2,"deadline_ms":30000,"max_rows":100},
+  "tasks":[
+    {"task_id":"t1","kind":"document.facts","depends_on":[],"input_refs":["query_frame"],"status":"pending"},
+    {"task_id":"t2","kind":"sql.measurements","depends_on":["t1"],"input_refs":["t1.part_id","t1.operation_no"],"status":"pending"},
+    {"task_id":"t3","kind":"report.facts","depends_on":["t2"],"status":"pending"},
+    {"task_id":"t4","kind":"fusion.verify","depends_on":["t1","t2","t3"],"status":"pending"}
+  ]
+}
+```
+
+状态枚举：`pending → ready → running → succeeded | failed | blocked | skipped`。每次变更写 `TraceEvent`；进程重启后从持久化状态恢复。依赖失败时只重跑受影响子图，且必须保留原失败事件。
+
+## 6.3 V-CAR：Plan → Execute → Verify → Repair
+
+**Plan**：把用户目标改写为可测试的 `ClaimSet` 和任务 DAG；每个子任务指定输入引用、工具、预期结果、超时与权限。\
+**Execute**：按拓扑序执行；独立 SQL/RAG 任务允许并发，带依赖的任务等待前序结构化结果。所有工具调用有 idempotency key、run_id、超时和限额。\
+**Verify**：校验 SQL 数值是否来自执行结果；文档事实是否由引用支持；实体 ID 与名称是否一致；时间、单位、币种和粒度是否匹配；不同来源是否冲突；查询/检索是否越权。\
+**Repair**：按失败原因选择局部动作：重新取 Schema、替换错误字段、调整检索查询、扩展证据范围、重新匹配实体、重算公式或发起澄清。修复后重新执行受影响节点并重做全部依赖的验证。\
+**Stop**：通过验证则回答；修复预算耗尽、权限被拒、来源冲突无法裁决或证据覆盖不足则终止并明确说明缺口。
+
+状态转换：`PLANNED → EXECUTING → VERIFYING → COMPLETED`；验证失败时 `VERIFYING → REPAIRING → EXECUTING`；不可恢复时进入 `NEEDS_CLARIFICATION` 或 `FAILED_WITH_EVIDENCE`。每轮修复保存 `failure_code`、`root_cause`、`repair_action`、输入差异、节点版本和结果差异，便于做修复成功率消融。
+
+## 6.4 跨源实体对齐与证据图
+
+实体映射优先级：主键/外部编码精确匹配 > 经审核别名表 > 规范化名称 + 上下文候选 > 模型建议后人工确认。不得仅凭名称相似度自动把两个实体合并。每条映射存 `source_entity`、`canonical_entity`、`match_method`、`score`、`approved_by`、`valid_from/to`。
+
+工程对象/连接关系表示文件中的业务结构，回答 Evidence Graph 表示结论的支持/反驳依据；二者通过对象/事实/来源 ID 关联。视觉候选关系不能直接视为已验证支持证据。
+
+Evidence Graph 节点类型：`Question`、`PlanTask`、`SQLQuery`、`SQLRow/Aggregate`、`Document`、`Chunk`、`TableCell`、`Formula`、`DocumentFact`、`DrawingFeature`、`BlockRelation`、`ConflictRecord`、`Claim`、`VerificationCheck`。工业扩展节点待实现，不能由已有 SQL 证据节点推定其已接入。边类型：`derived_from`、`retrieved_from`、`maps_to`、`supports`、`contradicts`、`verified_by`、`repaired_from`。每个最终 Claim 至少有一个 `supports` 边或明确的 `insufficient_evidence` 状态。
+
+## 6.5 校验规则与置信度
+
+规则化门禁必须先于模型评审：
+
+- 数值 Grounding：答案数值可在 SQL 结果或公式计算记录中定位；允许范围只用于格式舍入，不可容忍量级错位。
+- 引用 Grounding：关键文本 claim 至少映射到一个证据块；使用句级支持/矛盾判断，模型审校作为二级信号并抽样人工复核。
+- Entity Grounding：产品/客户/地区等规范 ID 与 SQL 行、文档实体映射同一。
+- Temporal Grounding：问题期间、数据时间戳、文档版本有效期一致。
+- Cross-source Consistency：冲突显式标出；无裁决依据时不自动选择。
+- Safety Grounding：执行身份、允许工具、SQL AST 和检索 ACL 均通过。
+
+展示置信等级而非未经校准的小数概率：`high / medium / low / insufficient`。如比赛需要数值分数，则用标注集做 isotonic/logistic calibration，另报 ECE/Brier Score；分数解释为已验证证据覆盖信号，不声称是事实绝对概率。
+
+## 6.6 失败恢复
+
+模型输出不符合 JSON Schema：一次结构化重试；仍失败转安全模板答复。工具超时：熔断该子任务、最多一次幂等重试；依赖关系允许时继续执行独立子图。RAG 无证据：不得用模型内知识补缺；询问是否扩大文档范围。SQL 与文档值冲突：先执行 §6.7 的实体/单位/版本与规则核验；缺少裁决依据时分列展示并转复核。Repair 超限：返回已验证的局部结论，并清楚列出未完成部分。
+
+## 6.7 结构化与非结构化数据的冲突检测与消解（新增，待实现）
+
+比较前先确定规范实体、工序、批次、指标定义、测量时点/方法、单位及适用版本。工艺规范与实测值不同可能表示不合规，并不是两个来源对同一事实的矛盾；只有同一事实、相同口径的记录不一致才进入跨源冲突判定。
+
+| 分类 | 核验动作 | 消解依据/状态 |
+|---|---|---|
+| 单位/口径差异 | 可靠换算，核对测量定义/精度/时点 | 口径对齐后等价则 `resolved_equivalent`；不同口径不强行比较 |
+| 实体/批次误对齐 | 检查编号、审核别名及工序键 | 撤销错误映射；无唯一候选则 `needs_review` |
+| 文档版本差异 | 按批次发生时间匹配已批准且生效的版本 | 有唯一适用版本则 `resolved_by_rule`；有效期重叠/缺失转复核 |
+| 疑似识别错误 | 原文局部重识别，对比候选并检查证据 | 保留旧值/新值/原因；不能仅因新值与数据库一致就认定正确 |
+| 同口径真实矛盾 | 展示双方原始记录、修订/审批链 | 只按已登记权威规则裁决；无依据则 `unresolved` |
+| 实测超出规范 | 确定性区间/条件计算 | 输出业务不合规结论及规则证据，单独统计 |
+
+处理顺序：对齐 → 标准化 → 查适用版本 → 分类 → 受控重识别或规则裁决 → 重新计算全部依赖结论。默认不存在“数据库永远正确”或“上传更晚的文件优先”规则；来源权威策略必须说明适用范围、审批人、规则版本与有效期。
+
+`ConflictRecord` 字段为 `conflict_id`、`entity_key`、`metric`、`conflict_type`、`left/right_fact_refs`、`comparison_context`、`normalized_values`、`rule_id/version`、`resolution_status`、`selected_fact_ref?`、`reason`、`repair_attempt_refs[]`。来源原值不可覆盖。消解成功只代表差异按证据/规则得到解释，不自动获得写回生产库的权限。
+
+示例：工艺要求 840–860℃，数据库实测 870℃，同批次报告实测 850℃。系统应分别报告“数据库记录超限”和“实测值跨源冲突”。即使报告写“合格”，也不能在温度事实未消解前生成单一确定的批次合格结论。
+
+## 6.8 高级创新自述与消融设计（新增，待验证）
+
+拟议自述主题：**面向工业混合数据的可追溯事实提取与冲突驱动局部重识别**。创新假设是：把业务事实绑定到原始区域，利用单位/版本/实体规则诊断跨源冲突，只对疑似识别错误的区域调用国产小视觉模型，能够在维持效果时减少全页模型调用并提高错误定位能力。该假设尚未实测，不能写成已证明突破。
+
+同一冻结测试集依次比较：①普通 OCR＋文本检索；②结构化事实＋实体/单位/版本核验；③再增加局部重识别；④完整规则消解和证据闭环。固定模型与其他配置做机制消融，再单独比较 2B/4B 的规模影响。统计字段准确率、冲突精确率/召回率、正确消解率、局部修复成功率、正确字段被改错比例、答案正确率、拒答率及额外耗时；分别保留成功、真实未消解和修复预算耗尽案例。
+
+# 7. 模块四：全链路可解释与可视化
+
+## 7.1 Trace 设计
+
+每个 run 事件统一含：`event_id`、`run_id`、`parent_event_id`、`task_id`、`agent_name`、`event_type`、`status`、`started_at`、`ended_at`、`duration_ms`、`input_summary`、`output_summary`、`tool_name`、`artifact_refs[]`、`retry_index`、`error_code`、`model_id`、`prompt_version`、`token_usage`、`visibility`。原始文档全文、凭证和隐私字段不得放到可视化事件中；SQL 参数按敏感级别脱敏。
+
+Trace 事件类型：`query.parsed`、`plan.created`、`tool.started`、`sql.validated`、`sql.executed`、`retrieval.completed`、`evidence.attached`、`verification.failed/passed`、`repair.started/completed`、`answer.completed`。新增工业事件（待实现）：`document.parsed`、`fact.extracted`、`version.selected`、`conflict.detected`、`region.reparsed`、`conflict.resolved/unresolved`；按事件区分规则消解与重识别。
+
+## 7.2 前端交互
+
+- **问答区**：流式显示回答草稿状态、澄清请求和最终答案；未验证时显示“正在核验”，不把中间生成当成最终结论。
+- **执行图**：Vue Flow / Cytoscape 展示 DAG 节点、依赖边、耗时、状态、失败/重试标识；可折叠低层细节。
+- **SQL 面板**：展示脱敏 SQL、数据库方言、Validator 检查清单、执行时间、行数、表格结果和导出按钮。
+- **证据面板**：展示来源、源/业务/解析版本、原文与质量发现，按 SourceLocator 打开原页/对象/单元格；PDF 显示实际页序号与印刷页码，CAD 显示实体/视图。后续 Office 不伪造页码，未支持定位类型明确提示。
+- **文档识别与核验视图（待实现）**：左侧原页/图纸区域，右侧工艺或质检字段、单位、版本和核验状态；点击字段高亮原文或 CAD 实体渲染位置；下方展示对应数据库值、差异和采用依据。
+- **校验面板**：逐条显示 Claim、证据、规则名称、PASS/WARN/FAIL、修复结果；区分业务不合规、已消解冲突、未消解冲突和待人工核验。
+- **性能面板**：总耗时、SQL、检索、解析、LLM 各阶段耗时；数据规模、并发数、缓存命中率和当前评测版本。
+
+展示对象是可复核的决策依据、工具调用和证据关系，不提供隐式内部思维链文本。用户应能从最终答案点击到原始 SQL 行、文档页和验证规则。
+
+## 7.3 流式协议
+
+`POST /v1/chat/stream` 使用 SSE；事件载荷统一为 `event: trace` / `data: {TraceEvent}`。断线后通过 `GET /v1/runs/{run_id}/events?after={cursor}` 按序恢复。客户端用 `run_id + event_id` 去重；完成事件是 `answer.completed`，失败事件包括 `run.failed` 和可读原因。大文件与页面图走文件 API 或预签名对象引用，不内嵌在 SSE。
+
+## 7.4 可解释性验收
+
+- 运行步骤完整率 ≥ 0.99（持久化事件数/实际工具调用数）。
+- 最终事实 Claim 证据覆盖率 ≥ 0.95；无法溯源的 Claim 必须被阻止或标记。
+- 前端展示的 SQL 与实际执行 SQL 哈希一致；修复前后 SQL 可比较。
+- 引用页码与原 PDF 页码映射正确率 ≥ 0.95。
+- 一条完整 Demo 路径可从运行 ID 重放；PII 和凭证泄漏数 = 0。
+
+# 8. Metadata / Knowledge Infrastructure
+
+## 8.1 统一元数据对象
+
+| 对象 | 主键 | 关键字段 | 主要用途 |
+|---|---|---|---|
+| DataSource | `source_id` | 类型、连接 secret 引用、schema allowlist、权限组、环境 | 连接与安全边界 |
+| SchemaSnapshot | `snapshot_id` | source_id、catalog_version、表列、关系、更新时间 | 可复现 SQL 生成 |
+| BusinessMetric | `metric_id` | 定义、表达式、单位、粒度、过滤口径、负责人 | 指标语义口径 |
+| EntityAlias | `alias_id` | canonical_id、alias、来源、有效期、审批状态 | Schema 和跨源实体匹配 |
+| DocumentAsset | `document_id` | 文件 hash、URI、页数、ACL、质量分、parser 版本 | 文档版本和访问控制 |
+| DocumentBlock / Chunk | block_id / chunk_id | 页、坐标、标题路径、文本/表格/公式、内容 hash | 引用追溯与检索 |
+| FileClassification / ParseResult（新增，待实现） | document_id / parse_version | 容器/内容画像、路由/能力、范围/缺口、产物/版本 | 文件分类与适配结果 |
+| BlockRelation / SourceLocator（新增，待实现） | relation_id / locator_ref | 结构关系、原生位置、源版本/坐标系/变换/状态 | 结构恢复与跨格式定位 |
+| DocumentFact（新增，待实现） | `fact_id` | 原始/标准化值、实体/工序/批次、单位、条件、版本、证据、抽取状态 | 工艺规范与质检实测值索引 |
+| DrawingFeature（新增，待实现） | `feature_id` | 图号/版次、尺寸/公差、对象关系、CAD 句柄/页坐标、关联状态 | 二维图纸字段与关联核验 |
+| ConflictRecord（新增，待实现） | `conflict_id` | 双方事实、比较口径、分类、规则版本、处理状态、重识别历史 | 冲突检测、消解与回放 |
+| EvaluationCase | `case_id` | query、标签、gold SQL/answer/evidence、slice、版本 | 离线评测与回归 |
+| Run / TraceEvent | run_id / event_id | plan、工具事件、时间、状态、版本 | 审计、演示、诊断 |
+| Evidence / Claim | evidence_id / claim_id | 原始出处、支持关系、校验状态 | 端到端可解释性 |
+
+## 8.2 存储建议
+
+- PostgreSQL 保存 Catalog、权限、运行、评测集和结构化证据索引；JSONB 放可变解析属性，关系型列保存必须过滤和约束的字段。
+- 对象存储保存源文件、页面渲染图和中间解析产物，按内容 hash 版本化；本地演示可用 MinIO 或文件卷。
+- Qdrant 保存 chunk dense/sparse vectors 与过滤 payload；若语料规模小、系统组件需最少，可用 PostgreSQL + pgvector 作为替代。向量索引需与 `document_version`、ACL、parser/embedding model version 同步。
+- Redis 可选：短时会话、任务协调、幂等锁和缓存。缓存键必须包含用户权限、查询规范化、数据/文档版本和模型/提示词版本，避免跨权限复用。
+- Schema Graph、文档结构、工程对象关系和回答证据图分别存 PostgreSQL 对应表/JSONB，按需内存遍历。版本/权限过滤覆盖邻接补全；不能通过跨域关系绕过原资产权限。有规模/查询成本实测后再考虑专门图数据库。
+
+## 8.3 数据治理与版本
+
+每次评测或 Demo 的 manifest 固定：应用 commit、SQL schema snapshot、业务词典版本、文档集合 hash、分类/Adapter/结构恢复/parser 版本、转换工具/参数、源/业务/解析版本、embedding/reranker 版本、模型 ID/国产来源/权重版本/参数量/量化配置、提示词版本、温度/采样参数、评测集版本、缓存状态、部署规格。更新知识库采用 `ingest → validate → shadow index → atomic switch`，失败可回滚到上一个可用索引。
+
+# 9. Evaluation System
+
+## 9.1 测试集建设
+
+项目自设初赛评测基线为至少 10 道 NL2SQL 与 10 道 RAG 测试题（非用户提供的官方数量要求）；建议扩充为 60–100 条可审计用例，并保持规则调参集与独立测试集隔离。样本按难度和失败类型分层：
+
+- NL2SQL：单表过滤、时间范围、别名、枚举、JOIN 2/3/4 表、聚合、排序 Top-k、同比/环比、嵌套、空值和歧义澄清。
+- RAG：原文段落、跨页标题、扫描件 OCR、复杂表格、表格计算、公式变量、跨文档冲突、过期版本、答案不可得。
+- Cross-source：工艺要求→批次 SQL→质检报告核对，图纸→零件/工序约束，单位等价、版本过期/重叠、真实矛盾、实体误对齐、证据不足。
+- 工业解析：分类/路由、混合扫描页、阅读顺序/标题/图注/脚注、续表/合并表头、工艺/实测/图纸字段、尺寸—对象关联；按载体/模板/质量分层。
+- 后续格式：Word 对象/批注、PPT 节点/连接线、Excel 表区/公式值、P&ID 拓扑在 B 类 Adapter 实现后才纳入正式支持集，单列成绩。
+- Robustness：错别字、口语简称、时间缺失、超长问题、权限越界、空检索、坏文件和服务超时。
+
+每条 Case 包含：`case_id`、类别/难度、用户问题、期望路由、gold query plan、gold SQL 或允许 SQL 集、结果断言、必需证据 ID/SourceLocator、gold blocks/relations、期望解析状态、gold answer claims、澄清标签、失败类别、数据版本、人工审核者。
+
+## 9.2 指标与计算
+
+| 子系统 | 主要指标 | 说明 |
+|---|---|---|
+| Schema Linking | Recall@k、MRR、表/列/关系路径准确率 | 分别报告表、列、枚举值，使用人工标注 gold IDs |
+| NL2SQL | Exact Match、Execution Accuracy、Clause Accuracy | Execution Accuracy 以只读参考库执行后结果比较；数值允许容差须逐题声明 |
+| RAG Retriever | Recall@k、Precision@k、MRR、nDCG@k | 至少报告 k=5、10，按文档类型/质量分层 |
+| RAG Answer | Correctness、Faithfulness、Citation Precision/Recall | 规则/标注为主，LLM Judge 只作辅助；随机抽样人工复核 |
+| 文件分类/结构 | 路由准确率、覆盖率、标题/顺序/图注/续表/表头与关系 Precision/Recall | 按格式/载体/业务分层；partial/unsupported 计入状态报告 |
+| 工业字段/图纸 | 字段 Precision/Recall/F1、值/单位/范围准确率、表格结构与标注—对象关联正确率 | 按文档/字段类别分层；缺失字段与多候选单列 |
+| 冲突与消解 | 冲突 Precision/Recall、正确消解率、错误消解率、未消解比例 | 与业务不合规分开；消解分母为触发规则/修复的冲突，不用一致率代替准确率 |
+| 局部重识别 | 修复成功率、误修复率、触发比例、额外耗时 | 误修复指原本正确的字段被改错；比较机制消融与规模实验 |
+| 模型效率 | 各模型参数、激活参数、量化位宽、显存/内存、视觉输入量、调用比例 | 同数据/硬件/效果下比较；API 别名规模未知须注明 |
+| Agent / V-CAR | 路由准确率、计划可执行率、跨源答案准确率、Verify 检出率、Repair Success Rate | 分母分别报告触发校验数/修复数，不能只展示成功案例 |
+| 可解释性 | Claim Evidence Coverage、Trace Completeness、Source Locator Accuracy | 输出 Claim 到 SQL/块/页码路径的可验证比例 |
+| 性能 | p50/p95 latency、吞吐 QPS、错误率、token/查询、cache hit | 分单源/跨源；固定数据量、并发数和硬件 |
+| 鲁棒性 | 澄清正确率、拒答正确率、权限违规数、低质文档风险召回率 | 对抗/异常用例单列；权限违规目标为 0 |
+
+执行结果比较可先用排序无关的行集 canonicalization（列顺序归一、数值类型归一、明确小数容差），对排名/限量问题必须保留排序与 Top-k。不要仅用 SQL 字符串完全相同作为准确率；也不要把“可运行”当成语义正确。
+
+## 9.3 测试流程和门禁
+
+1. Freeze 数据、元数据和评测集版本，记录 manifest。
+2. 运行组件级回归：Parser、Schema Retriever、SQL Guard、Retriever、Verifier。
+3. 运行端到端基准：按场景、难度、模态、工具路径输出 confusion matrix 和错误簇。
+4. 对每次提示词/索引/模型/路由变化做 A/B 与消融；一次只改变有限因素。
+5. 对新增成绩人工抽查至少 10% 样本与全部高风险边界样本。
+6. 发布门禁：SQL 安全违规为 0；关键路径通过率不下降；错误答案和低证据回答无静默增长；p95 不超预算；演示问题可重复运行。
+
+## 9.4 工业复杂数据、自建基准与效率实验
+
+第一批建议建设约 40 份核心源文档（工艺卡 15、质检报告 15、二维图纸 10），配套可重置生产/质检记录和约 60 条问答/核验用例。这是建设计划，当前尚未生成工业数据。文档需覆盖多模板、版本/有效期、合并/跨页表格、图纸视图、小字号/符号；真实授权样本与合成样本分别标注。
+
+同一源文档的原生、旋转、模糊、噪声扫描变体必须归入同一数据划分；按模板家族、零件系列/来源分组划分调参集与独立测试集，避免用近重复扫描页提高成绩。Gold 由人工逐字段标注原文位置、值/单位/条件、适用版本、实体/对象关联及冲突原因；模糊不可辨的字段标注为不可确定。没有真实样本时只报告合成数据边界，不声称适用于任意工业图纸。
+
+预置冲突覆盖单位表观差异、实体误配、有效期重叠、OCR 数字错误、来源真实矛盾与证据不足；同时加入大量无冲突样例检测误报。原生对照文本和 OHR-Bench gold 仅提供给评测端，OCR 推理不得读取 gold。分别统计“错误是否检出”“差异是否正确消解”和“最终业务结论是否正确”。
+
+结构反例必须包括双栏串序、图注邻近但不属于该图、不同单位的相似续表、含例外的脚注、标注有多个对象和混合 PDF 漏扫描页。B 类另增批注/修订、PPT 连线方向、Excel 多表区/隐藏/缓存过期、交叉线不连通。Gold 绑定原始对象/区域/版本，失败或不支持不能从分母静默删除。
+
+首轮效率比较优先固定工业数据复杂度、国产模型及硬件，报告冷/热缓存、解析耗时、问答 p50/p95、显存/内存、调用次数、视觉输入量和失败率；并发从 1 开始。千万行/万文档/20 并发的大规模压测降为可选后续实验，不能替代真实工业文件识别与冲突闭环。
+
+# 10. 接口契约与关键数据结构
+
+## 10.1 外部 API 与实现边界
+
+| 方法与路径 | 用途 | 当前状态 |
+|---|---|---|
+| `POST /v1/chat`、`POST /v1/chat/stream` | 问数与 SSE | 已实现 SQL 单源；文档/跨源返回 `ROUTE_UNSUPPORTED` |
+| `GET /v1/runs`、`GET /v1/runs/{id}` | 运行列表与结果 | 已实现 SQL 单源 |
+| `GET /v1/runs/{id}/events`、`GET /v1/runs/{id}/evidence` | 续传与证据回放 | 已实现 SQL；工业事实/冲突待扩展 |
+| `/v1/model/profiles` 及既有启用/导入/导出 | 多配置文本接入 | 已实现；国产来源/视觉配置待扩展 |
+| `POST /v1/documents`、`GET /v1/documents/{id}` | 上传、摄取状态/质量/版本 | 待实现；摄取脚本不等于上传 API |
+| `GET /v1/documents/{id}/facts` | 工艺/质检字段与原始证据 | 新增设计，待实现 |
+| `GET /v1/documents/{id}/features` | CAD 尺寸/公差及对象关联 | 新增设计，待实现 |
+| `GET /v1/documents/{id}/pages/{page_no}` | 原页预览与坐标基准 | 新增设计，待实现 |
+| `GET /v1/runs/{id}/conflicts` | 双方事实、规则与修复历史 | 新增设计，待实现 |
+| `POST /v1/documents/{id}/reparse` | 指定受控区域重解析 | 新增设计，待实现；受总修复预算限制 |
+| `POST /v1/evaluations/{suite}/run` | 固定评测作业 | 待实现；当前评测由脚本运行 |
+
+当前 HTTP 服务仅面向本机演示，未接身份认证。目标采用 JWT/反向代理身份，`scope` 只收窄权限；文件限制类型、大小、页数与解析时长，返回稳定错误码与运行 ID。新增接口、ACL 和对象须实现并迁移，不能凭本表视作上线。
+
+## 10.2 工业 Chat 请求（目标扩展，当前不可运行）
+
+```json
+{
+  "conversation_id": "conv-industrial-001",
+  "question": "2026年9月A102工序30哪些批次温度超限？生产记录和质检报告是否一致？",
+  "scope": {"database_sources": ["demo_industrial"], "knowledge_collections": ["process_and_quality"]},
+  "options": {"stream": true, "show_sql": true, "answer_locale": "zh-CN"}
+}
+```
+
+工业来源/集合未创建或授权前不进入 Agent allowlist；当前 SQL 数据源仍为 `demo_retail` 和 `chinook`。
+
+## 10.3 最终答案响应（目标契约）
+
+```json
+{
+  "run_id": "run-001",
+  "status": "completed",
+  "answer": "……[E1][E2]",
+  "claims": [{"claim_id":"c1","text":"批次 B001 的数据库温度记录超出适用工艺区间","status":"verified","evidence_ids":["e1"]}],
+  "confidence_level": "high",
+  "conflicts": [{"conflict_id":"conf-demo","status":"unresolved","left_fact_ref":"sql-demo","right_fact_ref":"report-demo","reason":"同批次同口径实测值矛盾，缺少裁决依据"}],
+  "trace_cursor": "evt-009",
+  "versions": {"schema":"s-14","knowledge":"kb-22","prompt":"p-8","model":"model-config-3"}
+}
+```
+
+## 10.4 错误契约（含待实现扩展，状态见 §18）
+
+| 错误码 | 含义 | 行为 |
+|---|---|---|
+| `AMBIGUOUS_METRIC` | 指标口径不唯一 | 返回候选定义并请求澄清 |
+| `SCHEMA_NOT_FOUND` | 未找到可信字段或关系 | 不生成 SQL；提示维护元数据 |
+| `SQL_POLICY_BLOCKED` | SQL 触犯只读/权限/资源门禁 | 拒绝执行并记录规则 |
+| `SQL_TIMEOUT` | 查询超时 | 取消语句，受预算限制重试或缩小范围 |
+| `DOCUMENT_LOW_QUALITY` | 文档解析可信度不足 | 进入降级/人工复核，引用中标警告 |
+| `EVIDENCE_NOT_FOUND` | 没有足够证据支持答案 | 澄清、扩大授权范围或返回未验证 |
+| `CROSS_SOURCE_CONFLICT`（待实现） | 同实体同口径来源矛盾 | 原值/版本/来源分列；有显式规则才消解 |
+| `DOCUMENT_FORMAT_UNSUPPORTED`（待实现） | CAD 格式/转换不支持 | 返回边界，不当空解析成功 |
+| `FACT_SCHEMA_INVALID`（待实现） | 契约不合法/单位未知 | 保留候选与原文，不参与确定结论 |
+| `VERSION_UNRESOLVED`（待实现） | 无唯一适用版本 | 返回版本候选，转待核验 |
+| `DRAWING_ASSOCIATION_UNCERTAIN`（待实现） | 标注对象不确定 | 保留关联候选并转复核 |
+| `REPAIR_BUDGET_EXHAUSTED` | 修复预算用尽 | 终止并附失败轨迹，不循环调用 |
+
+## 10.5 文件状态与解析结果扩展（待实现）
+
+`ingest_stage` 为 queued/classifying/parsing/validating/indexing/ready/failed；`parse_status` 为 §5.1.2 的 parsed/partial/needs_review/failed/unsupported。摄取就绪、局部解析完成、业务事实已验证分别报告，不共用 success 标记。
+
+拟议响应字段：document_id、source_version、document_version、parse_version、classification、adapter_capabilities、ingest_stage、parse_status、parsed_scope、failed_scope、quality_findings、unsupported_features、artifact_refs、model_manifest_ref。只发布通过验证的解析版本；重识别保留旧版本及依赖，不覆盖原文。
+
+`GET /v1/documents/{id}/relations`（新增设计）返回结构/工程关系与原始证据；`GET /v1/documents/{id}/source?locator_ref=...`（新增设计）由服务端查表解析已登记 locator，返回授权原页/对象预览，不能接受任意路径或把 URL 当访问权限。前端展示缺口、不支持和待核验，不能只显示“已入库”。
+
+# 11. Demo 设计与验收脚本
+
+## 11.1 工业演示数据与现有基线
+
+既有 `demo_retail`、`chinook` 和零售/OHR-Bench 语料保留回归；不将其成绩解释为工业识别能力。计划新增 `demo_industrial`：
+
+| 计划表/对象 | 核心字段 | 数据契约 |
+|---|---|---|
+| `parts` | 零件 ID、图号、材料、名称 | 唯一编码，审核别名辅助 |
+| `process_revisions` | 工艺/版次、零件、审批、有效期 | 时间半开区间，重叠/未知可检出 |
+| `operations` | 工艺版本、工序号/名称 | 同版本下工序唯一 |
+| `production_batches` | 批次、零件、生产时间、工艺版本 | 按批次时间选择适用版本 |
+| `process_measurements` | 批次/工序/指标、实测/单位/时点 | 多次采样明确逐次/汇总口径 |
+| `quality_records` | 检测 ID、批次/项目、实测与结论 | 对应报告记录有明确键 |
+| 工艺/质检文件、图纸 | 文档/图号、版次、实体、审批/有效期 | 字段证据可回原页/CAD 实体 |
+
+先冻结连接基数、字段与 gold，再编写 seed、Catalog、文档/标注及评测脚本。多采样与多检测 JOIN 不得重复聚合；缺信息保留缺失。材料标明合成/授权来源与版本。当前尚未创建上述工业表或数据。
+
+## 11.2 基础与专项现场演示路径
+
+**基础演示（文档部分待实现）**：单表“2024 年有多少笔订单？”展示 SQL；单文档“这份工艺卡工序 30 的温度要求是什么？”展示原文/页码/字段；无答案明确拒答。
+
+**路径 A：复杂多表问数**：既有零售 SQL 基线可运行；工业扩展查询零件/期间的批次、测量、质量记录，展示 JOIN/粒度/聚合与只读证据（待实现）。
+
+**路径 B：工艺＋质检混合核验（待实现）**：问“2026 年 9 月 A102 工序 30 哪些批次温度超限？生产记录和质检报告是否一致？”展示版本选择、字段、SQL、规则比较、冲突分类与原页高亮。
+
+**路径 C：CAD＋冲突局部重识别（待实现）**：读取零件/材料/选定尺寸公差，与工艺/质检核对；展示低清区域的识别风险、修复前后与重新核验。保留真实矛盾、版本不明/对象不确定和预算耗尽案例，不用预置正确值冒充识别。
+
+## 11.3 演示验收与阶段交付
+
+- 国产模型来源/版本、可核验参数量/量化配置与辅助模型可查；API 别名未知规模如实说明。
+- 一键启动/恢复版本，结果关联 `run_id`；历史运行标为回放，不能伪装实时演示。
+- 基础成功/无答案用例可复现；专项展示 SQL、字段、适用版本、原文、规则和冲突状态。
+- 初赛交付设计报告、技术实验说明书、可运行软件压缩包；附启动/重建说明、锁定依赖、数据/模型获取办法、固定标签、逐例报告及边界。大权重不随包时说明合法获取/缓存方式，按赛事规定准备环境。
+- 决赛展示可运行工业智能体与国产小模型对照，专项数量对照官方九项，附高级创新自述/消融/失败证据。
+- 按实际网络条件演练，未验证本地模型时不承诺离线可运行；不可用则明示失败或回放。
+- 指标附版本/分母，不把目标、gold 注入或原生对照当真实识别成绩。
+
+# 12. 技术选型与国产模型要求
+
+## 12.1 模型来源与规模
+
+**竞赛必须采用国产模型**。语言/视觉/OCR/Embedding/Reranker 登记研发来源、权重/模型卡、版本、许可与用途，并核对赛事认定口径；国产云地址或 OpenAI 兼容协议不能证明底层模型来源。
+
+- SQL/文本：保留 DeepSeek 历史基线，新增国产小规模开源文本模型同集对照。`deepseek-flash` 是历史别名，精确权重/参数需核验，不能据此宣称小模型优势。
+- 视觉：Qwen3-VL-2B/4B 候选，用于复杂局部；未安装/集成/评测，官方依据见 §5.8。
+- OCR/版面：PaddleOCR/PP-StructureV3 候选，先接真实扫描；冻结各子模型，不能当完整 CAD 理解器。
+- Embedding：当前 BAAI/bge-small-zh-v1.5；重排优先国产来源可核验模型，同集锁定。
+
+已有 Anthropic Messages 协议保留兼容性历史，不作为比赛模型方案或亮点。竞赛配置锁定已核验国产模型；当前未实现来源强制校验或视觉配置分工，需补 manifest/配置校验。
+
+## 12.2 工程组件与状态
+
+| 层 | 已有/候选 | 近期扩展 |
+|---|---|---|
+| API/编排 | FastAPI、SQL 状态机已有 | RAG/工业 DAG、文档 API/权限 |
+| 数据库/SQL | PostgreSQL、Catalog/审核图、SQLGlot 已有 | 工业 seed/口径/粒度、事实/冲突迁移 |
+| 检索 | BGE/Qdrant 摄取已有 | 运行时 Hybrid/重排/事实过滤 |
+| 文档 | PyMuPDF 已有；PaddleOCR/PP-StructureV3 待接 | Router/Adapter、结构关系、原生/扫描与工艺事实 |
+| Office/拓扑 | B 类待实现 | 原生对象/单元格/连接线优先，视觉补疑难，独立定位/评测 |
+| 模型/空间/音视频 | C 类后置 | 专业对象/坐标/时间契约，当前不在核心交付 |
+| CAD | ezdxf 候选；DWG 转换单独测试 | DXF 实体/图纸局部视觉、关联不确定处理 |
+| 解析替代 | MinerU 候选 | 核验部署模型来源、同集比较后决定 |
+| 存储 | 本地文件卷已有 | 裁剪/CAD 渲染/不可变版本；S3 可选 |
+| 前端 | HTML/JS/CSS 测试页已有 | 字段/原文高亮/冲突；Vue 迁移可选 |
+| 部署/观测 | Compose 数据服务/应用 Trace 已有 | worker 按需；OTel/Redis/大规模监控后续 |
+
+先用工业样本验证效果/资源，再锁依赖与权重。确定性工程库来源与国产模型要求分别登记，不堆叠多套服务。
+
+# 13. 前后端与部署方案
+
+## 13.1 服务拆分
+
+**单体模块化服务起步**：`api`、`orchestrator`、`sql`、`rag`、`verification`、`trace`、`evaluation` 分 package，共用类型和依赖注入；文档摄取/评测作为单独 worker 进程，必要时用 Redis Queue/Celery。不要在首版把每个 Agent 变成微服务。
+
+当前前端为 `web/index.html`、`web/app.js`、`web/style.css`，后端 FastAPI + Pydantic + psycopg2。优先在现有页面增加文件/字段/证据高亮/冲突，页图或 PDF.js 用于定位；Vue/TypeScript 和图形库按需评估，不阻塞主路径。摄取可独立 worker，文件先存本地卷，元数据存 PostgreSQL，向量存 Qdrant。
+
+## 13.2 目标部署拓扑（尚未全部实现）
+
+```text
+reverse-proxy (TLS / static frontend)
+   ├── frontend (existing web assets / optional Vue)
+   └── api (FastAPI, 1-2 replicas)
+         ├── worker (OCR / ingestion / evaluation)
+         ├── postgres (metadata + app state)
+         ├── qdrant (dense/sparse index)
+         ├── file volume / optional S3 (source / page / crop)
+         └── redis (optional queue/cache)
+```
+
+数据库赛题样例作为独立 read-only source 连接，或使用容器化 PostgreSQL 初始化脚本；不要与 Metadata DB 共用高权限账号。当前支持文本 remote API 配置；计划增加已核验国产本地兼容 API，视觉适配/本地部署须单独验收。模型不可用时，明确显示 degraded mode，不返回伪造的正常结果。
+
+## 13.3 安全、权限与资源限制
+
+- SQL: 独立只读角色、schema/table allowlist、AST allowlist、查询超时、结果行数和导出限制。
+- 文件: MIME 与魔数双重检测、大小/页数限制、病毒扫描按条件启用、路径隔离、租户 ACL 贯穿索引过滤。
+- 模型提示: 文档内容作为不可信数据，禁止其改变系统规则或工具权限；工具参数由 Pydantic/allowlist 校验。
+- 运行: 最大任务数、工具并发、token、deadline、重复调用上限；cancel 传播至数据库/worker。
+- 机密: `.env` 不入库；生产 secret manager；日志去除 key、原文 PII 和受限 SQL 参数。
+- 评测: 生产数据和演示数据分环境；人工检查已授权数据，模型供应商的数据保留条款单独审核。
+
+# 14. 现有仓库的增量实现位置
+
+保留 `datamind/`、`ingestion/`、`web/`、`db/`、`deploy/` 和 `scripts/` 结构，不迁移已运行 SQL。下面新增路径均为规划，当前未创建。
+
+| 位置 | 复用与计划新增 |
+|---|---|
+| `datamind/agent.py`、`api.py` | 复用 SQL 状态机/HTTP/SSE，扩展文档/工业路由与 API |
+| `datamind/providers.py` | 补视觉载荷、国产模型来源与配置分工 |
+| `datamind/catalog.py`、`sql_*.py` | 工业 Catalog、审核关系、测量粒度/口径与只读执行 |
+| 新增 `datamind/document_facts.py`、`industrial_verify.py`、`rag.py` | 事实契约、核验/消解、运行检索/引用/拒答 |
+| `ingestion/ingest.py`；新增 `router.py`、`parsers/`、`quality.py` | 分类/能力登记、PDF/OCR/DXF/视觉 Adapter、质量路由 |
+| 新增 `datamind/document_structure.py`、`source_locator.py` | Block/Relation/Locator，结构恢复、权限/版本定位与邻接补全 |
+| 新增 `db/seed_demo_industrial.py`、`deploy/init/` 增量迁移 | 工业 seed/Catalog，事实/CAD/冲突对象，兼容已有库 |
+| `web/` | 识别/字段/原文高亮、SQL 对应值、冲突面板 |
+| 新增 `scripts/eval_documents.py`、`eval_conflicts.py` | 字段/CAD/定位、冲突/消解/修复与消融；保留 SQL/Schema 回归 |
+| 新增 `data/industrial/`；扩展 `data/evaluation/`、`object_store/` | 工业源、独立 gold、裁剪/CAD 渲染/版本产物 |
+| `reports/`、`技术文档/` | 工业报告、设计/实验说明、模型 manifest 和创新自述 |
+
+已有 Document/Chunk/Evidence/Run 表不代表工业事实/CAD/冲突已实现；新增字段必须迁移并绑定版本/证据，不能靠重置既有库隐式完成。
+
+# 15. 研发路线图与赛题交付顺序
+
+本节保留 M1–M14 代号，原六周/三天节奏仅为估算，不代表比赛日期或已完成进度；状态见 §18.1。当前优先 M6→M7→M8 的真实文档闭环，再做 M10 工业冲突与 M11 创新；M9/M12 复用已有 SQL API/Trace/页面。
+
+## 里程碑 M1（第 1-3 天）：赛题冻结与工程骨架
+
+**目标**：把评分点变成需求、数据契约和可启动骨架。\
+**任务**：整理基础/中级/高级任务矩阵；冻结首批演示问题；复用 Git、配置、FastAPI、现有 web、PostgreSQL、Compose 骨架；定义 QueryFrame、TaskPlan、TraceEvent。\
+**交付物**：需求追踪表、仓库骨架、OpenAPI 初稿、端到端空流程。\
+**验收**：一键启动；`/health` 与前端连通；最小基准不少于 10 条，覆盖 NL2SQL 与 RAG 且有 gold label。
+**风险**：赛题评分理解偏差；处理：逐项回看原表，保留评分条款到需求映射。
+
+## M2（第 4-6 天）：演示数据与元数据登记
+
+**目标**：有可控、可重置的数据源与术语表。\
+**任务**：准备 customers/orders/order_items/products/regions；创建只读角色；录入 20 个字段描述、别名、单位、主外键和指标口径；实现 SchemaSnapshot。\
+**交付物**：SQL seed、业务词表、元数据 schema、初始化/重置脚本。\
+**验收**：初始化可重复；元数据覆盖核心表列 100%；业务指标定义可查询；只读账号无法写表。\
+**风险**：演示数据过简；处理：覆盖 JOIN、空值、退款、不同时间口径等边界。
+
+## M3（第 7-9 天）：Schema Linking 与 Join Graph
+
+**目标**：实现“问题要查哪张表/列/关系”的独立能力。\
+**任务**：实现词法别名、样例值、向量/词法混合召回；实现 Join Graph 路径代价；构建 30 条字段/关系标注题。\
+**交付物**：Schema Retriever、JoinPlanner、Schema Linking 评测报告。\
+**验收**：Top-5 表列 Recall@5 ≥ 0.85；核心 JOIN 路径正确率 ≥ 0.80；每个候选返回理由。\
+**风险**：仅靠 embedding 误召回；处理：指标口径和关系图作为硬约束，低分场景澄清。
+
+## M4（第 10-12 天）：结构化 Query Frame 与 SQL 生成/静态校验
+
+**目标**：把问数意图约束为可审查计划，再生成 SQL。\
+**任务**：实现时间/指标/维度抽取；定义计划 JSON Schema；接入 SQLGlot；实现 SELECT-only、权限表、行数、LIMIT、JOIN 检查。\
+**交付物**：SQLPlan、SQLGenerator、SQLGuard、单元级安全样例。\
+**验收**：基础问题可生成并通过 AST；DDL/DML/越权/无界查询拦截率 100%；歧义指标触发澄清。\
+**风险**：静态规则误拦合法 SQL；处理：逐规则记录 reason code，建立正反例回归集。
+
+## M5（第 13-15 天）：SQL 执行、语义校验与有界修复
+
+**目标**：完成稳定问数闭环和错误恢复。\
+**任务**：只读事务执行；单位/粒度/空值检查；分类语法、列名、方言、超时错误；最多 2 轮修复；补齐 30-40 条 NL2SQL 集。\
+**交付物**：SQL Agent v1、错误字典、NL2SQL 回归报告。\
+**验收**：初版 Execution Accuracy ≥ 0.75；安全违规 0；修复后正确率与修复次数分布可导出。\
+**风险**：LLM 修复绕过安全边界；处理：所有候选修复重新过 Guard，修复只基于允许 Schema。
+
+## M6（第 16-18 天）：真实 OCR、质量路由与业务事实
+
+**目标**：消除扫描文本代理，生成工艺/质检字段与原页证据。\
+**任务**：PyMuPDF 快速路径＋PaddleOCR/PP-StructureV3；按页/区域分流、坐标变换、表格/阅读顺序；分类/Adapter、Block/Relation/Locator；事实/单位/范围核验；模型/解析版本。\
+**交付物**：增量摄取、真实 OCR、字段/证据 JSON、质量诊断与 gold。\
+**验收**：至少 10 份工艺/质检样本逐字段报告；无对照/gold 输入也能解析；失败字段标记、位置可查，成绩有分母。\
+**风险**：小字/合并表头/单位错误；处理：解析与预览分辨率分开，候选/原文保留，局部重试有预算。
+
+## M7（第 19-21 天）：结构化切片、向量索引与混合检索
+
+**目标**：建成可追溯、受 ACL 控制的 RAG 检索基础。\
+**任务**：关系驱动切片，图注/续表/脚注/符号成组；content hash/源版次；事实/关系与 Qdrant 检索、ACL/有效期、RRF/重排先于融合。\
+**交付物**：Chunker、索引重建脚本、检索调试页。\
+**验收**：初始 RAG Recall@5 ≥ 0.80；每个命中可回到文档版本、页码、块坐标；越权检索 0。\
+**风险**：切片粒度影响证据完整度；处理：对照多种 chunk 长度和 overlap 做离线比较。
+
+## M8（第 22-24 天）：单文档问答、引用与拒答
+
+**目标**：基础单文档检索 Demo 与工艺原文证据。\
+**任务**：运行检索/事实过滤、版本/页码引用、表格查询、无答案拒答；文档/页图 API 与前端高亮。\
+**交付物**：RAG Agent、文件/证据接口、问答报告。\
+**验收**：已有 12 条 RAG 和新增工艺题逐例有结果；关键字段回原文；不确定不硬判；基础单表＋单文档可运行。\
+**风险**：只有摄取；处理：以 HTTP→检索→答案→页图验收。
+
+## M9（第 25-27 天）：Planner、Router 与持久化任务 DAG
+
+**目标**：统一编排 SQL、RAG 和澄清路径。\
+**任务**：实现状态机、TaskPlan Schema、路由策略、并行子任务、预算、事件落库、断线续传。\
+**交付物**：Orchestrator v1、SSE Event API、运行回放端点。\
+**验收**：SQL-only/RAG-only/DB→RAG 三类路由测试通过；事件顺序完整率 ≥ 0.98；超时后可终止。\
+**风险**：过早拆 Agent 造成复杂度；处理：保持模块内函数式工具，单进程可观测执行。
+
+## M10（第 28-30 天）：工业混合数据、CAD 与冲突核验
+
+**目标**：工艺/质检/二维图纸与生产库真实依赖。\
+**任务**：工业 seed/Catalog；零件/工序/批次/单位/版本对齐；工艺→SQL→报告；DXF/图纸视觉；ConflictRecord/工业证据与权威规则。\
+**交付物**：工业契约、核验/Fusion、CAD 产物、事实/冲突 API、20 条专项用例。\
+**验收**：字段/实体/版本/尺寸关联/冲突分列；单位等价、真实矛盾、版本/关联不明均覆盖；原文/SQL/规则可查；无依据保留未消解。\
+**风险**：范围过大、混淆不合规/冲突；处理：先工艺＋质检，再限定二维 CAD，分开统计。
+
+## M11（第 31-33 天）：局部重识别与国产小模型实验
+
+**目标**：验证创新假设和模型规模取舍。\
+**任务**：根因诊断、裁剪/视觉载荷、有界重识别、事实版本/依赖重算；机制消融与 2B/4B 比较。\
+**交付物**：Verifier/Repair、trace、消融/资源报告、高级自述。\
+**验收**：检出/消解/修复/误修复/未消解有分母；最多修复 2 次、每轮重验；参数/复杂度有依据，不为一致改写真实矛盾。\
+**风险**：一致率或兜底掩盖错误；处理：原文抽查，分级模型报告效果/调用比例。
+
+## M12（第 34-36 天）：全链路前端与证据可视化
+
+**目标**：现场能看懂、复核和重放系统执行。\
+**任务**：完成聊天、DAG、SQL、证据页图、校验卡片、指标面板；流式更新与刷新恢复；脱敏。\
+**交付物**：既有 web 扩展、识别/冲突视图、运行记录与现场脚本；Vue 可选。\
+**验收**：三条 Demo 路径可完成；Trace 展示真实 SQL/命中块/校验；可从答案跳到出处；页面 PII 泄漏 0。\
+**风险**：视觉效果抢占核心验证时间；处理：优先主链路和证据定位，再做动画/配色。
+
+## M13（第 37-39 天）：性能、安全与鲁棒性
+
+**目标**：证明系统不是只对单条样例有效。\
+**任务**：先固定工业复杂度/国产模型做资源与失败率对照，再按预算扩数据/并发；为常用查询、schema 和解析结果加版本化缓存；检查资源上限、ACL 和 Prompt Injection；失败恢复演练。\
+**交付物**：压测报告、安全检查清单、瓶颈与优化记录。\
+**验收**：p50/p95/QPS/错误率均有原始记录；权限违规 0；系统资源受预算限制；缓存开关有对照数据。\
+**风险**：外部模型服务波动；处理：固定模型版本或记录 API 版本，准备本地 fallback 与离线案例。
+
+## M14（第 40-42 天）：冻结、验收与比赛交付
+
+**目标**：完成能现场复现的版本、报告和答辩证据。\
+**任务**：冻结代码/数据/模型/评测版本；跑完整 benchmark；清理数据与配置；演练失败/澄清/跨源 Demo；制作架构图、结果表和技术说明。\
+**交付物**：初赛设计报告、技术实验说明书、软件压缩包；决赛演示/专项证据/高级自述/消融；附 release/数据/模型版本与备份。\
+**验收**：按实际赛场网络演练；本地模型离线验证后才宣称离线运行；至少 10 条覆盖 NL2SQL 与 RAG 的测试结果逐条可复核；性能和失败率如实报告；所有展示结果有 run_id 与版本。
+**风险**：提交前改动引入回归；处理：冻结窗口内只接受阻断性修复，并重新跑关键回归。
+
+## 15.1 关键路径与每周检查点
+
+| 周次 | 关键里程碑 | Gate |
+|---|---|---|
+| 第 1 周（D1-D9） | 骨架、演示数据、Schema Linking | 可复现初始化；Top-5 Schema 命中达到第一目标 |
+| 第 2 周（D10-D15） | NL2SQL 与安全闭环 | 只读 Guard 通过；基础 SQL 可执行并可修复 |
+| 第 3 周（D16-D24） | 多模态解析、质量评估、Hybrid RAG | 页码/引用可追溯；基准题可以回归 |
+| 第 4 周（D25-D30） | 工艺/质检/CAD 与跨源冲突 | 单位/版本/实体、双方证据与裁决依据可查 |
+| 第 5 周（D31-D36） | 局部重识别/小模型/可视化 | 修复/误修复分母与参数/资源对照 |
+| 第 6 周（D37-D42） | 性能、安全、冻结与交付 | 端到端可复现；证据与报告对得上 |
+
+# 16. 风险、治理与答辩证据
+
+## 16.1 重点风险登记
+
+| 风险 | 影响 | 预防/应对 | 监测指标 |
+|---|---|---|---|
+| 赛题评分变化 | 做了非重点 | 官方九项/阶段交付核对，不沿用旧分值 | 需求证据覆盖 |
+| 国产来源/规模未核验 | 选型依据不足 | 权重/模型卡/参数登记，别名未知说明 | 来源/规模可查比例 |
+| CAD 转换/关联不确定 | 对象/数值错误 | 限二维，留句柄/坐标/视图/候选 | 转换失败/关联正确率 |
+| 强行消解冲突 | 伪确定答案 | 不合规/矛盾区分，显式权威规则 | 错误消解/误修复率 |
+| 扫描变体/gold 泄漏 | 高估效果 | 按源/模板分组，gold 仅评测可见 | 近重复跨集数目标 0 |
+| Schema 元数据不全 | NL2SQL 错连/错口径 | 维护负责人、别名审批、低置信澄清 | Linking Recall、误链接率 |
+| OCR/版面恢复不稳定 | RAG 命中错误页/错序表 | 按文档质量路由；原页图和人工复核 | 页码准确率、OCR 低置信比例 |
+| 模型输出不稳定 | 复测波动 | 固定模型配置、提示词版本和温度；保存原始事件 | 重复运行方差 |
+| 跨源实体错误对齐 | 看似合理但结论错 | canonical ID 优先、实体置信门限、冲突展示 | Entity Match Accuracy |
+| 无限自修复循环 | 高成本/不可控 | max_repair=2、deadline、token 与工具预算 | 平均修复数、预算耗尽率 |
+| 越权 SQL 或文档访问 | 安全/合规事故 | 只读账号、ACL filter、AST guard、审计 | 越权次数目标 0 |
+| 外部服务不可用 | Demo 中断 | 提前预热、降级提示、本地预置 trace 与模型 adapter | 服务可用率、降级成功率 |
+| 指标被演示样例误导 | 成绩不可复核 | 固定 benchmark、分层报告、记录分母与失败例 | 报告复现率 |
+
+## 16.2 答辩展示证据链
+
+每个技术亮点按“问题 → 设计 → 对照 → 结果 → 限制”讲述：
+
+- **Schema Linking**：别名/图结构引入前后 Top-k 和 SQL Execution Accuracy 差异。
+- **Adaptive RAG**：统一解析器与质量感知路由的页码、表格、召回对照。
+- **工业识别**：真实工艺/质检/图纸字段/尺寸关联，按模板/质量分层，对照普通 OCR。
+- **V-CAR**：事实/规则、局部重识别、完整消解的消融；报冲突检出、正确/错误消解、误修复、耗时/未消解。
+- **国产小模型**：同数据/硬件/效果下 2B/4B 的参数/资源/级联比例；未验证前只写假设。
+- **性能**：不只给最好延迟；说明数据规模、硬件、并发、冷/热缓存及 p95。
+- **可解释**：从最终答案点击到 SQL 行、原始页、证据块和校验规则，展示失败案例的真实轨迹。
+
+对尚未完成的能力标注为研发计划；对完成项必须展示运行 ID、代码/模型版本、数据版本和可复现输入。不可用准确率目标替代实测成绩。
+
+# 17. 参考资料
+
+## 17.1 赛题资料
+
+- 《赛题八：多模态数据驱动的可解释精准问数/问答智能体》赛题 PDF，命题单位：中电云计算技术有限公司；本版依据用户 2026 年 10 月 1 日方向摘要；本次未复核官方完整九项/分值，不沿用旧推测编号/满分线。最终答辩/提交时以组委会公布的最新版原文及评分表为准。
+
+### 项目分类与解析参考
+
+- [复杂非结构化文件分类与解析技术文档](<复杂非结构化文件分类与解析技术文档.md>)：用户提供的 MD，涵盖办公/工程混合数据、结构/关系恢复与可追溯目标。参考内容保持不变，文件名已规范化；落地映射见 §1.4，其通用建议不作为比赛要求或实现证据。
+
+## 17.2 技术文档（官方/项目文档）
+
+1. FastAPI 官方教程与 API 文档：https://fastapi.tiangolo.com/tutorial/
+2. PostgreSQL JSONB 与索引：https://www.postgresql.org/docs/current/datatype-json.html
+3. PostgreSQL 全文检索：https://www.postgresql.org/docs/current/textsearch.html
+4. Qdrant Hybrid and Multi-Stage Queries：https://qdrant.tech/documentation/search/hybrid-queries/
+5. SQLGlot 文档：https://sqlglot.com/
+6. Vue 3 Composition API 指南：https://vuejs.org/guide/extras/composition-api-faq.html
+7. OpenTelemetry 概念与 Trace：https://opentelemetry.io/docs/concepts/
+8. Docling 项目文档：https://docling-project.github.io/docling/
+9. PaddleOCR 项目文档：https://github.com/PaddlePaddle/PaddleOCR
+10. pgvector 项目文档：https://github.com/pgvector/pgvector
+11. [PP-StructureV3 官方教程](https://github.com/PaddlePaddle/PaddleOCR/blob/main/docs/version3.x/pipeline_usage/PP-StructureV3.md)：版面/表格/阅读顺序，工业效果需自测。
+12. [Qwen3-VL 官方仓库](https://github.com/QwenLM/Qwen3-VL)：2B/4B 与文档/OCR/定位示例，未集成。
+13. [ezdxf 官方介绍](https://ezdxf.readthedocs.io/en/stable/introduction.html)：DXF 与 CAD/DWG 转换边界。
+14. [MinerU 官方仓库](https://github.com/opendatalab/MinerU)：解析替代，先核验部署模型来源。
+
+> 依赖版本、模型服务和赛事部署要求应在正式实现时通过兼容性测试锁定；本说明书不假定任何组件版本在赛期始终不变。
+
+# 18. 实施进度与下一步验收（2026 年 10 月 1 日）
+
+状态以工作区代码、已有报告与历史核查为依据。工作区包含未提交的模块一/文档改动，本次保留并更新说明；未重跑模型基准，未新增 OCR/CAD/冲突代码。状态不代表比赛正式验收，启动入口见根目录 `README.md`。
+
+## 18.1 当前阶段状态（以本表为准）
+
+| 对应里程碑/能力 | 当前状态 | 已有证据 | 尚缺实现/验收 |
+|---|---|---|---|
+| M1–M2：数据与元数据 | 零售/Chinook 底座已有；工业待建 | `db/`、`deploy/init/`、30 条种子用例与文档材料 | 官方九项映射、工业契约/seed、冻结与环境重建 |
+| M3：Schema/Join Graph | 词法/别名/值/审核图已实现并有小样本报告 | 18 题：表 31/31、列 28/28、指标 4/4、路径 6/6，见 §18.9 | 独立扩样、向量/权重；调参题不能证明泛化 |
+| M4–M5：SQL 生成/执行/修复 | 单源闭环可运行，困难覆盖待扩 | Guard/参数/只读/最多 2 次修复；历史 NL2SQL 14/14、鲁棒 4/4，见 §18.8 | 工业粒度/版本口径、完整计划、结果语义与资源门禁 |
+| M6：分类/解析/结构/质量 | 原生 PDF 基础已有；分类/Adapter、真实 OCR/统一关系待实现 | `ingest.py` 文本/表格/标题/页图；扫描读原生对照，OHR 读 gold | Router/ParseResult、真实 OCR、BlockRelation/SourceLocator、续表/顺序和质量基准 |
+| M7：切片/向量 | 摄取/入库路径已有；运行检索待建 | 标题/表格切片、BGE/Qdrant、PG 元数据 | Hybrid/Rerank、完整块证据绑定、版本/权限过滤、Recall@5 |
+| M8：单文档 RAG | 待实现，基础任务尚未完整完成 | 12 条 RAG 种子题；Agent 文档返回 `ROUTE_UNSUPPORTED` | HTTP→检索→答案→原页，引用/拒答逐例报告 |
+| M9：编排/API | SQL 单源状态机、HTTP/SSE、持久化已实现 | `agent.py`、`api.py`；Run/Trace/SQL Evidence/Claim/回放 | 文档/工业路由与依赖 DAG；SQL Trace 不等于跨源编排 |
+| M10：工业事实/CAD/冲突 | 设计已纳入，代码/数据未实现 | 本版 §5.6–§5.7、§6.7、§11.1 | 工业源、字段/CAD 转换/关联、单位/版本/实体与消解 |
+| M11：V-CAR/小模型 | SQL 修复已有；工业创新待验证 | SQL 修复记录；本版 §5.8、§6.8 | 视觉载荷、局部重识别、规则消解、2B/4B 与消融 |
+| M12：前端/可解释 | SQL 页/模型配置/运行回放已实现 | `web/` 三视图、SQL 证据 | 文件/字段高亮、CAD 定位、冲突面板；Vue 可选 |
+| M13–M14：实验/交付 | SQL/Schema 小样本报告已有；比赛包未完成 | `reports/` 三类报告；历史回归 35 项 | 国产来源/规模 manifest、工业独立基准/资源、初赛材料/包与决赛演练 |
+
+“已实现”指有运行代码，不自动代表完整验收；“报告已有”指读取现存报告/历史记录，不代表本次重跑。工业新功能全部待实现，不能因文档升级改成已完成。
+
+## 18.2 历史核查与统计边界（2026 年 9 月 30 日早期记录）
+
+- 2026 年 9 月 30 日运行 `.venv/bin/python -m unittest discover -s tests -v`：9 项测试通过。覆盖 SQL 禁写、敏感列、未审核 JOIN、参数顺序、只读执行、澄清、时间范围和销售额口径门禁。这是组件回归结果，不是 NL2SQL Execution Accuracy。
+- 同日对“2024年一共有多少笔订单？”发起一次真实模型调用：返回 `MODEL_AUTH_FAILED`，未产生查询行。因此目前没有可报告的模型端到端正确率，也不能把 gold SQL 执行或注入式 generator 测试计入模型成绩。
+- `scripts/eval_sql.py` 已能按用例比较执行结果并输出逐例 JSON；正式指标需在有效凭据、固定模型/提示词/快照/评测集版本下运行，保留失败例及分母。RAG、跨源、V-CAR 和性能指标均未实测。
+
+## 18.3 当前执行顺序与完成条件
+
+1. **P0：真实文档基础闭环**。复用 SQL API/Trace，真实 OCR 替换代理，接运行时单文档检索/引用/拒答，冻结工艺/质检 gold。完成条件：核心分类/路由和失败状态明确；单表/单文档可启动；扫描不读 gold；结构/事实可定位，新对象须迁移。
+2. **P1：工业事实与跨源核验**。冻结 §11.1 契约，建设批次/测量/报告，落地事实/冲突对象及实体/单位/版本规则、工艺→SQL→报告。完成条件：超限/矛盾分开；单位等价可解释；真实矛盾/证据缺口不强行裁定。
+3. **P2：限定二维 CAD**。标题栏/技术要求优先，再选定尺寸/公差及关联；验证 DXF/图纸 PDF/扫描与 DWG 转换边界。完成条件：字段、关联、实体句柄/页坐标有人工标签与可复核结果。
+4. **P3：重识别与模型效率**。补视觉载荷/国产配置、来源/参数登记，做机制消融与规模比较。完成条件：修复/误修复分母、资源和未消解样例齐全；验证后才主张突破。
+5. **P4：阶段交付**。核对官方九项专项映射，整理设计报告、技术实验说明书、可运行包，冻结独立基准与国产模型 manifest，准备决赛实时/失败演示及高级创新材料。
+
+模型凭据、SQL API/Trace 已有，不再列为从零待办。旧 SQL/Schema 成绩保留作回归，新工业计划不改写历史实验范围。
+
+## 18.4 SQL Agent 本地联调补充（2026 年 9 月 30 日）
+
+已新增 SQL 单源 Agent 状态机、FastAPI/SSE 接口与浏览器测试页。`POST /v1/chat/stream` 会产生并持久化 Query Understanding、Plan、SQL 工具、Verify 和最终事件；`GET /v1/runs/{id}`、`/events`、`/evidence` 可按运行 ID 回放。成功路径将参数化 SQL、结果行和已验证 Claim 关联为证据；文档或跨源问题明确返回 `ROUTE_UNSUPPORTED`。
+
+本地集成回归共 13 项通过，含 Agent 持久化、SSE、范围限制、固定数据库链路自检和原有 SQL Guard 测试。浏览器中的固定自检查询经过 Agent、Guard 和只读数据库后返回 2024 年订单数 997，并能按运行 ID 回放 SQL 与证据；此自检不调用模型。自然语言模型问数仍显示 `MODEL_AUTH_FAILED` 及对应 Trace；当前网关令牌返回 401，因此尚无模型问数成功或 NL2SQL 准确率成绩。服务限本机演示，尚未接入身份认证、RAG Agent、跨源推理和 V-CAR 完整闭环。
+
+## 18.5 模型接入改为页面配置（2026 年 9 月 30 日）
+
+本节取代 §18.2 中「模型凭据不可用、尚无正确率」的结论，并废止「应用通过本地密令文件调用模型」的旧路径。
+
+**变更内容**
+
+1. **取消密令文件调用**：`datamind/sql_engine.py` 不再读取 `gateway/secrets/datamind-api.env`；该文件已退役至 `gateway/backups/`。配置来源改为「页面配置（`datamind_meta.app_settings`）→ 环境变量 `NEW_API_*` → 内置默认值」三级，页面配置优先。
+2. **新增页面「模型接入」（侧边栏）**：服务商预设、接口地址、模型名、API 密钥四个输入，配 `保存配置`、`测试连接`、`拉取模型列表`、`清除密钥` 四步操作；侧边栏底部常驻「模型 / 数据库」状态灯与当前模型名。
+3. **新增接口**：`GET|PUT|DELETE /v1/model/config`、`POST /v1/model/config/models`（拉取上游模型列表）、`POST /v1/model/config/test`（最小真实对话探活）、`GET /v1/runs`（运行记录列表）；页面拆分为 `web/index.html` + `web/app.js` + `web/style.css`，经 `/assets` 提供。
+4. **密钥治理**：密钥只存 `app_settings`，HTTP 接口仅返回掩码（如 `sk-Mpw…p5CQ`），`readonly_user` 对该表 `SELECT` 权限实测为 `false`；`deploy/init/02_metadata.sql` 已加入建表与 `REVOKE`。
+5. **错误码**：新增 `MODEL_KEY_MISSING`、`MODEL_BALANCE_EMPTY`、`MODEL_RATE_LIMITED`、`MODEL_TIMEOUT`、`MODEL_UNREACHABLE`、`MODEL_NOT_FOUND`、`MODEL_EMPTY_RESPONSE`；前端在出现配置类错误时自动跳转到「模型接入」并显示原因。
+
+**核查结果**
+
+- 回归测试 22 项全部通过（原有 13 项 + 模型配置 9 项），覆盖掩码不回显明文、空密钥保存不清空、探活错误分类、未配置密钥返回 `MODEL_KEY_MISSING`、运行记录接口。
+- 真实模型基线：14 条 NL2SQL 用例执行一致率 **13/14**（92.9%，模型 `deepseek-flash`，经本地网关；报告见 `reports/nl2sql.json`）。唯一失败项 `nl2sql-010`（同比）为时间校验规则与 CASE 分支绑定参数不匹配所致，属已知缺陷，已记录待修。
+- 网关令牌额度已改为无限，计费落到钱包；此为本地演示配置，不代表生产可用性。
+
+**尚未完成**：模型配置接口没有鉴权（服务只监听 127.0.0.1，仅限本机演示）；多密钥/多模型切换与用量统计未做；上游额度不足时尚未做自动降级。
+## 18.6 多协议接入与配置管理（2026 年 9 月 30 日）
+
+在 §18.5「页面配置」基础上，把模型接入从「一套配置」升级为「协议适配 + 多配置管理」，对齐 ccswitch 的使用习惯，全部落在本项目既有结构内（元数据表 + FastAPI + 侧边栏页面）。
+
+**协议层（新增 `datamind/providers.py`）**
+
+- 协议：`openai`（`/chat/completions`，`Authorization: Bearer`）与 `anthropic`（`/v1/messages`，`x-api-key` + `anthropic-version: 2023-06-01`，`max_tokens` 必填，system 作为顶层字段）。
+- 地址拼接：已带版本段（`/v1`、`/api/paas/v4`、`/api/v3`）时直接拼资源路径，否则补 `/v1`；粘贴完整端点会被自动截断。
+- 鉴权方式可选：自动（`x-api-key` + `Bearer` 同时发送）、仅 `x-api-key`（Anthropic 官方）、仅 `Bearer`（多数中转站）；另支持自定义额外请求头 JSON。
+- 传输层由 urllib 改为 httpx，统一超时（默认 75s，可配），错误分类统一为 `MODEL_AUTH_FAILED`、`MODEL_BALANCE_EMPTY`、`MODEL_RATE_LIMITED`、`MODEL_TIMEOUT`、`MODEL_UNREACHABLE`、`MODEL_NOT_FOUND`、`MODEL_EMPTY_RESPONSE` 等稳定错误码。
+
+**配置管理**
+
+- 存储结构：`app_settings` 中的 `model.profiles`（`{active, items[]}`），旧版单配置行 `model.gateway` 首次读取时自动迁移为「迁移配置」。
+- 接口：配置增删改查、启用切换、导出（默认剔除密钥）、导入（一律新建，避免覆盖）。
+- 页面：左侧为配置卡片列表（协议徽标、启用状态、地址/模型/密钥掩码、启用/编辑/测试/删除），右侧为编辑表单（名称、协议、地址、模型、密钥、鉴权方式、最大输出、超时、额外请求头）；协议切换时提示与鉴权项联动。
+- 运行记录新增 `versions.protocol` 与 `versions.profile`，便于回溯「这次问数用的是哪套配置」。
+
+**核查结果**
+
+- 回归测试 28 项全部通过（协议拼接、Anthropic 载荷与请求头、两条协议的响应解析、状态码分类、配置 CRUD 与掩码、启用切换、导出导入、缺钥路径、运行记录）。
+- 用本地 Anthropic 协议模拟服务（强制校验 `x-api-key`、`anthropic-version`、`max_tokens`、messages 结构）做端到端验收：模型列表、测试连接、错误密钥返回 `MODEL_AUTH_FAILED`，以及一次完整问数均通过，返回 2024 年订单数 997。
+- 真实上游回归（OpenAI 协议经本地网关）：`2025年销售额最高的前三个产品是什么？` 与 `Chinook库里哪个国家客户最多？` 均 COMPLETED，后者返回 `ORDER BY customer_count DESC LIMIT 1`（此前评测中的失败例已消失）。
+
+**尚未完成**：配置接口仍未鉴权（服务只监听 127.0.0.1）；未做多配置并发压测与用量统计；Anthropic 流式与工具调用（tool use）未接入，仅用其 Messages 基本对话能力。
+## 18.7 两处缺陷修复与评测复核（2026 年 9 月 30 日）
+
+§18.5 记录的两个已知缺陷已修复，NL2SQL 评测由 12–13/14 提升到 **14/14**。
+
+**缺陷一：比较字面量绑定不完整（对应 `nl2sql-010` 同比失败）**
+
+- 现象：模型给出的同比 SQL 语义正确（单次扫描 + `CASE WHEN created_at >= DATE '2024-01-01' ...`），却被 `_semantic_findings` 判为 `TIME_FILTER_MISMATCH`，重写三次后 `REPAIR_BUDGET_EXHAUSTED`。
+- 根因：`sql_guard.guard_sql` 只绑定 `WHERE`/`HAVING` 子句中的字面量，CASE 分支与 JOIN ON 里的日期字面量未参数化，校验器在参数列表中找不到 2025-01-01。
+- 修复：绑定规则改为「任何参与比较的字面量」（`EQ/NEQ/GT/GTE/LT/LTE/LIKE/ILIKE/IN/BETWEEN` 的操作数子树，覆盖 WHERE、HAVING、JOIN ON、CASE WHEN），结构性字面量（`LIMIT`、`OFFSET`、`GROUP BY 1`、`ORDER BY 2`、`INTERVAL`）保持原样。
+- 效果：同比 SQL 的 11 个常量全部参数化（含 `CAST(%s AS DATE)`），时间口径校验通过。
+
+**缺陷二：策略拦截一律硬停，不给重写机会**
+
+- 现象：同一题在不同轮次时对时错，失败轮次的模型草稿被 Guard 拦下后直接返回 `SQL_POLICY_BLOCKED`，没有重写机会（评测中的 `nl2sql-009` 即此类波动）。
+- 修复：仅对「试图写库或调用危险能力」的原因保持硬停（`SELECT_ONLY`、`MUTATION_OR_COMMAND`、`DANGEROUS_FUNCTION`、`RECURSIVE_CTE_NOT_ALLOWED`）；其余策略原因（`SELECT_STAR`、`UNAPPROVED_JOIN`、`COLUMN_NOT_ALLOWED` 等）带原因反馈重写，次数仍受既有 `max_repair=2` 约束。每次重写都要重新过 Guard，安全边界不因重写而放宽。
+
+**核查结果**
+
+- 回归测试 34 项全部通过（新增 6 项：CASE/JOIN 字面量绑定、结构字面量不被参数化、同比时间口径校验、策略失败后可重写、写库草稿硬停、重写预算耗尽）。
+- 修复后首轮 NL2SQL 得 14/14；但紧接着的复跑只有 12/14，说明当时仍存在未被识别的外部干扰（见 §18.8 的系统代理缺陷）。因此本节的 14/14 只代表「这两处缺陷修好后的单轮结果」，不作为稳定基线；稳定基线以 §18.8 为准。
+
+**边界说明**：14/14 是当前 14 条 NL2SQL 用例 + 当前提示词/快照下的实测值，不是模型能力的普适结论；用例规模仍小，扩样后需重跑。RAG、跨源与 V-CAR 指标仍未实测。
+
+## 18.8 系统代理劫持与评测基线（2026 年 9 月 30 日）
+
+§18.7 修复两处缺陷后，评测仍出现「一轮 14/14、下一轮 12/14」的抖动，且出现整轮挂起。本节记录真正的根因、修复与重新建立的基线。
+
+**根因：httpx 通过 urllib 读取 macOS 系统代理，把 localhost 也塞进代理**
+
+- 现象：评测进程长时间无输出，`lsof` 显示它与 `127.0.0.1:7897`（系统代理）保持 ESTABLISHED 且阻塞在 `sock_recv`；同一批次里出现 `MODEL_UPSTREAM_ERROR`、`MODEL_TIMEOUT`，单次调用耗时 25 秒级；而数据库会话处于 idle，并非数据库阻塞。
+- 定位：`httpx/_utils.py` 的 `get_environment_proxies()` 调用 `urllib.request.getproxies()`；在 macOS 上该函数**回落到系统网络配置**，而 httpx 只解析 `no_proxy` 环境变量，**不识别 macOS 的「忽略代理列表」**。于是 `http://localhost:4000/v1` 被送进系统代理，代理对本地回环地址时好时坏。
+- 修复：`providers.make_client()` 统一构造客户端——本机地址（`localhost`/`127.0.0.1`/`::1`/`*.local`）一律 `trust_env=False` 直连；远端地址继续尊重系统/环境代理；新增每套配置的 `proxy` 字段可显式覆盖；连接超时拆为 connect 10s / read = 配置值。
+- 效果：同一问句经本机网关的调用由 **24.9 秒超时失败** 变为 **0.91 秒成功**，进程挂起消失。
+
+**评测集修订（retail-v2）与提示词 v2**
+
+- 抖动过程中发现评测集自身的投影歧义：如「家电类有哪些产品？」的 gold 为 `[product_name, list_price]`，而模型返回 `[product_id, product_name]` 同样合理，判为不匹配属于题目没有规定答案形状，不是模型答错。
+- 修订：为 5 条存在投影歧义的问题补上显式投影要求（nl2sql-002/008/010/011/012），gold 不变，`data_version` 由 `retail-v1` 升为 `retail-v2`；越权用例 rb-003 显式标注 `clarification_label=needed`。
+- 空结果用例改为语义判定：0 行或整行 NULL 均算通过，但必须由系统显式给出 `EMPTY_RESULT` 标记——考核点是「系统能说明数据为空」，而非投影形状恰好相同。
+- 提示词升级为 `sql-v2`：新增「只 SELECT 问题所需列」「唯一答案类问句用 `ORDER BY ... LIMIT 1`」，并在运行记录的 `versions.prompt` 中留痕。
+
+**重新建立的基线**
+
+| 项 | 结果 | 条件 |
+|---|---|---|
+| NL2SQL 执行一致率 | **14/14，连续三轮（A/B/C）** | `retail-v2` + 提示词 `sql-v2` + 代理修复后；`deepseek-flash` 经本地网关；快照 `snap-demo_retail-e9495c660cd1` |
+| 鲁棒性 | **4/4** | 错别字、口语简称、越权拒答、空结果（`--suite robustness`） |
+| 回归测试 | **35 项通过** | 新增：CASE/JOIN 字面量绑定、结构字面量不参数化、策略失败可重写、写库硬停、本机地址绕过系统代理 |
+
+报告：`reports/nl2sql.json`（逐例含生成 SQL、gold SQL、尝试记录与结果预览，便于复核失败例）、`reports/robustness.json`。
+
+**边界说明**：以上为 14+4 条自建用例、单一模型与单一快照下的实测值，样本量小，不能外推为通用能力；评测脚本已支持 `--suite` 切换，扩样后需重跑。RAG、跨源与 V-CAR 指标仍未实测。
+
+## 18.9 Schema Linking 与 Join Graph 定量验收（2026 年 10 月 1 日）
+
+为落实 §4.6 的表/列 Recall@5 和 Join Path 正确率，新增 `data/evaluation/schema_linking_v1.json` 与 `scripts/eval_schema.py`。评测标签逐题核对问题和 gold SQL，覆盖 12 条可执行 NL2SQL 用例及 6 条额外措辞。表、列、指标分别统计语义锚点 Top-5 微平均召回；连接路径按已审核 Join Graph 的完整表序列判定。候选生成保持 SQL Agent 当前的 `retrieve(limit=8)` 预算，评测脚本还核对已入库用例的文本/版本，报告记录快照和检索代码哈希。
+
+首轮列召回为 10/18，主要漏掉显式年份对应的时间列、“退款总金额”对应的金额列、“价格”对应的标价列，以及“所属大区”的外键列。检索器增加了聚合词归一、业务标签前缀消除、已召回表上的时间/价格列补召回，并提高已审核连接路径中间表的优先级。扩展到 18 题后重新运行：**表 31/31、列 28/28、指标 4/4、连接路径 6/6**；逐例数据见 `reports/schema_linking.json`。35 项已有回归测试通过。
+
+上述分母只含人工标注的语义锚点列，不含 SQL JOIN 键或计算公式的每个操作数；后两者由 SQL/Join Guard 与 NL2SQL 执行评测另行约束。18 题均为本项目自建小样本，且前 12 题用于调整规则，结果不能代表未见问题的泛化表现。向量召回、权重调参和更大独立测试集仍是 M3 后续工作。10 月 1 日复核中，模型网关到上游发生一次临时 `EOF`（返回 HTTP 500）；随后连接测试和真实问数重试成功，后者生成 `SELECT product_name, list_price FROM products WHERE category = %s LIMIT 100` 并返回 7 行。该短暂故障未计入 Schema Linking 分数。
+
+
+## 18.10 本次方向修订与工业增强待办（2026 年 10 月 1 日）
+
+**本次完成的是设计与状态修订**：当时正文升级 V1.1 并沿用旧文件名；新增真实 OCR/质量路由、工艺/质检事实契约、二维 CAD、跨源冲突分类/消解、局部重识别、国产模型 manifest/对照、工业数据/基准和接口/前端规划。整合 §18.4–§18.9 已有成果至 §18.1，保留历史故障/成绩边界。
+
+**旧方向调整**：零售“销售冠军＋市场原因”改为工业规范/实测/报告核验主例；零售/Chinook 回归保留。删除未经当前赛题依据确认的分值/满分线/任务编号，国产模型列明确约束；通用公式、多协议扩展、Vue 迁移和大规模服务/压测降为后续项。
+
+| 增强项 | 状态 | 最小完成条件 | 计划产物 |
+|---|---|---|---|
+| 真实 OCR/质量 | 待实现 | 无 gold/对照输入，坐标/风险可查 | 标签、识别/定位报告 |
+| 单文档问答 | 待实现 | HTTP 检索/引用/拒答跑通 | RAG 逐例与回放 |
+| 工艺/质检事实 | 待实现 | 原文→字段→单位/条件→版本证据 | 契约/迁移/字段结果 |
+| 工业复杂 SQL | 待实现；复用既有 SQL | 连接/粒度正确、gold 可比 | seed/Catalog/逐例结果 |
+| 冲突消解 | 待实现 | 对齐/规则可查，未消解明确 | 双方证据、检出/消解报告 |
+| 二维 CAD | 待实现 | 标题栏/选定尺寸可溯源，关联不明不硬判 | 转换记录、字段/关联报告 |
+| 重识别/小模型 | 待实现 | 根因驱动、有界、保留原值/依赖重验 | 消融/误修复/规模资源报告 |
+| 核验前端 | 待实现；复用 web/Trace | 原文高亮、SQL 值、冲突/依据可见 | 实时 Demo 与版本回放 |
+| 比赛交付 | 待完成 | 初赛三项、官方专项映射/国产确认 | 可运行包、设计/实验报告、创新自述 |
+
+**统计边界**：本次核对代码路径与已有报告：NL2SQL 当前报告 14/14、鲁棒 4/4，Schema 18 题表 31/31、列 28/28、指标 4/4、路径 6/6；连续三轮与 35 项回归沿用历史记录，未重跑。真实 OCR、工艺字段、CAD、冲突检测/消解、RAG 与工业端到端成绩仍为空。没有提交软件包、增加工业表/源或更改模型配置。各项转为“已验证”须附代码/数据/模型版本、运行/报告路径、分母及失败边界。
+
+
+## 18.11 依据复杂文件分类参考 MD 的优化记录（2026 年 10 月 1 日）
+
+正文升级 **V1.2**，文件名同步为 `DataMind_Agent_技术设计说明书_V1.2.md`；参考 MD 规范命名为 `复杂非结构化文件分类与解析技术文档.md`，内容保持原样。本次只优化设计/README，未实现解析器或运行模型/OCR/工业基准；SQL/Schema 历史成绩及工业待实现状态不变。
+
+| 参考能力 | 本版落地设计 | 当前状态/验收 |
+|---|---|---|
+| 文件分类 | 格式/载体/业务三层、A/B/C 范围与能力登记 | 待实现，先核心与异常格式 |
+| 统一解析 | Router/Adapter、ParseResult、摄取/查询分离 | 基础 PDF 摄取已有，统一契约待实现 |
+| 结构/语义 | BlockRelation、标题/顺序/图注/续表/脚注、关系切片 | 基础标题/切片已有，关系恢复/gold 待建 |
+| 图纸/拓扑 | 原生实体/尺寸关联、关系候选/证据 | 二维 CAD 待实现；P&ID/电气 B 类后续 |
+| 跨格式追溯 | SourceLocator、原生位置、源/业务/解析版本 | 页图/bbox 已有，统一定位/API/UI 待实现 |
+| 混合检索 | 文档先重排，事实/关系/SQL 核验融合 | 向量摄取已有，运行融合待实现 |
+| 分层质量 | 分类/结构/关系/字段/定位/回答与反例 | 设计已明确，新增成绩为空 |
+
+A 类先真实 PDF/OCR、工艺/质检、单文档问答、跨源与二维 CAD；B 类按样本需要扩 Office/工程流程；C 类模型/空间/音视频后置。A/B/C 是数据范围，不等于官方任务等级。
+
+转为已验证须有支持画像、版本化结果、结构/字段/关系标签、可访问原生定位、失败/缺口状态和逐例报告；能打开或向量入库不等于识别/问答通过。执行顺序以 §18.3 为准。
