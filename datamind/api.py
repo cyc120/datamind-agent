@@ -1,12 +1,14 @@
-"""Local development API for the SQL Agent and its persisted trace."""
+"""Local API for SQL/document agents, source files and persisted evidence."""
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import queue
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal
 
 import psycopg2
 from fastapi import FastAPI, HTTPException, Query
@@ -16,7 +18,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from psycopg2.extras import RealDictCursor
 
-from .agent import SQLAgent, _read_dsn
+from .agent import DataMindAgent, _read_dsn, _write_dsn
+from .knowledge import COLLECTIONS, ROOT
 from .providers import (OPENAI, PROTOCOLS, list_models as provider_list_models,
                         test_chat as provider_test_chat)
 from .settings_store import (DEFAULT_BASE_URL, DEFAULT_MODEL, PROFILE_FIELDS, activate_profile,
@@ -27,11 +30,25 @@ from .settings_store import (DEFAULT_BASE_URL, DEFAULT_MODEL, PROFILE_FIELDS, ac
 
 class Scope(BaseModel):
     database_sources: list[str] | None = None
+    document_collections: list[str] | None = None
 
 
 class ChatRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
     scope: Scope | None = None
+    mode: Literal["auto", "sql", "rag", "industrial"] = "auto"
+
+
+class FactReviewRequest(BaseModel):
+    request_id: str = Field(min_length=1,max_length=64,pattern=r'^[A-Za-z0-9_-]+$')
+    document_version: int = Field(ge=1)
+    source_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+    parser_version: str = Field(min_length=1,max_length=64)
+    payload_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+    previous_review_id: str | None = Field(default=None,max_length=64)
+    decision: Literal['confirmed','rejected','needs_review']
+    reviewer_label: str = Field(min_length=1,max_length=120)
+    reason: str = Field(min_length=1,max_length=1000)
 
 
 class ProfileRequest(BaseModel):
@@ -57,7 +74,7 @@ class ProfileImportRequest(BaseModel):
     activate_first: bool = False
 
 
-app = FastAPI(title="DataMind Agent", version="0.2.0")
+app = FastAPI(title="DataMind Agent", version="0.7.0")
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
 WEB = WEB_DIR / "index.html"
 app.mount("/assets", StaticFiles(directory=WEB_DIR), name="assets")
@@ -74,7 +91,11 @@ def health():
         with psycopg2.connect(_read_dsn()) as conn, conn.cursor() as cur:
             cur.execute("SELECT 1")
             cur.fetchone()
-        return {"status": "ok", "database": "ready", "agent": "sql-only"}
+            cur.execute("SELECT count(*) FROM document_assets WHERE status='indexed' AND 'public'=ANY(acl) AND NOT needs_review")
+            document_count = cur.fetchone()[0]
+        return {"status": "ok", "database": "ready", "agent": "sql+rag",
+                "capabilities": ["sql", "rag", "industrial_rules", "industrial_nl2sql", "fact_reviews"],
+                "knowledge": "ready" if document_count else "empty", "document_count": document_count}
     except psycopg2.Error:
         raise HTTPException(503, detail={"error_code": "DATABASE_UNAVAILABLE"})
 
@@ -252,10 +273,11 @@ def probe_chat(request: ProfileRequest):
 
 @app.post("/v1/chat")
 def chat(request: ChatRequest):
-    agent = SQLAgent()
+    agent = DataMindAgent()
     try:
         return jsonable_encoder(agent.run(request.question,
-                                         database_sources=request.scope.database_sources if request.scope else None))
+            mode=request.mode, database_sources=request.scope.database_sources if request.scope else None,
+            document_collections=request.scope.document_collections if request.scope else None))
     finally:
         agent.close()
 
@@ -266,7 +288,7 @@ def diagnostic_sql():
     question = "2024年一共有多少笔订单？"
     sql = ("SELECT count(*) FROM orders WHERE created_at >= '2024-01-01' "
            "AND created_at < '2025-01-01'")
-    agent = SQLAgent()
+    agent = DataMindAgent()
     try:
         return jsonable_encoder(agent.run(question, database_sources=["demo_retail"],
                                          generator=lambda *_: {"sql": sql, "interpretation": "固定链路自检"}))
@@ -277,11 +299,13 @@ def diagnostic_sql():
 @app.post("/v1/chat/stream")
 def chat_stream(request: ChatRequest):
     updates: queue.Queue = queue.Queue()
-    agent = SQLAgent(sink=updates.put)
+    agent = DataMindAgent(sink=updates.put)
 
     def worker():
         try:
-            agent.run(request.question, database_sources=request.scope.database_sources if request.scope else None)
+            agent.run(request.question, mode=request.mode,
+                      database_sources=request.scope.database_sources if request.scope else None,
+                      document_collections=request.scope.document_collections if request.scope else None)
         finally:
             agent.close()
             updates.put(None)
@@ -301,6 +325,100 @@ def chat_stream(request: ChatRequest):
 
     return StreamingResponse(events(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+def _public_document(document_id: str) -> dict:
+    with psycopg2.connect(_read_dsn()) as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute("""SELECT * FROM document_assets WHERE document_id=%s AND status='indexed'
+                       AND 'public'=ANY(acl) AND NOT needs_review AND collection=ANY(%s)""",
+                    (document_id, sorted(COLLECTIONS)))
+        row = cur.fetchone()
+    if not row:
+        raise HTTPException(404, detail={"error_code": "DOCUMENT_NOT_FOUND"})
+    return dict(row)
+
+
+@app.get("/v1/documents")
+def list_documents(collection: str | None = None):
+    if collection and collection not in COLLECTIONS:
+        raise HTTPException(400, detail={"error_code": "COLLECTION_NOT_ALLOWED"})
+    with psycopg2.connect(_read_dsn()) as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute("""SELECT document_id,title,collection,file_type,origin,page_count,doc_version,sha256,
+                              quality_score,quality_detail,parser_version FROM document_assets
+                       WHERE status='indexed' AND 'public'=ANY(acl) AND NOT needs_review AND collection=ANY(%s)
+                       ORDER BY title LIMIT 200""", ([collection] if collection else sorted(COLLECTIONS),))
+        return {"documents": jsonable_encoder([dict(row) for row in cur.fetchall()])}
+
+
+@app.get("/v1/documents/{document_id}")
+def get_document(document_id: str):
+    document = _public_document(document_id)
+    document.pop("object_uri", None)
+    return jsonable_encoder(document)
+
+
+def _source_path(document: dict) -> Path:
+    path = Path(document.get("object_uri") or "").resolve()
+    if not any(path.is_relative_to(ROOT / name) for name in ("data/knowledge_base", "data/ohr_bench_samples", "data/industrial_demo")) or not path.is_file():
+        raise HTTPException(404, detail={"error_code": "SOURCE_FILE_UNAVAILABLE"})
+    if hashlib.sha256(path.read_bytes()).hexdigest() != document["sha256"]:
+        raise HTTPException(409, detail={"error_code": "SOURCE_VERSION_MISMATCH"})
+    return path
+
+
+@app.get("/v1/documents/{document_id}/file")
+def document_file(document_id: str):
+    document = _public_document(document_id)
+    path = _source_path(document)
+    return FileResponse(path, media_type="application/pdf" if document["file_type"] == "pdf" else "application/json",
+                        filename=path.name, content_disposition_type="inline")
+
+
+@app.get("/v1/documents/{document_id}/facts")
+def document_facts(document_id: str):
+    from .field_store import read_verified_facts
+    document = _public_document(document_id)
+    source = _source_path(document)
+    facts = read_verified_facts(document, source, _read_dsn())
+    return {"document_id": document_id, "document_version": document["doc_version"], "source_sha256": document["sha256"],
+            "parser_version": document["parser_version"], "facts": jsonable_encoder(facts), "fact_count": len(facts),
+            "quality": (document.get("quality_detail") or {}).get("fact_extraction")}
+
+
+@app.get('/v1/documents/{document_id}/facts/{fact_id}/reviews')
+def get_fact_reviews(document_id: str,fact_id: str):
+    document=_public_document(document_id);_source_path(document)
+    from .fact_reviews import history
+    return {'reviews':jsonable_encoder(history(document_id,fact_id,_read_dsn())),
+            'semantics':'Local extraction review; not authenticated identity, source approval or conflict authority'}
+
+
+@app.post('/v1/documents/{document_id}/facts/{fact_id}/reviews')
+def review_document_fact(document_id: str,fact_id: str,request: FactReviewRequest):
+    from .field_store import read_verified_facts
+    from .fact_reviews import record
+    document=_public_document(document_id);source=_source_path(document)
+    facts=read_verified_facts(document,source,_read_dsn())
+    fact=next((f for f in facts if f['fact_id']==fact_id),None)
+    if not fact:raise HTTPException(409,detail={'error_code':'FACT_UNAVAILABLE_OR_STALE'})
+    payload=request.model_dump();payload['reviewer_label']=payload['reviewer_label'].strip();payload['reason']=payload['reason'].strip()
+    if not payload['reviewer_label'] or not payload['reason']:raise HTTPException(422,detail={'error_code':'REVIEW_LABEL_AND_REASON_REQUIRED'})
+    result=record(document,fact,source,payload,_write_dsn())
+    return {'review':jsonable_encoder({k:v for k,v in result.items() if k not in ('fact_snapshot','request_payload')}),
+            'semantics':'Only extraction fidelity is reviewed; source approval and unresolved conflicts remain unchanged'}
+
+
+@app.get("/v1/documents/{document_id}/pages/{page_no}")
+def document_page(document_id: str, page_no: int):
+    document = _public_document(document_id)
+    if document["file_type"] != "pdf" or not 1 <= page_no <= (document["page_count"] or 0):
+        raise HTTPException(404, detail={"error_code": "SOURCE_PAGE_UNAVAILABLE"})
+    _source_path(document)
+    image_root = ROOT / "data/object_store/page_images"
+    path = (image_root / document_id / f"page_{page_no:03d}.png").resolve()
+    if not path.is_relative_to(image_root) or not path.is_file():
+        raise HTTPException(404, detail={"error_code": "SOURCE_PAGE_UNAVAILABLE"})
+    return FileResponse(path, media_type="image/png")
 
 
 def _run_exists(cur, run_id: str):
@@ -352,3 +470,11 @@ def get_evidence(run_id: str):
         cur.execute("SELECT * FROM claims WHERE run_id=%s ORDER BY created_at", (run_id,))
         claims = [dict(r) for r in cur.fetchall()]
     return jsonable_encoder({"nodes": nodes, "edges": edges, "claims": claims})
+
+
+@app.get('/v1/runs/{run_id}/conflicts')
+def get_conflicts(run_id: str):
+    with psycopg2.connect(_read_dsn()) as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+        _run_exists(cur,run_id)
+        cur.execute('SELECT payload FROM conflict_records WHERE run_id=%s ORDER BY conflict_id',(run_id,))
+        return {'conflicts':[r['payload'] for r in cur.fetchall()]}

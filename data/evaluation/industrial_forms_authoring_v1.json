@@ -1,0 +1,8 @@
+{
+  "dataset_version": "industrial-forms-holdout-v1",
+  "provenance": "Synthetic follow-on templates authored after industrial-native-v1 was implemented. Author-provided field labels and regions, visually checked; not independent factory data or a blind benchmark. First-run parser remains frozen.",
+  "records": [
+    {"template":"vertical_fullwidth","fields":[["文档类型","质检报告"],["零件编号","A210"],["工序编号","20"],["指标","holding_temperature"],["版次","A210-R4"],["审批状态","已批准"],["批次编号","B210"],["测量编号","M210-3"],["报告编号","Q210-3"],["测量时点","2026-10-05T09:25:00+08:00"],["测量方法","core"],["实测值","812.4"],["单位","degC"],["报告结论","模拟原文，仅用于字段测试"]]},
+    {"template":"compact_ascii","fields":[["文档类型","质检报告"],["零件编号","A211"],["工序编号","40"],["指标","holding_temperature"],["版次","A211-R2"],["审批状态","未批准"],["批次编号","B211"],["测量编号","M211-2"],["报告编号","Q211-2"],["测量时点","2026-10-06T14:10:00+08:00"],["测量方法","surface"],["实测值","1073.15"],["单位","K"],["报告结论","模拟原文，按实际来源复核"]]}
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "suite_version": "industrial-nl2sql-dev-v1",
+  "scope": "Synthetic development set. Eight real-model executable cases and two pre-model clarification checks; not an independent generalization set.",
+  "dataset_version": "industrial-demo-v1",
+  "seed_sha256": "5d08098da172328d938d35877c8eff63a87a9f3769615f2ef8f16e813be52d7c",
+  "cases": [
+    {"case_id":"indsql-001","question":"2026年9月A102工序30有多少个已测量批次？","expected_status":"completed","gold_rows":[[9]],"ordered":false},
+    {"case_id":"indsql-002","question":"2026年9月A102工序30有多少条测量记录？","expected_status":"completed","gold_rows":[[10]],"ordered":false},
+    {"case_id":"indsql-003","question":"2026年9月工序30每个零件的已测量批次数是多少？按零件编号排序。","expected_status":"completed","gold_rows":[["A102",9],["A103",1],["A104",1]],"ordered":true},
+    {"case_id":"indsql-004","question":"2026年9月A102工序30的平均温度是多少摄氏度？保留两位小数。","expected_status":"completed","gold_rows":[[855.56]],"ordered":false},
+    {"case_id":"indsql-005","question":"列出B006批次工序30的测量编号、原始温度和原始单位，按测量编号排序。","expected_status":"completed","gold_rows":[["M006-1",850,"degC"],["M006-2",870,"degC"]],"ordered":true},
+    {"case_id":"indsql-006","question":"2026年9月A102工序30哪些测量的温度单位无法归一化？列出测量编号和原始单位。","expected_status":"completed","gold_rows":[["M005-1","sensorX"]],"ordered":false},
+    {"case_id":"indsql-007","question":"列出零件目录中的零件编号、名称和材料，按零件编号排序。","expected_status":"completed","gold_rows":[["A102","演示零件102","模拟合金"],["A103","演示零件103","模拟合金"],["A104","演示零件104","模拟合金"]],"ordered":true},
+    {"case_id":"indsql-008","question":"2026年8月A102工序30有多少条测量记录？","expected_status":"completed","gold_rows":[[1]],"ordered":false},
+    {"case_id":"indsql-009","question":"A102工序30有多少条测量记录？","expected_status":"clarification_required"},
+    {"case_id":"indsql-010","question":"2026年9月A102工序30哪些批次温度超限？","expected_status":"clarification_required"}
+  ]
+}

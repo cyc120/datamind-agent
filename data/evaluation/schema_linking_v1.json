@@ -1,0 +1,25 @@
+{
+  "suite_version": "schema-linking-v1",
+  "data_version": "retail-v2",
+  "annotation": "The first 12 cases were checked against the question and gold SQL; six extra questions were annotated directly. Join keys and formula operands are assessed by the SQL/Join Guard, not counted as semantic anchor columns here.",
+  "cases": [
+    {"case_id": "nl2sql-001", "source_id": "demo_retail", "question": "有多少个客户注册了大区信息？", "tables": ["customers"], "columns": ["customers.region_id"], "metrics": [], "paths": []},
+    {"case_id": "nl2sql-002", "source_id": "demo_retail", "question": "家电类产品有哪些？请给出产品名称和价格。", "tables": ["products"], "columns": ["products.category", "products.product_name", "products.list_price"], "metrics": [], "paths": []},
+    {"case_id": "nl2sql-003", "source_id": "demo_retail", "question": "2024年一共有多少笔订单？", "tables": ["orders"], "columns": ["orders.created_at"], "metrics": [], "paths": []},
+    {"case_id": "nl2sql-004", "source_id": "demo_retail", "question": "已取消的订单有多少？", "tables": ["orders"], "columns": ["orders.order_status"], "metrics": [], "paths": []},
+    {"case_id": "nl2sql-005", "source_id": "demo_retail", "question": "VIP客户有多少人？", "tables": ["customers"], "columns": ["customers.customer_level"], "metrics": [], "paths": []},
+    {"case_id": "nl2sql-006", "source_id": "demo_retail", "question": "华东地区的客户下了多少笔订单？", "tables": ["orders", "customers", "regions"], "columns": ["regions.region_name"], "metrics": [], "paths": [{"from": "orders", "to": "regions", "tables": ["orders", "customers", "regions"]}]},
+    {"case_id": "nl2sql-007", "source_id": "demo_retail", "question": "2024年每个大区的销售额分别是多少？（口径见业务指标 sales_amount）", "tables": ["order_items", "orders", "customers", "regions"], "columns": ["regions.region_name", "orders.created_at"], "metrics": ["demo_retail.sales_amount"], "paths": [{"from": "order_items", "to": "regions", "tables": ["order_items", "orders", "customers", "regions"]}]},
+    {"case_id": "nl2sql-008", "source_id": "demo_retail", "question": "2025年销售额最高的前三个产品是什么？请给出产品名称和销售额。", "tables": ["order_items", "orders", "products"], "columns": ["products.product_name", "orders.created_at"], "metrics": ["demo_retail.sales_amount"], "paths": [{"from": "order_items", "to": "products", "tables": ["order_items", "products"]}]},
+    {"case_id": "nl2sql-009", "source_id": "demo_retail", "question": "2025年各退款原因的退款总金额是多少？", "tables": ["refunds"], "columns": ["refunds.reason", "refunds.refunded_at", "refunds.refund_amount"], "metrics": [], "paths": []},
+    {"case_id": "nl2sql-010", "source_id": "demo_retail", "question": "2025年销售额比2024年增长了多少？请给出增长金额。", "tables": ["order_items", "orders"], "columns": ["orders.created_at"], "metrics": ["demo_retail.sales_amount"], "paths": [{"from": "order_items", "to": "orders", "tables": ["order_items", "orders"]}]},
+    {"case_id": "nl2sql-011", "source_id": "chinook", "question": "Chinook库里哪个国家客户最多？请给出国家名称和客户数。", "tables": ["customer"], "columns": ["customer.country"], "metrics": [], "paths": []},
+    {"case_id": "nl2sql-012", "source_id": "chinook", "question": "Chinook里销量最高的歌手是谁？请给出歌手名称和销量。", "tables": ["invoice_line", "track", "album", "artist"], "columns": ["artist.name"], "metrics": ["chinook.tracks_sold"], "paths": [{"from": "invoice_line", "to": "artist", "tables": ["invoice_line", "track", "album", "artist"]}]},
+    {"case_id": "schema-001", "source_id": "demo_retail", "question": "按下单时间统计2025年各订单状态的订单数", "tables": ["orders"], "columns": ["orders.created_at", "orders.order_status"], "metrics": [], "paths": []},
+    {"case_id": "schema-002", "source_id": "demo_retail", "question": "2024年各退款原因对应的退款金额是多少？", "tables": ["refunds"], "columns": ["refunds.reason", "refunds.refunded_at", "refunds.refund_amount"], "metrics": [], "paths": []},
+    {"case_id": "schema-003", "source_id": "demo_retail", "question": "各客户等级有多少人？", "tables": ["customers"], "columns": ["customers.customer_level"], "metrics": [], "paths": []},
+    {"case_id": "schema-004", "source_id": "chinook", "question": "Chinook的客户来自哪些国家？", "tables": ["customer"], "columns": ["customer.country"], "metrics": [], "paths": []},
+    {"case_id": "schema-005", "source_id": "demo_retail", "question": "售价最高的商品名称和标价是什么？", "tables": ["products"], "columns": ["products.product_name", "products.list_price"], "metrics": [], "paths": []},
+    {"case_id": "schema-006", "source_id": "demo_retail", "question": "华南地区会员下了多少笔订单？", "tables": ["orders", "customers", "regions"], "columns": ["regions.region_name"], "metrics": [], "paths": [{"from": "orders", "to": "regions", "tables": ["orders", "customers", "regions"]}]}
+  ]
+}

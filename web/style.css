@@ -119,3 +119,32 @@ th{background:#f3f8f5;color:#3b5e50;position:sticky;top:0}tr:last-child td{borde
 .profile-actions button{padding:6px 11px;font-size:12px;border-radius:8px}
 .danger-text{background:#fdeee9;color:#a54224}
 .danger-text:hover{background:#f9ded4}
+/* Grounded document source cards. */
+.hidden{display:none}
+.citations { display: grid; gap: 16px; margin-top: 14px; }
+.citation { padding: 16px; border: 1px solid var(--line, #e2e8f0); border-radius: 12px; min-width: 0; }
+.citation h3 { margin: 0 0 8px; font-size: 15px; overflow-wrap: anywhere; }
+.citation blockquote { margin: 12px 0; padding: 10px 14px; border-left: 3px solid #5776db; background: #f5f7fc; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
+.citation-links { display: flex; gap: 20px; }
+.citation-links a { color: #3e5cba; }
+.document-fields { width: min(980px, 92vw); max-height: 88vh; overflow: auto; border: 1px solid #d9e2ef; border-radius: 14px; padding: 22px; color: #172033; }
+.document-fields::backdrop { background: #0f172a88; }
+.document-fields > button { float: right; }
+.document-fields td, .document-fields th { padding: 9px; white-space: normal; }
+.field-preview { margin-top: 16px; }
+.field-page { position: relative; width: min(100%, 650px); margin: auto; }
+.field-page img { display: block; width: 100%; height: auto; }
+.field-page svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.industrial-table { overflow-x: auto; margin-top: 12px; }
+.industrial-table td { vertical-align: top; white-space: normal; min-width: 85px; }
+.industrial-table td:last-child { min-width: 220px; }
+.industrial-table a { color: #3e5cba; }
+.industrial-table button { font-size: 11px; padding: 5px 7px; margin: 3px; }
+.industrial-conflict { background: #fff2ed; }
+.review-form { display: grid; grid-template-columns: 200px 1fr; gap: 12px; margin: 16px 0; }
+.review-form textarea { min-height: 70px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; }
+.document-fields td { vertical-align: top; white-space: pre-wrap; }
+.document-fields td:last-child { min-width: 190px; }
+.document-fields td button { font-size: 11px; padding: 5px 7px; margin: 3px; }
+.review-history { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+@media(max-width:650px){ .review-form { grid-template-columns: 1fr; } }

@@ -1,0 +1,141 @@
+{
+  "suite_version": "document-fields-v1",
+  "scope": "Development set: 2 original demo scan pages, 9 headers, 15 product/store field values; not an independent industrial benchmark",
+  "method": "Original source SHA must match. Compare header text, row/entity binding, raw and normalized values/units, evidence page/cell bounds. No labels supplied to parser. Unknown batch/time/approval remain unknown.",
+  "cases": [
+    {
+      "source_file": "data/knowledge_base/07_门店巡检记录_2025年12月_扫描版.pdf",
+      "source_sha256": "da26528aceb234147bbed0c88af9d2d489017ef51133f3e3ec3a4c56a0de5527",
+      "page": 1,
+      "case_id": "fields-07",
+      "headers": [
+        "门店",
+        "得分",
+        "主要失分项",
+        "其他问题"
+      ],
+      "facts": [
+        {
+          "entity_name": "南京新街口店",
+          "metric": "inspection_score",
+          "raw_value": "76",
+          "normalized_value": "76",
+          "normalized_unit": null
+        },
+        {
+          "entity_name": "杭州西湖店",
+          "metric": "inspection_score",
+          "raw_value": "94",
+          "normalized_value": "94",
+          "normalized_unit": null
+        },
+        {
+          "entity_name": "无锡中山店",
+          "metric": "inspection_score",
+          "raw_value": "85",
+          "normalized_value": "85",
+          "normalized_unit": null
+        }
+      ]
+    },
+    {
+      "source_file": "data/knowledge_base/08_产品质检报告_数码品类_扫描版.pdf",
+      "source_sha256": "3f96fd67999d5804faff1f271c365eb5da66aeaf93f231879a8de38660fc5141",
+      "page": 1,
+      "case_id": "fields-08",
+      "headers": [
+        "产品",
+        "抽检数",
+        "外观瑕疵",
+        "功能不良",
+        "不良率"
+      ],
+      "facts": [
+        {
+          "entity_name": "无线降噪耳机Pro",
+          "metric": "sample_count",
+          "raw_value": "45",
+          "normalized_value": "45",
+          "normalized_unit": null
+        },
+        {
+          "entity_name": "无线降噪耳机Pro",
+          "metric": "appearance_defects",
+          "raw_value": "3",
+          "normalized_value": "3",
+          "normalized_unit": null
+        },
+        {
+          "entity_name": "无线降噪耳机Pro",
+          "metric": "functional_defects",
+          "raw_value": "1",
+          "normalized_value": "1",
+          "normalized_unit": null
+        },
+        {
+          "entity_name": "无线降噪耳机Pro",
+          "metric": "defect_rate",
+          "raw_value": "8.9%",
+          "normalized_value": "0.089",
+          "normalized_unit": "1"
+        },
+        {
+          "entity_name": "真无线耳机Air",
+          "metric": "sample_count",
+          "raw_value": "40",
+          "normalized_value": "40",
+          "normalized_unit": null
+        },
+        {
+          "entity_name": "真无线耳机Air",
+          "metric": "appearance_defects",
+          "raw_value": "2",
+          "normalized_value": "2",
+          "normalized_unit": null
+        },
+        {
+          "entity_name": "真无线耳机Air",
+          "metric": "functional_defects",
+          "raw_value": "1",
+          "normalized_value": "1",
+          "normalized_unit": null
+        },
+        {
+          "entity_name": "真无线耳机Air",
+          "metric": "defect_rate",
+          "raw_value": "7.5%",
+          "normalized_value": "0.075",
+          "normalized_unit": "1"
+        },
+        {
+          "entity_name": "便携蓝牙音箱",
+          "metric": "sample_count",
+          "raw_value": "35",
+          "normalized_value": "35",
+          "normalized_unit": null
+        },
+        {
+          "entity_name": "便携蓝牙音箱",
+          "metric": "appearance_defects",
+          "raw_value": "2",
+          "normalized_value": "2",
+          "normalized_unit": null
+        },
+        {
+          "entity_name": "便携蓝牙音箱",
+          "metric": "functional_defects",
+          "raw_value": "0",
+          "normalized_value": "0",
+          "normalized_unit": null
+        },
+        {
+          "entity_name": "便携蓝牙音箱",
+          "metric": "defect_rate",
+          "raw_value": "5.7%",
+          "normalized_value": "0.057",
+          "normalized_unit": "1"
+        }
+      ]
+    }
+  ]
+}

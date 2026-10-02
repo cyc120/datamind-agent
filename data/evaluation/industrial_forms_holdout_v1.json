@@ -1,0 +1,646 @@
+{
+  "suite_version": "industrial-forms-holdout-v1",
+  "provenance": "Synthetic follow-on templates authored after industrial-native-v1 was implemented. Author-provided field labels and regions, visually checked; not independent factory data or a blind benchmark. First-run parser remains frozen.",
+  "source_file": "output/pdf/industrial_forms_holdout_v1.pdf",
+  "authoring_sha256": "a65e38904a5c1f75c814fce69f0251e9d442a13c12c20035c05d2a9f95b6817c",
+  "frozen_parser_code_hashes": {
+    "ingestion/industrial_facts.py": "b2f8ae5f5d9f628ec074c0d85f97469c71b9b7317221cbd128e89f8a1a386183",
+    "ingestion/ingest.py": "c36262ea2227792661f90e395a006a2c5db9d1142c31f7302360e0ccac046a16",
+    "ingestion/ocr.py": "caebb1038dc865b00a1f76b5ae37475c1b3472d9e7cce4f4623952f46cc4eae2",
+    "ingestion/tables.py": "36eeff85ed5de20ce59516b293a813f5c853dda30bce70c9b3b732b9188d2666"
+  },
+  "cases": [
+    {
+      "case_id": "form-native-1",
+      "page": 1,
+      "carrier": "native",
+      "template": "vertical_fullwidth",
+      "fields": [
+        {
+          "label": "文档类型",
+          "value": "质检报告",
+          "bbox": [
+            50,
+            112,
+            162.0,
+            132
+          ]
+        },
+        {
+          "label": "零件编号",
+          "value": "A210",
+          "bbox": [
+            50,
+            151,
+            139.2,
+            171
+          ]
+        },
+        {
+          "label": "工序编号",
+          "value": "20",
+          "bbox": [
+            50,
+            190,
+            125.256,
+            210
+          ]
+        },
+        {
+          "label": "指标",
+          "value": "holding_temperature",
+          "bbox": [
+            50,
+            229,
+            192.804,
+            249
+          ]
+        },
+        {
+          "label": "版次",
+          "value": "A210-R4",
+          "bbox": [
+            50,
+            268,
+            133.152,
+            288
+          ]
+        },
+        {
+          "label": "审批状态",
+          "value": "已批准",
+          "bbox": [
+            50,
+            307,
+            150.0,
+            327
+          ]
+        },
+        {
+          "label": "批次编号",
+          "value": "B210",
+          "bbox": [
+            50,
+            346,
+            138.54000000000002,
+            366
+          ]
+        },
+        {
+          "label": "测量编号",
+          "value": "M210-3",
+          "bbox": [
+            50,
+            385,
+            151.692,
+            405
+          ]
+        },
+        {
+          "label": "报告编号",
+          "value": "Q210-3",
+          "bbox": [
+            50,
+            424,
+            149.4,
+            444
+          ]
+        },
+        {
+          "label": "测量时点",
+          "value": "2026-10-05T09:25:00+08:00",
+          "bbox": [
+            50,
+            463,
+            246.276,
+            483
+          ]
+        },
+        {
+          "label": "测量方法",
+          "value": "core",
+          "bbox": [
+            50,
+            502,
+            134.268,
+            522
+          ]
+        },
+        {
+          "label": "实测值",
+          "value": "812.4",
+          "bbox": [
+            50,
+            541,
+            127.14,
+            561
+          ]
+        },
+        {
+          "label": "单位",
+          "value": "degC",
+          "bbox": [
+            50,
+            580,
+            114.048,
+            600
+          ]
+        },
+        {
+          "label": "报告结论",
+          "value": "模拟原文，仅用于字段测试",
+          "bbox": [
+            50,
+            619,
+            258.0,
+            639
+          ]
+        }
+      ],
+      "expected_fact": {
+        "entity_id": "A210",
+        "operation_no": "20",
+        "measurement_id": "M210-3",
+        "raw_value": "812.4",
+        "raw_unit": "degC",
+        "normalized_value": "812.4"
+      }
+    },
+    {
+      "case_id": "form-native-2",
+      "page": 2,
+      "carrier": "native",
+      "template": "compact_ascii",
+      "fields": [
+        {
+          "label": "文档类型",
+          "value": "质检报告",
+          "bbox": [
+            92,
+            123,
+            180.69,
+            141
+          ]
+        },
+        {
+          "label": "零件编号",
+          "value": "A211",
+          "bbox": [
+            92,
+            153,
+            161.69,
+            171
+          ]
+        },
+        {
+          "label": "工序编号",
+          "value": "40",
+          "bbox": [
+            92,
+            183,
+            150.07,
+            201
+          ]
+        },
+        {
+          "label": "指标",
+          "value": "holding_temperature",
+          "bbox": [
+            92,
+            213,
+            206.36,
+            231
+          ]
+        },
+        {
+          "label": "版次",
+          "value": "A211-R2",
+          "bbox": [
+            92,
+            243,
+            156.65,
+            261
+          ]
+        },
+        {
+          "label": "审批状态",
+          "value": "未批准",
+          "bbox": [
+            92,
+            273,
+            170.69,
+            291
+          ]
+        },
+        {
+          "label": "批次编号",
+          "value": "B211",
+          "bbox": [
+            92,
+            303,
+            161.14,
+            321
+          ]
+        },
+        {
+          "label": "测量编号",
+          "value": "M211-2",
+          "bbox": [
+            92,
+            333,
+            172.10000000000002,
+            351
+          ]
+        },
+        {
+          "label": "报告编号",
+          "value": "Q211-2",
+          "bbox": [
+            92,
+            363,
+            170.19,
+            381
+          ]
+        },
+        {
+          "label": "测量时点",
+          "value": "2026-10-06T14:10:00+08:00",
+          "bbox": [
+            92,
+            393,
+            250.92000000000002,
+            411
+          ]
+        },
+        {
+          "label": "测量方法",
+          "value": "surface",
+          "bbox": [
+            92,
+            423,
+            170.11,
+            441
+          ]
+        },
+        {
+          "label": "实测值",
+          "value": "1073.15",
+          "bbox": [
+            92,
+            453,
+            161.01999999999998,
+            471
+          ]
+        },
+        {
+          "label": "单位",
+          "value": "K",
+          "bbox": [
+            92,
+            483,
+            128.17000000000002,
+            501
+          ]
+        },
+        {
+          "label": "报告结论",
+          "value": "模拟原文，按实际来源复核",
+          "bbox": [
+            92,
+            513,
+            260.69,
+            531
+          ]
+        }
+      ],
+      "expected_fact": {
+        "entity_id": "A211",
+        "operation_no": "40",
+        "measurement_id": "M211-2",
+        "raw_value": "1073.15",
+        "raw_unit": "K",
+        "normalized_value": "800.00"
+      }
+    },
+    {
+      "case_id": "form-scan-1",
+      "page": 3,
+      "carrier": "scan",
+      "template": "vertical_fullwidth",
+      "fields": [
+        {
+          "label": "文档类型",
+          "value": "质检报告",
+          "bbox": [
+            50.0,
+            112.0,
+            162.0,
+            132.0
+          ]
+        },
+        {
+          "label": "零件编号",
+          "value": "A210",
+          "bbox": [
+            50.0,
+            151.0,
+            139.2,
+            171.0
+          ]
+        },
+        {
+          "label": "工序编号",
+          "value": "20",
+          "bbox": [
+            50.0,
+            190.0,
+            125.26,
+            210.0
+          ]
+        },
+        {
+          "label": "指标",
+          "value": "holding_temperature",
+          "bbox": [
+            50.0,
+            229.0,
+            192.8,
+            249.0
+          ]
+        },
+        {
+          "label": "版次",
+          "value": "A210-R4",
+          "bbox": [
+            50.0,
+            268.0,
+            133.15,
+            288.0
+          ]
+        },
+        {
+          "label": "审批状态",
+          "value": "已批准",
+          "bbox": [
+            50.0,
+            307.0,
+            150.0,
+            327.0
+          ]
+        },
+        {
+          "label": "批次编号",
+          "value": "B210",
+          "bbox": [
+            50.0,
+            346.0,
+            138.54,
+            366.0
+          ]
+        },
+        {
+          "label": "测量编号",
+          "value": "M210-3",
+          "bbox": [
+            50.0,
+            385.0,
+            151.69,
+            405.0
+          ]
+        },
+        {
+          "label": "报告编号",
+          "value": "Q210-3",
+          "bbox": [
+            50.0,
+            424.0,
+            149.4,
+            444.0
+          ]
+        },
+        {
+          "label": "测量时点",
+          "value": "2026-10-05T09:25:00+08:00",
+          "bbox": [
+            50.0,
+            463.0,
+            246.28,
+            483.0
+          ]
+        },
+        {
+          "label": "测量方法",
+          "value": "core",
+          "bbox": [
+            50.0,
+            502.0,
+            134.27,
+            522.0
+          ]
+        },
+        {
+          "label": "实测值",
+          "value": "812.4",
+          "bbox": [
+            50.0,
+            541.0,
+            127.14,
+            561.0
+          ]
+        },
+        {
+          "label": "单位",
+          "value": "degC",
+          "bbox": [
+            50.0,
+            580.0,
+            114.05,
+            600.0
+          ]
+        },
+        {
+          "label": "报告结论",
+          "value": "模拟原文，仅用于字段测试",
+          "bbox": [
+            50.0,
+            619.0,
+            258.0,
+            639.0
+          ]
+        }
+      ],
+      "expected_fact": {
+        "entity_id": "A210",
+        "operation_no": "20",
+        "measurement_id": "M210-3",
+        "raw_value": "812.4",
+        "raw_unit": "degC",
+        "normalized_value": "812.4"
+      },
+      "scan_dpi": 144,
+      "scan_rotation_degrees": 0
+    },
+    {
+      "case_id": "form-scan-2",
+      "page": 4,
+      "carrier": "scan",
+      "template": "compact_ascii",
+      "fields": [
+        {
+          "label": "文档类型",
+          "value": "质检报告",
+          "bbox": [
+            85.8,
+            125.51,
+            174.85,
+            145.37
+          ]
+        },
+        {
+          "label": "零件编号",
+          "value": "A211",
+          "bbox": [
+            86.43,
+            155.9,
+            156.48,
+            175.36
+          ]
+        },
+        {
+          "label": "工序编号",
+          "value": "40",
+          "bbox": [
+            87.06,
+            186.14,
+            145.5,
+            205.35
+          ]
+        },
+        {
+          "label": "指标",
+          "value": "holding_temperature",
+          "bbox": [
+            87.69,
+            214.95,
+            202.4,
+            235.35
+          ]
+        },
+        {
+          "label": "版次",
+          "value": "A211-R2",
+          "bbox": [
+            88.32,
+            245.99,
+            153.33,
+            265.34
+          ]
+        },
+        {
+          "label": "审批状态",
+          "value": "未批准",
+          "bbox": [
+            88.95,
+            275.69,
+            168.0,
+            295.33
+          ]
+        },
+        {
+          "label": "批次编号",
+          "value": "B211",
+          "bbox": [
+            89.57,
+            305.88,
+            159.08,
+            325.33
+          ]
+        },
+        {
+          "label": "测量编号",
+          "value": "M211-2",
+          "bbox": [
+            90.2,
+            335.65,
+            170.66,
+            355.32
+          ]
+        },
+        {
+          "label": "报告编号",
+          "value": "Q211-2",
+          "bbox": [
+            90.83,
+            365.68,
+            169.38,
+            385.31
+          ]
+        },
+        {
+          "label": "测量时点",
+          "value": "2026-10-06T14:10:00+08:00",
+          "bbox": [
+            91.46,
+            393.98,
+            250.72,
+            415.31
+          ]
+        },
+        {
+          "label": "测量方法",
+          "value": "surface",
+          "bbox": [
+            92.09,
+            425.67,
+            170.56,
+            445.3
+          ]
+        },
+        {
+          "label": "实测值",
+          "value": "1073.15",
+          "bbox": [
+            92.72,
+            455.85,
+            162.1,
+            475.29
+          ]
+        },
+        {
+          "label": "单位",
+          "value": "K",
+          "bbox": [
+            93.34,
+            486.53,
+            129.88,
+            505.29
+          ]
+        },
+        {
+          "label": "报告结论",
+          "value": "模拟原文，按实际来源复核",
+          "bbox": [
+            93.97,
+            513.75,
+            263.0,
+            535.28
+          ]
+        }
+      ],
+      "expected_fact": {
+        "entity_id": "A211",
+        "operation_no": "40",
+        "measurement_id": "M211-2",
+        "raw_value": "1073.15",
+        "raw_unit": "K",
+        "normalized_value": "800.00"
+      },
+      "scan_dpi": 144,
+      "scan_rotation_degrees": 1.2
+    }
+  ],
+  "visual_qa": "all four pages visually checked",
+  "source_sha256": "a99d7860d8fe49a1cce328b1df56ffa669b0255a69aff52b2363b688fe3ef75b",
+  "builder_sha256": "9c5ea1c9fc43b1d2f7ce8fb3000c59aee33a50b95570bc94ed996904475689ec",
+  "page_count": 4
+}

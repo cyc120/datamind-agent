@@ -70,8 +70,8 @@ class AgentAPITest(unittest.TestCase):
         self.runs.append(response.json()["run_id"])
         self.assertEqual(response.json()["error_code"], "SOURCE_NOT_ALLOWED")
 
-    def test_document_route_is_explicitly_unavailable(self):
-        response = self.client.post("/v1/chat", json={"question": "结合市场分析报告说明原因"})
+    def test_cross_source_route_is_explicitly_unavailable(self):
+        response = self.client.post("/v1/chat", json={"question": "查询销售额前三产品并结合市场分析报告说明原因"})
         self.runs.append(response.json()["run_id"])
         self.assertEqual(response.json()["error_code"], "ROUTE_UNSUPPORTED")
 

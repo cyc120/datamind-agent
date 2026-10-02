@@ -36,7 +36,10 @@ echo "=== [6/7] 评测集种子 ==="
 py -3.13 db/seed_eval_cases.py
 
 echo "=== [7/7] 知识库摄取（解析→切片→BGE→Qdrant） ==="
+py -3.13 db/migrate.py
 export HF_ENDPOINT=https://hf-mirror.com
 py -3.13 ingestion/ingest.py --reset
+py -3.13 db/seed_industrial.py
+py -3.13 db/build_industrial_catalog.py
 
 echo "=== 完成。运行 bash scripts/verify.py 做端到端验证 ==="

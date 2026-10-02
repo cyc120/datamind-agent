@@ -1,0 +1,151 @@
+{
+  "suite_version": "industrial-rules-dev-v1",
+  "scope": "Frozen development checks on synthetic structured records and native PDF fields; no LLM or general OCR benchmark",
+  "cases": [
+    {
+      "case_id": "industrial-conflict",
+      "part_id": "A102",
+      "operation_no": "30",
+      "month": "2026-09",
+      "measurement_id": "M001-1",
+      "expected_compliance": "out_of_range",
+      "expected_agreement": "unresolved",
+      "expected_revision": "A102-V2"
+    },
+    {
+      "case_id": "industrial-unit",
+      "part_id": "A102",
+      "operation_no": "30",
+      "month": "2026-09",
+      "measurement_id": "M002-1",
+      "expected_compliance": "within_range",
+      "expected_agreement": "resolved_equivalent",
+      "expected_revision": "A102-V2"
+    },
+    {
+      "case_id": "industrial-old_version",
+      "part_id": "A102",
+      "operation_no": "30",
+      "month": "2026-08",
+      "measurement_id": "M003-1",
+      "expected_compliance": "within_range",
+      "expected_agreement": "consistent",
+      "expected_revision": "A102-V1"
+    },
+    {
+      "case_id": "industrial-overlap",
+      "part_id": "A102",
+      "operation_no": "30",
+      "month": "2026-09",
+      "measurement_id": "M004-1",
+      "expected_compliance": "needs_review",
+      "expected_agreement": "consistent",
+      "expected_revision": null
+    },
+    {
+      "case_id": "industrial-unknown_unit",
+      "part_id": "A102",
+      "operation_no": "30",
+      "month": "2026-09",
+      "measurement_id": "M005-1",
+      "expected_compliance": "needs_review",
+      "expected_agreement": "needs_review",
+      "expected_revision": "A102-V2"
+    },
+    {
+      "case_id": "industrial-sample_a",
+      "part_id": "A102",
+      "operation_no": "30",
+      "month": "2026-09",
+      "measurement_id": "M006-1",
+      "expected_compliance": "within_range",
+      "expected_agreement": "consistent",
+      "expected_revision": "A102-V2"
+    },
+    {
+      "case_id": "industrial-sample_b",
+      "part_id": "A102",
+      "operation_no": "30",
+      "month": "2026-09",
+      "measurement_id": "M006-2",
+      "expected_compliance": "out_of_range",
+      "expected_agreement": "consistent",
+      "expected_revision": "A102-V2"
+    },
+    {
+      "case_id": "industrial-missing_report",
+      "part_id": "A102",
+      "operation_no": "30",
+      "month": "2026-09",
+      "measurement_id": "M007-1",
+      "expected_compliance": "within_range",
+      "expected_agreement": "insufficient_evidence",
+      "expected_revision": "A102-V2"
+    },
+    {
+      "case_id": "industrial-wrong_entity",
+      "part_id": "A103",
+      "operation_no": "30",
+      "month": "2026-09",
+      "measurement_id": "M008-1",
+      "expected_compliance": "within_range",
+      "expected_agreement": "needs_review",
+      "expected_revision": "A103-V1"
+    },
+    {
+      "case_id": "industrial-wrong_method",
+      "part_id": "A102",
+      "operation_no": "30",
+      "month": "2026-09",
+      "measurement_id": "M009-1",
+      "expected_compliance": "within_range",
+      "expected_agreement": "needs_review",
+      "expected_revision": "A102-V2"
+    },
+    {
+      "case_id": "industrial-draft_report",
+      "part_id": "A102",
+      "operation_no": "30",
+      "month": "2026-09",
+      "measurement_id": "M010-1",
+      "expected_compliance": "within_range",
+      "expected_agreement": "needs_review",
+      "expected_revision": "A102-V2"
+    },
+    {
+      "case_id": "industrial-upper_boundary",
+      "part_id": "A102",
+      "operation_no": "30",
+      "month": "2026-09",
+      "measurement_id": "M011-1",
+      "expected_compliance": "within_range",
+      "expected_agreement": "consistent",
+      "expected_revision": "A102-V2"
+    },
+    {
+      "case_id": "industrial-missing_process",
+      "part_id": "A104",
+      "operation_no": "30",
+      "month": "2026-09",
+      "measurement_id": "M012-1",
+      "expected_compliance": "insufficient_evidence",
+      "expected_agreement": "consistent",
+      "expected_revision": null
+    }
+  ],
+  "invariants": {
+    "september_A102_batches": 9,
+    "september_A102_measurements": 10,
+    "conflict_measurements": [
+      "M001-1"
+    ],
+    "out_of_range_measurements": [
+      "M001-1",
+      "M006-2"
+    ],
+    "do_not_count_out_of_range_as_source_conflict": true,
+    "original_values_unchanged": true
+  },
+  "source_sha256": "0ac6c55838c3ceeee9d9275a4d550e29e84e8e38e4fa03f5e67733e65c0739a2",
+  "seed_sha256": "5d08098da172328d938d35877c8eff63a87a9f3769615f2ef8f16e813be52d7c"
+}

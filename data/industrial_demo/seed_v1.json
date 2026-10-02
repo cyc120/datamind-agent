@@ -1,0 +1,557 @@
+{
+  "dataset_version": "industrial-demo-v1",
+  "provenance": "Synthetic demonstration authored for this repository; no factory data, real approvals or independent accuracy claims",
+  "timezone": "Asia/Shanghai",
+  "parts": [
+    {
+      "part_id": "A102",
+      "name": "演示零件102",
+      "material": "模拟合金"
+    },
+    {
+      "part_id": "A103",
+      "name": "演示零件103",
+      "material": "模拟合金"
+    },
+    {
+      "part_id": "A104",
+      "name": "演示零件104",
+      "material": "模拟合金"
+    }
+  ],
+  "revisions": [
+    {
+      "revision_id": "A102-V1",
+      "part_id": "A102",
+      "operation_no": "30",
+      "approval_status": "approved",
+      "valid_from": "2026-08-01T00:00:00+08:00",
+      "valid_to": "2026-09-01T00:00:00+08:00",
+      "lower": "820",
+      "upper": "840",
+      "unit": "degC",
+      "metric": "holding_temperature",
+      "method": "core"
+    },
+    {
+      "revision_id": "A102-V2",
+      "part_id": "A102",
+      "operation_no": "30",
+      "approval_status": "approved",
+      "valid_from": "2026-09-01T00:00:00+08:00",
+      "valid_to": null,
+      "lower": "840",
+      "upper": "860",
+      "unit": "degC",
+      "metric": "holding_temperature",
+      "method": "core"
+    },
+    {
+      "revision_id": "A102-V3",
+      "part_id": "A102",
+      "operation_no": "30",
+      "approval_status": "approved",
+      "valid_from": "2026-09-15T00:00:00+08:00",
+      "valid_to": "2026-09-20T00:00:00+08:00",
+      "lower": "835",
+      "upper": "855",
+      "unit": "degC",
+      "metric": "holding_temperature",
+      "method": "core"
+    },
+    {
+      "revision_id": "A102-DRAFT",
+      "part_id": "A102",
+      "operation_no": "30",
+      "approval_status": "unapproved",
+      "valid_from": "2026-09-01T00:00:00+08:00",
+      "valid_to": null,
+      "lower": "800",
+      "upper": "900",
+      "unit": "degC",
+      "metric": "holding_temperature",
+      "method": "core"
+    },
+    {
+      "revision_id": "A103-V1",
+      "part_id": "A103",
+      "operation_no": "30",
+      "approval_status": "approved",
+      "valid_from": "2026-08-01T00:00:00+08:00",
+      "valid_to": null,
+      "lower": "840",
+      "upper": "860",
+      "unit": "degC",
+      "metric": "holding_temperature",
+      "method": "core"
+    }
+  ],
+  "batches": [
+    {
+      "batch_id": "B001",
+      "part_id": "A102",
+      "produced_at": "2026-09-05T10:00:00+08:00",
+      "recorded_revision": "A102-V2"
+    },
+    {
+      "batch_id": "B002",
+      "part_id": "A102",
+      "produced_at": "2026-09-06T10:00:00+08:00",
+      "recorded_revision": "A102-V2"
+    },
+    {
+      "batch_id": "B003",
+      "part_id": "A102",
+      "produced_at": "2026-08-31T10:00:00+08:00",
+      "recorded_revision": "A102-V2"
+    },
+    {
+      "batch_id": "B004",
+      "part_id": "A102",
+      "produced_at": "2026-09-17T10:00:00+08:00",
+      "recorded_revision": "A102-V2"
+    },
+    {
+      "batch_id": "B005",
+      "part_id": "A102",
+      "produced_at": "2026-09-07T10:00:00+08:00",
+      "recorded_revision": "A102-V2"
+    },
+    {
+      "batch_id": "B006",
+      "part_id": "A102",
+      "produced_at": "2026-09-08T10:00:00+08:00",
+      "recorded_revision": "A102-V2"
+    },
+    {
+      "batch_id": "B007",
+      "part_id": "A102",
+      "produced_at": "2026-09-09T10:00:00+08:00",
+      "recorded_revision": "A102-V2"
+    },
+    {
+      "batch_id": "B008",
+      "part_id": "A103",
+      "produced_at": "2026-09-09T10:00:00+08:00",
+      "recorded_revision": null
+    },
+    {
+      "batch_id": "B009",
+      "part_id": "A102",
+      "produced_at": "2026-09-10T10:00:00+08:00",
+      "recorded_revision": "A102-V2"
+    },
+    {
+      "batch_id": "B010",
+      "part_id": "A102",
+      "produced_at": "2026-09-11T10:00:00+08:00",
+      "recorded_revision": "A102-V2"
+    },
+    {
+      "batch_id": "B011",
+      "part_id": "A102",
+      "produced_at": "2026-09-12T10:00:00+08:00",
+      "recorded_revision": "A102-V2"
+    },
+    {
+      "batch_id": "B012",
+      "part_id": "A104",
+      "produced_at": "2026-09-12T10:00:00+08:00",
+      "recorded_revision": null
+    }
+  ],
+  "measurements": [
+    {
+      "measurement_id": "M001-1",
+      "batch_id": "B001",
+      "operation_no": "30",
+      "metric": "holding_temperature",
+      "value": "870",
+      "unit": "degC",
+      "measured_at": "2026-09-05T10:00:00+08:00",
+      "method": "core"
+    },
+    {
+      "measurement_id": "M002-1",
+      "batch_id": "B002",
+      "operation_no": "30",
+      "metric": "holding_temperature",
+      "value": "1123.15",
+      "unit": "K",
+      "measured_at": "2026-09-06T10:00:00+08:00",
+      "method": "core"
+    },
+    {
+      "measurement_id": "M003-1",
+      "batch_id": "B003",
+      "operation_no": "30",
+      "metric": "holding_temperature",
+      "value": "835",
+      "unit": "degC",
+      "measured_at": "2026-08-31T10:00:00+08:00",
+      "method": "core"
+    },
+    {
+      "measurement_id": "M004-1",
+      "batch_id": "B004",
+      "operation_no": "30",
+      "metric": "holding_temperature",
+      "value": "850",
+      "unit": "degC",
+      "measured_at": "2026-09-17T10:00:00+08:00",
+      "method": "core"
+    },
+    {
+      "measurement_id": "M005-1",
+      "batch_id": "B005",
+      "operation_no": "30",
+      "metric": "holding_temperature",
+      "value": "850",
+      "unit": "sensorX",
+      "measured_at": "2026-09-07T10:00:00+08:00",
+      "method": "core"
+    },
+    {
+      "measurement_id": "M006-1",
+      "batch_id": "B006",
+      "operation_no": "30",
+      "metric": "holding_temperature",
+      "value": "850",
+      "unit": "degC",
+      "measured_at": "2026-09-08T10:00:00+08:00",
+      "method": "core"
+    },
+    {
+      "measurement_id": "M006-2",
+      "batch_id": "B006",
+      "operation_no": "30",
+      "metric": "holding_temperature",
+      "value": "870",
+      "unit": "degC",
+      "measured_at": "2026-09-08T11:00:00+08:00",
+      "method": "core"
+    },
+    {
+      "measurement_id": "M007-1",
+      "batch_id": "B007",
+      "operation_no": "30",
+      "metric": "holding_temperature",
+      "value": "850",
+      "unit": "degC",
+      "measured_at": "2026-09-09T10:00:00+08:00",
+      "method": "core"
+    },
+    {
+      "measurement_id": "M008-1",
+      "batch_id": "B008",
+      "operation_no": "30",
+      "metric": "holding_temperature",
+      "value": "850",
+      "unit": "degC",
+      "measured_at": "2026-09-09T10:00:00+08:00",
+      "method": "core"
+    },
+    {
+      "measurement_id": "M009-1",
+      "batch_id": "B009",
+      "operation_no": "30",
+      "metric": "holding_temperature",
+      "value": "850",
+      "unit": "degC",
+      "measured_at": "2026-09-10T10:00:00+08:00",
+      "method": "core"
+    },
+    {
+      "measurement_id": "M010-1",
+      "batch_id": "B010",
+      "operation_no": "30",
+      "metric": "holding_temperature",
+      "value": "850",
+      "unit": "degC",
+      "measured_at": "2026-09-11T10:00:00+08:00",
+      "method": "core"
+    },
+    {
+      "measurement_id": "M011-1",
+      "batch_id": "B011",
+      "operation_no": "30",
+      "metric": "holding_temperature",
+      "value": "860",
+      "unit": "degC",
+      "measured_at": "2026-09-12T10:00:00+08:00",
+      "method": "core"
+    },
+    {
+      "measurement_id": "M012-1",
+      "batch_id": "B012",
+      "operation_no": "30",
+      "metric": "holding_temperature",
+      "value": "850",
+      "unit": "degC",
+      "measured_at": "2026-09-12T10:00:00+08:00",
+      "method": "core"
+    }
+  ],
+  "quality_records": [
+    {
+      "quality_id": "Q001-1",
+      "measurement_id": "M001-1",
+      "report_id": "Q001-1",
+      "method": "core"
+    },
+    {
+      "quality_id": "Q002-1",
+      "measurement_id": "M002-1",
+      "report_id": "Q002-1",
+      "method": "core"
+    },
+    {
+      "quality_id": "Q003-1",
+      "measurement_id": "M003-1",
+      "report_id": "Q003-1",
+      "method": "core"
+    },
+    {
+      "quality_id": "Q004-1",
+      "measurement_id": "M004-1",
+      "report_id": "Q004-1",
+      "method": "core"
+    },
+    {
+      "quality_id": "Q005-1",
+      "measurement_id": "M005-1",
+      "report_id": "Q005-1",
+      "method": "core"
+    },
+    {
+      "quality_id": "Q006-1",
+      "measurement_id": "M006-1",
+      "report_id": "Q006-1",
+      "method": "core"
+    },
+    {
+      "quality_id": "Q006-2",
+      "measurement_id": "M006-2",
+      "report_id": "Q006-2",
+      "method": "core"
+    },
+    {
+      "quality_id": "Q007-1",
+      "measurement_id": "M007-1",
+      "report_id": "Q007-1",
+      "method": "core"
+    },
+    {
+      "quality_id": "Q008-1",
+      "measurement_id": "M008-1",
+      "report_id": "Q008-1",
+      "method": "core"
+    },
+    {
+      "quality_id": "Q009-1",
+      "measurement_id": "M009-1",
+      "report_id": "Q009-1",
+      "method": "core"
+    },
+    {
+      "quality_id": "Q010-1",
+      "measurement_id": "M010-1",
+      "report_id": "Q010-1",
+      "method": "core"
+    },
+    {
+      "quality_id": "Q011-1",
+      "measurement_id": "M011-1",
+      "report_id": "Q011-1",
+      "method": "core"
+    },
+    {
+      "quality_id": "Q012-1",
+      "measurement_id": "M012-1",
+      "report_id": "Q012-1",
+      "method": "core"
+    }
+  ],
+  "reports": [
+    {
+      "report_id": "Q001-1",
+      "measurement_id": "M001-1",
+      "batch_id": "B001",
+      "part_id": "A102",
+      "operation_no": "30",
+      "metric": "holding_temperature",
+      "value": "850",
+      "unit": "degC",
+      "measured_at": "2026-09-05T10:00:00+08:00",
+      "method": "core",
+      "approval_status": "approved",
+      "revision": "R1",
+      "conclusion": "合格（合成原文声明，须独立核验）"
+    },
+    {
+      "report_id": "Q002-1",
+      "measurement_id": "M002-1",
+      "batch_id": "B002",
+      "part_id": "A102",
+      "operation_no": "30",
+      "metric": "holding_temperature",
+      "value": "850",
+      "unit": "degC",
+      "measured_at": "2026-09-06T10:00:00+08:00",
+      "method": "core",
+      "approval_status": "approved",
+      "revision": "R1",
+      "conclusion": "合格（合成原文声明，须独立核验）"
+    },
+    {
+      "report_id": "Q003-1",
+      "measurement_id": "M003-1",
+      "batch_id": "B003",
+      "part_id": "A102",
+      "operation_no": "30",
+      "metric": "holding_temperature",
+      "value": "835",
+      "unit": "degC",
+      "measured_at": "2026-08-31T10:00:00+08:00",
+      "method": "core",
+      "approval_status": "approved",
+      "revision": "R1",
+      "conclusion": "合格（合成原文声明，须独立核验）"
+    },
+    {
+      "report_id": "Q004-1",
+      "measurement_id": "M004-1",
+      "batch_id": "B004",
+      "part_id": "A102",
+      "operation_no": "30",
+      "metric": "holding_temperature",
+      "value": "850",
+      "unit": "degC",
+      "measured_at": "2026-09-17T10:00:00+08:00",
+      "method": "core",
+      "approval_status": "approved",
+      "revision": "R1",
+      "conclusion": "合格（合成原文声明，须独立核验）"
+    },
+    {
+      "report_id": "Q005-1",
+      "measurement_id": "M005-1",
+      "batch_id": "B005",
+      "part_id": "A102",
+      "operation_no": "30",
+      "metric": "holding_temperature",
+      "value": "850",
+      "unit": "degC",
+      "measured_at": "2026-09-07T10:00:00+08:00",
+      "method": "core",
+      "approval_status": "approved",
+      "revision": "R1",
+      "conclusion": "合格（合成原文声明，须独立核验）"
+    },
+    {
+      "report_id": "Q006-1",
+      "measurement_id": "M006-1",
+      "batch_id": "B006",
+      "part_id": "A102",
+      "operation_no": "30",
+      "metric": "holding_temperature",
+      "value": "850",
+      "unit": "degC",
+      "measured_at": "2026-09-08T10:00:00+08:00",
+      "method": "core",
+      "approval_status": "approved",
+      "revision": "R1",
+      "conclusion": "合格（合成原文声明，须独立核验）"
+    },
+    {
+      "report_id": "Q006-2",
+      "measurement_id": "M006-2",
+      "batch_id": "B006",
+      "part_id": "A102",
+      "operation_no": "30",
+      "metric": "holding_temperature",
+      "value": "870",
+      "unit": "degC",
+      "measured_at": "2026-09-08T11:00:00+08:00",
+      "method": "core",
+      "approval_status": "approved",
+      "revision": "R1",
+      "conclusion": "合格（合成原文声明，须独立核验）"
+    },
+    {
+      "report_id": "Q008-1",
+      "measurement_id": "M008-1",
+      "batch_id": "B008",
+      "part_id": "A102",
+      "operation_no": "30",
+      "metric": "holding_temperature",
+      "value": "850",
+      "unit": "degC",
+      "measured_at": "2026-09-09T10:00:00+08:00",
+      "method": "core",
+      "approval_status": "approved",
+      "revision": "R1",
+      "conclusion": "合格（合成原文声明，须独立核验）"
+    },
+    {
+      "report_id": "Q009-1",
+      "measurement_id": "M009-1",
+      "batch_id": "B009",
+      "part_id": "A102",
+      "operation_no": "30",
+      "metric": "holding_temperature",
+      "value": "850",
+      "unit": "degC",
+      "measured_at": "2026-09-10T10:00:00+08:00",
+      "method": "surface",
+      "approval_status": "approved",
+      "revision": "R1",
+      "conclusion": "合格（合成原文声明，须独立核验）"
+    },
+    {
+      "report_id": "Q010-1",
+      "measurement_id": "M010-1",
+      "batch_id": "B010",
+      "part_id": "A102",
+      "operation_no": "30",
+      "metric": "holding_temperature",
+      "value": "850",
+      "unit": "degC",
+      "measured_at": "2026-09-11T10:00:00+08:00",
+      "method": "core",
+      "approval_status": "unapproved",
+      "revision": "R1",
+      "conclusion": "合格（合成原文声明，须独立核验）"
+    },
+    {
+      "report_id": "Q011-1",
+      "measurement_id": "M011-1",
+      "batch_id": "B011",
+      "part_id": "A102",
+      "operation_no": "30",
+      "metric": "holding_temperature",
+      "value": "860",
+      "unit": "degC",
+      "measured_at": "2026-09-12T10:00:00+08:00",
+      "method": "core",
+      "approval_status": "approved",
+      "revision": "R1",
+      "conclusion": "合格（合成原文声明，须独立核验）"
+    },
+    {
+      "report_id": "Q012-1",
+      "measurement_id": "M012-1",
+      "batch_id": "B012",
+      "part_id": "A104",
+      "operation_no": "30",
+      "metric": "holding_temperature",
+      "value": "850",
+      "unit": "degC",
+      "measured_at": "2026-09-12T10:00:00+08:00",
+      "method": "core",
+      "approval_status": "approved",
+      "revision": "R1",
+      "conclusion": "合格（合成原文声明，须独立核验）"
+    }
+  ]
+}

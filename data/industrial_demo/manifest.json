@@ -1,0 +1,9 @@
+{
+  "dataset_version": "industrial-demo-v1",
+  "provenance": "Synthetic demonstration authored for this repository; no factory data, real approvals or independent accuracy claims",
+  "file": "industrial_demo_v1.pdf",
+  "sha256": "0ac6c55838c3ceeee9d9275a4d550e29e84e8e38e4fa03f5e67733e65c0739a2",
+  "page_count": 17,
+  "seed_sha256": "5d08098da172328d938d35877c8eff63a87a9f3769615f2ef8f16e813be52d7c",
+  "builder_sha256": "ad57fb3d4aaf2744070f99950d81e9b3c27ce7ad4b3b5b06e95fc5778435baf9"
+}

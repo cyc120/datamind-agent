@@ -1,0 +1,217 @@
+{
+  "suite_version": "rag-v2",
+  "data_version": "kb-v2",
+  "method": "Fixed factual answer checks and required source/page; formula-image gap stays a failed answerable case; no model judge.",
+  "cases": [
+    {
+      "case_id": "rag-001",
+      "question": "七天无理由退款的条件是什么？",
+      "document_prefix": "04_售后服务与退款管理制度",
+      "source_file": "data/knowledge_base/04_售后服务与退款管理制度.pdf",
+      "page": 1,
+      "answer_checks": [
+        [
+          "7日",
+          "7天",
+          "七日",
+          "七天"
+        ],
+        [
+          "未拆封"
+        ],
+        [
+          "二次销售"
+        ]
+      ],
+      "source_sha256": "89352d5f5555ca8214598ff93b8742874661232ab6dfb35eb51911c6250a1fc2"
+    },
+    {
+      "case_id": "rag-002",
+      "question": "一般商品退款多久到账？",
+      "document_prefix": "04_售后服务与退款管理制度",
+      "source_file": "data/knowledge_base/04_售后服务与退款管理制度.pdf",
+      "page": 1,
+      "answer_checks": [
+        [
+          "验收"
+        ],
+        [
+          "3个工作日",
+          "3工作日",
+          "三个工作日"
+        ]
+      ],
+      "source_sha256": "89352d5f5555ca8214598ff93b8742874661232ab6dfb35eb51911c6250a1fc2"
+    },
+    {
+      "case_id": "rag-003",
+      "question": "大件家电退款时限是多久？",
+      "document_prefix": "04_售后服务与退款管理制度",
+      "source_file": "data/knowledge_base/04_售后服务与退款管理制度.pdf",
+      "page": 1,
+      "answer_checks": [
+        [
+          "上门取件"
+        ],
+        [
+          "5个工作日",
+          "5工作日",
+          "五个工作日"
+        ]
+      ],
+      "source_sha256": "89352d5f5555ca8214598ff93b8742874661232ab6dfb35eb51911c6250a1fc2"
+    },
+    {
+      "case_id": "rag-004",
+      "question": "根据《2025年分区域经营数据简报》，2025年华东Q4销售额是多少（万元）？",
+      "document_prefix": "03_2025年分区域经营数据简报",
+      "source_file": "data/knowledge_base/03_2025年分区域经营数据简报.pdf",
+      "page": 1,
+      "answer_checks": [
+        [
+          "华东"
+        ],
+        [
+          "9.5"
+        ],
+        [
+          "万元"
+        ]
+      ],
+      "source_sha256": "349c66e6dae296b3dce259dc4d7ab10a00a170d6805d07ca0ea687d232f82ef8"
+    },
+    {
+      "case_id": "rag-005",
+      "question": "渠道年度预算中APP渠道占多少万元？",
+      "document_prefix": "02_渠道运营策略白皮书",
+      "source_file": "data/knowledge_base/02_渠道运营策略白皮书.pdf",
+      "page": 1,
+      "answer_checks": [
+        [
+          "APP"
+        ],
+        [
+          "90"
+        ],
+        [
+          "万元"
+        ]
+      ],
+      "source_sha256": "e13c7624daa34eb0e07621082a361638dba114acbcfa0c14b90233add334c942"
+    },
+    {
+      "case_id": "rag-006",
+      "question": "同比增长率的计算公式是什么？",
+      "document_prefix": "05_经营指标核算与计算公式说明",
+      "source_file": "data/knowledge_base/05_经营指标核算与计算公式说明.pdf",
+      "page": 1,
+      "answer_checks": [
+        [
+          "100%"
+        ],
+        [
+          "S_t",
+          "本期",
+          "当期"
+        ]
+      ],
+      "known_gap": "FORMULA_IMAGE_UNPARSED",
+      "source_sha256": "7c04987b07ada57164ad55df807a4749ada1d72f244489e31c5ebf50e62ef1c9"
+    },
+    {
+      "case_id": "rag-007",
+      "question": "无线降噪耳机Pro的续航时间是多少？",
+      "document_prefix": "09_无线降噪耳机Pro产品手册",
+      "source_file": "data/knowledge_base/09_无线降噪耳机Pro产品手册.pdf",
+      "page": 1,
+      "answer_checks": [
+        [
+          "38小时",
+          "38个小时"
+        ],
+        [
+          "降噪"
+        ]
+      ],
+      "source_sha256": "805851bac6cc6eaaac1c6ede7dee913899f9fd20877499b627578824fcd46401"
+    },
+    {
+      "case_id": "rag-008",
+      "question": "钻石会员有哪些权益？",
+      "document_prefix": "11_客户服务话术手册",
+      "source_file": "data/knowledge_base/11_客户服务话术手册.pdf",
+      "page": 1,
+      "answer_checks": [
+        [
+          "免费上门安装",
+          "免费安装"
+        ],
+        [
+          "专属客服"
+        ],
+        [
+          "提前购"
+        ]
+      ],
+      "source_sha256": "123aa7dd945b0541344363ad230656f93b0968859ff75d5183adef305bf7cfab"
+    },
+    {
+      "case_id": "rag-009",
+      "question": "12月门店巡检中哪家门店得分最低？",
+      "document_prefix": "07_门店巡检记录_2025年12月_扫描版",
+      "source_file": "data/knowledge_base/07_门店巡检记录_2025年12月_扫描版.pdf",
+      "page": 1,
+      "answer_checks": [
+        [
+          "南京新街口"
+        ],
+        [
+          "76"
+        ]
+      ],
+      "source_sha256": "da26528aceb234147bbed0c88af9d2d489017ef51133f3e3ec3a4c56a0de5527"
+    },
+    {
+      "case_id": "rag-010",
+      "question": "质检报告里无线降噪耳机Pro的不良率是多少？",
+      "document_prefix": "08_产品质检报告_数码品类_扫描版",
+      "source_file": "data/knowledge_base/08_产品质检报告_数码品类_扫描版.pdf",
+      "page": 1,
+      "answer_checks": [
+        [
+          "8.9%"
+        ]
+      ],
+      "source_sha256": "3f96fd67999d5804faff1f271c365eb5da66aeaf93f231879a8de38660fc5141"
+    },
+    {
+      "case_id": "rag-011",
+      "question": "According to OHR-Bench finance sample ohr-005, what topic and years does the document discuss?",
+      "document_prefix": "[ohr-005/OHR-Bench/finance]",
+      "source_file": "data/ohr_bench_samples/ohr-005_finance_finance_DUDE_fc03b3768346584a3fa425c656bfe748_p0.json",
+      "page": 1,
+      "answer_checks": [
+        [
+          "Sales/Use Tax",
+          "Sales and Use Tax"
+        ],
+        [
+          "Capital Program"
+        ],
+        [
+          "2017"
+        ],
+        [
+          "2021"
+        ]
+      ],
+      "source_sha256": "0e7db9f20ac82bbd07ae29884fdd21a7ffc994eef9adf953fbfe54e311a8ff77"
+    },
+    {
+      "case_id": "rag-012",
+      "question": "公司2026年的预算总额是多少？",
+      "expected_abstain": true,
+      "answer_checks": []
+    }
+  ]
+}

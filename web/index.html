@@ -3,20 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>DataMind Agent · 问数控制台</title>
-  <link rel="stylesheet" href="/assets/style.css">
-  <script src="/assets/app.js" defer></script>
+  <title>DataMind Agent · 问数与文档问答</title>
+  <link rel="stylesheet" href="/assets/style.css?v=0.7.0">
+  <script src="/assets/app.js?v=0.7.0" defer></script>
 </head>
 <body>
   <aside class="sidebar">
     <div class="brand">
       <span class="logo">DM</span>
-      <div><strong>DataMind Agent</strong><small>结构化问数 · 本地演示</small></div>
+      <div><strong>DataMind Agent</strong><small>问数与文档问答 · 本地演示</small></div>
     </div>
     <nav class="nav">
-      <button class="nav-item active" data-view="chat"><span class="ico">◎</span>问数</button>
+      <button class="nav-item active" data-view="chat"><span class="ico">◎</span>问数与问答</button>
       <button class="nav-item" data-view="model"><span class="ico">⚙</span>模型接入<span class="badge" id="navModelBadge">未配置</span></button>
       <button class="nav-item" data-view="runs"><span class="ico">↺</span>运行记录</button>
+      <button class="nav-item" data-view="fields"><span class="ico">▤</span>字段复核</button>
     </nav>
     <div class="side-foot">
       <div class="pulse warn" id="pulseModel"><span class="dot"></span>模型 <span id="pulseModelText">检测中…</span></div>
@@ -30,20 +31,24 @@
     <section class="view active" data-view="chat">
       <div class="page-head">
         <div class="eyebrow">DataMind Agent / Local Demo</div>
-        <h1>结构化问数测试台</h1>
-        <p>Agent 规划 · SQL 安全校验 · 只读执行 · 证据与运行轨迹</p>
+        <h1>问数与文档问答</h1>
+        <p>数据库查询 · 文档检索 · 原文引用 · 证据与运行轨迹</p>
       </div>
       <div class="grid">
         <section class="card">
-          <h2>提出数据库问题</h2>
+          <h2>提出问题</h2>
           <div class="controls">
             <div><label for="question">自然语言问题</label><textarea id="question">2024年一共有多少笔订单？</textarea></div>
-            <div><label for="source">数据源</label><select id="source"><option value="demo_retail">零售演示库</option><option value="chinook">Chinook 音乐库</option></select></div>
+            <div><label for="source">问题范围</label><select id="source"><option value="auto">自动选择</option><option value="demo_retail">零售数据库</option><option value="chinook">Chinook 音乐库</option><option value="demo_kb">演示文档知识库</option><option value="ohrbench_kb">OHR-Bench 文档样本</option><option value="demo_industrial">工业合成演示核验</option><option value="industrial_sql">工业生产问数（模型）</option></select></div>
           </div>
           <div class="chips">
             <button class="chip" data-q="2025年销售额最高的前三个产品是什么？">销售额前三产品</button>
             <button class="chip" data-q="VIP客户有多少人？">VIP 客户数</button>
             <button class="chip" data-q="2024年每个大区的销售额分别是多少？">各大区销售额</button>
+            <button class="chip" data-source="demo_kb" data-q="七天无理由退款的条件是什么？">退款条件</button>
+            <button class="chip" data-source="demo_kb" data-q="无线降噪耳机Pro的续航时间是多少？">耳机续航</button>
+            <button class="chip" data-source="demo_industrial" data-q="2026年9月A102工序30哪些批次温度超限？生产记录和质检报告是否一致？">工业温度核验</button>
+            <button class="chip" data-source="industrial_sql" data-q="2026年9月A102工序30有多少个已测量批次？">工业批次数</button>
           </div>
           <div class="actions">
             <button id="send">运行 Agent</button>
@@ -58,9 +63,16 @@
           <div class="runline"><span id="runid">暂无运行 ID</span><span id="confidence"></span></div>
         </section>
         <section class="card"><h2>执行轨迹</h2><ul id="trace" class="trace"><li class="muted">事件会按实际执行顺序显示。</li></ul></section>
-        <section class="card"><h2>SQL 与证据</h2><div class="mini" id="meta">等待查询</div><pre id="sql">—</pre></section>
-        <section class="card wide"><h2>查询结果</h2><div class="tablewrap" id="result"><div class="muted" style="padding:15px">暂无结果</div></div></section>
+        <section class="card" id="sqlEvidence"><h2>SQL 与证据</h2><div class="mini" id="meta">等待查询</div><p class="field-hint hidden" id="sqlContract"></p><pre id="sql">—</pre></section>
+        <section class="card wide" id="sqlResults"><h2>查询结果</h2><div class="tablewrap" id="result"><div class="muted" style="padding:15px">暂无结果</div></div></section>
+        <section class="card wide hidden" id="documentEvidence"><h2>文档出处与原文</h2><div class="mini" id="knowledgeMeta"></div><div id="citations" class="citations"></div></section>
+        <section class="card wide hidden" id="industrialEvidence"><h2>跨源规则核验</h2><p class="field-hint">自建合成数据；按原文声明的审批和有效期核验。超限与来源冲突分别展示，未消解项保留双方原值。</p><div id="industrialSummary" class="mini"></div><div id="industrialRows" class="industrial-table"></div></section>
       </div>
+    </section>
+
+    <section class="view" data-view="fields">
+      <div class="page-head"><div class="eyebrow">Document Review</div><h1>字段复核</h1><p>打开文档，核对原页并记录字段提取问题。复核记录保留版本和依据。</p></div>
+      <section class="card"><div class="actions"><button class="secondary" id="refreshDocuments">刷新文档</button></div><div class="tablewrap" id="documentList">正在读取…</div></section>
     </section>
 
     <!-- ============ 模型接入 ============ -->
@@ -172,13 +184,13 @@
       <div class="page-head">
         <div class="eyebrow">Runs &amp; Replay</div>
         <h1>运行记录</h1>
-        <p>每次问数都会落库；刷新页面后可凭运行 ID 回放事件、SQL 证据与结果。</p>
+        <p>问数与文档问答均会保存；刷新页面后可凭运行 ID 回放答案、证据与执行轨迹。</p>
       </div>
       <div class="grid">
         <section class="card wide">
           <h2>按运行 ID 恢复</h2>
           <div class="replay"><input id="replayId" placeholder="输入 run-... 运行 ID"><button id="replay">读取 Trace</button></div>
-          <p class="muted">回放会读取 <code>/v1/runs/{id}</code>、事件流与证据图，并在「问数」视图还原当时的答案、SQL 和结果表。</p>
+          <p class="muted">回放当时的答案、执行轨迹和数据库或文档证据。</p>
         </section>
         <section class="card wide">
           <h2>最近运行</h2>

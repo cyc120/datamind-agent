@@ -6,6 +6,7 @@ RAG: 原文段落 / 表格 / 扫描件 / 公式 / FAQ / OHR-Bench 英文语料 /
 
 用法: py -3.13 db/seed_eval_cases.py
 """
+import argparse
 import psycopg2
 
 PG = dict(host="localhost", port=5432, user="datamind_app",
@@ -95,9 +96,9 @@ RAG = [
      {"doc": "04_售后服务与退款管理制度.pdf", "section": "第三章 退款时限与金额"},
      ["上门取件后5个工作日内退回"], False),
     ("rag-004", "表格", "medium",
-     "2025年华东Q4销售额是多少（万元）？",
+     "根据《2025年分区域经营数据简报》，2025年华东Q4销售额是多少（万元）？",
      {"doc": "03_2025年分区域经营数据简报.pdf", "section": "表 1"},
-     ["需从表 1 中读取华东 Q4 数值（与数据库聚合一致）"], False),
+     ["原文表 1 为 9.5 万元；按文档版本回答"], False),
     ("rag-005", "表格", "medium",
      "渠道年度预算中APP渠道占多少万元？",
      {"doc": "02_渠道运营策略白皮书.pdf", "section": "表 3-1"},
@@ -123,9 +124,9 @@ RAG = [
      {"doc": "08_产品质检报告_数码品类_扫描版.pdf", "section": "二、抽检结果"},
      ["8.9%"], False),
     ("rag-011", "OHR-Bench英文", "hard",
-     "According to the OHR-Bench finance sample, what company or topic does the document discuss?",
+     "According to OHR-Bench finance sample ohr-005, what topic and years does the document discuss?",
      {"doc": "ohr-005 (finance)", "section": "gt_text"},
-     ["需从 ohr-005 gt_text 定位"], False),
+     ["Sales/Use Tax Analysis for the 2017-2021 Capital Program (Cash Basis)"], False),
     ("rag-012", "不可得", "easy",
      "公司2026年的预算总额是多少？",
      {"doc": None, "section": None},
@@ -157,11 +158,19 @@ ROBUST_CLARIFY = {"rb-003": "needed"}
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--suite", choices=("all", "nl2sql", "rag", "robustness"), default="all")
+    args = parser.parse_args()
     conn = psycopg2.connect(**PG)
     cur = conn.cursor()
-    cur.execute("DELETE FROM evaluation_cases")
+    if args.suite == "all":
+        cur.execute("DELETE FROM evaluation_cases")
+    else:
+        cur.execute("DELETE FROM evaluation_cases WHERE suite=%s", (args.suite,))
 
     for cid, cat, diff, q, sql, clarify in NL2SQL:
+        if args.suite not in {"all", "nl2sql"}:
+            continue
         cur.execute("""
             INSERT INTO evaluation_cases(case_id, suite, category, difficulty, question,
                 expected_route, gold_sql, clarification_label, data_version)
@@ -170,17 +179,21 @@ def main():
              sql, clarify or "none"))
 
     for cid, cat, diff, q, ev, claims, abstain in RAG:
+        if args.suite not in {"all", "rag"}:
+            continue
         cur.execute("""
             INSERT INTO evaluation_cases(case_id, suite, category, difficulty, question,
                 expected_route, gold_answer_claims, required_evidence, clarification_label,
                 data_version)
-            VALUES (%s,'rag',%s,%s,%s,'rag',%s,%s,%s,'kb-v1')""",
+            VALUES (%s,'rag',%s,%s,%s,'rag',%s,%s,%s,'kb-v2')""",
             (cid, cat, diff, q,
              __import__("json").dumps(claims, ensure_ascii=False),
              __import__("json").dumps(ev, ensure_ascii=False),
              "abstain" if abstain else "none"))
 
     for cid, cat, q, sql, note in ROBUSTNESS:
+        if args.suite not in {"all", "robustness"}:
+            continue
         cur.execute("""
             INSERT INTO evaluation_cases(case_id, suite, category, difficulty, question,
                 expected_route, gold_sql, failure_category, clarification_label, data_version)

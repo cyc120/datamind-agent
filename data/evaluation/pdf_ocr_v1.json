@@ -1,0 +1,79 @@
+{
+  "suite_version": "pdf-ocr-v1",
+  "method": "Frozen rows from original scan pixels and formula transcription; no reference text supplied to recognizers. Structural normalization ignores LaTeX whitespace, grouping, scalable delimiters and character case only. Missing headers remain a gap.",
+  "cases": [
+    {
+      "case_id": "ocr-07",
+      "source_file": "data/knowledge_base/07_门店巡检记录_2025年12月_扫描版.pdf",
+      "source_sha256": "da26528aceb234147bbed0c88af9d2d489017ef51133f3e3ec3a4c56a0de5527",
+      "page": 1,
+      "gold_rows": [
+        [
+          "南京新街口店",
+          "76"
+        ],
+        [
+          "杭州西湖店",
+          "94"
+        ],
+        [
+          "无锡中山店",
+          "85"
+        ]
+      ]
+    },
+    {
+      "case_id": "ocr-08",
+      "source_file": "data/knowledge_base/08_产品质检报告_数码品类_扫描版.pdf",
+      "source_sha256": "3f96fd67999d5804faff1f271c365eb5da66aeaf93f231879a8de38660fc5141",
+      "page": 1,
+      "gold_rows": [
+        [
+          "无线降噪耳机Pro",
+          "45",
+          "3",
+          "1",
+          "8.9%"
+        ],
+        [
+          "真无线耳机Air",
+          "40",
+          "2",
+          "1",
+          "7.5%"
+        ],
+        [
+          "便携蓝牙音箱",
+          "35",
+          "2",
+          "0",
+          "5.7%"
+        ]
+      ]
+    },
+    {
+      "case_id": "formula-0",
+      "source_file": "data/knowledge_base/05_经营指标核算与计算公式说明.pdf",
+      "source_sha256": "7c04987b07ada57164ad55df807a4749ada1d72f244489e31c5ebf50e62ef1c9",
+      "page": 1,
+      "figure_index": 0,
+      "gold_latex": "S=\\sum_{i}q_{i}\\cdot p_{i}\\cdot(1-d_{i})"
+    },
+    {
+      "case_id": "formula-1",
+      "source_file": "data/knowledge_base/05_经营指标核算与计算公式说明.pdf",
+      "source_sha256": "7c04987b07ada57164ad55df807a4749ada1d72f244489e31c5ebf50e62ef1c9",
+      "page": 1,
+      "figure_index": 1,
+      "gold_latex": "S_{net}=S-R"
+    },
+    {
+      "case_id": "formula-2",
+      "source_file": "data/knowledge_base/05_经营指标核算与计算公式说明.pdf",
+      "source_sha256": "7c04987b07ada57164ad55df807a4749ada1d72f244489e31c5ebf50e62ef1c9",
+      "page": 1,
+      "figure_index": 2,
+      "gold_latex": "g=\\frac{S_t-S_{t-1}}{S_{t-1}}\\times100\\%"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+-r requirements-sql.txt
+pymupdf>=1.24,<2
+fastembed>=0.8,<1
+qdrant-client>=1.12,<1.13

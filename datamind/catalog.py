@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from heapq import heappop, heappush
+import re
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -25,7 +26,7 @@ class Catalog:
         with psycopg2.connect(meta_dsn) as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute("""
                 SELECT s.snapshot_id, s.catalog_version, d.database_name, d.schema_allowlist,
-                       d.table_allowlist, d.access_mode
+                       d.table_allowlist, d.access_mode, d.description
                 FROM schema_snapshots s JOIN data_sources d USING (source_id)
                 WHERE s.source_id=%s ORDER BY s.catalog_version DESC LIMIT 1
             """, (source_id,))
@@ -37,6 +38,7 @@ class Catalog:
             self.database_name = info["database_name"]
             self.schemas = set(info["schema_allowlist"])
             self.table_allowlist = set(info["table_allowlist"] or [])
+            self.description = info.get("description") or ""
             cur.execute("SELECT * FROM schema_tables WHERE snapshot_id=%s", (self.snapshot_id,))
             self.tables = {r["table_name"]: dict(r) for r in cur.fetchall()
                            if r["schema_name"] in self.schemas}
@@ -63,10 +65,15 @@ class Catalog:
             self.metrics = [dict(r) for r in cur.fetchall()]
             cur.execute("SELECT alias, canonical_name, entity_type FROM entity_aliases WHERE approved=TRUE")
             self.aliases = [dict(r) for r in cur.fetchall()]
+            if source_id == 'demo_industrial':
+                self.aliases = []  # Retail entity aliases are not industrial business definitions.
 
     def retrieve(self, question: str, limit: int = 8) -> dict:
         """Deterministic lexical/alias/value recall with inspectable reasons."""
         q = question.lower().replace(" ", "")
+        # Aggregation words may interrupt an otherwise exact business label:
+        # “退款总金额” should still match the catalog label “退款金额”.
+        q_terms = (q, q.replace("总金额", "金额").replace("总额", "金额"))
         candidates = []
         for name, row in self.tables.items():
             terms = [(name, "table"), (row.get("business_name") or "", "business_name")]
@@ -80,13 +87,18 @@ class Catalog:
             if row.get("sensitivity") == "restricted":
                 continue
             terms = [(name, "column"), (row.get("business_name") or "", "business_name")]
-            if (row.get("business_name") or "").endswith("名称"):
-                terms.append((row["business_name"][:-2], "business_name"))
+            business_name = row.get("business_name") or ""
+            if business_name.endswith("名称"):
+                terms.append((business_name[:-2], "business_name"))
+            for prefix in ("所属", "所在", "关联"):
+                if business_name.startswith(prefix):
+                    terms.append((business_name[len(prefix):], "business_name"))
             terms += [(a, "alias") for a in row.get("aliases") or []]
             enum = row.get("enum_map") or {}
             terms += [(str(k), "enum_value") for k in enum]
             terms += [(str(v), "enum_value") for v in enum.values()]
-            hits = [why for term, why in terms if len(term) >= 2 and term.lower() in q]
+            hits = [why for term, why in terms
+                    if len(term) >= 2 and any(term.lower() in text for text in q_terms)]
             if hits:
                 candidates.append({"kind": "column", "id": f"{table}.{name}",
                                    "score": max(1.0 if x == "enum_value" else 0.75 if x == "alias" else 0.8 for x in hits),
@@ -102,6 +114,9 @@ class Catalog:
                     "net_sales": ("order_items", "orders", "refunds"), "refund_amount": ("refunds",),
                     "order_count": ("orders",), "customer_count": ("customers",),
                     "revenue": ("invoice",), "tracks_sold": ("invoice_line",),
+                    "measured_batch_count": ("measurement_observations",),
+                    "measurement_count": ("measurement_observations",),
+                    "mean_temperature_c": ("measurement_observations",),
                 }.get(metric["metric_id"].split(".")[-1], ())
                 for table in anchors:
                     if table in self.tables:
@@ -117,6 +132,16 @@ class Catalog:
                     candidates.append({"kind": "table", "id": table, "score": 0.65,
                                        "reasons": ["approved_entity_alias"]})
         table_hits = {c["id"] for c in candidates if c["kind"] == "table"}
+        has_time_scope = bool(re.search(r"20\d{2}年|去年|今年|上个月|本月|季度|月份|日期|时间", q))
+        for (table, name), row in self.columns.items():
+            if table not in table_hits or row.get("sensitivity") == "restricted":
+                continue
+            if has_time_scope and row.get("semantic_role") == "time":
+                candidates.append({"kind": "column", "id": f"{table}.{name}", "score": 0.55,
+                                   "reasons": ["time_scope_on_recalled_table"]})
+            if "价格" in q and name.endswith("price") and not name.startswith("cost_"):
+                candidates.append({"kind": "column", "id": f"{table}.{name}", "score": 0.6,
+                                   "reasons": ["price_on_recalled_table"]})
         for left in table_hits:
             for right in table_hits:
                 if left >= right:
@@ -124,7 +149,7 @@ class Catalog:
                 try:
                     for edge in self.join_path(left, right):
                         for table in (edge.from_table, edge.to_table):
-                            candidates.append({"kind": "table", "id": table, "score": 0.45,
+                            candidates.append({"kind": "table", "id": table, "score": 0.62,
                                                "reasons": ["approved_join_path"]})
                 except ValueError:
                     pass
@@ -161,6 +186,8 @@ class Catalog:
 
     def prompt_context(self) -> str:
         lines = [f"Source {self.source_id}, snapshot {self.snapshot_id}."]
+        if self.source_id == 'demo_industrial':
+            lines.append(self.description)
         for table, info in sorted(self.tables.items()):
             cols = []
             for (t, c), r in self.columns.items():
@@ -171,7 +198,8 @@ class Catalog:
                 enum = r.get("enum_map") or {}
                 suffix = f" enum={enum}" if enum else ""
                 cols.append(f"{c}({label}{'/' + aliases if aliases else ''}){suffix}")
-            lines.append(f"TABLE {table} ({info.get('business_name')}) : {', '.join(cols)}")
+            qualified = f"{info['schema_name']}.{table}" if self.source_id == 'demo_industrial' else table
+            lines.append(f"TABLE {qualified} ({info.get('business_name')}) : {', '.join(cols)}")
         for e in self.relations:
             lines.append(f"JOIN {e.from_table}.{','.join(e.from_columns)} = {e.to_table}.{','.join(e.to_columns)}")
         for m in self.metrics:

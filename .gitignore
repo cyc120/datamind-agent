@@ -11,6 +11,8 @@ deploy/.env
 __pycache__/
 *.pyc
 .venv/
+.venv-formula/
+.cache/
 
 # ===== 系统文件 =====
 .DS_Store
@@ -26,6 +28,10 @@ Thumbs.db
 # ===== 临时提取文件 =====
 saiti_text.txt
 spec_text.txt
+
+# 页面预览由摄取/评测生成；历史已跟踪预览不受影响。
+/data/object_store/page_images/
+/tmp/
 
 # ===== gateway（New API 接入基座）本地私有文件 =====
 /gateway/.env

@@ -14,6 +14,7 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import psycopg2
+from psycopg2 import sql as pg_sql
 
 from .catalog import Catalog
 from .providers import OPENAI, chat as provider_chat
@@ -92,8 +93,9 @@ def clarify(question: str) -> str | None:
 
 
 def source_for(question: str, requested: str | None) -> str:
-    source = requested or ("chinook" if re.search(r"chinook|歌手|歌曲|曲目|专辑|音乐", question, re.I) else "demo_retail")
-    if source not in {"demo_retail", "chinook"}:
+    source = requested or ("chinook" if re.search(r"chinook|歌手|歌曲|曲目|专辑|音乐", question, re.I) else
+                           "demo_industrial" if re.search(r"零件|工序|批次|测量", question) else "demo_retail")
+    if source not in {"demo_retail", "chinook", "demo_industrial"}:
         raise ValueError("SCHEMA_NOT_FOUND: unknown source")
     return source
 
@@ -126,6 +128,10 @@ def time_periods(question: str, today: date | None = None) -> list[dict]:
 
 
 def query_frame(question: str, catalog: Catalog, candidates: list[dict]) -> dict:
+    if catalog.source_id == 'demo_industrial':
+        from .industrial_query import frame_for
+        frame, clarification = frame_for(question)
+        return {**(frame or {}), 'source_id':catalog.source_id, 'clarification':clarification}
     metrics = [c["id"] for c in candidates if c["kind"] == "metric"]
     intent = "rank_entities" if re.search(r"最高|最多|前[一二三四五十\d]+|第一", question) else "aggregate" if re.search(r"多少|总|每个|各", question) else "list"
     time_field = ("refunds.refunded_at" if "退款" in question else
@@ -163,11 +169,20 @@ def _call_model(question: str, catalog: Catalog, feedback: str | None = None) ->
     profile = model_profile()
     if not (profile.get("api_key") or "").strip():
         raise RuntimeError("MODEL_KEY_MISSING")
-    user = ("CATALOG:\n" + catalog.prompt_context() +
-            "\nNORMALIZED_TIME_JSON:\n" + json.dumps(time_periods(question), ensure_ascii=False) +
+    prompt = SYSTEM_PROMPT
+    normalized_time = time_periods(question)
+    extra = ''
+    if catalog.source_id == 'demo_industrial':
+        from .industrial_query import frame_for, PROMPT
+        frame, _ = frame_for(question)
+        prompt += '\n' + PROMPT
+        normalized_time = frame['time_filters']
+        extra = '\nINDUSTRIAL_FRAME:\n' + json.dumps(frame, ensure_ascii=False)
+    user = ("CATALOG:\n" + catalog.prompt_context() + extra +
+            "\nNORMALIZED_TIME_JSON:\n" + json.dumps(normalized_time, ensure_ascii=False) +
             "\nQUESTION_JSON:\n" + json.dumps(question, ensure_ascii=False) +
             ("\nPREVIOUS_ERROR:\n" + feedback if feedback else ""))
-    reply = provider_chat(profile, SYSTEM_PROMPT, user)
+    reply = provider_chat(profile, prompt, user)
     if not reply.get("ok"):
         raise RuntimeError(reply.get("error_code") or "MODEL_UNAVAILABLE")
     content = reply["text"].strip()
@@ -203,6 +218,10 @@ def _execute(query, catalog: Catalog, cfg: dict) -> dict:
     started = time.monotonic()
     try:
         with conn.cursor() as cur:
+            cur.execute(pg_sql.SQL('SET LOCAL search_path TO {}').format(
+                pg_sql.SQL(',').join(pg_sql.Identifier(s) for s in sorted(catalog.schemas))))
+            if catalog.source_id == 'demo_industrial':
+                cur.execute("SET LOCAL TIME ZONE 'Asia/Shanghai'")
             cur.execute("SELECT set_config('statement_timeout', %s, true)", (cfg.get("DATAMIND_SQL_TIMEOUT", "5000ms"),))
             cur.execute("SELECT set_config('lock_timeout', '1000ms', true)")
             cur.execute(query.sql, query.params)
@@ -253,6 +272,14 @@ def ask(question: str, source_id: str | None = None, *, generator=None, run_id: 
     if clarification:
         return {**answer, "status": "clarification_required", "clarification": clarification}
     source = source_for(question, source_id)
+    industrial_frame = None
+    if source == 'demo_industrial':
+        from .industrial_query import frame_for, PROMPT_VERSION as INDUSTRIAL_PROMPT, NOTE
+        answer.update(source_id=source, prompt_version=INDUSTRIAL_PROMPT, model_used=False,
+                      semantic_contract=NOTE)
+        industrial_frame, clarification = frame_for(question)
+        if clarification:
+            return {**answer, 'status':'clarification_required', 'clarification':clarification}
     cfg = settings()
     meta_dsn = cfg.get("DATAMIND_META_DSN") or "host=127.0.0.1 port=5432 dbname=datamind_meta user=readonly_user password=readonly_dev"
     catalog = Catalog(meta_dsn, source)
@@ -263,16 +290,23 @@ def ask(question: str, source_id: str | None = None, *, generator=None, run_id: 
     generate = generator or _call_model
     for attempt in range(3):
         try:
+            if source == 'demo_industrial':
+                answer['model_used'] = generator is None
             draft = generate(question, catalog, feedback)
             if draft.get("clarification") and not draft.get("sql"):
                 return {**answer, "status": "clarification_required", "clarification": draft["clarification"]}
             if not draft.get("sql"):
                 return {**answer, "error_code": "SCHEMA_NOT_FOUND"}
             checked = guard_sql(draft["sql"], catalog)
-            semantic = _semantic_findings(question, checked.sql, checked.params, source)
+            if source == 'demo_industrial':
+                from .industrial_query import findings
+                semantic = findings(draft['sql'], industrial_frame)
+            else:
+                semantic = _semantic_findings(question, checked.sql, checked.params, source)
             if semantic:
-                answer["attempts"].append({"attempt": attempt + 1, "error_code": semantic[0]})
-                feedback = f"Semantic validation failed: {semantic[0]}. Follow the sales_amount metric definition exactly."
+                answer["attempts"].append({"attempt": attempt + 1, "error_code": semantic[0],
+                                           **({'sql':draft['sql']} if source=='demo_industrial' else {})})
+                feedback = f"Semantic validation failed: {semantic[0]}. Follow the source query contract, all frame filters and metric definitions exactly."
                 continue
             execution = _execute(checked, catalog, cfg)
             sql_hash = hashlib.sha256(checked.sql.encode()).hexdigest()
@@ -285,9 +319,11 @@ def ask(question: str, source_id: str | None = None, *, generator=None, run_id: 
                     "metric_ids": draft.get("metric_ids", []), "tables": checked.tables,
                     "join_plan": _join_plan(catalog, checked.tables),
                     "sql": checked.sql, "sql_hash": sql_hash,
+                    **({'model_sql':draft['sql']} if source=='demo_industrial' else {}),
                     "bound_params": checked.params, **execution, "validator_findings": findings}
         except PolicyError as exc:
-            answer["attempts"].append({"attempt": attempt + 1, "error_code": exc.reason})
+            answer["attempts"].append({"attempt": attempt + 1, "error_code": exc.reason,
+                                       **({'sql':draft.get('sql')} if source=='demo_industrial' else {})})
             # 尝试写库/执行危险函数的草稿直接终止；其余策略拦截允许重写，
             # 每次重写都会重新过 Guard，安全边界不因此放宽。
             if exc.reason in HARD_STOP_POLICY_REASONS or attempt == 2:
