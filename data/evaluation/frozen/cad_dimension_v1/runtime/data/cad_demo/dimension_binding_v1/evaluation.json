@@ -1,0 +1,115 @@
+{
+  "contract_version": "cad-dimension-binding-v1",
+  "measurement": {
+    "measurement_id": "dimension-demo-1",
+    "part_id": "A200",
+    "batch_id": "DIM-BATCH-1",
+    "operation_no": "30",
+    "process_revision": "PROCESS-A200-R5",
+    "metric": "diameter",
+    "feature_role": "outer_diameter",
+    "method": "declared_caliper",
+    "measured_at": "2026-10-05T08:00:00+08:00",
+    "value": "20.04",
+    "unit": "mm",
+    "source": {
+      "source_id": "dimension-fixture-v1",
+      "record_version": 1,
+      "provenance": "synthetic_demo",
+      "locator": "/measurements/0",
+      "source_sha256": "df1694b2b4bed33ce83a9f8b294f7cf61e9ea0b332ebea0cdbba60c5721ea5ba"
+    }
+  },
+  "review": {
+    "payload": {
+      "review_id": "synthetic-review-1",
+      "document_id": "binding-demo",
+      "document_version": 1,
+      "source_sha256": "35dff275076412943c4bf37fe5a809c0161efee68f4f852d47930d80f3cb367f",
+      "parser_version": "dxf-native-v1",
+      "bundle_sha256": "e5c1e959d580dd56705a99767792af86d5ca42f8d2efeefe63ae930914b9373e",
+      "feature_id": "diameter-3B",
+      "feature_sha256": "2d0228fd1fb9ca2ec4ab07807283bc3dc577f1328e1049c819672ff6cd28b664",
+      "decision": "confirmed",
+      "selected_target": "38",
+      "reviewer_user_id": "synthetic-reviewer-1",
+      "reviewer_roles": [
+        "reviewer"
+      ],
+      "reason": "Synthetic declared association only; not authenticated by this fixture."
+    },
+    "sha256": "0bc1d7bb657d79f6ba3f42d9ddfb8a6e5831c41cc8d5bf3b2213f24a8895cda0"
+  },
+  "binding": {
+    "payload": {
+      "binding_id": "synthetic-binding-1",
+      "binding_version": 1,
+      "document_id": "binding-demo",
+      "document_version": 1,
+      "source_sha256": "35dff275076412943c4bf37fe5a809c0161efee68f4f852d47930d80f3cb367f",
+      "parser_version": "dxf-native-v1",
+      "bundle_sha256": "e5c1e959d580dd56705a99767792af86d5ca42f8d2efeefe63ae930914b9373e",
+      "feature_id": "diameter-3B",
+      "feature_sha256": "2d0228fd1fb9ca2ec4ab07807283bc3dc577f1328e1049c819672ff6cd28b664",
+      "target_handle": "38",
+      "drawing_id": "CAD-DEV-1",
+      "drawing_revision": "R2",
+      "part_id": "A200",
+      "measurement_id": "dimension-demo-1",
+      "batch_id": "DIM-BATCH-1",
+      "operation_no": "30",
+      "process_revision": "PROCESS-A200-R5",
+      "metric": "diameter",
+      "feature_role": "outer_diameter",
+      "method": "declared_caliper",
+      "measurement_sha256": "6947411294ae5d27ff9ca178c506c145e7011e2eda944fbe38fa4817fd985c3b",
+      "measurement_source_sha256": "df1694b2b4bed33ce83a9f8b294f7cf61e9ea0b332ebea0cdbba60c5721ea5ba",
+      "measurement_record_version": 1,
+      "review_id": "synthetic-review-1",
+      "review_sha256": "0bc1d7bb657d79f6ba3f42d9ddfb8a6e5831c41cc8d5bf3b2213f24a8895cda0",
+      "valid_from": "2026-10-05T00:00:00+08:00",
+      "valid_to": "2026-10-06T00:00:00+08:00",
+      "registrar_user_id": "synthetic-registrar-1",
+      "registrar_roles": [
+        "admin"
+      ],
+      "rationale": "Synthetic explicit mapping; drawing revision is not process revision."
+    },
+    "sha256": "3b902b1beafebfa40c4965b251f336871c8411acef31b55e3b0c6a76a59b34ec"
+  },
+  "approvals": [
+    {
+      "payload": {
+        "approval_id": "synthetic-approval-1",
+        "binding_id": "synthetic-binding-1",
+        "binding_version": 1,
+        "binding_sha256": "3b902b1beafebfa40c4965b251f336871c8411acef31b55e3b0c6a76a59b34ec",
+        "review_id": "synthetic-review-1",
+        "review_sha256": "0bc1d7bb657d79f6ba3f42d9ddfb8a6e5831c41cc8d5bf3b2213f24a8895cda0",
+        "measurement_sha256": "6947411294ae5d27ff9ca178c506c145e7011e2eda944fbe38fa4817fd985c3b",
+        "previous_approval_id": null,
+        "decision": "approved",
+        "approver_user_id": "synthetic-approver-1",
+        "approver_roles": [
+          "approver"
+        ],
+        "reason": "Synthetic independent use declaration only; no verified session or manufacturing authority.",
+        "created_at": "2026-10-05T09:00:00+08:00"
+      },
+      "sha256": "b39642e667791b1992b43f18fd9a48f7dd9516c71e5f2decb1c06da3d6ca3ea6"
+    }
+  ],
+  "context": {
+    "current_document_id": "binding-demo",
+    "current_document_version": 1,
+    "current_source_sha256": "35dff275076412943c4bf37fe5a809c0161efee68f4f852d47930d80f3cb367f",
+    "current_measurement_id": "dimension-demo-1",
+    "current_measurement_record_version": 1,
+    "current_measurement_sha256": "6947411294ae5d27ff9ca178c506c145e7011e2eda944fbe38fa4817fd985c3b",
+    "current_review_id": "synthetic-review-1",
+    "current_review_sha256": "0bc1d7bb657d79f6ba3f42d9ddfb8a6e5831c41cc8d5bf3b2213f24a8895cda0",
+    "current_binding_id": "synthetic-binding-1",
+    "current_binding_version": 1,
+    "evaluated_at": "2026-10-05T10:00:00+08:00"
+  }
+}

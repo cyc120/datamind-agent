@@ -91,6 +91,8 @@ class FieldExtractionTest(unittest.TestCase):
 class FieldAPIIntegrationTest(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
+        from auth_fixtures import login
+        login(self.client)
         self.doc_id = 'field-test-' + uuid.uuid4().hex[:12]
         self.source = ROOT / 'data/knowledge_base/07_门店巡检记录_2025年12月_扫描版.pdf'
         self.sha = hashlib.sha256(self.source.read_bytes()).hexdigest()
@@ -116,6 +118,8 @@ class FieldAPIIntegrationTest(unittest.TestCase):
         with psycopg2.connect(WRITE_DSN) as conn, conn.cursor() as cur:
             cur.execute('DELETE FROM document_assets WHERE document_id=%s',(self.doc_id,))
         self.path.unlink(missing_ok=True)
+        from auth_fixtures import cleanup
+        cleanup(self.client)
         self.client.close()
 
     def get(self):

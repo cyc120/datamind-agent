@@ -146,5 +146,33 @@ th{background:#f3f8f5;color:#3b5e50;position:sticky;top:0}tr:last-child td{borde
 .document-fields td { vertical-align: top; white-space: pre-wrap; }
 .document-fields td:last-child { min-width: 190px; }
 .document-fields td button { font-size: 11px; padding: 5px 7px; margin: 3px; }
+.field-content { overflow-x: auto; }
+.field-content > table { min-width: 740px; }
+.account-panel { font-size: 12px; padding: 12px; border: 1px solid #507469; border-radius: 10px; }
+.account-panel form { display: grid; gap: 8px; margin-top: 10px; }
+.account-panel input { min-width: 0; width: 100%; }
+.account-panel p { margin: 6px 0 0; }
+.account-panel form.hidden { display: none; }
 .review-history { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
 @media(max-width:650px){ .review-form { grid-template-columns: 1fr; } }
+
+.authority-form { display:grid; gap:8px; max-width:760px; margin-top:16px; }
+.authority-form input,.authority-form select,.authority-form textarea { width:100%; min-width:0; }
+.authority-form textarea,.authority-rule textarea { min-height:80px; padding:10px; font:inherit; border:1px solid #cbd5e1; border-radius:8px; }
+.authority-rule { border-top:1px solid #dce5e1; padding:18px 0; }
+.authority-rule pre { white-space:pre-wrap; overflow-wrap:anywhere; }
+.authority-rule label,.authority-rule textarea { display:block; width:100%; margin:8px 0; }
+
+.cad-selectors { display:grid; grid-template-columns:2fr 1fr; gap:16px; margin-top:12px; }
+.cad-selectors select { width:100%; min-width:0; }
+#cadVersionInfo { overflow-wrap:anywhere; }
+#cadFeatures { margin:16px 0; }
+#cadFeatures td { white-space:normal; vertical-align:top; min-width:120px; }
+#cadViewer { width:100%; min-height:690px; border:1px solid #dce5e1; border-radius:8px; background:#f5f8fa; }
+@media(max-width:650px){ .cad-selectors{grid-template-columns:1fr;} }
+
+.cad-review-card { margin:16px 0; padding:16px; border:1px solid #dce5e1; border-radius:8px; overflow-wrap:anywhere; }
+.cad-review-card h3 { margin-top:0; }
+.cad-review-form { display:grid; gap:8px; margin-top:16px; }
+.cad-review-form textarea { min-height:72px; width:100%; }
+.cad-review-history { font-size:13px; color:#52645d; }

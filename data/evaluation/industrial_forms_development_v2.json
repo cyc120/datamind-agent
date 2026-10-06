@@ -1,0 +1,642 @@
+{
+  "suite_version": "industrial-forms-development-v2",
+  "stage": "development",
+  "provenance": "Synthetic forms authored by the implementer; no independent factory data or blind benchmark.",
+  "development_participation": true,
+  "source_file": "output/pdf/industrial_forms_development_v2.pdf",
+  "cases": [
+    {
+      "case_id": "development-native-1",
+      "page": 1,
+      "carrier": "native",
+      "template": "development-compact-1",
+      "fields": [
+        {
+          "label": "文档类型",
+          "value": "质检报告",
+          "bbox": [
+            60,
+            110,
+            154.409,
+            129
+          ]
+        },
+        {
+          "label": "零件编号",
+          "value": "P320",
+          "bbox": [
+            60,
+            144,
+            132.365,
+            163
+          ]
+        },
+        {
+          "label": "工序编号",
+          "value": "15",
+          "bbox": [
+            60,
+            178,
+            120.727,
+            197
+          ]
+        },
+        {
+          "label": "指标",
+          "value": "holding_temperature",
+          "bbox": [
+            60,
+            212,
+            182.646,
+            231
+          ]
+        },
+        {
+          "label": "版次",
+          "value": "P320-V2",
+          "bbox": [
+            60,
+            246,
+            126.656,
+            265
+          ]
+        },
+        {
+          "label": "审批状态",
+          "value": "已批准",
+          "bbox": [
+            60,
+            280,
+            143.409,
+            299
+          ]
+        },
+        {
+          "label": "单位",
+          "value": "degC",
+          "bbox": [
+            60,
+            314,
+            110.453,
+            333
+          ]
+        },
+        {
+          "label": "测量方法",
+          "value": "core",
+          "bbox": [
+            60,
+            348,
+            128.988,
+            367
+          ]
+        },
+        {
+          "label": "批次编号",
+          "value": "LOT-320",
+          "bbox": [
+            60,
+            382,
+            151.307,
+            401
+          ]
+        },
+        {
+          "label": "测量编号",
+          "value": "MEAS-320-7",
+          "bbox": [
+            60,
+            416,
+            168.48899999999998,
+            435
+          ]
+        },
+        {
+          "label": "报告编号",
+          "value": "REP-320-7",
+          "bbox": [
+            60,
+            450,
+            159.63400000000001,
+            469
+          ]
+        },
+        {
+          "label": "测量时点",
+          "value": "2026-11-01T10:35:20+08:00",
+          "bbox": [
+            60,
+            484,
+            231.66199999999998,
+            503
+          ]
+        },
+        {
+          "label": "实测值",
+          "value": "824.6",
+          "bbox": [
+            60,
+            518,
+            122.454,
+            537
+          ]
+        },
+        {
+          "label": "报告结论",
+          "value": "合成声明，须以原文和记录核验",
+          "bbox": [
+            60,
+            552,
+            264.409,
+            571
+          ]
+        }
+      ],
+      "expected_fact": {
+        "entity_id": "P320",
+        "operation_no": "15",
+        "raw_unit": "degC",
+        "source_revision": "P320-V2",
+        "approval_status": "approved",
+        "normalized_unit": "degC",
+        "fact_kind": "measurement",
+        "batch_id": "LOT-320",
+        "measurement_id": "MEAS-320-7",
+        "report_id": "REP-320-7",
+        "measured_at": "2026-11-01T10:35:20+08:00",
+        "raw_value": "824.6",
+        "normalized_value": "824.6"
+      }
+    },
+    {
+      "case_id": "development-native-2",
+      "page": 2,
+      "carrier": "native",
+      "template": "development-compact-2",
+      "fields": [
+        {
+          "label": "文档类型",
+          "value": "工艺要求",
+          "bbox": [
+            69,
+            110.5,
+            178.0,
+            129
+          ]
+        },
+        {
+          "label": "零件编号",
+          "value": "P321",
+          "bbox": [
+            69,
+            144.5,
+            156.958,
+            163
+          ]
+        },
+        {
+          "label": "工序编号",
+          "value": "25",
+          "bbox": [
+            69,
+            178.5,
+            145.849,
+            197
+          ]
+        },
+        {
+          "label": "指标",
+          "value": "holding_temperature",
+          "bbox": [
+            69,
+            212.5,
+            199.70350000000002,
+            231
+          ]
+        },
+        {
+          "label": "版次",
+          "value": "P321-V3",
+          "bbox": [
+            69,
+            246.5,
+            146.2585,
+            265
+          ]
+        },
+        {
+          "label": "审批状态",
+          "value": "未批准",
+          "bbox": [
+            69,
+            280.5,
+            167.5,
+            299
+          ]
+        },
+        {
+          "label": "单位",
+          "value": "K",
+          "bbox": [
+            69,
+            314.5,
+            117.60400000000001,
+            333
+          ]
+        },
+        {
+          "label": "测量方法",
+          "value": "surface",
+          "bbox": [
+            69,
+            348.5,
+            166.89100000000002,
+            367
+          ]
+        },
+        {
+          "label": "生效时间",
+          "value": "2026-10-01T00:00:00+08:00",
+          "bbox": [
+            69,
+            382.5,
+            251.7415,
+            401
+          ]
+        },
+        {
+          "label": "失效时间",
+          "value": "无",
+          "bbox": [
+            69,
+            416.5,
+            146.5,
+            435
+          ]
+        },
+        {
+          "label": "温度下限",
+          "value": "1068.15",
+          "bbox": [
+            69,
+            450.5,
+            167.8465,
+            469
+          ]
+        },
+        {
+          "label": "温度上限",
+          "value": "1118.15",
+          "bbox": [
+            69,
+            484.5,
+            167.8465,
+            503
+          ]
+        }
+      ],
+      "expected_fact": {
+        "entity_id": "P321",
+        "operation_no": "25",
+        "raw_unit": "K",
+        "source_revision": "P321-V3",
+        "approval_status": "unapproved",
+        "normalized_unit": "degC",
+        "fact_kind": "requirement",
+        "valid_from": "2026-10-01T00:00:00+08:00",
+        "valid_to": null,
+        "raw_value": "1068.15 .. 1118.15",
+        "normalized_range": {
+          "min": "795.00",
+          "max": "845.00",
+          "min_inclusive": true,
+          "max_inclusive": true
+        }
+      }
+    },
+    {
+      "case_id": "development-scan-1",
+      "page": 3,
+      "carrier": "scan",
+      "template": "development-compact-1",
+      "fields": [
+        {
+          "label": "文档类型",
+          "value": "质检报告",
+          "bbox": [
+            60.0,
+            110.0,
+            154.41,
+            129.0
+          ]
+        },
+        {
+          "label": "零件编号",
+          "value": "P320",
+          "bbox": [
+            60.0,
+            144.0,
+            132.37,
+            163.0
+          ]
+        },
+        {
+          "label": "工序编号",
+          "value": "15",
+          "bbox": [
+            60.0,
+            178.0,
+            120.73,
+            197.0
+          ]
+        },
+        {
+          "label": "指标",
+          "value": "holding_temperature",
+          "bbox": [
+            60.0,
+            212.0,
+            182.65,
+            231.0
+          ]
+        },
+        {
+          "label": "版次",
+          "value": "P320-V2",
+          "bbox": [
+            60.0,
+            246.0,
+            126.66,
+            265.0
+          ]
+        },
+        {
+          "label": "审批状态",
+          "value": "已批准",
+          "bbox": [
+            60.0,
+            280.0,
+            143.41,
+            299.0
+          ]
+        },
+        {
+          "label": "单位",
+          "value": "degC",
+          "bbox": [
+            60.0,
+            314.0,
+            110.45,
+            333.0
+          ]
+        },
+        {
+          "label": "测量方法",
+          "value": "core",
+          "bbox": [
+            60.0,
+            348.0,
+            128.99,
+            367.0
+          ]
+        },
+        {
+          "label": "批次编号",
+          "value": "LOT-320",
+          "bbox": [
+            60.0,
+            382.0,
+            151.31,
+            401.0
+          ]
+        },
+        {
+          "label": "测量编号",
+          "value": "MEAS-320-7",
+          "bbox": [
+            60.0,
+            416.0,
+            168.49,
+            435.0
+          ]
+        },
+        {
+          "label": "报告编号",
+          "value": "REP-320-7",
+          "bbox": [
+            60.0,
+            450.0,
+            159.63,
+            469.0
+          ]
+        },
+        {
+          "label": "测量时点",
+          "value": "2026-11-01T10:35:20+08:00",
+          "bbox": [
+            60.0,
+            484.0,
+            231.66,
+            503.0
+          ]
+        },
+        {
+          "label": "实测值",
+          "value": "824.6",
+          "bbox": [
+            60.0,
+            518.0,
+            122.45,
+            537.0
+          ]
+        },
+        {
+          "label": "报告结论",
+          "value": "合成声明，须以原文和记录核验",
+          "bbox": [
+            60.0,
+            552.0,
+            264.41,
+            571.0
+          ]
+        }
+      ],
+      "expected_fact": {
+        "entity_id": "P320",
+        "operation_no": "15",
+        "raw_unit": "degC",
+        "source_revision": "P320-V2",
+        "approval_status": "approved",
+        "normalized_unit": "degC",
+        "fact_kind": "measurement",
+        "batch_id": "LOT-320",
+        "measurement_id": "MEAS-320-7",
+        "report_id": "REP-320-7",
+        "measured_at": "2026-11-01T10:35:20+08:00",
+        "raw_value": "824.6",
+        "normalized_value": "824.6"
+      },
+      "scan_dpi": 144,
+      "scan_rotation_degrees": 0
+    },
+    {
+      "case_id": "development-scan-2",
+      "page": 4,
+      "carrier": "scan",
+      "template": "development-compact-2",
+      "fields": [
+        {
+          "label": "文档类型",
+          "value": "工艺要求",
+          "bbox": [
+            63.62,
+            112.63,
+            172.92,
+            133.03
+          ]
+        },
+        {
+          "label": "零件编号",
+          "value": "P321",
+          "bbox": [
+            64.21,
+            146.99,
+            152.48,
+            167.03
+          ]
+        },
+        {
+          "label": "工序编号",
+          "value": "25",
+          "bbox": [
+            64.8,
+            181.18,
+            141.96,
+            201.02
+          ]
+        },
+        {
+          "label": "指标",
+          "value": "holding_temperature",
+          "bbox": [
+            65.4,
+            214.24,
+            196.4,
+            235.02
+          ]
+        },
+        {
+          "label": "版次",
+          "value": "P321-V3",
+          "bbox": [
+            65.99,
+            249.17,
+            143.56,
+            269.01
+          ]
+        },
+        {
+          "label": "审批状态",
+          "value": "未批准",
+          "bbox": [
+            66.58,
+            282.79,
+            165.39,
+            303.01
+          ]
+        },
+        {
+          "label": "单位",
+          "value": "K",
+          "bbox": [
+            67.18,
+            317.66,
+            116.1,
+            337.0
+          ]
+        },
+        {
+          "label": "测量方法",
+          "value": "surface",
+          "bbox": [
+            67.77,
+            350.79,
+            165.97,
+            371.0
+          ]
+        },
+        {
+          "label": "生效时间",
+          "value": "2026-10-01T00:00:00+08:00",
+          "bbox": [
+            68.36,
+            383.3,
+            251.4,
+            404.99
+          ]
+        },
+        {
+          "label": "失效时间",
+          "value": "无",
+          "bbox": [
+            68.96,
+            419.14,
+            146.77,
+            438.99
+          ]
+        },
+        {
+          "label": "温度下限",
+          "value": "1068.15",
+          "bbox": [
+            69.55,
+            452.76,
+            168.7,
+            472.98
+          ]
+        },
+        {
+          "label": "温度上限",
+          "value": "1118.15",
+          "bbox": [
+            70.14,
+            486.75,
+            169.3,
+            506.98
+          ]
+        }
+      ],
+      "expected_fact": {
+        "entity_id": "P321",
+        "operation_no": "25",
+        "raw_unit": "K",
+        "source_revision": "P321-V3",
+        "approval_status": "unapproved",
+        "normalized_unit": "degC",
+        "fact_kind": "requirement",
+        "valid_from": "2026-10-01T00:00:00+08:00",
+        "valid_to": null,
+        "raw_value": "1068.15 .. 1118.15",
+        "normalized_range": {
+          "min": "795.00",
+          "max": "845.00",
+          "min_inclusive": true,
+          "max_inclusive": true
+        }
+      },
+      "scan_dpi": 144,
+      "scan_rotation_degrees": 1.0
+    }
+  ],
+  "visual_qa": "all pages visually checked",
+  "frozen_parser_code_hashes": {
+    "ingestion/industrial_facts.py": "b2f8ae5f5d9f628ec074c0d85f97469c71b9b7317221cbd128e89f8a1a386183",
+    "ingestion/ingest.py": "c36262ea2227792661f90e395a006a2c5db9d1142c31f7302360e0ccac046a16",
+    "ingestion/ocr.py": "caebb1038dc865b00a1f76b5ae37475c1b3472d9e7cce4f4623952f46cc4eae2",
+    "ingestion/tables.py": "36eeff85ed5de20ce59516b293a813f5c853dda30bce70c9b3b732b9188d2666",
+    "datamind/field_store.py": "411de6f3dbc9a96a5e655c3d9aef81ac534526c9f769a5fd7b5dc70ce8ba20c8"
+  },
+  "builder_sha256": "7a7b81d1e85a197edfe0e8c96e675039581a5a9d3aa7f0068500fc7228899785",
+  "source_sha256": "0ba302d33e5c9d31557e5465d9fd1b22a2c2874eb04539a8fd76f2a3635b3236",
+  "page_count": 4
+}

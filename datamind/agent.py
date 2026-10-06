@@ -330,10 +330,12 @@ class DataMindAgent:
         except ValueError as exc:
             code=str(exc)
             return self._finish('FAILED_WITH_EVIDENCE','工业核验证据不可用或超出范围，请查看轨迹并补充来源。','insufficient',error_code=code)
+        parser_versions=sorted({f['parser_version'] for f in result['facts']})
         with self.conn.cursor() as cur:
             cur.execute('UPDATE runs SET status=%s,versions=%s WHERE run_id=%s',('VERIFYING',Json({
-                'rules':result['rule_version'],'dataset':result['dataset'],'sql_snapshot':result['source_snapshot_id'],
-                'parser':'industrial-native-v1','model_used':False}),self.run_id))
+                'rules':result['rule_version'],'authority':result['authority_version'],'dataset':result['dataset'],'sql_snapshot':result['source_snapshot_id'],
+                'parser':parser_versions[0] if len(parser_versions)==1 else 'multiple' if parser_versions else None,
+                'parsers':parser_versions,'model_used':False}),self.run_id))
         self._record_industrial_evidence(result)
         return self._finish('COMPLETED' if result['rows'] else 'ABSTAINED', result['answer'],
                             'medium' if result['rows'] else 'insufficient',
@@ -385,6 +387,12 @@ class DataMindAgent:
                         'rule_id':issue['reason'],'rule_version':result['rule_version'],'resolution_status':issue['status'],
                         'selected_fact_ref':{'fact_id':row['requirement_fact_id']} if issue['kind']=='version_difference' else None,
                         'reason':issue['reason'],'repair_attempt_refs':[]}
+                    if issue.get('authority'):
+                        record.update(rule_id=issue['authority']['rule_id'],rule_version=issue['authority']['rule_version'],
+                                      selected_fact_ref=issue['selected_fact_ref'],authority=issue['authority'])
+                        record['normalized_values'].update(selected=row['selected_value'],selected_unit=row['selected_unit'])
+                    if issue.get('authority_rule_ids'):
+                        record['authority_rule_ids']=issue['authority_rule_ids']
                     cur.execute('''INSERT INTO conflict_records(conflict_id,run_id,entity_key,metric,conflict_type,left_fact_refs,
                                    right_fact_refs,comparison_context,normalized_values,rule_id,rule_version,resolution_status,
                                    selected_fact_ref,reason,payload) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''',
@@ -392,6 +400,9 @@ class DataMindAgent:
                          Json(record['comparison_context']),Json(record['normalized_values']),record['rule_id'],record['rule_version'],
                          record['resolution_status'],Json(record['selected_fact_ref']),record['reason'],Json(record)))
                     cn=node('ConflictRecord',cid,record);edge(cn,vn,'derived_from')
+                    if issue.get('authority'):
+                        authority=issue['authority'];an=node('AuthorityRule',authority['rule_id'],authority)
+                        edge(cn,an,'resolved_by');edge(vn,an,'derived_from')
                 text=f"测量 {row['measurement_id']}：工艺范围核验 {row['compliance']}；来源比较 {row['agreement']}。"
                 claim_id='claim-'+uuid.uuid4().hex[:16];claim_node=node('Claim',claim_id,{'text':text});edge(claim_node,vn,'supports')
                 cur.execute('INSERT INTO claims(claim_id,run_id,text,status,evidence_ids,confidence_level,verification) VALUES (%s,%s,%s,%s,%s,%s,%s)',

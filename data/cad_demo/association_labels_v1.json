@@ -1,0 +1,13 @@
+{
+  "provenance": "synthetic_demo",
+  "labels": [
+    {
+      "method": "human_label",
+      "reference_id": "synthetic-association-1",
+      "source_sha256": "c146a548e78bb34fb9bf7ff06e2b270b501011b8f98566c28ecb0e1ca6c805e1",
+      "annotation_handle": "13",
+      "target_handle": "20",
+      "rationale": "Synthetic author label; no native DXF reference or factory approval claimed."
+    }
+  ]
+}

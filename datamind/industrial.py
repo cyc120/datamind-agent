@@ -11,6 +11,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from .field_store import read_verified_facts
 from .industrial_rules import RULE_VERSION, evaluate
+from .authority import load as load_authority, basis_valid, resolve as resolve_authority
 
 ROOT=Path(__file__).resolve().parents[1]
 SQL='''SELECT b.batch_id,b.part_id,b.produced_at,b.recorded_revision,m.measurement_id,m.operation_no,
@@ -38,7 +39,7 @@ def parse_question(question):
             'month':f'{year:04}-{month:02}','metric':'holding_temperature'}
 
 
-def run(question, *, dsn, on_step=None):
+def run(question, *, dsn, on_step=None, apply_authority=True):
     started=time.perf_counter();params=parse_question(question);step=on_step or (lambda *_:None)
     # Evidence and production data are scoped to the synthetic industrial source only.
     with psycopg2.connect(dsn) as conn:
@@ -65,11 +66,19 @@ def run(question, *, dsn, on_step=None):
             step('requirements.loaded',{'fact_count':len(requirements),'source_sha256':manifest['pdf_sha256'],'scope':params})
             cur.execute(SQL,(params['part_id'],params['operation_no'],params['start'],params['end']))
             raw_rows=plain([dict(r) for r in cur.fetchall()])
+            authority_rules=load_authority(cur) if apply_authority else []
+            for rule in authority_rules:
+                rule['basis_valid']=rule['payload_valid'] and basis_valid(cur,rule['payload']['basis'])
     if len(raw_rows)>1000: raise ValueError('INDUSTRIAL_ROW_LIMIT')
     snapshot=hashlib.sha256(json.dumps(raw_rows,sort_keys=True,separators=(',',':')).encode()).hexdigest()
     step('sql.executed',{'row_count':len(raw_rows),'sql_hash':hashlib.sha256(SQL.encode()).hexdigest(),'snapshot':snapshot,
                          'readonly':True,'grain':'one measurement_id per row'})
-    evaluated=[evaluate(row,requirements,reports) for row in raw_rows]
+    evaluated=[]
+    for row in raw_rows:
+        checked=evaluate(row,requirements,reports)
+        if checked['report']:
+            resolve_authority(checked,row,checked['report'],dict(manifest),authority_rules)
+        evaluated.append(checked)
     results=[]
     for row in evaluated:
         req,report=row.pop('requirement'),row.pop('report')
@@ -79,6 +88,7 @@ def run(question, *, dsn, on_step=None):
     summary={'batch_count':len({r['batch_id'] for r in results}),'measurement_count':len(results),
              'out_of_range':[r['measurement_id'] for r in results if r['compliance']=='out_of_range'],
              'conflicts':[r['measurement_id'] for r in results if r['agreement']=='unresolved'],
+             'authority_resolved':[r['measurement_id'] for r in results if r['agreement']=='resolved_by_authority'],
              'needs_review':[r['measurement_id'] for r in results if r['compliance'] in {'needs_review','insufficient_evidence'} or r['agreement'] in {'needs_review','insufficient_evidence'}]}
     step('verification.completed',{'summary':summary,'rule_version':RULE_VERSION,'overall_pass_not_asserted':True})
     if not results:
@@ -89,10 +99,11 @@ def run(question, *, dsn, on_step=None):
         answer=(f'工业合成演示：查到 {summary["batch_count"]} 个批次、{len(results)} 条测量。'
                 f'数据库温度超限批次：{"、".join(bad) or "无"}。'
                 f'同测量来源冲突批次：{"、".join(conflicts) or "无"}。'
+                f'按已登记权威规则裁决 {len(summary["authority_resolved"])} 条测量；裁决与来源一致分别记录。'
                 f'有 {len(summary["needs_review"])} 条测量存在版本、单位或报告证据缺口，详见核验表。'
                 '未消解冲突保留双方原值，不能据此给出统一的合格结论。')
     return {'kind':'industrial','status':'completed' if results else 'abstained','answer':answer,'scope':params,
-            'rule_version':RULE_VERSION,'dataset':dict(manifest),'rows':results,'facts':facts,'summary':summary,
+            'rule_version':RULE_VERSION,'authority_version':'source-authority-v1','dataset':dict(manifest),'rows':results,'facts':facts,'summary':summary,
             'sql':SQL,'bound_params':[params[k] for k in ('part_id','operation_no','start','end')],
             'sql_hash':hashlib.sha256(SQL.encode()).hexdigest(),'source_snapshot_id':snapshot,
             'sql_rows':raw_rows,'elapsed_ms':round((time.perf_counter()-started)*1000,2),'model_used':False,

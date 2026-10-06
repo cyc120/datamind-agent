@@ -1,0 +1,442 @@
+# -*- coding: utf-8 -*-
+"""
+ingest.py — 知识库摄取管线（里程碑 M6/M7 简化版）
+流程: 登记文档资产 → 解析(块/表格/页图) → 标题树切片 → BGE 向量化 →
+      Qdrant 入库 + PostgreSQL 元数据落库
+
+说明:
+- 扫描页只读取原 PDF 像素，通过本地 OCR 识别，不读取原生对照。
+- OHR-Bench 样张仅摄取 gt_text；noise_text 保留在 manifest 供鲁棒性评测。
+
+用法: py -3.13 ingestion/ingest.py [--reset]
+"""
+import argparse
+import hashlib
+import json
+import uuid
+import sys
+from pathlib import Path
+
+import psycopg2
+import psycopg2.extras
+import pymupdf
+from qdrant_client import QdrantClient
+from qdrant_client.models import Distance, PointStruct, VectorParams
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from ingestion import formula, facts
+KB_DIR = ROOT / "data" / "knowledge_base"
+OHR_DIR = ROOT / "data" / "ohr_bench_samples"
+PAGE_IMG_DIR = ROOT / "data" / "object_store" / "page_images"
+
+PG = dict(host="localhost", port=5432, user="datamind_app",
+          password="datamind_app_dev", dbname="datamind_meta")
+QDRANT = "http://localhost:6333"
+COLLECTION = "datamind_knowledge"
+EMBED_MODEL = "BAAI/bge-small-zh-v1.5"
+EMBED_DIM = 512
+EMBED_CACHE = ROOT / ".cache" / "fastembed"
+
+CHUNK_TARGET = 500   # 字符（中文）
+CHUNK_MAX = 800
+CHUNK_OVERLAP = 80
+PARSER_VERSION = "pdf-ocr-0.4"
+
+
+def sha256_file(p: Path) -> str:
+    h = hashlib.sha256()
+    h.update(p.read_bytes())
+    return h.hexdigest()
+
+
+def md5(s: str) -> str:
+    return hashlib.md5(s.encode()).hexdigest()[:12]
+
+
+# ============================================================
+# 解析
+# ============================================================
+def detect_heading(span_size):
+    if span_size >= 17:
+        return 1
+    if span_size >= 13:
+        return 2
+    if span_size >= 11.5:
+        return 3
+    return 0
+
+
+def parse_pdf(pdf_path: Path, doc_id: str, ocr_proxy: Path | None = None, *, include_quality=False,
+              ocr_engine=None, formula_engine=None):
+    """Parse native text or original pixels. Reference text is never an input."""
+    if ocr_proxy is not None:
+        raise ValueError("OCR_REFERENCE_INPUT_FORBIDDEN")
+    blocks = []
+    detail = {"pages": [], "formula_candidates": [], "reference_inputs_used": False,
+              "parser_version": PARSER_VERSION, "source_sha256": sha256_file(pdf_path),
+              "quality_calibration": "not_calibrated", "note": "原生 PDF 文本/图片与原扫描像素解析"}
+    doc = pymupdf.open(pdf_path)
+    page_count = len(doc)
+
+    # 页面截图（供前端证据定位）
+    img_dir = PAGE_IMG_DIR / doc_id
+    img_dir.mkdir(parents=True, exist_ok=True)
+    for pno in range(page_count):
+        pix = doc[pno].get_pixmap(dpi=110)
+        (img_dir / f"page_{pno + 1:03d}.png").write_bytes(pix.tobytes("png"))
+
+    figure_inputs = []
+    for pno in range(page_count):
+        page = doc[pno]
+        tpage = page
+        native_chars = len(page.get_text().strip())
+        if native_chars < 30:
+            try:
+                from ingestion import ocr
+                page_ocr, page_detail = ocr.page_blocks(page, pno + 1, ocr=ocr_engine)
+                blocks.extend(page_ocr)
+                detail["ocr_model"] = ocr.model_manifest(ocr_engine)
+                detail["pages"].append(page_detail)
+            except Exception as exc:
+                detail["pages"].append({"page_no": pno + 1, "route": "pixel_ocr", "error_code": "OCR_FAILED",
+                                        "exception_type": type(exc).__name__})
+            continue
+        detail["pages"].append({"page_no": pno + 1, "route": "native_text", "native_chars": native_chars})
+
+        # ---- 原生文本页表格识别 ----
+        tables = None
+        try:
+            tables = tpage.find_tables()
+        except Exception:
+            pass
+        table_bboxes = []
+        for ti, tab in enumerate(tables.tables if tables else []):
+            bbox = tab.bbox
+            table_bboxes.append(bbox)
+            cells = tab.extract()
+            blocks.append({
+                "page_no": pno + 1, "block_type": "table",
+                "bbox": [round(x, 1) for x in bbox],
+                "text": tab.to_markdown(clean=False).replace("\x00", ""),
+                "table_cells": {"n_rows": tab.row_count, "n_cols": tab.col_count,
+                                "cells": [[("" if v is None else str(v).replace("\x00", ""))
+                                           for v in row] for row in cells]},
+                "ocr_confidence": None,
+            })
+
+        # ---- 文本块 ----
+        d = tpage.get_text("dict")
+        for blk in d["blocks"]:
+            if blk["type"] != 0:
+                if blk["type"] == 1:
+                    figure = {"page_no": pno + 1, "block_type": "figure", "bbox": list(blk["bbox"]),
+                              "text": "", "heading_level": None, "table_cells": None, "ocr_confidence": None}
+                    blocks.append(figure)
+                    bb = pymupdf.Rect(blk["bbox"])
+                    if bb.width > 2 * bb.height and bb.height < page.rect.height * .15 and len(figure_inputs) < 6:
+                        crop_dir = ROOT / ".cache/formula" / detail["source_sha256"]
+                        crop_dir.mkdir(parents=True, exist_ok=True)
+                        crop_path = crop_dir / f"page-{pno+1}-figure-{len(figure_inputs)}.png"
+                        crop_path.write_bytes(blk["image"])
+                        figure_inputs.append((figure, crop_path))
+                continue
+            # 跳过落入表格区域的块
+            bb = blk["bbox"]
+            if any(not (bb[2] < tb[0] or bb[0] > tb[2] or bb[3] < tb[1] or bb[1] > tb[3])
+                   for tb in table_bboxes):
+                continue
+            # 合并 span 文本，取最大字号判断标题
+            text_parts, max_size = [], 0
+            for line in blk["lines"]:
+                for span in line["spans"]:
+                    text_parts.append(span["text"])
+                    max_size = max(max_size, span["size"])
+            text = "".join(text_parts).replace("\x00", "").strip()
+            if not text:
+                continue
+            level = detect_heading(max_size) if len(text) < 40 else 0
+            blocks.append({
+                "page_no": pno + 1,
+                "block_type": {1: "title", 2: "title", 3: "title"}.get(level, "paragraph"),
+                "bbox": [round(x, 1) for x in bb],
+                "text": text,
+                "heading_level": level or None,
+                "table_cells": None,
+                "ocr_confidence": None,
+            })
+
+    if figure_inputs:
+        parsed = (formula_engine or formula.recognize)([path for _, path in figure_inputs])
+        detail["formula_model"] = parsed.get("manifest")
+        detail["formula_error"] = parsed.get("error_code")
+        for (block, crop), candidate in zip(figure_inputs, parsed.get("results", [])):
+            accepted = formula.valid_latex(candidate.get("latex"))
+            detail["formula_candidates"].append({**candidate, "page_no": block["page_no"], "bbox": block["bbox"],
+                "structural_check": "passed" if accepted else "failed", "semantic_verification": "not_independently_verified"})
+            if accepted:
+                block.update({"block_type": "formula", "formula_latex": candidate["latex"],
+                              "text": candidate["latex"], "ocr_confidence": None})
+    detail["unparsed_figures"] = sum(b["block_type"] == "figure" for b in blocks)
+    detail["parse_status"] = "partial" if detail["unparsed_figures"] or any(
+        p.get("error_code") or p.get("warnings") for p in detail["pages"]) else "parsed"
+    if not any(b["text"] for b in blocks):
+        detail["parse_status"] = "failed"
+    # 阅读顺序: 页内按 y,x 排序
+    blocks.sort(key=lambda b: (b["page_no"], b["bbox"][1], b["bbox"][0]))
+    for i, b in enumerate(blocks):
+        b["reading_order"] = i
+    doc.close()
+    return (blocks, page_count, detail) if include_quality else (blocks, page_count)
+
+
+# ============================================================
+# 切片（标题树 + 段落聚合 + 表格独立切片）
+# ============================================================
+def build_chunks(blocks, doc_id):
+    chunks = []
+    heading_stack = []          # [(level, text)]
+    buf, buf_pages, buf_blocks = [], [], []
+
+    def flush():
+        nonlocal buf, buf_pages, buf_blocks
+        text = "\n".join(buf).strip()
+        if not text:
+            return
+        # 嵌入文本带标题路径前缀（提升检索召回）
+        sec_path = [t for _, t in heading_stack]
+        embed_text = (" > ".join(sec_path) + "\n" + text) if sec_path else text
+        chunks.append({
+            "chunk_id": f"chk-{md5(doc_id + str(len(chunks)))}",
+            "document_id": doc_id,
+            "chunk_type": "text",
+            "section_path": sec_path,
+            "page_start": min(buf_pages), "page_end": max(buf_pages),
+            "block_ids": list(buf_blocks),
+            "text_for_embedding": embed_text[:4000],
+            "exact_text": text,
+        })
+        buf, buf_pages, buf_blocks = [], [], []
+
+    for bi, b in enumerate(blocks):
+        if not b["text"] or b["text"].startswith("DataMind Agent 演示知识库") or b["text"].strip().startswith("第 ") and b["text"].strip().endswith(" 页"):
+            continue
+        if buf_pages and b["page_no"] != buf_pages[-1]:
+            flush()
+        if b["block_type"] == "table":
+            flush()
+            caption = next((candidate for candidate in blocks[bi + 1:bi + 3]
+                if candidate["page_no"] == b["page_no"] and candidate["text"].startswith("表 ")), None)
+            table_text = ((caption["text"] + "\n") if caption else "") + b["text"]
+            chunks.append({
+                "chunk_id": f"chk-{md5(doc_id + 'tbl' + str(len(chunks)))}",
+                "document_id": doc_id,
+                "chunk_type": "table",
+                "section_path": [t for _, t in heading_stack],
+                "page_start": b["page_no"], "page_end": b["page_no"],
+                "block_ids": [b["block_id"]] + ([caption["block_id"]] if caption else []),
+                "text_for_embedding": (" > ".join(t for _, t in heading_stack) + "\n" +
+                                       table_text)[:4000],
+                "exact_text": table_text,
+                "table_json": b["table_cells"],
+            })
+            continue
+        if b["block_type"] == "title" and b.get("heading_level"):
+            flush()
+            level = b["heading_level"]
+            while heading_stack and heading_stack[-1][0] >= level:
+                heading_stack.pop()
+            heading_stack.append((level, b["text"]))
+            buf.append(f"【{b['text']}】")       # 标题保留在正文切片开头
+            buf_pages.append(b["page_no"])
+            buf_blocks.append(b["block_id"])
+            continue
+        text = b["text"]
+        while text:
+            available = CHUNK_MAX - sum(len(x) + 1 for x in buf)
+            if available < CHUNK_OVERLAP:
+                flush()
+                available = CHUNK_MAX
+            part = text[:available]
+            buf.append(part)
+            buf_pages.append(b["page_no"])
+            buf_blocks.append(b["block_id"])
+            if len(text) <= available:
+                break
+            text = text[max(1, available - CHUNK_OVERLAP):]
+            flush()
+    flush()
+
+    # 二次切分过长 chunk（标题树已保证基本粒度，这里仅防御）
+    return chunks
+
+
+# ============================================================
+# 主流程
+# ============================================================
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--reset", action="store_true", help="清空后重建索引")
+    ap.add_argument("--refresh", action="store_true", help="保留文档资产，重新解析并刷新切片/向量")
+    args = ap.parse_args()
+
+    from db.migrate import migrate
+    migrate()
+    meta = psycopg2.connect(**PG)
+    cur = meta.cursor()
+
+    if args.reset:
+        print("resetting knowledge index ...")
+        cur.execute("DELETE FROM chunks")
+        cur.execute("DELETE FROM document_blocks")
+        cur.execute("DELETE FROM ingest_jobs")
+        cur.execute("DELETE FROM document_assets")
+        meta.commit()
+        qc = QdrantClient(url=QDRANT, trust_env=False)
+        if qc.collection_exists(COLLECTION):
+            qc.delete_collection(COLLECTION)
+
+    # ---------- 向量模型 ----------
+    print(f"loading embedding model {EMBED_MODEL} ...")
+    from fastembed import TextEmbedding
+    model = TextEmbedding(model_name=EMBED_MODEL, cache_dir=str(EMBED_CACHE), threads=2)
+
+    qc = QdrantClient(url=QDRANT, trust_env=False)
+    rebuild_vectors = not qc.collection_exists(COLLECTION)
+    if rebuild_vectors:
+        qc.create_collection(COLLECTION,
+                             vectors_config=VectorParams(size=EMBED_DIM, distance=Distance.COSINE))
+        qc.create_payload_index(COLLECTION, "document_id", "keyword")
+        qc.create_payload_index(COLLECTION, "chunk_type", "keyword")
+        print(f"created collection {COLLECTION}")
+
+    # ---------- 收集待摄取文档 ----------
+    jobs = []
+    for pdf in sorted(KB_DIR.glob("*.pdf")):
+        manifest = json.loads((KB_DIR / "manifest.json").read_text(encoding="utf-8"))
+        info = next((m for m in manifest["documents"] if m["file"] == pdf.name), {})
+        origin = "scan" if "扫描版" in pdf.name else "curated"
+        jobs.append({"path": pdf, "origin": origin, "file_type": "pdf",
+                     "title": pdf.stem, "info": info,
+                     "collection": "demo_kb"})
+    for js in sorted(OHR_DIR.glob("ohr-*.json")):
+        rec = json.loads(js.read_text(encoding="utf-8"))
+        jobs.append({"path": js, "origin": "ohrbench", "file_type": "json",
+                     "title": f"[{rec['sample_id']}/OHR-Bench/{rec['domain']}] {rec['doc_name']} p{rec['page_idx'] + 1}",
+                     "info": {"desc": f"OHR-Bench 真实语料 ({rec['domain']})"},
+                     "record": rec, "collection": "ohrbench_kb"})
+
+    print(f"ingesting {len(jobs)} documents ...")
+    total_chunks = 0
+    for job in jobs:
+        path, doc_id = job["path"], "doc-" + md5(job["title"] + sha256_file(job["path"])[:8])
+        digest = sha256_file(path)
+
+        cur.execute("""SELECT status,parser_version FROM document_assets WHERE document_id=%s""", (doc_id,))
+        row = cur.fetchone()
+        if row and row == ("indexed", PARSER_VERSION) and not args.refresh and not rebuild_vectors:
+            print(f"  skip (indexed): {job['title']}")
+            continue
+
+        cur.execute("""
+            INSERT INTO document_assets(document_id, title, collection, file_type, origin,
+                sha256, object_uri, page_count, language, acl, quality_score, quality_detail,
+                parser_version, status, uploaded_at)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'parsing',now())
+            ON CONFLICT (document_id) DO UPDATE SET status='parsing'""",
+            (doc_id, job["title"], job["collection"], job["file_type"], job["origin"],
+             digest, str(path), 0, "zh", ["public"], None, None, PARSER_VERSION))
+
+        if job["file_type"] == "pdf":
+            blocks, page_count, q_detail = parse_pdf(path, doc_id, include_quality=True)
+            q_detail["document_type"] = job["info"].get("type")
+            q_score = None  # Model confidence is not a calibrated document quality score.
+        else:
+            rec = job["record"]
+            page_count = 1
+            blocks = [{"page_no": rec['page_idx'] + 1, "block_type": "paragraph",
+                       "bbox": [0, 0, 0, 0], "text": rec["gt_text"],
+                       "heading_level": None, "table_cells": None,
+                       "reading_order": 0, "ocr_confidence": 1.0}]
+            q_detail = {"text_coverage": 1.0, "source_page_no": rec['page_idx'] + 1,
+                        "note": "OHR-Bench 人工校准 gt_text（原始样本转录，不是本项目 OCR）"}
+            q_score = 1.0
+
+        # document_blocks
+        cur.execute("DELETE FROM document_blocks WHERE document_id=%s", (doc_id,))
+        for b in blocks:
+            b["block_id"] = f"blk-{md5(doc_id + str(b['reading_order']))}"
+            cur.execute("""
+                INSERT INTO document_blocks(block_id, document_id, page_no, bbox, block_type,
+                    text, table_cells, formula_latex, reading_order, heading_level,
+                    ocr_confidence, parser_version, content_hash)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                (b["block_id"], doc_id, b["page_no"],
+                 json.dumps(b["bbox"]), b["block_type"], b["text"],
+                 json.dumps(b["table_cells"], ensure_ascii=False) if b.get("table_cells") else None,
+                 b.get("formula_latex"), b["reading_order"], b.get("heading_level"),
+                 b.get("ocr_confidence"), PARSER_VERSION,
+                 hashlib.sha256(b["text"].encode()).hexdigest()))
+
+        extracted, field_detail = facts.extract(blocks, document_id=doc_id, source_sha256=digest,
+                                               parser_version=PARSER_VERSION)
+        facts.persist(cur, doc_id, extracted)
+        q_detail["fact_extraction"] = field_detail
+        chunks = build_chunks(blocks, doc_id)
+
+        # 嵌入 + Qdrant
+        texts = [c["text_for_embedding"] for c in chunks]
+        vectors = list(model.embed(texts)) if texts else []
+        points = []
+        for c, vec in zip(chunks, vectors):
+            vid = str(uuid.uuid5(uuid.NAMESPACE_DNS, c["chunk_id"]))
+            c["vector_id"] = vid
+            points.append(PointStruct(id=vid, vector=list(vec), payload={
+                "document_id": doc_id, "chunk_id": c["chunk_id"],
+                "chunk_type": c["chunk_type"], "section_path": c["section_path"],
+                "page_start": c["page_start"], "page_end": c["page_end"],
+                "acl": ["public"], "collection": job["collection"],
+                "document_version": 1, "embedding_model": EMBED_MODEL,
+                "title": job["title"], "origin": job["origin"],
+            }))
+        from qdrant_client.models import FieldCondition, Filter, FilterSelector, MatchValue
+        qc.delete(COLLECTION, points_selector=FilterSelector(filter=Filter(must=[
+            FieldCondition(key="document_id", match=MatchValue(value=doc_id))])), wait=True)
+        if points:
+            qc.upsert(COLLECTION, points)
+
+        # chunks 表
+        cur.execute("DELETE FROM chunks WHERE document_id=%s", (doc_id,))
+        for ci, c in enumerate(chunks):
+            cur.execute("""
+                INSERT INTO chunks(chunk_id, document_id, document_version, chunk_index,
+                    chunk_type, section_path, page_start, page_end, block_ids,
+                    text_for_embedding, exact_text, table_json, token_count,
+                    quality_score, acl, embedding_model, vector_id, content_hash)
+                VALUES (%s,%s,1,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                (c["chunk_id"], doc_id, ci, c["chunk_type"], c["section_path"],
+                 c["page_start"], c["page_end"], c["block_ids"],
+                 c["text_for_embedding"], c["exact_text"],
+                 json.dumps(c["table_json"], ensure_ascii=False) if c.get("table_json") else None,
+                 int(len(c["exact_text"]) * 0.6), q_score, ["public"], EMBED_MODEL,
+                 c["vector_id"], hashlib.sha256(c["exact_text"].encode()).hexdigest()))
+
+        cur.execute("""
+            UPDATE document_assets SET status=%s, needs_review=%s, page_count=%s,
+                   quality_score=%s, quality_detail=%s, doc_version=1, parser_version=%s
+            WHERE document_id=%s""", ('indexed' if chunks else 'failed', not bool(chunks), page_count,
+                q_score, json.dumps(q_detail, ensure_ascii=False), PARSER_VERSION, doc_id))
+        meta.commit()
+        total_chunks += len(chunks)
+        print(f"  [{job['origin']:8s}] {job['title'][:44]:46s} blocks={len(blocks):3d} chunks={len(chunks):3d}")
+
+    # 汇总
+    cur.execute("""SELECT origin, count(*), sum(page_count) FROM document_assets GROUP BY origin""")
+    print("assets:", cur.fetchall())
+    cur.execute("SELECT count(*) FROM chunks")
+    print("total chunks:", cur.fetchone()[0], "| vectors:", qc.count(COLLECTION, exact=True).count)
+    meta.close()
+
+
+if __name__ == "__main__":
+    main()

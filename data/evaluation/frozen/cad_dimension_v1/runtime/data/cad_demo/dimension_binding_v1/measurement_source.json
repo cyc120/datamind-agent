@@ -1,0 +1,20 @@
+{
+  "source_id": "dimension-fixture-v1",
+  "record_version": 1,
+  "provenance": "synthetic_demo",
+  "measurements": [
+    {
+      "measurement_id": "dimension-demo-1",
+      "part_id": "A200",
+      "batch_id": "DIM-BATCH-1",
+      "operation_no": "30",
+      "process_revision": "PROCESS-A200-R5",
+      "metric": "diameter",
+      "feature_role": "outer_diameter",
+      "method": "declared_caliper",
+      "measured_at": "2026-10-05T08:00:00+08:00",
+      "value": "20.04",
+      "unit": "mm"
+    }
+  ]
+}

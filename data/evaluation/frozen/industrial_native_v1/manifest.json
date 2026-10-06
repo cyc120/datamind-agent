@@ -1,0 +1,12 @@
+{
+  "git_revision": "0ad8b94274818bf621147ca52f46a75efdb63d9d",
+  "frozen_parser_code_hashes": {
+    "ingestion/industrial_facts.py": "b2f8ae5f5d9f628ec074c0d85f97469c71b9b7317221cbd128e89f8a1a386183",
+    "ingestion/ingest.py": "c36262ea2227792661f90e395a006a2c5db9d1142c31f7302360e0ccac046a16",
+    "ingestion/ocr.py": "caebb1038dc865b00a1f76b5ae37475c1b3472d9e7cce4f4623952f46cc4eae2",
+    "ingestion/tables.py": "36eeff85ed5de20ce59516b293a813f5c853dda30bce70c9b3b732b9188d2666"
+  },
+  "parser_snapshot": "data/evaluation/frozen/industrial_native_v1/industrial_facts.py",
+  "historical_report_sha256": "b7a590aa6de8dd00f53344bc4e646aec1625e780acc289c4b3e35e7e17fa33fe",
+  "reproduction": "Use the recorded Git revision for all original code and evaluator; the parser file here is an additional immutable snapshot."
+}

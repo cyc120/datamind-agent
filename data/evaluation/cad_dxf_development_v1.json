@@ -1,0 +1,223 @@
+{
+  "suite_version": "cad-dxf-development-v1",
+  "stage": "development",
+  "provenance": "synthetic_demo",
+  "limitation": "Same-author controlled DXF layer/XDATA profile, not independent factory drawings.",
+  "frozen_reader": null,
+  "cases": [
+    {
+      "case_id": "dev-mm",
+      "source_file": "data/cad_demo/development/dev-mm.dxf",
+      "source_sha256": "35dff275076412943c4bf37fe5a809c0161efee68f4f852d47930d80f3cb367f",
+      "document_id": "doc-dev-mm",
+      "expected_error": null,
+      "expected_identity": {
+        "drawing_revision": {
+          "value": "R2",
+          "handle": "35"
+        },
+        "part_id": {
+          "value": "A200",
+          "handle": "36"
+        },
+        "drawing_id": {
+          "value": "CAD-DEV-1",
+          "handle": "37"
+        }
+      },
+      "expected_entities": [
+        {
+          "entity_type": "TEXT",
+          "handle": "35",
+          "layer": "DM_REVISION",
+          "text": "R2",
+          "insertion": {
+            "x": 5,
+            "y": 55
+          }
+        },
+        {
+          "entity_type": "TEXT",
+          "handle": "36",
+          "layer": "DM_PART_ID",
+          "text": "A200",
+          "insertion": {
+            "x": 5,
+            "y": 63
+          }
+        },
+        {
+          "entity_type": "TEXT",
+          "handle": "37",
+          "layer": "DM_DRAWING_ID",
+          "text": "CAD-DEV-1",
+          "insertion": {
+            "x": 5,
+            "y": 71
+          }
+        },
+        {
+          "entity_type": "CIRCLE",
+          "handle": "38",
+          "layer": "GEOMETRY",
+          "center": {
+            "x": 10.0,
+            "y": 10.0
+          },
+          "radius": 10.0
+        },
+        {
+          "entity_type": "CIRCLE",
+          "handle": "39",
+          "layer": "GEOMETRY",
+          "center": {
+            "x": 50.0,
+            "y": 10.0
+          },
+          "radius": 10.0
+        },
+        {
+          "entity_type": "LINE",
+          "handle": "3A",
+          "layer": "GEOMETRY",
+          "start": {
+            "x": 0,
+            "y": 0
+          },
+          "end": {
+            "x": 80,
+            "y": 0
+          }
+        },
+        {
+          "entity_type": "TEXT",
+          "handle": "3B",
+          "layer": "DM_DIAMETER",
+          "text": "%%c20 +/-0.1",
+          "insertion": {
+            "x": 20,
+            "y": 35
+          }
+        }
+      ],
+      "expected_feature": {
+        "annotation_raw": "%%c20 +/-0.1",
+        "annotation_handle": "3B",
+        "nominal_value": "20",
+        "tolerance_lower": "-0.1",
+        "tolerance_upper": "0.1",
+        "unit": "mm",
+        "association_status": "confirmed",
+        "selected_target": "38"
+      },
+      "expected_gate_reason": null
+    },
+    {
+      "case_id": "dev-no-ref",
+      "source_file": "data/cad_demo/development/dev-no-ref.dxf",
+      "source_sha256": "9600274a1d5589ff1358a8d801d2d282df74fabf02d27eb8ced957413d0f468b",
+      "document_id": "doc-dev-no-ref",
+      "expected_error": null,
+      "expected_identity": {
+        "part_id": {
+          "value": "A201",
+          "handle": "35"
+        },
+        "drawing_id": {
+          "value": "CAD-DEV-2",
+          "handle": "36"
+        },
+        "drawing_revision": {
+          "value": "R3",
+          "handle": "37"
+        }
+      },
+      "expected_entities": [
+        {
+          "entity_type": "TEXT",
+          "handle": "35",
+          "layer": "DM_PART_ID",
+          "text": "A201",
+          "insertion": {
+            "x": 15,
+            "y": 55
+          }
+        },
+        {
+          "entity_type": "TEXT",
+          "handle": "36",
+          "layer": "DM_DRAWING_ID",
+          "text": "CAD-DEV-2",
+          "insertion": {
+            "x": 15,
+            "y": 63
+          }
+        },
+        {
+          "entity_type": "TEXT",
+          "handle": "37",
+          "layer": "DM_REVISION",
+          "text": "R3",
+          "insertion": {
+            "x": 15,
+            "y": 71
+          }
+        },
+        {
+          "entity_type": "CIRCLE",
+          "handle": "38",
+          "layer": "GEOMETRY",
+          "center": {
+            "x": 16.0,
+            "y": 6.0
+          },
+          "radius": 6.0
+        },
+        {
+          "entity_type": "CIRCLE",
+          "handle": "39",
+          "layer": "GEOMETRY",
+          "center": {
+            "x": 40.0,
+            "y": 6.0
+          },
+          "radius": 6.0
+        },
+        {
+          "entity_type": "LINE",
+          "handle": "3A",
+          "layer": "GEOMETRY",
+          "start": {
+            "x": 10,
+            "y": 0
+          },
+          "end": {
+            "x": 60,
+            "y": 0
+          }
+        },
+        {
+          "entity_type": "TEXT",
+          "handle": "3B",
+          "layer": "DM_DIAMETER",
+          "text": "%%c12 +/-0.05",
+          "insertion": {
+            "x": 22,
+            "y": 35
+          }
+        }
+      ],
+      "expected_feature": {
+        "annotation_raw": "%%c12 +/-0.05",
+        "annotation_handle": "3B",
+        "nominal_value": "12",
+        "tolerance_lower": "-0.05",
+        "tolerance_upper": "0.05",
+        "unit": "mm",
+        "association_status": "ambiguous",
+        "selected_target": null
+      },
+      "expected_gate_reason": "CAD_ASSOCIATION_UNCERTAIN"
+    }
+  ]
+}

@@ -1,0 +1,636 @@
+{
+  "$defs": {
+    "AssociationEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "enum": [
+            "native_reference",
+            "human_label"
+          ],
+          "title": "Method",
+          "type": "string"
+        },
+        "reference_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Reference Id",
+          "type": "string"
+        },
+        "source_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Source Sha256",
+          "type": "string"
+        },
+        "annotation_handle": {
+          "maxLength": 32,
+          "pattern": "^[1-9A-F][0-9A-F]*$",
+          "title": "Annotation Handle",
+          "type": "string"
+        },
+        "target_handle": {
+          "maxLength": 32,
+          "pattern": "^[1-9A-F][0-9A-F]*$",
+          "title": "Target Handle",
+          "type": "string"
+        },
+        "rationale": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "title": "Rationale",
+          "type": "string"
+        }
+      },
+      "required": [
+        "method",
+        "reference_id",
+        "source_sha256",
+        "annotation_handle",
+        "target_handle",
+        "rationale"
+      ],
+      "title": "AssociationEvidence",
+      "type": "object"
+    },
+    "Box": {
+      "additionalProperties": false,
+      "properties": {
+        "xmin": {
+          "title": "Xmin",
+          "type": "number"
+        },
+        "ymin": {
+          "title": "Ymin",
+          "type": "number"
+        },
+        "xmax": {
+          "title": "Xmax",
+          "type": "number"
+        },
+        "ymax": {
+          "title": "Ymax",
+          "type": "number"
+        }
+      },
+      "required": [
+        "xmin",
+        "ymin",
+        "xmax",
+        "ymax"
+      ],
+      "title": "Box",
+      "type": "object"
+    },
+    "BusinessIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "drawing_id": {
+          "$ref": "#/$defs/TitleField"
+        },
+        "drawing_revision": {
+          "$ref": "#/$defs/TitleField"
+        },
+        "part_id": {
+          "$ref": "#/$defs/TitleField"
+        }
+      },
+      "required": [
+        "drawing_id",
+        "drawing_revision",
+        "part_id"
+      ],
+      "title": "BusinessIdentity",
+      "type": "object"
+    },
+    "Circle": {
+      "additionalProperties": false,
+      "properties": {
+        "handle": {
+          "maxLength": 32,
+          "pattern": "^[1-9A-F][0-9A-F]*$",
+          "title": "Handle",
+          "type": "string"
+        },
+        "layer": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "title": "Layer",
+          "type": "string"
+        },
+        "view_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "View Id",
+          "type": "string"
+        },
+        "entity_type": {
+          "const": "CIRCLE",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "center": {
+          "$ref": "#/$defs/Point"
+        },
+        "radius": {
+          "exclusiveMinimum": 0,
+          "title": "Radius",
+          "type": "number"
+        }
+      },
+      "required": [
+        "handle",
+        "layer",
+        "view_id",
+        "entity_type",
+        "center",
+        "radius"
+      ],
+      "title": "Circle",
+      "type": "object"
+    },
+    "DrawingFeature": {
+      "additionalProperties": false,
+      "properties": {
+        "feature_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Feature Id",
+          "type": "string"
+        },
+        "feature_type": {
+          "const": "diameter",
+          "title": "Feature Type",
+          "type": "string"
+        },
+        "annotation_raw": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "title": "Annotation Raw",
+          "type": "string"
+        },
+        "locator": {
+          "$ref": "#/$defs/Locator"
+        },
+        "nominal_value": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Nominal Value"
+        },
+        "tolerance_lower": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Tolerance Lower"
+        },
+        "tolerance_upper": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Tolerance Upper"
+        },
+        "unit": {
+          "enum": [
+            "mm",
+            "in",
+            "unknown"
+          ],
+          "title": "Unit",
+          "type": "string"
+        },
+        "association_status": {
+          "enum": [
+            "confirmed",
+            "ambiguous",
+            "unresolved"
+          ],
+          "title": "Association Status",
+          "type": "string"
+        },
+        "target_candidates": {
+          "items": {
+            "maxLength": 32,
+            "pattern": "^[1-9A-F][0-9A-F]*$",
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Target Candidates",
+          "type": "array"
+        },
+        "selected_target": {
+          "anyOf": [
+            {
+              "maxLength": 32,
+              "pattern": "^[1-9A-F][0-9A-F]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Selected Target"
+        },
+        "association_evidence": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AssociationEvidence"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "feature_id",
+        "feature_type",
+        "annotation_raw",
+        "locator",
+        "nominal_value",
+        "tolerance_lower",
+        "tolerance_upper",
+        "unit",
+        "association_status",
+        "target_candidates",
+        "selected_target",
+        "association_evidence"
+      ],
+      "title": "DrawingFeature",
+      "type": "object"
+    },
+    "Line": {
+      "additionalProperties": false,
+      "properties": {
+        "handle": {
+          "maxLength": 32,
+          "pattern": "^[1-9A-F][0-9A-F]*$",
+          "title": "Handle",
+          "type": "string"
+        },
+        "layer": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "title": "Layer",
+          "type": "string"
+        },
+        "view_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "View Id",
+          "type": "string"
+        },
+        "entity_type": {
+          "const": "LINE",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "start": {
+          "$ref": "#/$defs/Point"
+        },
+        "end": {
+          "$ref": "#/$defs/Point"
+        }
+      },
+      "required": [
+        "handle",
+        "layer",
+        "view_id",
+        "entity_type",
+        "start",
+        "end"
+      ],
+      "title": "Line",
+      "type": "object"
+    },
+    "Locator": {
+      "additionalProperties": false,
+      "properties": {
+        "locator_kind": {
+          "const": "cad_entity",
+          "title": "Locator Kind",
+          "type": "string"
+        },
+        "source_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Source Sha256",
+          "type": "string"
+        },
+        "handle": {
+          "maxLength": 32,
+          "pattern": "^[1-9A-F][0-9A-F]*$",
+          "title": "Handle",
+          "type": "string"
+        },
+        "layer": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "title": "Layer",
+          "type": "string"
+        },
+        "view_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "View Id",
+          "type": "string"
+        },
+        "coordinate_system": {
+          "const": "WCS_XY",
+          "title": "Coordinate System",
+          "type": "string"
+        },
+        "layout": {
+          "const": "Model",
+          "title": "Layout",
+          "type": "string"
+        }
+      },
+      "required": [
+        "locator_kind",
+        "source_sha256",
+        "handle",
+        "layer",
+        "view_id",
+        "coordinate_system",
+        "layout"
+      ],
+      "title": "Locator",
+      "type": "object"
+    },
+    "NativeText": {
+      "additionalProperties": false,
+      "properties": {
+        "handle": {
+          "maxLength": 32,
+          "pattern": "^[1-9A-F][0-9A-F]*$",
+          "title": "Handle",
+          "type": "string"
+        },
+        "layer": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "title": "Layer",
+          "type": "string"
+        },
+        "view_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "View Id",
+          "type": "string"
+        },
+        "entity_type": {
+          "const": "TEXT",
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "insertion": {
+          "$ref": "#/$defs/Point"
+        },
+        "bbox": {
+          "$ref": "#/$defs/Box"
+        }
+      },
+      "required": [
+        "handle",
+        "layer",
+        "view_id",
+        "entity_type",
+        "text",
+        "insertion",
+        "bbox"
+      ],
+      "title": "NativeText",
+      "type": "object"
+    },
+    "Point": {
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "title": "Y",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ],
+      "title": "Point",
+      "type": "object"
+    },
+    "Source": {
+      "additionalProperties": false,
+      "properties": {
+        "document_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Document Id",
+          "type": "string"
+        },
+        "document_version": {
+          "exclusiveMinimum": 0,
+          "title": "Document Version",
+          "type": "integer"
+        },
+        "source_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Source Sha256",
+          "type": "string"
+        },
+        "format": {
+          "const": "dxf",
+          "title": "Format",
+          "type": "string"
+        },
+        "parser_version": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Parser Version",
+          "type": "string"
+        },
+        "provenance": {
+          "enum": [
+            "synthetic_demo",
+            "authorized_external"
+          ],
+          "title": "Provenance",
+          "type": "string"
+        },
+        "insunits": {
+          "title": "Insunits",
+          "type": "integer"
+        },
+        "unit": {
+          "enum": [
+            "mm",
+            "in",
+            "unknown"
+          ],
+          "title": "Unit",
+          "type": "string"
+        },
+        "coordinate_system": {
+          "const": "WCS_XY",
+          "title": "Coordinate System",
+          "type": "string"
+        },
+        "layout": {
+          "const": "Model",
+          "title": "Layout",
+          "type": "string"
+        }
+      },
+      "required": [
+        "document_id",
+        "document_version",
+        "source_sha256",
+        "format",
+        "parser_version",
+        "provenance",
+        "insunits",
+        "unit",
+        "coordinate_system",
+        "layout"
+      ],
+      "title": "Source",
+      "type": "object"
+    },
+    "TitleField": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Value",
+          "type": "string"
+        },
+        "locator": {
+          "$ref": "#/$defs/Locator"
+        }
+      },
+      "required": [
+        "value",
+        "locator"
+      ],
+      "title": "TitleField",
+      "type": "object"
+    },
+    "View": {
+      "additionalProperties": false,
+      "properties": {
+        "view_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "View Id",
+          "type": "string"
+        },
+        "bbox": {
+          "$ref": "#/$defs/Box"
+        }
+      },
+      "required": [
+        "view_id",
+        "bbox"
+      ],
+      "title": "View",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "const": "cad-contract-v1",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "source": {
+      "$ref": "#/$defs/Source"
+    },
+    "identity": {
+      "$ref": "#/$defs/BusinessIdentity"
+    },
+    "views": {
+      "items": {
+        "$ref": "#/$defs/View"
+      },
+      "maxItems": 100,
+      "minItems": 1,
+      "title": "Views",
+      "type": "array"
+    },
+    "entities": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "CIRCLE": "#/$defs/Circle",
+            "LINE": "#/$defs/Line",
+            "TEXT": "#/$defs/NativeText"
+          },
+          "propertyName": "entity_type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/Line"
+          },
+          {
+            "$ref": "#/$defs/Circle"
+          },
+          {
+            "$ref": "#/$defs/NativeText"
+          }
+        ]
+      },
+      "maxItems": 10000,
+      "minItems": 1,
+      "title": "Entities",
+      "type": "array"
+    },
+    "features": {
+      "items": {
+        "$ref": "#/$defs/DrawingFeature"
+      },
+      "maxItems": 10000,
+      "title": "Features",
+      "type": "array"
+    }
+  },
+  "required": [
+    "contract_version",
+    "source",
+    "identity",
+    "views",
+    "entities",
+    "features"
+  ],
+  "title": "DrawingSnapshot",
+  "type": "object"
+}

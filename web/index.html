@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>DataMind Agent · 问数与文档问答</title>
-  <link rel="stylesheet" href="/assets/style.css?v=0.7.0">
-  <script src="/assets/app.js?v=0.7.0" defer></script>
+  <link rel="stylesheet" href="/assets/style.css?v=0.12.0">
+  <script src="/assets/app.js?v=0.12.0" defer></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -18,7 +18,19 @@
       <button class="nav-item" data-view="model"><span class="ico">⚙</span>模型接入<span class="badge" id="navModelBadge">未配置</span></button>
       <button class="nav-item" data-view="runs"><span class="ico">↺</span>运行记录</button>
       <button class="nav-item" data-view="fields"><span class="ico">▤</span>字段复核</button>
+      <button class="nav-item" data-view="authority"><span class="ico">◇</span>来源权威规则</button>
+      <button class="nav-item" data-view="cad"><span class="ico">⌖</span>图纸与实体</button>
     </nav>
+    <div class="account-panel">
+      <div id="accountStatus">未登录 · 只读浏览</div>
+      <form id="loginForm">
+        <input id="loginUsername" aria-label="账户" autocomplete="username" placeholder="账户" required>
+        <input id="loginPassword" aria-label="密码" type="password" autocomplete="current-password" placeholder="密码" required>
+        <button type="submit">登录</button>
+      </form>
+      <button id="logout" class="secondary hidden">退出登录</button>
+      <p id="authMessage" role="status"></p>
+    </div>
     <div class="side-foot">
       <div class="pulse warn" id="pulseModel"><span class="dot"></span>模型 <span id="pulseModelText">检测中…</span></div>
       <div class="pulse" id="pulseDb"><span class="dot"></span>数据库 <span id="pulseDbText">检测中…</span></div>
@@ -73,6 +85,50 @@
     <section class="view" data-view="fields">
       <div class="page-head"><div class="eyebrow">Document Review</div><h1>字段复核</h1><p>打开文档，核对原页并记录字段提取问题。复核记录保留版本和依据。</p></div>
       <section class="card"><div class="actions"><button class="secondary" id="refreshDocuments">刷新文档</button></div><div class="tablewrap" id="documentList">正在读取…</div></section>
+    </section>
+
+    <section class="view" data-view="authority">
+      <div class="page-head"><div class="eyebrow">Source Authority</div><h1>来源权威规则</h1><p>登记具体测量的裁定依据，再由另一账户批准启用。裁决保留双方原值，不能据此宣称来源一致或整体合格。</p></div>
+      <section class="card">
+        <h2>登记规则</h2><p class="field-hint">仅支持工业温度数值冲突。报告字段须先完成认证复核与独立审批；规则绑定当前生产记录、报告版本、有效期和依据页。</p>
+        <label for="authorityQuestion">核验范围</label><input id="authorityQuestion" value="2026年9月A102工序30温度核验，生产记录和质检报告是否一致？">
+        <div class="actions"><button id="loadAuthorityCandidates" class="secondary">读取冲突测量</button></div>
+        <form id="authorityForm" class="authority-form">
+          <label for="authorityCandidate">冲突测量</label><select id="authorityCandidate"></select><p id="authorityCandidateInfo" class="field-hint"></p>
+          <label for="authoritySelected">本次采用的来源</label><select id="authoritySelected"><option value="">请选择来源</option><option value="production">生产记录</option><option value="report">质检报告</option></select>
+          <label for="authorityFrom">有效期起点（含时区，包含）</label><input id="authorityFrom" required>
+          <label for="authorityTo">有效期终点（含时区，不包含）</label><input id="authorityTo" required>
+          <label for="authorityBasis">依据文件（公开 PDF）</label><select id="authorityBasis"></select>
+          <label for="authorityPage">依据页码</label><input id="authorityPage" type="number" min="1" value="1" required>
+          <label for="authorityRationale">裁定依据</label><textarea id="authorityRationale" required minlength="10" maxlength="1000" placeholder="说明依据文件中哪些内容支持采用该来源，以及适用边界。"></textarea>
+          <div class="actions"><button id="registerAuthority" type="submit">登记待审批规则</button></div>
+        </form><p id="authorityMessage" role="status"></p>
+      </section>
+      <section class="card"><div class="actions"><h2>规则与审批历史</h2><button id="refreshAuthority" class="secondary">刷新规则</button></div><p class="field-hint">登记状态不保证当前适用；运行时再次核验版本、审批、依据与重叠规则。</p><div id="authorityRules"></div></section>
+    </section>
+
+    <section class="view" data-view="cad">
+      <div class="page-head"><div class="eyebrow">Drawing Evidence</div><h1>图纸与实体</h1><p>核对原图、尺寸文字和明确对象引用。图纸版本保留历史，登记不代表审批或生产质量结论。</p></div>
+      <section class="card">
+        <div class="actions"><button id="refreshCad" class="secondary">刷新图纸</button></div>
+        <div class="cad-selectors"><div><label for="cadAsset">已登记图纸</label><select id="cadAsset"></select></div><div><label for="cadVersion">查看版本</label><select id="cadVersion"></select></div></div>
+        <p id="cadMessage" role="status"></p><p id="cadVersionInfo" class="field-hint"></p>
+        <a id="cadSourceLink" class="hidden" target="_blank" rel="noopener">下载本版本原 DXF</a>
+        <div id="cadFeatures" class="tablewrap"></div>
+        <section id="cadReviews" aria-label="尺寸对象关联复核"></section>
+        <iframe id="cadViewer" title="本版本图纸原文与实体关联" sandbox="allow-scripts" src="about:blank"></iframe>
+        <p class="field-hint">文字边界和字体近似；原图显示原始提取关联；人工关联复核单独记录，尚未接正式审批或生产尺寸核验。</p>
+      </section>
+      <section class="card hidden" id="cadRegistration">
+        <h2>登记本地图纸或新版本</h2><p class="field-hint">素材区中的文件由本地管理员准备；仅支持当前限定 DXF 格式。系统固定源文件和版本，失败不生成图纸记录。</p>
+        <form id="cadForm" class="authority-form">
+          <label for="cadDocumentId">图纸资产 ID</label><input id="cadDocumentId" required maxlength="64" pattern="[A-Za-z0-9][A-Za-z0-9_.-]*" placeholder="drawing-demo-1">
+          <label for="cadTitle">显示名称</label><input id="cadTitle" required maxlength="200" placeholder="合成演示图纸">
+          <label for="cadStagedSource">本地素材</label><select id="cadStagedSource" required></select>
+          <p id="cadRegistrationBaseline" class="field-hint"></p>
+          <div class="actions"><button id="registerCad" type="submit">登记源文件与版本</button></div>
+        </form><p id="cadRegistrationMessage" role="status"></p>
+      </section>
     </section>
 
     <!-- ============ 模型接入 ============ -->

@@ -1,0 +1,770 @@
+{
+  "$defs": {
+    "ApprovalEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "approval_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Approval Id",
+          "type": "string"
+        },
+        "binding_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Binding Id",
+          "type": "string"
+        },
+        "binding_version": {
+          "exclusiveMinimum": 0,
+          "title": "Binding Version",
+          "type": "integer"
+        },
+        "binding_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Binding Sha256",
+          "type": "string"
+        },
+        "review_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Review Id",
+          "type": "string"
+        },
+        "review_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Review Sha256",
+          "type": "string"
+        },
+        "measurement_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Measurement Sha256",
+          "type": "string"
+        },
+        "previous_approval_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Previous Approval Id"
+        },
+        "decision": {
+          "enum": [
+            "approved",
+            "rejected",
+            "revoked"
+          ],
+          "title": "Decision",
+          "type": "string"
+        },
+        "approver_user_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Approver User Id",
+          "type": "string"
+        },
+        "approver_roles": {
+          "items": {
+            "enum": [
+              "viewer",
+              "reviewer",
+              "approver",
+              "admin"
+            ],
+            "type": "string"
+          },
+          "maxItems": 4,
+          "minItems": 1,
+          "title": "Approver Roles",
+          "type": "array"
+        },
+        "reason": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "created_at": {
+          "maxLength": 40,
+          "minLength": 20,
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "approval_id",
+        "binding_id",
+        "binding_version",
+        "binding_sha256",
+        "review_id",
+        "review_sha256",
+        "measurement_sha256",
+        "previous_approval_id",
+        "decision",
+        "approver_user_id",
+        "approver_roles",
+        "reason",
+        "created_at"
+      ],
+      "title": "ApprovalEvent",
+      "type": "object"
+    },
+    "ApprovalRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "payload": {
+          "$ref": "#/$defs/ApprovalEvent"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "payload",
+        "sha256"
+      ],
+      "title": "ApprovalRecord",
+      "type": "object"
+    },
+    "AssociationReview": {
+      "additionalProperties": false,
+      "properties": {
+        "review_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Review Id",
+          "type": "string"
+        },
+        "document_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Document Id",
+          "type": "string"
+        },
+        "document_version": {
+          "exclusiveMinimum": 0,
+          "title": "Document Version",
+          "type": "integer"
+        },
+        "source_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Source Sha256",
+          "type": "string"
+        },
+        "parser_version": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Parser Version",
+          "type": "string"
+        },
+        "bundle_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Bundle Sha256",
+          "type": "string"
+        },
+        "feature_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Feature Id",
+          "type": "string"
+        },
+        "feature_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Feature Sha256",
+          "type": "string"
+        },
+        "decision": {
+          "enum": [
+            "confirmed",
+            "rejected",
+            "needs_review"
+          ],
+          "title": "Decision",
+          "type": "string"
+        },
+        "selected_target": {
+          "anyOf": [
+            {
+              "maxLength": 32,
+              "pattern": "^[1-9A-F][0-9A-F]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Selected Target"
+        },
+        "reviewer_user_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Reviewer User Id",
+          "type": "string"
+        },
+        "reviewer_roles": {
+          "items": {
+            "enum": [
+              "viewer",
+              "reviewer",
+              "approver",
+              "admin"
+            ],
+            "type": "string"
+          },
+          "maxItems": 4,
+          "minItems": 1,
+          "title": "Reviewer Roles",
+          "type": "array"
+        },
+        "reason": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "review_id",
+        "document_id",
+        "document_version",
+        "source_sha256",
+        "parser_version",
+        "bundle_sha256",
+        "feature_id",
+        "feature_sha256",
+        "decision",
+        "selected_target",
+        "reviewer_user_id",
+        "reviewer_roles",
+        "reason"
+      ],
+      "title": "AssociationReview",
+      "type": "object"
+    },
+    "BindingRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "payload": {
+          "$ref": "#/$defs/DimensionBinding"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "payload",
+        "sha256"
+      ],
+      "title": "BindingRecord",
+      "type": "object"
+    },
+    "DimensionBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "binding_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Binding Id",
+          "type": "string"
+        },
+        "binding_version": {
+          "exclusiveMinimum": 0,
+          "title": "Binding Version",
+          "type": "integer"
+        },
+        "document_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Document Id",
+          "type": "string"
+        },
+        "document_version": {
+          "exclusiveMinimum": 0,
+          "title": "Document Version",
+          "type": "integer"
+        },
+        "source_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Source Sha256",
+          "type": "string"
+        },
+        "parser_version": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Parser Version",
+          "type": "string"
+        },
+        "bundle_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Bundle Sha256",
+          "type": "string"
+        },
+        "feature_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Feature Id",
+          "type": "string"
+        },
+        "feature_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Feature Sha256",
+          "type": "string"
+        },
+        "target_handle": {
+          "maxLength": 32,
+          "pattern": "^[1-9A-F][0-9A-F]*$",
+          "title": "Target Handle",
+          "type": "string"
+        },
+        "drawing_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Drawing Id",
+          "type": "string"
+        },
+        "drawing_revision": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Drawing Revision",
+          "type": "string"
+        },
+        "part_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Part Id",
+          "type": "string"
+        },
+        "measurement_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Measurement Id",
+          "type": "string"
+        },
+        "measurement_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Measurement Sha256",
+          "type": "string"
+        },
+        "measurement_source_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Measurement Source Sha256",
+          "type": "string"
+        },
+        "measurement_record_version": {
+          "exclusiveMinimum": 0,
+          "title": "Measurement Record Version",
+          "type": "integer"
+        },
+        "batch_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Batch Id",
+          "type": "string"
+        },
+        "operation_no": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Operation No",
+          "type": "string"
+        },
+        "process_revision": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Process Revision",
+          "type": "string"
+        },
+        "metric": {
+          "const": "diameter",
+          "title": "Metric",
+          "type": "string"
+        },
+        "feature_role": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Feature Role",
+          "type": "string"
+        },
+        "method": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Method",
+          "type": "string"
+        },
+        "review_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Review Id",
+          "type": "string"
+        },
+        "review_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Review Sha256",
+          "type": "string"
+        },
+        "valid_from": {
+          "maxLength": 40,
+          "minLength": 20,
+          "title": "Valid From",
+          "type": "string"
+        },
+        "valid_to": {
+          "maxLength": 40,
+          "minLength": 20,
+          "title": "Valid To",
+          "type": "string"
+        },
+        "registrar_user_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Registrar User Id",
+          "type": "string"
+        },
+        "registrar_roles": {
+          "items": {
+            "enum": [
+              "viewer",
+              "reviewer",
+              "approver",
+              "admin"
+            ],
+            "type": "string"
+          },
+          "maxItems": 4,
+          "minItems": 1,
+          "title": "Registrar Roles",
+          "type": "array"
+        },
+        "rationale": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "title": "Rationale",
+          "type": "string"
+        }
+      },
+      "required": [
+        "binding_id",
+        "binding_version",
+        "document_id",
+        "document_version",
+        "source_sha256",
+        "parser_version",
+        "bundle_sha256",
+        "feature_id",
+        "feature_sha256",
+        "target_handle",
+        "drawing_id",
+        "drawing_revision",
+        "part_id",
+        "measurement_id",
+        "measurement_sha256",
+        "measurement_source_sha256",
+        "measurement_record_version",
+        "batch_id",
+        "operation_no",
+        "process_revision",
+        "metric",
+        "feature_role",
+        "method",
+        "review_id",
+        "review_sha256",
+        "valid_from",
+        "valid_to",
+        "registrar_user_id",
+        "registrar_roles",
+        "rationale"
+      ],
+      "title": "DimensionBinding",
+      "type": "object"
+    },
+    "DimensionMeasurement": {
+      "additionalProperties": false,
+      "properties": {
+        "measurement_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Measurement Id",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/MeasurementSource"
+        },
+        "part_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Part Id",
+          "type": "string"
+        },
+        "batch_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Batch Id",
+          "type": "string"
+        },
+        "operation_no": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Operation No",
+          "type": "string"
+        },
+        "process_revision": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Process Revision",
+          "type": "string"
+        },
+        "metric": {
+          "const": "diameter",
+          "title": "Metric",
+          "type": "string"
+        },
+        "feature_role": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Feature Role",
+          "type": "string"
+        },
+        "method": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Method",
+          "type": "string"
+        },
+        "measured_at": {
+          "maxLength": 40,
+          "minLength": 20,
+          "title": "Measured At",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        },
+        "unit": {
+          "enum": [
+            "mm",
+            "in",
+            "unknown"
+          ],
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "measurement_id",
+        "source",
+        "part_id",
+        "batch_id",
+        "operation_no",
+        "process_revision",
+        "metric",
+        "feature_role",
+        "method",
+        "measured_at",
+        "value",
+        "unit"
+      ],
+      "title": "DimensionMeasurement",
+      "type": "object"
+    },
+    "EvaluationContext": {
+      "additionalProperties": false,
+      "properties": {
+        "current_document_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Current Document Id",
+          "type": "string"
+        },
+        "current_document_version": {
+          "exclusiveMinimum": 0,
+          "title": "Current Document Version",
+          "type": "integer"
+        },
+        "current_source_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Current Source Sha256",
+          "type": "string"
+        },
+        "current_measurement_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Current Measurement Id",
+          "type": "string"
+        },
+        "current_measurement_record_version": {
+          "exclusiveMinimum": 0,
+          "title": "Current Measurement Record Version",
+          "type": "integer"
+        },
+        "current_measurement_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Current Measurement Sha256",
+          "type": "string"
+        },
+        "current_review_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Current Review Id",
+          "type": "string"
+        },
+        "current_review_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Current Review Sha256",
+          "type": "string"
+        },
+        "current_binding_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Current Binding Id",
+          "type": "string"
+        },
+        "current_binding_version": {
+          "exclusiveMinimum": 0,
+          "title": "Current Binding Version",
+          "type": "integer"
+        },
+        "evaluated_at": {
+          "maxLength": 40,
+          "minLength": 20,
+          "title": "Evaluated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "current_document_id",
+        "current_document_version",
+        "current_source_sha256",
+        "current_measurement_id",
+        "current_measurement_record_version",
+        "current_measurement_sha256",
+        "current_review_id",
+        "current_review_sha256",
+        "current_binding_id",
+        "current_binding_version",
+        "evaluated_at"
+      ],
+      "title": "EvaluationContext",
+      "type": "object"
+    },
+    "MeasurementSource": {
+      "additionalProperties": false,
+      "properties": {
+        "source_id": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+          "title": "Source Id",
+          "type": "string"
+        },
+        "record_version": {
+          "exclusiveMinimum": 0,
+          "title": "Record Version",
+          "type": "integer"
+        },
+        "source_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Source Sha256",
+          "type": "string"
+        },
+        "provenance": {
+          "enum": [
+            "synthetic_demo",
+            "authorized_external"
+          ],
+          "title": "Provenance",
+          "type": "string"
+        },
+        "locator": {
+          "maxLength": 64,
+          "pattern": "^/measurements/(0|[1-9][0-9]*)$",
+          "title": "Locator",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_id",
+        "record_version",
+        "source_sha256",
+        "provenance",
+        "locator"
+      ],
+      "title": "MeasurementSource",
+      "type": "object"
+    },
+    "ReviewRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "payload": {
+          "$ref": "#/$defs/AssociationReview"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "payload",
+        "sha256"
+      ],
+      "title": "ReviewRecord",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "const": "cad-dimension-binding-v1",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "measurement": {
+      "$ref": "#/$defs/DimensionMeasurement"
+    },
+    "review": {
+      "$ref": "#/$defs/ReviewRecord"
+    },
+    "binding": {
+      "$ref": "#/$defs/BindingRecord"
+    },
+    "approvals": {
+      "items": {
+        "$ref": "#/$defs/ApprovalRecord"
+      },
+      "maxItems": 1000,
+      "title": "Approvals",
+      "type": "array"
+    },
+    "context": {
+      "$ref": "#/$defs/EvaluationContext"
+    }
+  },
+  "required": [
+    "contract_version",
+    "measurement",
+    "review",
+    "binding",
+    "approvals",
+    "context"
+  ],
+  "title": "DimensionEvaluation",
+  "type": "object"
+}

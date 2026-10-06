@@ -1,0 +1,203 @@
+{
+  "contract_version": "cad-contract-v1",
+  "source": {
+    "document_id": "doc-cad-A102",
+    "document_version": 1,
+    "source_sha256": "c146a548e78bb34fb9bf7ff06e2b270b501011b8f98566c28ecb0e1ca6c805e1",
+    "format": "dxf",
+    "parser_version": "manual-contract-fixture-v1",
+    "provenance": "synthetic_demo",
+    "insunits": 4,
+    "unit": "mm",
+    "coordinate_system": "WCS_XY",
+    "layout": "Model"
+  },
+  "identity": {
+    "drawing_id": {
+      "value": "DRW-A102",
+      "locator": {
+        "locator_kind": "cad_entity",
+        "source_sha256": "c146a548e78bb34fb9bf7ff06e2b270b501011b8f98566c28ecb0e1ca6c805e1",
+        "handle": "10",
+        "layer": "ANNOTATIONS",
+        "view_id": "front",
+        "coordinate_system": "WCS_XY",
+        "layout": "Model"
+      }
+    },
+    "drawing_revision": {
+      "value": "R1",
+      "locator": {
+        "locator_kind": "cad_entity",
+        "source_sha256": "c146a548e78bb34fb9bf7ff06e2b270b501011b8f98566c28ecb0e1ca6c805e1",
+        "handle": "11",
+        "layer": "ANNOTATIONS",
+        "view_id": "front",
+        "coordinate_system": "WCS_XY",
+        "layout": "Model"
+      }
+    },
+    "part_id": {
+      "value": "A102",
+      "locator": {
+        "locator_kind": "cad_entity",
+        "source_sha256": "c146a548e78bb34fb9bf7ff06e2b270b501011b8f98566c28ecb0e1ca6c805e1",
+        "handle": "12",
+        "layer": "ANNOTATIONS",
+        "view_id": "front",
+        "coordinate_system": "WCS_XY",
+        "layout": "Model"
+      }
+    }
+  },
+  "views": [
+    {
+      "view_id": "front",
+      "bbox": {
+        "xmin": -5,
+        "ymin": -5,
+        "xmax": 80,
+        "ymax": 80
+      }
+    }
+  ],
+  "entities": [
+    {
+      "entity_type": "TEXT",
+      "handle": "10",
+      "layer": "ANNOTATIONS",
+      "view_id": "front",
+      "text": "DRW-A102",
+      "insertion": {
+        "x": 0,
+        "y": 70
+      },
+      "bbox": {
+        "xmin": 0,
+        "ymin": 70,
+        "xmax": 25,
+        "ymax": 73
+      }
+    },
+    {
+      "entity_type": "TEXT",
+      "handle": "11",
+      "layer": "ANNOTATIONS",
+      "view_id": "front",
+      "text": "R1",
+      "insertion": {
+        "x": 0,
+        "y": 60
+      },
+      "bbox": {
+        "xmin": 0,
+        "ymin": 60,
+        "xmax": 25,
+        "ymax": 63
+      }
+    },
+    {
+      "entity_type": "TEXT",
+      "handle": "12",
+      "layer": "ANNOTATIONS",
+      "view_id": "front",
+      "text": "A102",
+      "insertion": {
+        "x": 0,
+        "y": 50
+      },
+      "bbox": {
+        "xmin": 0,
+        "ymin": 50,
+        "xmax": 25,
+        "ymax": 53
+      }
+    },
+    {
+      "entity_type": "TEXT",
+      "handle": "13",
+      "layer": "ANNOTATIONS",
+      "view_id": "front",
+      "text": "%%c20 +/-0.1",
+      "insertion": {
+        "x": 25,
+        "y": 25
+      },
+      "bbox": {
+        "xmin": 25,
+        "ymin": 25,
+        "xmax": 50,
+        "ymax": 28
+      }
+    },
+    {
+      "entity_type": "CIRCLE",
+      "handle": "20",
+      "layer": "GEOMETRY",
+      "view_id": "front",
+      "center": {
+        "x": 10,
+        "y": 10
+      },
+      "radius": 10
+    },
+    {
+      "entity_type": "CIRCLE",
+      "handle": "21",
+      "layer": "GEOMETRY",
+      "view_id": "front",
+      "center": {
+        "x": 50,
+        "y": 10
+      },
+      "radius": 10
+    },
+    {
+      "entity_type": "LINE",
+      "handle": "22",
+      "layer": "GEOMETRY",
+      "view_id": "front",
+      "start": {
+        "x": 0,
+        "y": 0
+      },
+      "end": {
+        "x": 60,
+        "y": 0
+      }
+    }
+  ],
+  "features": [
+    {
+      "feature_id": "diameter-1",
+      "feature_type": "diameter",
+      "annotation_raw": "%%c20 +/-0.1",
+      "locator": {
+        "locator_kind": "cad_entity",
+        "source_sha256": "c146a548e78bb34fb9bf7ff06e2b270b501011b8f98566c28ecb0e1ca6c805e1",
+        "handle": "13",
+        "layer": "ANNOTATIONS",
+        "view_id": "front",
+        "coordinate_system": "WCS_XY",
+        "layout": "Model"
+      },
+      "nominal_value": "20",
+      "tolerance_lower": "-0.1",
+      "tolerance_upper": "0.1",
+      "unit": "mm",
+      "association_status": "confirmed",
+      "target_candidates": [
+        "20"
+      ],
+      "selected_target": "20",
+      "association_evidence": {
+        "method": "human_label",
+        "reference_id": "synthetic-association-1",
+        "source_sha256": "c146a548e78bb34fb9bf7ff06e2b270b501011b8f98566c28ecb0e1ca6c805e1",
+        "annotation_handle": "13",
+        "target_handle": "20",
+        "rationale": "Synthetic author label; no native DXF reference or factory approval claimed."
+      }
+    }
+  ]
+}

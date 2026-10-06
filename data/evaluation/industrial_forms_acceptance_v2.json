@@ -1,0 +1,1265 @@
+{
+  "suite_version": "industrial-forms-acceptance-v2",
+  "stage": "acceptance",
+  "provenance": "Synthetic forms authored by the implementer; no independent factory data or blind benchmark.",
+  "development_participation": false,
+  "source_file": "output/pdf/industrial_forms_acceptance_v2.pdf",
+  "cases": [
+    {
+      "case_id": "acceptance-native-1",
+      "page": 1,
+      "carrier": "native",
+      "template": "acceptance-compact-1",
+      "fields": [
+        {
+          "label": "文档类型",
+          "value": "质检报告",
+          "bbox": [
+            60,
+            110,
+            154.409,
+            129
+          ]
+        },
+        {
+          "label": "报告结论",
+          "value": "合成声明，须以原文和记录核验",
+          "bbox": [
+            60,
+            144,
+            264.409,
+            163
+          ]
+        },
+        {
+          "label": "实测值",
+          "value": "824.6",
+          "bbox": [
+            60,
+            178,
+            122.454,
+            197
+          ]
+        },
+        {
+          "label": "测量时点",
+          "value": "2026-11-01T10:35:20+08:00",
+          "bbox": [
+            60,
+            212,
+            231.66199999999998,
+            231
+          ]
+        },
+        {
+          "label": "报告编号",
+          "value": "REP-460-7",
+          "bbox": [
+            60,
+            246,
+            159.63400000000001,
+            265
+          ]
+        },
+        {
+          "label": "测量编号",
+          "value": "MEAS-460-7",
+          "bbox": [
+            60,
+            280,
+            168.48899999999998,
+            299
+          ]
+        },
+        {
+          "label": "批次编号",
+          "value": "LOT-460",
+          "bbox": [
+            60,
+            314,
+            151.307,
+            333
+          ]
+        },
+        {
+          "label": "测量方法",
+          "value": "core",
+          "bbox": [
+            60,
+            348,
+            128.988,
+            367
+          ]
+        },
+        {
+          "label": "单位",
+          "value": "degC",
+          "bbox": [
+            60,
+            382,
+            110.453,
+            401
+          ]
+        },
+        {
+          "label": "审批状态",
+          "value": "已批准",
+          "bbox": [
+            60,
+            416,
+            143.409,
+            435
+          ]
+        },
+        {
+          "label": "版次",
+          "value": "P460-V2",
+          "bbox": [
+            60,
+            450,
+            126.656,
+            469
+          ]
+        },
+        {
+          "label": "指标",
+          "value": "holding_temperature",
+          "bbox": [
+            60,
+            484,
+            182.646,
+            503
+          ]
+        },
+        {
+          "label": "工序编号",
+          "value": "15",
+          "bbox": [
+            60,
+            518,
+            120.727,
+            537
+          ]
+        },
+        {
+          "label": "零件编号",
+          "value": "P460",
+          "bbox": [
+            60,
+            552,
+            132.365,
+            571
+          ]
+        }
+      ],
+      "expected_fact": {
+        "entity_id": "P460",
+        "operation_no": "15",
+        "raw_unit": "degC",
+        "source_revision": "P460-V2",
+        "approval_status": "approved",
+        "normalized_unit": "degC",
+        "fact_kind": "measurement",
+        "batch_id": "LOT-460",
+        "measurement_id": "MEAS-460-7",
+        "report_id": "REP-460-7",
+        "measured_at": "2026-11-01T10:35:20+08:00",
+        "raw_value": "824.6",
+        "normalized_value": "824.6"
+      }
+    },
+    {
+      "case_id": "acceptance-native-2",
+      "page": 2,
+      "carrier": "native",
+      "template": "acceptance-compact-2",
+      "fields": [
+        {
+          "label": "文档类型",
+          "value": "工艺要求",
+          "bbox": [
+            69,
+            110.5,
+            178.0,
+            129
+          ]
+        },
+        {
+          "label": "温度上限",
+          "value": "1118.15",
+          "bbox": [
+            69,
+            144.5,
+            167.8465,
+            163
+          ]
+        },
+        {
+          "label": "温度下限",
+          "value": "1068.15",
+          "bbox": [
+            69,
+            178.5,
+            167.8465,
+            197
+          ]
+        },
+        {
+          "label": "失效时间",
+          "value": "无",
+          "bbox": [
+            69,
+            212.5,
+            146.5,
+            231
+          ]
+        },
+        {
+          "label": "生效时间",
+          "value": "2026-10-01T00:00:00+08:00",
+          "bbox": [
+            69,
+            246.5,
+            251.7415,
+            265
+          ]
+        },
+        {
+          "label": "测量方法",
+          "value": "surface",
+          "bbox": [
+            69,
+            280.5,
+            166.89100000000002,
+            299
+          ]
+        },
+        {
+          "label": "单位",
+          "value": "K",
+          "bbox": [
+            69,
+            314.5,
+            117.60400000000001,
+            333
+          ]
+        },
+        {
+          "label": "审批状态",
+          "value": "未批准",
+          "bbox": [
+            69,
+            348.5,
+            167.5,
+            367
+          ]
+        },
+        {
+          "label": "版次",
+          "value": "P461-V3",
+          "bbox": [
+            69,
+            382.5,
+            146.2585,
+            401
+          ]
+        },
+        {
+          "label": "指标",
+          "value": "holding_temperature",
+          "bbox": [
+            69,
+            416.5,
+            199.70350000000002,
+            435
+          ]
+        },
+        {
+          "label": "工序编号",
+          "value": "25",
+          "bbox": [
+            69,
+            450.5,
+            145.849,
+            469
+          ]
+        },
+        {
+          "label": "零件编号",
+          "value": "P461",
+          "bbox": [
+            69,
+            484.5,
+            156.958,
+            503
+          ]
+        }
+      ],
+      "expected_fact": {
+        "entity_id": "P461",
+        "operation_no": "25",
+        "raw_unit": "K",
+        "source_revision": "P461-V3",
+        "approval_status": "unapproved",
+        "normalized_unit": "degC",
+        "fact_kind": "requirement",
+        "valid_from": "2026-10-01T00:00:00+08:00",
+        "valid_to": null,
+        "raw_value": "1068.15 .. 1118.15",
+        "normalized_range": {
+          "min": "795.00",
+          "max": "845.00",
+          "min_inclusive": true,
+          "max_inclusive": true
+        }
+      }
+    },
+    {
+      "case_id": "acceptance-native-3",
+      "page": 3,
+      "carrier": "native",
+      "template": "acceptance-compact-3",
+      "fields": [
+        {
+          "label": "文档类型",
+          "value": "质检报告",
+          "bbox": [
+            78,
+            110,
+            172.409,
+            129
+          ]
+        },
+        {
+          "label": "报告结论",
+          "value": "合成声明，须以原文和记录核验",
+          "bbox": [
+            78,
+            144,
+            282.409,
+            163
+          ]
+        },
+        {
+          "label": "实测值",
+          "value": "1090.35",
+          "bbox": [
+            78,
+            178,
+            150.772,
+            197
+          ]
+        },
+        {
+          "label": "测量时点",
+          "value": "2026-11-03T10:35:20+08:00",
+          "bbox": [
+            78,
+            212,
+            249.66199999999998,
+            231
+          ]
+        },
+        {
+          "label": "报告编号",
+          "value": "REP-462-7",
+          "bbox": [
+            78,
+            246,
+            177.63400000000001,
+            265
+          ]
+        },
+        {
+          "label": "测量编号",
+          "value": "MEAS-462-7",
+          "bbox": [
+            78,
+            280,
+            186.48899999999998,
+            299
+          ]
+        },
+        {
+          "label": "批次编号",
+          "value": "LOT-462",
+          "bbox": [
+            78,
+            314,
+            169.307,
+            333
+          ]
+        },
+        {
+          "label": "测量方法",
+          "value": "core",
+          "bbox": [
+            78,
+            348,
+            146.988,
+            367
+          ]
+        },
+        {
+          "label": "单位",
+          "value": "K",
+          "bbox": [
+            78,
+            382,
+            114.637,
+            401
+          ]
+        },
+        {
+          "label": "审批状态",
+          "value": "已批准",
+          "bbox": [
+            78,
+            416,
+            161.409,
+            435
+          ]
+        },
+        {
+          "label": "版次",
+          "value": "P462-V4",
+          "bbox": [
+            78,
+            450,
+            144.656,
+            469
+          ]
+        },
+        {
+          "label": "指标",
+          "value": "holding_temperature",
+          "bbox": [
+            78,
+            484,
+            200.646,
+            503
+          ]
+        },
+        {
+          "label": "工序编号",
+          "value": "35",
+          "bbox": [
+            78,
+            518,
+            138.727,
+            537
+          ]
+        },
+        {
+          "label": "零件编号",
+          "value": "P462",
+          "bbox": [
+            78,
+            552,
+            150.365,
+            571
+          ]
+        }
+      ],
+      "expected_fact": {
+        "entity_id": "P462",
+        "operation_no": "35",
+        "raw_unit": "K",
+        "source_revision": "P462-V4",
+        "approval_status": "approved",
+        "normalized_unit": "degC",
+        "fact_kind": "measurement",
+        "batch_id": "LOT-462",
+        "measurement_id": "MEAS-462-7",
+        "report_id": "REP-462-7",
+        "measured_at": "2026-11-03T10:35:20+08:00",
+        "raw_value": "1090.35",
+        "normalized_value": "817.20"
+      }
+    },
+    {
+      "case_id": "acceptance-native-4",
+      "page": 4,
+      "carrier": "native",
+      "template": "acceptance-compact-4",
+      "fields": [
+        {
+          "label": "文档类型",
+          "value": "工艺要求",
+          "bbox": [
+            87,
+            110.5,
+            196.0,
+            129
+          ]
+        },
+        {
+          "label": "温度上限",
+          "value": "825.5",
+          "bbox": [
+            87,
+            144.5,
+            175.9975,
+            163
+          ]
+        },
+        {
+          "label": "温度下限",
+          "value": "775.5",
+          "bbox": [
+            87,
+            178.5,
+            175.9975,
+            197
+          ]
+        },
+        {
+          "label": "失效时间",
+          "value": "无",
+          "bbox": [
+            87,
+            212.5,
+            164.5,
+            231
+          ]
+        },
+        {
+          "label": "生效时间",
+          "value": "2026-10-01T00:00:00+08:00",
+          "bbox": [
+            87,
+            246.5,
+            269.7415,
+            265
+          ]
+        },
+        {
+          "label": "测量方法",
+          "value": "surface",
+          "bbox": [
+            87,
+            280.5,
+            184.89100000000002,
+            299
+          ]
+        },
+        {
+          "label": "单位",
+          "value": "degC",
+          "bbox": [
+            87,
+            314.5,
+            148.792,
+            333
+          ]
+        },
+        {
+          "label": "审批状态",
+          "value": "未批准",
+          "bbox": [
+            87,
+            348.5,
+            185.5,
+            367
+          ]
+        },
+        {
+          "label": "版次",
+          "value": "P463-V5",
+          "bbox": [
+            87,
+            382.5,
+            164.2585,
+            401
+          ]
+        },
+        {
+          "label": "指标",
+          "value": "holding_temperature",
+          "bbox": [
+            87,
+            416.5,
+            217.70350000000002,
+            435
+          ]
+        },
+        {
+          "label": "工序编号",
+          "value": "45",
+          "bbox": [
+            87,
+            450.5,
+            163.849,
+            469
+          ]
+        },
+        {
+          "label": "零件编号",
+          "value": "P463",
+          "bbox": [
+            87,
+            484.5,
+            174.958,
+            503
+          ]
+        }
+      ],
+      "expected_fact": {
+        "entity_id": "P463",
+        "operation_no": "45",
+        "raw_unit": "degC",
+        "source_revision": "P463-V5",
+        "approval_status": "unapproved",
+        "normalized_unit": "degC",
+        "fact_kind": "requirement",
+        "valid_from": "2026-10-01T00:00:00+08:00",
+        "valid_to": null,
+        "raw_value": "775.5 .. 825.5",
+        "normalized_range": {
+          "min": "775.5",
+          "max": "825.5",
+          "min_inclusive": true,
+          "max_inclusive": true
+        }
+      }
+    },
+    {
+      "case_id": "acceptance-scan-1",
+      "page": 5,
+      "carrier": "scan",
+      "template": "acceptance-compact-1",
+      "fields": [
+        {
+          "label": "文档类型",
+          "value": "质检报告",
+          "bbox": [
+            60.0,
+            110.0,
+            154.41,
+            129.0
+          ]
+        },
+        {
+          "label": "报告结论",
+          "value": "合成声明，须以原文和记录核验",
+          "bbox": [
+            60.0,
+            144.0,
+            264.41,
+            163.0
+          ]
+        },
+        {
+          "label": "实测值",
+          "value": "824.6",
+          "bbox": [
+            60.0,
+            178.0,
+            122.45,
+            197.0
+          ]
+        },
+        {
+          "label": "测量时点",
+          "value": "2026-11-01T10:35:20+08:00",
+          "bbox": [
+            60.0,
+            212.0,
+            231.66,
+            231.0
+          ]
+        },
+        {
+          "label": "报告编号",
+          "value": "REP-460-7",
+          "bbox": [
+            60.0,
+            246.0,
+            159.63,
+            265.0
+          ]
+        },
+        {
+          "label": "测量编号",
+          "value": "MEAS-460-7",
+          "bbox": [
+            60.0,
+            280.0,
+            168.49,
+            299.0
+          ]
+        },
+        {
+          "label": "批次编号",
+          "value": "LOT-460",
+          "bbox": [
+            60.0,
+            314.0,
+            151.31,
+            333.0
+          ]
+        },
+        {
+          "label": "测量方法",
+          "value": "core",
+          "bbox": [
+            60.0,
+            348.0,
+            128.99,
+            367.0
+          ]
+        },
+        {
+          "label": "单位",
+          "value": "degC",
+          "bbox": [
+            60.0,
+            382.0,
+            110.45,
+            401.0
+          ]
+        },
+        {
+          "label": "审批状态",
+          "value": "已批准",
+          "bbox": [
+            60.0,
+            416.0,
+            143.41,
+            435.0
+          ]
+        },
+        {
+          "label": "版次",
+          "value": "P460-V2",
+          "bbox": [
+            60.0,
+            450.0,
+            126.66,
+            469.0
+          ]
+        },
+        {
+          "label": "指标",
+          "value": "holding_temperature",
+          "bbox": [
+            60.0,
+            484.0,
+            182.65,
+            503.0
+          ]
+        },
+        {
+          "label": "工序编号",
+          "value": "15",
+          "bbox": [
+            60.0,
+            518.0,
+            120.73,
+            537.0
+          ]
+        },
+        {
+          "label": "零件编号",
+          "value": "P460",
+          "bbox": [
+            60.0,
+            552.0,
+            132.37,
+            571.0
+          ]
+        }
+      ],
+      "expected_fact": {
+        "entity_id": "P460",
+        "operation_no": "15",
+        "raw_unit": "degC",
+        "source_revision": "P460-V2",
+        "approval_status": "approved",
+        "normalized_unit": "degC",
+        "fact_kind": "measurement",
+        "batch_id": "LOT-460",
+        "measurement_id": "MEAS-460-7",
+        "report_id": "REP-460-7",
+        "measured_at": "2026-11-01T10:35:20+08:00",
+        "raw_value": "824.6",
+        "normalized_value": "824.6"
+      },
+      "scan_dpi": 144,
+      "scan_rotation_degrees": 0
+    },
+    {
+      "case_id": "acceptance-scan-2",
+      "page": 6,
+      "carrier": "scan",
+      "template": "acceptance-compact-2",
+      "fields": [
+        {
+          "label": "文档类型",
+          "value": "工艺要求",
+          "bbox": [
+            63.62,
+            112.63,
+            172.92,
+            133.03
+          ]
+        },
+        {
+          "label": "温度上限",
+          "value": "1118.15",
+          "bbox": [
+            64.21,
+            146.8,
+            163.36,
+            167.03
+          ]
+        },
+        {
+          "label": "温度下限",
+          "value": "1068.15",
+          "bbox": [
+            64.8,
+            180.8,
+            163.96,
+            201.02
+          ]
+        },
+        {
+          "label": "失效时间",
+          "value": "无",
+          "bbox": [
+            65.4,
+            215.17,
+            143.21,
+            235.02
+          ]
+        },
+        {
+          "label": "生效时间",
+          "value": "2026-10-01T00:00:00+08:00",
+          "bbox": [
+            65.99,
+            247.33,
+            249.03,
+            269.01
+          ]
+        },
+        {
+          "label": "测量方法",
+          "value": "surface",
+          "bbox": [
+            66.58,
+            282.8,
+            164.78,
+            303.01
+          ]
+        },
+        {
+          "label": "单位",
+          "value": "K",
+          "bbox": [
+            67.18,
+            317.66,
+            116.1,
+            337.0
+          ]
+        },
+        {
+          "label": "审批状态",
+          "value": "未批准",
+          "bbox": [
+            67.77,
+            350.78,
+            166.58,
+            371.0
+          ]
+        },
+        {
+          "label": "版次",
+          "value": "P461-V3",
+          "bbox": [
+            68.36,
+            385.15,
+            145.93,
+            404.99
+          ]
+        },
+        {
+          "label": "指标",
+          "value": "holding_temperature",
+          "bbox": [
+            68.96,
+            418.21,
+            199.96,
+            438.99
+          ]
+        },
+        {
+          "label": "工序编号",
+          "value": "25",
+          "bbox": [
+            69.55,
+            453.14,
+            146.71,
+            472.98
+          ]
+        },
+        {
+          "label": "零件编号",
+          "value": "P461",
+          "bbox": [
+            70.14,
+            486.94,
+            158.41,
+            506.98
+          ]
+        }
+      ],
+      "expected_fact": {
+        "entity_id": "P461",
+        "operation_no": "25",
+        "raw_unit": "K",
+        "source_revision": "P461-V3",
+        "approval_status": "unapproved",
+        "normalized_unit": "degC",
+        "fact_kind": "requirement",
+        "valid_from": "2026-10-01T00:00:00+08:00",
+        "valid_to": null,
+        "raw_value": "1068.15 .. 1118.15",
+        "normalized_range": {
+          "min": "795.00",
+          "max": "845.00",
+          "min_inclusive": true,
+          "max_inclusive": true
+        }
+      },
+      "scan_dpi": 144,
+      "scan_rotation_degrees": 1.0
+    },
+    {
+      "case_id": "acceptance-scan-3",
+      "page": 7,
+      "carrier": "scan",
+      "template": "acceptance-compact-3",
+      "fields": [
+        {
+          "label": "文档类型",
+          "value": "质检报告",
+          "bbox": [
+            82.1,
+            106.97,
+            176.76,
+            127.28
+          ]
+        },
+        {
+          "label": "报告结论",
+          "value": "合成声明，须以原文和记录核验",
+          "bbox": [
+            81.62,
+            140.96,
+            286.28,
+            162.81
+          ]
+        },
+        {
+          "label": "实测值",
+          "value": "1090.35",
+          "bbox": [
+            81.15,
+            174.96,
+            154.18,
+            194.97
+          ]
+        },
+        {
+          "label": "测量时点",
+          "value": "2026-11-03T10:35:20+08:00",
+          "bbox": [
+            80.67,
+            208.96,
+            252.58,
+            230.35
+          ]
+        },
+        {
+          "label": "报告编号",
+          "value": "REP-462-7",
+          "bbox": [
+            80.2,
+            242.95,
+            180.09,
+            263.34
+          ]
+        },
+        {
+          "label": "测量编号",
+          "value": "MEAS-462-7",
+          "bbox": [
+            79.72,
+            276.95,
+            188.47,
+            297.46
+          ]
+        },
+        {
+          "label": "批次编号",
+          "value": "LOT-462",
+          "bbox": [
+            79.25,
+            310.95,
+            170.81,
+            331.22
+          ]
+        },
+        {
+          "label": "测量方法",
+          "value": "core",
+          "bbox": [
+            78.78,
+            344.94,
+            148.02,
+            364.9
+          ]
+        },
+        {
+          "label": "单位",
+          "value": "K",
+          "bbox": [
+            78.3,
+            378.94,
+            115.2,
+            398.45
+          ]
+        },
+        {
+          "label": "审批状态",
+          "value": "已批准",
+          "bbox": [
+            77.83,
+            412.94,
+            161.49,
+            433.1
+          ]
+        },
+        {
+          "label": "版次",
+          "value": "P462-V4",
+          "bbox": [
+            77.35,
+            446.93,
+            144.27,
+            466.86
+          ]
+        },
+        {
+          "label": "指标",
+          "value": "holding_temperature",
+          "bbox": [
+            76.88,
+            480.93,
+            199.78,
+            501.64
+          ]
+        },
+        {
+          "label": "工序编号",
+          "value": "35",
+          "bbox": [
+            76.4,
+            514.93,
+            137.39,
+            534.77
+          ]
+        },
+        {
+          "label": "零件编号",
+          "value": "P462",
+          "bbox": [
+            75.93,
+            548.92,
+            148.55,
+            568.93
+          ]
+        }
+      ],
+      "expected_fact": {
+        "entity_id": "P462",
+        "operation_no": "35",
+        "raw_unit": "K",
+        "source_revision": "P462-V4",
+        "approval_status": "approved",
+        "normalized_unit": "degC",
+        "fact_kind": "measurement",
+        "batch_id": "LOT-462",
+        "measurement_id": "MEAS-462-7",
+        "report_id": "REP-462-7",
+        "measured_at": "2026-11-03T10:35:20+08:00",
+        "raw_value": "1090.35",
+        "normalized_value": "817.20"
+      },
+      "scan_dpi": 144,
+      "scan_rotation_degrees": -0.8
+    },
+    {
+      "case_id": "acceptance-scan-4",
+      "page": 8,
+      "carrier": "scan",
+      "template": "acceptance-compact-4",
+      "fields": [
+        {
+          "label": "文档类型",
+          "value": "工艺要求",
+          "bbox": [
+            83.76,
+            111.58,
+            192.95,
+            131.22
+          ]
+        },
+        {
+          "label": "温度上限",
+          "value": "825.5",
+          "bbox": [
+            84.12,
+            145.79,
+            173.3,
+            165.22
+          ]
+        },
+        {
+          "label": "温度下限",
+          "value": "775.5",
+          "bbox": [
+            84.47,
+            179.79,
+            173.66,
+            199.22
+          ]
+        },
+        {
+          "label": "失效时间",
+          "value": "无",
+          "bbox": [
+            84.83,
+            213.9,
+            162.52,
+            233.21
+          ]
+        },
+        {
+          "label": "生效时间",
+          "value": "2026-10-01T00:00:00+08:00",
+          "bbox": [
+            85.18,
+            246.8,
+            268.11,
+            267.21
+          ]
+        },
+        {
+          "label": "测量方法",
+          "value": "surface",
+          "bbox": [
+            85.54,
+            281.69,
+            183.62,
+            301.21
+          ]
+        },
+        {
+          "label": "单位",
+          "value": "degC",
+          "bbox": [
+            85.9,
+            316.06,
+            147.88,
+            335.21
+          ]
+        },
+        {
+          "label": "审批状态",
+          "value": "未批准",
+          "bbox": [
+            86.25,
+            349.68,
+            184.94,
+            369.21
+          ]
+        },
+        {
+          "label": "版次",
+          "value": "P463-V5",
+          "bbox": [
+            86.61,
+            383.9,
+            164.06,
+            403.21
+          ]
+        },
+        {
+          "label": "指标",
+          "value": "holding_temperature",
+          "bbox": [
+            86.96,
+            417.34,
+            217.85,
+            437.2
+          ]
+        },
+        {
+          "label": "工序编号",
+          "value": "45",
+          "bbox": [
+            87.32,
+            451.9,
+            164.36,
+            471.2
+          ]
+        },
+        {
+          "label": "零件编号",
+          "value": "P463",
+          "bbox": [
+            87.68,
+            485.78,
+            175.82,
+            505.2
+          ]
+        }
+      ],
+      "expected_fact": {
+        "entity_id": "P463",
+        "operation_no": "45",
+        "raw_unit": "degC",
+        "source_revision": "P463-V5",
+        "approval_status": "unapproved",
+        "normalized_unit": "degC",
+        "fact_kind": "requirement",
+        "valid_from": "2026-10-01T00:00:00+08:00",
+        "valid_to": null,
+        "raw_value": "775.5 .. 825.5",
+        "normalized_range": {
+          "min": "775.5",
+          "max": "825.5",
+          "min_inclusive": true,
+          "max_inclusive": true
+        }
+      },
+      "scan_dpi": 144,
+      "scan_rotation_degrees": 0.6
+    }
+  ],
+  "visual_qa": "all pages visually checked",
+  "frozen_parser_code_hashes": {
+    "ingestion/industrial_facts.py": "3d6645c6ffa0c7779ddb29c477cd7004b14f65bb51deb4bf5bb808e8e021a544",
+    "ingestion/ingest.py": "c36262ea2227792661f90e395a006a2c5db9d1142c31f7302360e0ccac046a16",
+    "ingestion/ocr.py": "caebb1038dc865b00a1f76b5ae37475c1b3472d9e7cce4f4623952f46cc4eae2",
+    "ingestion/tables.py": "36eeff85ed5de20ce59516b293a813f5c853dda30bce70c9b3b732b9188d2666",
+    "datamind/field_store.py": "3099f0cc83c17c6596764dae7e204ac4341bd445402737ee986e004934dea31a"
+  },
+  "frozen_evaluator_sha256": "3687f0cdbdedbf35c0aa40db67d5f841269a22e545c4d4efd911628313176615",
+  "builder_sha256": "a92f1999499f26a0e451ce0cb5aab511521a5a92fad5b78b7aba5bdb18022e50",
+  "source_sha256": "75145a664a64c7787709946efdde71f089750613c6eb4fdaf58f69b343636095",
+  "page_count": 8
+}

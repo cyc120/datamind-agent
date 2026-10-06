@@ -11,9 +11,10 @@ from pathlib import Path
 from typing import Literal
 
 import psycopg2
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
+from starlette.concurrency import run_in_threadpool
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from psycopg2.extras import RealDictCursor
@@ -40,6 +41,7 @@ class ChatRequest(BaseModel):
 
 
 class FactReviewRequest(BaseModel):
+    model_config = {'extra':'forbid'}
     request_id: str = Field(min_length=1,max_length=64,pattern=r'^[A-Za-z0-9_-]+$')
     document_version: int = Field(ge=1)
     source_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
@@ -47,7 +49,80 @@ class FactReviewRequest(BaseModel):
     payload_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
     previous_review_id: str | None = Field(default=None,max_length=64)
     decision: Literal['confirmed','rejected','needs_review']
-    reviewer_label: str = Field(min_length=1,max_length=120)
+    reviewer_label: str | None = Field(default=None,min_length=1,max_length=120)
+    reason: str = Field(min_length=1,max_length=1000)
+
+
+class FactApprovalRequest(BaseModel):
+    model_config = {'extra':'forbid'}
+    request_id: str = Field(min_length=1,max_length=64,pattern=r'^[A-Za-z0-9_-]+$')
+    document_version: int = Field(ge=1)
+    source_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+    parser_version: str = Field(min_length=1,max_length=64)
+    payload_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+    review_id: str = Field(min_length=1,max_length=64)
+    previous_approval_id: str | None = Field(default=None,max_length=64)
+    decision: Literal['approved','rejected','revoked']
+    reason: str = Field(min_length=1,max_length=1000)
+
+
+class LoginRequest(BaseModel):
+    username: str = Field(min_length=1,max_length=64)
+    password: str = Field(min_length=1,max_length=256)
+
+
+class DrawingRegistrationRequest(BaseModel):
+    model_config = {'extra':'forbid','strict':True}
+    request_id: str = Field(min_length=1,max_length=64,pattern=r'^[A-Za-z0-9_-]+$')
+    document_id: str = Field(min_length=1,max_length=64,pattern=r'^[A-Za-z0-9][A-Za-z0-9_.-]*$')
+    title: str = Field(min_length=1,max_length=200)
+    source_path: str = Field(min_length=1,max_length=500)
+    source_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+    provenance: Literal['synthetic_demo','authorized_external']
+    previous_version: int = Field(ge=0)
+    previous_source_sha256: str | None = Field(pattern=r'^[a-f0-9]{64}$')
+
+
+class AuthorityBasis(BaseModel):
+    model_config = {'extra':'forbid'}
+    document_id: str = Field(min_length=1,max_length=64)
+    document_version: int = Field(ge=1)
+    source_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+    page_no: int = Field(ge=1)
+
+
+class DrawingAssociationReviewRequest(BaseModel):
+    model_config = {'extra':'forbid','strict':True}
+    request_id: str = Field(min_length=1,max_length=64,pattern=r'^[A-Za-z0-9_-]+$')
+    document_version: int = Field(ge=1)
+    source_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+    parser_version: str = Field(min_length=1,max_length=64)
+    bundle_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+    feature_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+    previous_review_id: str | None = Field(default=None,max_length=64)
+    decision: Literal['confirmed','rejected','needs_review']
+    selected_target: str | None = Field(default=None,pattern=r'^[1-9A-F][0-9A-F]*$',max_length=32)
+    reason: str = Field(min_length=1,max_length=1000)
+
+
+class AuthorityRequest(BaseModel):
+    model_config = {'extra':'forbid'}
+    request_id: str = Field(min_length=1,max_length=64,pattern=r'^[A-Za-z0-9_-]+$')
+    question: str = Field(min_length=1,max_length=2000)
+    measurement_id: str = Field(min_length=1,max_length=64)
+    candidate_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+    selected_source: Literal['production','report']
+    valid_from: str = Field(min_length=1,max_length=50)
+    valid_to: str = Field(min_length=1,max_length=50)
+    basis: AuthorityBasis
+    rationale: str = Field(min_length=10,max_length=1000)
+
+
+class AuthorityEventRequest(BaseModel):
+    model_config = {'extra':'forbid'}
+    request_id: str = Field(min_length=1,max_length=64,pattern=r'^[A-Za-z0-9_-]+$')
+    previous_event_id: str | None = Field(default=None,max_length=64)
+    decision: Literal['approved','rejected','revoked']
     reason: str = Field(min_length=1,max_length=1000)
 
 
@@ -74,7 +149,260 @@ class ProfileImportRequest(BaseModel):
     activate_first: bool = False
 
 
-app = FastAPI(title="DataMind Agent", version="0.7.0")
+app = FastAPI(title="DataMind Agent", version="0.13.0")
+
+
+@app.middleware('http')
+async def identity_permissions(request: Request, call_next):
+    path=request.url.path
+    authority_path=path.startswith('/v1/authority/')
+    cad_path=path=='/v1/drawings' or path.startswith('/v1/drawings/')
+    dimension_path=path.startswith('/v1/dimensions/')
+    permission=('approver' if dimension_path and request.method=='POST' and path.endswith('/approvals') else
+                'admin' if dimension_path and (request.method=='POST' or path.endswith('/sources')) else
+                'reviewer' if cad_path and request.method=='POST' and path.endswith('/reviews') else
+                'admin' if path=='/v1/drawings/sources' or (cad_path and request.method=='POST') else
+                'admin' if path.startswith('/v1/model/') or path=='/v1/authority/candidates' or
+                (authority_path and request.method=='POST' and path.endswith('/rules')) else
+                'approver' if authority_path and request.method=='POST' and path.endswith('/events') else
+                'reviewer' if request.method=='POST' and path.endswith('/reviews') else
+                'approver' if request.method=='POST' and path.endswith('/approvals') else None)
+    if permission or authority_path or cad_path or dimension_path:
+        from .auth import current
+        try:
+            request.state.identity=await run_in_threadpool(current,request,_write_dsn(),required=True,
+                permission=permission,mutation=request.method not in {'GET','HEAD','OPTIONS'})
+        except HTTPException as exc:
+            return JSONResponse(status_code=exc.status_code,content={'detail':exc.detail})
+    response=await call_next(request)
+    if cad_path or dimension_path:response.headers['Cache-Control']='no-store'
+    return response
+
+
+@app.get('/v1/drawings/sources')
+def drawing_sources():
+    from .cad_store import sources
+    return {'sources':sources()}
+
+
+@app.post('/v1/drawings')
+def register_drawing(payload: DrawingRegistrationRequest,request: Request):
+    from .cad_store import register
+    return {'version':jsonable_encoder(register(payload.model_dump(),_write_dsn(),request.state.identity)),
+            'semantics':'Versioned CAD inspection registration; not formal approval or production binding'}
+
+
+@app.get('/v1/drawings')
+def drawings():
+    from .cad_store import list_assets
+    return {'drawings':jsonable_encoder(list_assets(_read_dsn()))}
+
+
+@app.get('/v1/drawings/{document_id}/versions')
+def drawing_versions(document_id: str):
+    from .cad_store import history
+    return jsonable_encoder(history(document_id,_read_dsn()))
+
+
+@app.get('/v1/drawings/{document_id}')
+def drawing_detail(document_id: str,version: int | None=Query(default=None,ge=1)):
+    from .cad_store import read_version,public_version
+    row=read_version(document_id,_read_dsn(),version)
+    return {'version':jsonable_encoder(public_version(row)),'source':row['bundle']['snapshot']['source'],
+            'identity':row['bundle']['snapshot']['identity'],
+            'metadata':{k:v for k,v in row['bundle']['metadata'].items() if k!='render_entities'}}
+
+
+@app.get('/v1/drawings/{document_id}/entities')
+def drawing_entities(document_id: str,version: int | None=Query(default=None,ge=1)):
+    from .cad_store import read_version,public_version
+    row=read_version(document_id,_read_dsn(),version)
+    snapshot=row['bundle']['snapshot']
+    return {'version':jsonable_encoder(public_version(row)),'entities':snapshot['entities'],'views':snapshot['views']}
+
+
+@app.get('/v1/drawings/{document_id}/features')
+def drawing_features(document_id: str,version: int | None=Query(default=None,ge=1)):
+    from .cad_store import read_version,public_version
+    from .cad_reviews import inspect
+    from ingestion.cad_contract import eligible_features
+    row=read_version(document_id,_read_dsn(),version);snapshot=row['bundle']['snapshot']
+    context={k:f['value'] for k,f in snapshot['identity'].items()};context['source_sha256']=row['source_sha256']
+    return {'version':jsonable_encoder(public_version(row)),'features':snapshot['features'],
+            'inspection_gate':eligible_features(snapshot,context),
+            **jsonable_encoder(inspect(row,_read_dsn())),
+            'semantics':'Original extraction/object consistency; association reviews are separate, without formal approval or production binding'}
+
+
+@app.get('/v1/drawings/{document_id}/features/{feature_id}/reviews')
+def drawing_review_history(document_id: str,feature_id: str,version: int | None=Query(default=None,ge=1)):
+    from .cad_store import read_version
+    from .cad_reviews import history
+    return jsonable_encoder(history(read_version(document_id,_read_dsn(),version),feature_id,_read_dsn()))
+
+
+@app.post('/v1/drawings/{document_id}/features/{feature_id}/reviews')
+def drawing_review_record(document_id: str,feature_id: str,payload: DrawingAssociationReviewRequest,request: Request):
+    from .cad_reviews import record
+    return {'review':jsonable_encoder(record(document_id,feature_id,payload.model_dump(),_write_dsn(),request.state.identity))}
+
+
+@app.get('/v1/drawings/{document_id}/file')
+def drawing_file(document_id: str,version: int | None=Query(default=None,ge=1)):
+    from .cad_store import read_version
+    row=read_version(document_id,_read_dsn(),version)
+    return Response(row['_source_bytes'],media_type='application/dxf',
+                    headers={'Content-Disposition':f'attachment; filename="drawing-v{row["document_version"]}.dxf"',
+                             'X-Content-Type-Options':'nosniff'})
+
+
+@app.get('/v1/drawings/{document_id}/preview')
+def drawing_preview(document_id: str,version: int | None=Query(default=None,ge=1)):
+    from .cad_store import read_version
+    from ingestion.cad_render import render_svg
+    row=read_version(document_id,_read_dsn(),version)
+    return Response(render_svg(row['bundle']),media_type='image/svg+xml',
+                    headers={'Content-Security-Policy':"sandbox; default-src 'none'; style-src 'unsafe-inline'",
+                             'X-Content-Type-Options':'nosniff'})
+
+
+@app.get('/v1/drawings/{document_id}/viewer')
+def drawing_viewer(document_id: str,version: int | None=Query(default=None,ge=1)):
+    from .cad_store import read_version
+    from ingestion.cad_render import render_html
+    row=read_version(document_id,_read_dsn(),version)
+    return Response(render_html(row['bundle']),media_type='text/html',
+                    headers={'Content-Security-Policy':"sandbox allow-scripts; default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'",
+                             'X-Content-Type-Options':'nosniff'})
+
+
+from .cad_dimensions import MeasurementRegistration,BindingRegistration,ApprovalRequest,ComparisonRequest
+
+
+@app.get('/v1/dimensions/sources')
+def dimension_sources():
+    from .cad_dimensions import sources
+    return {'sources':sources()}
+
+
+@app.get('/v1/dimensions/measurements')
+def dimension_measurements():
+    from .cad_dimensions import listing
+    return listing('measurements',_read_dsn())
+
+
+@app.post('/v1/dimensions/measurements')
+def dimension_measurement_register(payload: MeasurementRegistration,request: Request):
+    from .cad_dimensions import register_measurement
+    return {'measurement':register_measurement(payload.model_dump(),_write_dsn(),request.state.identity)}
+
+
+@app.get('/v1/dimensions/measurements/{measurement_id}')
+def dimension_measurement_detail(measurement_id: str,version: int | None=Query(default=None,ge=1)):
+    from .cad_dimensions import read_measurement
+    return {'measurement':read_measurement(measurement_id,_read_dsn(),version)}
+
+
+@app.get('/v1/dimensions/bindings')
+def dimension_bindings():
+    from .cad_dimensions import listing
+    return listing('bindings',_read_dsn())
+
+
+@app.post('/v1/dimensions/bindings')
+def dimension_binding_register(payload: BindingRegistration,request: Request):
+    from .cad_dimensions import register_binding
+    return {'binding':register_binding(payload.model_dump(),_write_dsn(),request.state.identity)}
+
+
+@app.get('/v1/dimensions/bindings/{binding_id}')
+def dimension_binding_detail(binding_id: str,version: int | None=Query(default=None,ge=1)):
+    from .cad_dimensions import read_binding
+    return read_binding(binding_id,_read_dsn(),version)
+
+
+@app.post('/v1/dimensions/bindings/{binding_id}/approvals')
+def dimension_approval_register(binding_id: str,payload: ApprovalRequest,request: Request):
+    from .cad_dimensions import record_approval
+    return {'approval':record_approval(binding_id,payload.model_dump(),_write_dsn(),request.state.identity)}
+
+
+@app.post('/v1/dimensions/bindings/{binding_id}/comparisons')
+def dimension_comparison_register(binding_id: str,payload: ComparisonRequest,request: Request):
+    from .cad_dimensions import comparison
+    return comparison(binding_id,payload.model_dump(),_write_dsn(),request.state.identity)
+
+
+@app.get('/v1/dimensions/bindings/{binding_id}/comparisons')
+def dimension_comparison_history(binding_id: str,offset: int=Query(default=0,ge=0,le=10000),
+                                 limit: int=Query(default=20,ge=1,le=50)):
+    from .cad_dimensions import comparison_history
+    return comparison_history(binding_id,_read_dsn(),offset,limit)
+
+
+@app.get('/v1/dimensions/comparisons/{comparison_id}')
+def dimension_comparison_replay(comparison_id: str):
+    from .cad_dimensions import replay
+    return replay(comparison_id,_read_dsn())
+
+
+@app.get('/v1/auth/me')
+def auth_me(request: Request,response: Response):
+    from .auth import current
+    identity=current(request,_write_dsn())
+    response.headers['Cache-Control']='no-store'
+    return {'user':{k:v for k,v in identity.items() if k not in {'csrf_token','_session_hash'}} if identity else None,
+            'csrf_token':identity['csrf_token'] if identity else None}
+
+
+@app.post('/v1/auth/login')
+def auth_login(payload: LoginRequest,request: Request,response: Response):
+    from .auth import login,COOKIE,SESSION_SECONDS
+    token,user,csrf=login(request,payload.username,payload.password,_write_dsn())
+    response.set_cookie(COOKIE,token,max_age=SESSION_SECONDS,httponly=True,samesite='strict',
+                        secure=request.url.scheme=='https',path='/')
+    response.headers['Cache-Control']='no-store'
+    return {'user':user,'csrf_token':csrf}
+
+
+@app.post('/v1/auth/logout')
+def auth_logout(request: Request,response: Response):
+    from .auth import logout,COOKIE
+    logout(request,_write_dsn());response.delete_cookie(COOKIE,path='/')
+    return {'status':'signed_out'}
+
+
+@app.get('/v1/authority/candidates')
+def authority_candidates(question: str = Query(min_length=1,max_length=2000)):
+    from .authority import candidates
+    try:return jsonable_encoder({'candidates':candidates(question,_read_dsn())})
+    except ValueError as exc:raise HTTPException(422,detail={'error_code':str(exc)})
+
+
+@app.get('/v1/authority/rules')
+def authority_rules():
+    from .authority import list_rules
+    return jsonable_encoder({'rules':list_rules(_read_dsn())})
+
+
+@app.post('/v1/authority/rules')
+def authority_register(payload: AuthorityRequest,request: Request):
+    from .authority import register
+    try:rule=register(payload.model_dump(),request.state.identity,_write_dsn())
+    except ValueError as exc:raise HTTPException(422,detail={'error_code':str(exc)})
+    return jsonable_encoder({'rule':rule})
+
+
+@app.get('/v1/authority/rules/{rule_id}/events')
+def authority_history(rule_id: str):
+    from .authority import history
+    return jsonable_encoder({'events':history(rule_id,_read_dsn())})
+
+
+@app.post('/v1/authority/rules/{rule_id}/events')
+def authority_activate(rule_id: str,payload: AuthorityEventRequest,request: Request):
+    from .authority import activation
+    return jsonable_encoder({'event':activation(rule_id,payload.model_dump(),request.state.identity,_write_dsn())})
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
 WEB = WEB_DIR / "index.html"
 app.mount("/assets", StaticFiles(directory=WEB_DIR), name="assets")
@@ -94,7 +422,7 @@ def health():
             cur.execute("SELECT count(*) FROM document_assets WHERE status='indexed' AND 'public'=ANY(acl) AND NOT needs_review")
             document_count = cur.fetchone()[0]
         return {"status": "ok", "database": "ready", "agent": "sql+rag",
-                "capabilities": ["sql", "rag", "industrial_rules", "industrial_nl2sql", "fact_reviews"],
+                "capabilities": ["sql", "rag", "industrial_rules", "industrial_nl2sql", "fact_reviews", "local_identity", "fact_approvals", "source_authority"],
                 "knowledge": "ready" if document_count else "empty", "document_count": document_count}
     except psycopg2.Error:
         raise HTTPException(503, detail={"error_code": "DATABASE_UNAVAILABLE"})
@@ -390,22 +718,54 @@ def get_fact_reviews(document_id: str,fact_id: str):
     document=_public_document(document_id);_source_path(document)
     from .fact_reviews import history
     return {'reviews':jsonable_encoder(history(document_id,fact_id,_read_dsn())),
-            'semantics':'Local extraction review; not authenticated identity, source approval or conflict authority'}
+            'semantics':'Authenticated local extraction review; legacy rows have no authenticated identity; separate from approval/authority'}
 
 
 @app.post('/v1/documents/{document_id}/facts/{fact_id}/reviews')
-def review_document_fact(document_id: str,fact_id: str,request: FactReviewRequest):
+def review_document_fact(document_id: str,fact_id: str,request: FactReviewRequest,http_request: Request):
     from .field_store import read_verified_facts
     from .fact_reviews import record
     document=_public_document(document_id);source=_source_path(document)
     facts=read_verified_facts(document,source,_read_dsn())
     fact=next((f for f in facts if f['fact_id']==fact_id),None)
     if not fact:raise HTTPException(409,detail={'error_code':'FACT_UNAVAILABLE_OR_STALE'})
-    payload=request.model_dump();payload['reviewer_label']=payload['reviewer_label'].strip();payload['reason']=payload['reason'].strip()
-    if not payload['reviewer_label'] or not payload['reason']:raise HTTPException(422,detail={'error_code':'REVIEW_LABEL_AND_REASON_REQUIRED'})
-    result=record(document,fact,source,payload,_write_dsn())
+    identity=http_request.state.identity
+    if request.reviewer_label is not None and request.reviewer_label!=identity['display_name']:
+        raise HTTPException(422,detail={'error_code':'REVIEWER_IDENTITY_SERVER_OWNED'})
+    payload=request.model_dump();payload['reviewer_label']=identity['display_name'];payload['reason']=payload['reason'].strip()
+    if not payload['reason']:raise HTTPException(422,detail={'error_code':'REVIEW_REASON_REQUIRED'})
+    payload.update(reviewer_user_id=identity['user_id'],reviewer_roles=identity['roles'])
+    result=record(document,fact,source,payload,_write_dsn(),identity=identity)
+    current_fact=next((f for f in read_verified_facts(document,source,_read_dsn()) if f['fact_id']==fact_id),None)
     return {'review':jsonable_encoder({k:v for k,v in result.items() if k not in ('fact_snapshot','request_payload')}),
+            'field_state':jsonable_encoder({k:current_fact[k] for k in ('latest_review','latest_approval','formal_approval_status')}) if current_fact else None,
             'semantics':'Only extraction fidelity is reviewed; source approval and unresolved conflicts remain unchanged'}
+
+
+@app.get('/v1/documents/{document_id}/facts/{fact_id}/approvals')
+def get_fact_approvals(document_id: str,fact_id: str):
+    document=_public_document(document_id);_source_path(document)
+    from .approvals import history
+    return {'approvals':jsonable_encoder(history(document_id,fact_id,_read_dsn())),
+            'semantics':'Separate version-bound local approval; does not overwrite source declarations or resolve conflicts'}
+
+
+@app.post('/v1/documents/{document_id}/facts/{fact_id}/approvals')
+def approve_document_fact(document_id: str,fact_id: str,request: FactApprovalRequest,http_request: Request):
+    from .field_store import read_verified_facts
+    from .approvals import record
+    document=_public_document(document_id);source=_source_path(document)
+    fact=next((f for f in read_verified_facts(document,source,_read_dsn()) if f['fact_id']==fact_id),None)
+    if not fact:raise HTTPException(409,detail={'error_code':'FACT_UNAVAILABLE_OR_STALE'})
+    payload=request.model_dump();payload['reason']=payload['reason'].strip()
+    if not payload['reason']:raise HTTPException(422,detail={'error_code':'APPROVAL_REASON_REQUIRED'})
+    identity=http_request.state.identity
+    payload.update(approver_user_id=identity['user_id'],approver_label=identity['display_name'],approver_roles=identity['roles'])
+    result=record(document,fact,source,payload,_write_dsn(),identity=identity)
+    current_fact=next((f for f in read_verified_facts(document,source,_read_dsn()) if f['fact_id']==fact_id),None)
+    return {'approval':jsonable_encoder({k:v for k,v in result.items() if k not in {'fact_snapshot','request_payload'}}),
+            'field_state':jsonable_encoder({k:current_fact[k] for k in ('latest_review','latest_approval','formal_approval_status')}) if current_fact else None,
+            'semantics':'A separate local approval; original approval declaration and conflicting source values are preserved'}
 
 
 @app.get("/v1/documents/{document_id}/pages/{page_no}")

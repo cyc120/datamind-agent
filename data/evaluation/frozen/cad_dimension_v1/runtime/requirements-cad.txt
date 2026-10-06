@@ -1,0 +1,2 @@
+# Optional offline CAD reader/renderer. Install into the project environment.
+ezdxf==1.4.4

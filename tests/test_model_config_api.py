@@ -97,6 +97,8 @@ class ProviderProtocolTest(unittest.TestCase):
 class ProfileAPITest(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
+        from auth_fixtures import login
+        login(self.client,roles=('admin',))
         self.state = list_profiles()
 
     def tearDown(self):
@@ -110,6 +112,8 @@ class ProfileAPITest(unittest.TestCase):
         if self.state.get("active"):
             activate_profile(self.state["active"])
         self.client.close()
+        from auth_fixtures import cleanup
+        cleanup(self.client)
 
     def create(self, **overrides):
         payload = {"name": "测试配置", "protocol": "anthropic", "base_url": "https://api.anthropic.com",
