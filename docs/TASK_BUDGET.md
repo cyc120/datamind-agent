@@ -1,6 +1,6 @@
 # 统一任务预算与进程时限
 
-2026-10-07，API **0.19.0**。本阶段为解析、OCR 与登记类任务提供统一的资源预算和**硬进程时限**，补齐 [原生 PDF 准备](PDF_PREPARATION.md) 与 [多文件并发方案](MULTIFILE_CONCURRENCY.md) 中记录的缺口：「跨主机任务的租约、资源槽和子进程 deadline 仍需工作器实现」。
+2026-10-07，API **0.19.0** 引入预算原语，**0.20.0** 接入 OCR/公式。本阶段为解析、OCR 与登记类任务提供统一的资源预算和**硬进程时限**，补齐 [原生 PDF 准备](PDF_PREPARATION.md) 与 [多文件并发方案](MULTIFILE_CONCURRENCY.md) 中记录的缺口：「跨主机任务的租约、资源槽和子进程 deadline 仍需工作器实现」。
 
 ## 提供的能力
 
@@ -9,6 +9,7 @@
 | 原语 | 作用 |
 |---|---|
 | `run_bounded(module, function, args, …)` | 在**独立进程组**中执行 `module.function(*args)`，挂钟超时后终止整组 |
+| `run_bounded_command(argv, stdin_text, …)` | 同上，但执行**任意命令**（可为独立解释器/入口脚本），成功仅表示退出码为 0，stdout 由调用方解释 |
 | `resource_slot(dsn, name, concurrency)` | 用 PostgreSQL 会话 advisory lock 限制跨进程同时运行数，无空槽立即 `503/TASK_BUDGET_BUSY` |
 | `effective_dsn(dsn)` | 解析当前进程**实际连接**的数据库名，避免子进程写入原库 |
 | `validate_deadline` / `configured_*` | 参数与环境变量校验（`DATAMIND_TASK_DEADLINE_SECONDS`、`DATAMIND_TASK_GRACE_SECONDS`、`DATAMIND_TASK_OUTPUT_BYTES`、`DATAMIND_TASK_SLOTS`） |
@@ -30,6 +31,8 @@
 - `datamind/file_jobs.py`：`work_once` / `drain` 新增可选 `deadline_s`。设置后每次登记在该预算下的独立进程组执行，超时记为 `FILE_JOB_DEADLINE_EXCEEDED` 并释放租约；数据库中的取消请求会终止运行中的进程组并记为 `cancelled`。不设置时保持原有进程内线程路径。
 - `scripts/file_job_worker.py`：新增 `--deadline`、`--grace`。
 - `scripts/prepare_pdf.py`：新增 `--deadline`、`--grace`，在独立进程组内运行准备；`ingestion/pdf_prepare.py` 新增 JSON 入口 `prepare_json` / `verify_json`。
+- `ingestion/formula.py`：公式识别经 `run_bounded_command` 在 `.venv-formula` 独立解释器中执行，可选跨进程槽，保留 `FORMULA_TIMEOUT` 等错误码。
+- `ingestion/ocr.py` + `ingestion/ocr_worker.py`：`page_blocks_bounded` 在独立进程组内渲染并 OCR 单页，映射 `OCR_TIMEOUT`/`OCR_CANCELLED`/`OCR_FAILED`；`ingestion/ingest.py` 通过 `--ocr-deadline`/`--ocr-slots` 可选启用（默认仍在解析进程内）。
 
 ```bash
 # 受控登记 worker：每次登记独立进程组，60 秒硬时限
@@ -43,7 +46,7 @@
 
 ## 验证
 
-`tests/test_task_budget.py` **17/17**、`tests/test_file_jobs.py` **25/25**，完整隔离回归见 `reports/task_budget_verification.json`。其中：
+`tests/test_task_budget.py` **23/23**、`tests/test_file_jobs.py` **25/25**、`tests/test_pdf_ocr.py` **13/13**，完整隔离回归见 `reports/task_budget_verification.json`。其中：
 
 - 真实子进程（`sleep 60`）在 1 秒时限内被终止，且 `sh -c 'echo $$ > pid; sleep 60'` 的孙进程一并消失。
 - 输出上限：10 万字节 stdout 被截到 4096 字节，`output_truncated=true`，且无法产生结果。
@@ -51,6 +54,7 @@
 - 取消传播：`cancel_event` 在 0.5 秒后置位，`sleep 60` 子进程被立即终止并返回 `TASK_CANCELLED`。
 - `effective_dsn` 指向当前数据库；登记接线把 claim、deadline 与该 DSN 交给子进程。
 - CLI 冒烟：真实原生 PDF 在 60 秒时限下准备成功、`verified=true`；非法时限与孤立 `--grace` 均以 exit 2 拒绝。
+- 真实扫描页 OCR：子进程路径与进程内路径的块与 detail 关键字段**完全一致**（16 块、27 行、1.79 秒）；同一页给 1 秒时限时进程组被终止并返回 `OCR_TIMEOUT`。
 
 这些是组件与契约证据，不是 OCR/问答准确率。
 

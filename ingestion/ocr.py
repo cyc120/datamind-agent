@@ -2,15 +2,33 @@
 from functools import lru_cache
 import hashlib
 from importlib.metadata import version
+import json
 from pathlib import Path
 import re
+import sys
 
 import cv2
 import numpy as np
+from fastapi import HTTPException
+
+from datamind import task_budget
 
 OCR_VERSION = "rapidocr-tables-v2"
 OCR_DPI = 240
 MIN_CONFIDENCE = 0.75
+OCR_DEADLINE_SECONDS = 180.0
+OCR_SLOTS = 2
+OCR_SLOT_NAME = 'ocr-page'
+OCR_MARKER = "DATAMIND_OCR_RESULT:"
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class OcrWorkerError(RuntimeError):
+    """Stable bounded-OCR failure; the code is recorded as a parse gap."""
+
+    def __init__(self, code):
+        self.code = code
+        super().__init__(code)
 
 
 @lru_cache(maxsize=1)
@@ -105,3 +123,51 @@ def page_blocks(page, page_no, *, ocr=None, table_recognizer=None):
               "model_confidence_mean": float(np.mean([line["confidence"] for line in lines])) if lines else None,
               "tables": table_findings, "warnings": warnings}
     return blocks, detail
+
+
+def page_blocks_bounded(pdf_path, page_no, *, dsn=None, deadline_s=None, slots=None, grace_s=None):
+    """Recognise one page in its own process group under the shared task budget.
+
+    Returns the same `(blocks, detail)` pair as `page_blocks`. Failures raise
+    `OcrWorkerError` with a stable code so the caller records a parse gap instead of
+    publishing partial pixels as a complete page.
+    """
+    if not isinstance(page_no, int) or isinstance(page_no, bool) or page_no < 1:
+        raise OcrWorkerError("OCR_PAGE_NUMBER_INVALID")
+    payload = json.dumps({"pdf_path": str(pdf_path), "page_no": page_no})
+
+    def run():
+        return task_budget.run_bounded_command(
+            [sys.executable, str(ROOT / "ingestion" / "ocr_worker.py")], payload,
+            deadline_s=deadline_s or OCR_DEADLINE_SECONDS, grace_s=grace_s,
+            fallback_error_code="OCR_FAILED")
+
+    try:
+        if dsn:
+            # Bound simultaneous native OCR sessions across processes.
+            with task_budget.resource_slot(dsn, OCR_SLOT_NAME,
+                                           slots or task_budget.configured_slots(OCR_SLOTS)):
+                outcome = run()
+        else:
+            outcome = run()
+    except HTTPException as error:
+        code = error.detail.get('error_code') if isinstance(error.detail, dict) else None
+        raise OcrWorkerError(code or "OCR_FAILED")
+    if outcome['status'] == 'timeout':
+        raise OcrWorkerError("OCR_TIMEOUT")
+    if outcome['status'] == 'cancelled':
+        raise OcrWorkerError("OCR_CANCELLED")
+    if outcome['status'] != 'ok':
+        raise OcrWorkerError("OCR_FAILED")
+    line = next((item for item in reversed(outcome['stdout'].splitlines())
+                 if item.startswith(OCR_MARKER)), None)
+    if not line:
+        raise OcrWorkerError("OCR_FAILED")
+    try:
+        result = json.loads(line.split(":", 1)[1])
+        blocks, detail = result["blocks"], result["detail"]
+        if not isinstance(blocks, list) or not isinstance(detail, dict):
+            raise ValueError("shape")
+        return blocks, detail
+    except (ValueError, KeyError, TypeError):
+        raise OcrWorkerError("OCR_FAILED")

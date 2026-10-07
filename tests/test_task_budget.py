@@ -164,6 +164,44 @@ class TaskBudgetRunnerTests(unittest.TestCase):
             self.assertEqual(cur.fetchone()[0], expected)
 
 
+class TaskBudgetCommandTests(unittest.TestCase):
+    def test_command_runs_any_interpreter_and_reports_success(self):
+        result = task_budget.run_bounded_command(['/bin/sh', '-c', 'printf hello'], deadline_s=30)
+        self.assertEqual(result['status'], 'ok', result)
+        self.assertEqual(result['exit_code'], 0)
+        self.assertEqual(result['stdout'], 'hello')
+
+    def test_command_receives_its_stdin_payload(self):
+        result = task_budget.run_bounded_command(['/bin/cat'], 'payload-text', deadline_s=30)
+        self.assertEqual(result['status'], 'ok', result)
+        self.assertEqual(result['stdout'], 'payload-text')
+
+    def test_command_nonzero_exit_uses_the_fallback_code(self):
+        result = task_budget.run_bounded_command(['/bin/sh', '-c', 'exit 7'], deadline_s=30,
+                                                 fallback_error_code='SYNTHETIC_FALLBACK')
+        self.assertEqual(result['status'], 'failed', result)
+        self.assertEqual(result['error_code'], 'SYNTHETIC_FALLBACK')
+        self.assertEqual(result['exit_code'], 7)
+
+    def test_command_deadline_terminates_the_group(self):
+        started = time.monotonic()
+        result = task_budget.run_bounded_command(['/bin/sleep', '60'], deadline_s=1, grace_s=1)
+        self.assertEqual(result['status'], 'timeout', result)
+        self.assertEqual(result['error_code'], 'TASK_DEADLINE_EXCEEDED')
+        self.assertLess(time.monotonic() - started, 10)
+
+    def test_command_accepts_an_explicit_environment(self):
+        result = task_budget.run_bounded_command(['/bin/sh', '-c', 'printf %s "$SYNTHETIC_FLAG"'],
+                                                 deadline_s=30, env={'SYNTHETIC_FLAG': 'set'})
+        self.assertEqual(result['status'], 'ok', result)
+        self.assertEqual(result['stdout'], 'set')
+
+    def test_command_arguments_are_validated(self):
+        for argv in ([], 'not-a-list', [''], ['ok', 3], None):
+            with self.assertRaises(ValueError):
+                task_budget.run_bounded_command(argv, deadline_s=30)
+
+
 class TaskBudgetSlotTests(unittest.TestCase):
     def test_slots_are_bounded_and_released(self):
         name = 'task-budget-test-' + str(os.getpid())

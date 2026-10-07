@@ -220,28 +220,26 @@ def _terminate_group(process, grace):
         pass
 
 
-def run_bounded(module, function, args, *, deadline_s=None, output_limit=None, grace_s=None,
-                env=None, fallback_error_code='TASK_EXECUTION_FAILED', cwd=None,
-                cancel_event=None, poll_interval=0.5):
-    """Run `module.function(*args)` in a separate process group under a hard deadline.
+def _child_env(env):
+    child_env = dict(os.environ if env is None else env)
+    child_env['PYTHONPATH'] = str(ROOT) + os.pathsep + child_env.get('PYTHONPATH', '')
+    child_env['PYTHONDONTWRITEBYTECODE'] = '1'
+    return child_env
 
-    `args` must be JSON-serializable; pass `effective_dsn(dsn)` when the target needs a
-    database connection. Output is captured up to `output_limit` bytes per stream and
-    never raises for a crash or a timeout: the outcome is returned as a status dict.
-    Setting `cancel_event` terminates the group early and returns `status='cancelled'`.
-    """
+
+def _policy(deadline_s, output_limit, grace_s, poll_interval):
     deadline = validate_deadline(deadline_s if deadline_s is not None else configured_deadline())
     limit = int(_bounded_number(output_limit if output_limit is not None else configured_output_limit(),
                                 'output', MIN_OUTPUT_BYTES, MAX_OUTPUT_BYTES))
     grace = _bounded_number(grace_s if grace_s is not None else configured_grace(), 'grace', 0.0, 120.0)
     interval = _bounded_number(poll_interval, 'poll', 0.05, 5.0)
-    request = {'module': module, 'function': function, 'args': list(args),
-               'fallback_error_code': fallback_error_code}
-    child_env = dict(os.environ if env is None else env)
-    child_env['PYTHONPATH'] = str(ROOT) + os.pathsep + child_env.get('PYTHONPATH', '')
-    child_env['PYTHONDONTWRITEBYTECODE'] = '1'
+    return deadline, limit, grace, interval
+
+
+def _run_child(argv, stdin_text, deadline, limit, grace, interval, child_env, cwd, cancel_event):
+    """Start `argv` in its own process group, feed stdin, and enforce the deadline."""
     started = time.monotonic()
-    process = subprocess.Popen([sys.executable, '-c', _RUNNER], cwd=str(cwd or ROOT), env=child_env,
+    process = subprocess.Popen(argv, cwd=str(cwd or ROOT), env=child_env,
                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                start_new_session=True)
     out, err = _Capped(limit), _Capped(limit)
@@ -250,7 +248,8 @@ def run_bounded(module, function, args, *, deadline_s=None, output_limit=None, g
     for reader in readers:
         reader.start()
     try:
-        process.stdin.write(json.dumps(request, ensure_ascii=False).encode('utf-8'))
+        if stdin_text:
+            process.stdin.write(stdin_text.encode('utf-8'))
     except (BrokenPipeError, OSError, ValueError):
         pass
     finally:
@@ -283,6 +282,52 @@ def run_bounded(module, function, args, *, deadline_s=None, output_limit=None, g
             'elapsed_ms': round((time.monotonic() - started) * 1000, 1),
             'deadline_seconds': deadline, 'stdout_bytes': out.total, 'stderr_bytes': err.total,
             'output_truncated': out.truncated() or err.truncated()}
+    return base, out, err, timed_out, cancelled
+
+
+def run_bounded_command(argv, stdin_text='', *, deadline_s=None, output_limit=None, grace_s=None,
+                        env=None, cwd=None, cancel_event=None, poll_interval=0.5,
+                        fallback_error_code='TASK_EXECUTION_FAILED'):
+    """Run an explicit command in its own process group under the same budget.
+
+    Use this for targets that need their own interpreter or entry point (for example the
+    isolated formula environment). Success only means the process exited 0; interpreting
+    stdout is the caller's responsibility. Timeouts and cancellations terminate the whole
+    group and are reported with the shared codes.
+    """
+    if not isinstance(argv, (list, tuple)) or not argv or not all(isinstance(x, str) and x for x in argv):
+        raise ValueError('TASK_BUDGET_COMMAND_INVALID')
+    deadline, limit, grace, interval = _policy(deadline_s, output_limit, grace_s, poll_interval)
+    base, out, err, timed_out, cancelled = _run_child(list(argv), stdin_text, deadline, limit, grace,
+                                                      interval, _child_env(env), cwd, cancel_event)
+    if cancelled:
+        return {**base, 'status': 'cancelled', 'error_code': 'TASK_CANCELLED',
+                'stdout': out.text(), 'stderr': err.text()}
+    if timed_out:
+        return {**base, 'status': 'timeout', 'error_code': DEADLINE_ERROR_CODE,
+                'stdout': out.text(), 'stderr': err.text()}
+    if base['exit_code'] == 0:
+        return {**base, 'status': 'ok', 'stdout': out.text(), 'stderr': err.text()}
+    return {**base, 'status': 'failed', 'error_code': fallback_error_code,
+            'stdout': out.text(), 'stderr': err.text()}
+
+
+def run_bounded(module, function, args, *, deadline_s=None, output_limit=None, grace_s=None,
+                env=None, fallback_error_code='TASK_EXECUTION_FAILED', cwd=None,
+                cancel_event=None, poll_interval=0.5):
+    """Run `module.function(*args)` in a separate process group under a hard deadline.
+
+    `args` must be JSON-serializable; pass `effective_dsn(dsn)` when the target needs a
+    database connection. Output is captured up to `output_limit` bytes per stream and
+    never raises for a crash or a timeout: the outcome is returned as a status dict.
+    Setting `cancel_event` terminates the group early and returns `status='cancelled'`.
+    """
+    deadline, limit, grace, interval = _policy(deadline_s, output_limit, grace_s, poll_interval)
+    request = {'module': module, 'function': function, 'args': list(args),
+               'fallback_error_code': fallback_error_code}
+    base, out, err, timed_out, cancelled = _run_child(
+        [sys.executable, '-c', _RUNNER], json.dumps(request, ensure_ascii=False), deadline, limit,
+        grace, interval, _child_env(env), cwd, cancel_event)
     if cancelled:
         return {**base, 'status': 'cancelled', 'error_code': 'TASK_CANCELLED',
                 'stdout': out.text(), 'stderr': err.text()}
@@ -295,7 +340,7 @@ def run_bounded(module, function, args, *, deadline_s=None, output_limit=None, g
         payload = None
     if not isinstance(payload, dict) or 'ok' not in payload:
         return {**base, 'status': 'failed',
-                'error_code': fallback_error_code if process.returncode else 'TASK_RESULT_INVALID',
+                'error_code': fallback_error_code if base['exit_code'] else 'TASK_RESULT_INVALID',
                 'stdout': out.text(), 'stderr': err.text()}
     if payload.get('ok'):
         return {**base, 'status': 'ok', 'value': payload.get('value')}

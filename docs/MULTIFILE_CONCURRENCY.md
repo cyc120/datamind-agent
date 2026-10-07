@@ -108,7 +108,7 @@ python scripts/file_job_worker.py --watch --workers 2
 
 全部 API 进程共享同一数据库的两个 session advisory 检索槽，忙时 503，模型/文件/向量操作没有长事务；连接失效后探测并拒绝结果。总候选 512、源文本 20 万 UTF-8 字节、DB JSONB 计划 16 MiB，取行时同 SQL 过滤预算并再次核对实际内容。所有文件复核后联合读取完整点集合，再单条 SQL 复核原始 DB JSONB 摘要，响应编码后重查身份。
 
-两个检索槽与两个索引 running 槽独立，数据库断连不能物理取消已进入原生推理的任务，不是全部任务统一 CPU/内存硬隔离或完整 deadline。API 0.19.0 已新增[统一任务预算与进程时限](TASK_BUDGET.md)提供挂钟 deadline、进程组终止与跨进程资源槽，登记 worker 与 PDF 准备 CLI 可选接入；OCR/公式阶段与统一 CPU/内存配额仍待接入。专项 14/14、联合 capture 8/8、HTTP 32/32，本地真实 BGE/独立认证 Qdrant 的两文件历史场景通过；合成与实际模型记录分别保留。私有模型回答已完成，PDF/OCR 解析队列、自动修复/回收待补，完整限制见 [私有 PDF 检索](PDF_PRIVATE_SEARCH.md)。
+两个检索槽与两个索引 running 槽独立，数据库断连不能物理取消已进入原生推理的任务，不是全部任务统一 CPU/内存硬隔离或完整 deadline。API 0.19.0 已新增[统一任务预算与进程时限](TASK_BUDGET.md)提供挂钟 deadline、进程组终止与跨进程资源槽，登记 worker、PDF 准备 CLI、扫描页 OCR 与公式会话均可选接入；统一 CPU/内存配额与跨主机租约仍待接入。专项 14/14、联合 capture 8/8、HTTP 32/32，本地真实 BGE/独立认证 Qdrant 的两文件历史场景通过；合成与实际模型记录分别保留。私有模型回答已完成，PDF/OCR 解析队列、自动修复/回收待补，完整限制见 [私有 PDF 检索](PDF_PRIVATE_SEARCH.md)。
 
 ## PDF/OCR 完整发布路线（私有索引/冻结计划恢复与检索已实现，解析队列和完整回收待补）
 

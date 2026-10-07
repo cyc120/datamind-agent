@@ -5,13 +5,13 @@ import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
-import subprocess
 
 import cv2
 import numpy as np
 import pymupdf
 
 from ingestion import formula, ingest, ocr
+from datamind import task_budget
 from datamind.rag_engine import verify_claims
 
 
@@ -72,9 +72,35 @@ class FormulaBoundaryTest(unittest.TestCase):
         self.assertTrue(all(not b["text"] for b in blocks if b["block_type"] == "figure"))
 
     def test_worker_timeout_is_a_parse_gap(self):
+        timeout = {"status": "timeout", "error_code": "TASK_DEADLINE_EXCEEDED", "exit_code": -15,
+                   "elapsed_ms": 90000.0, "deadline_seconds": 90.0, "stdout": "", "stderr": ""}
         with patch.object(Path, "is_file", return_value=True), \
-             patch.object(subprocess, "run", side_effect=subprocess.TimeoutExpired("worker", 90)):
+             patch.object(task_budget, "run_bounded_command", return_value=timeout) as runner:
             self.assertEqual(formula.recognize([Path("crop.png")])["error_code"], "FORMULA_TIMEOUT")
+        self.assertEqual(runner.call_args.kwargs["deadline_s"], 90.0)
+        self.assertIn("formula_worker.py", runner.call_args.args[0][1])
+
+    def test_worker_failure_and_missing_result_are_gaps(self):
+        failed = {"status": "failed", "error_code": "FORMULA_INFERENCE_FAILED", "exit_code": 1,
+                  "elapsed_ms": 5.0, "deadline_seconds": 90.0, "stdout": "", "stderr": "boom"}
+        with patch.object(Path, "is_file", return_value=True), \
+             patch.object(task_budget, "run_bounded_command", return_value=failed):
+            self.assertEqual(formula.recognize([Path("crop.png")])["error_code"], "FORMULA_INFERENCE_FAILED")
+        no_marker = {"status": "ok", "exit_code": 0, "elapsed_ms": 5.0, "deadline_seconds": 90.0,
+                     "stdout": "no result marker\n", "stderr": ""}
+        with patch.object(Path, "is_file", return_value=True), \
+             patch.object(task_budget, "run_bounded_command", return_value=no_marker):
+            self.assertEqual(formula.recognize([Path("crop.png")])["error_code"], "FORMULA_INFERENCE_FAILED")
+
+    def test_busy_slot_is_reported_without_running_the_worker(self):
+        from fastapi import HTTPException
+        busy = HTTPException(503, detail={'error_code': 'TASK_BUDGET_BUSY'})
+        with patch.object(Path, "is_file", return_value=True), \
+             patch.object(task_budget, "resource_slot", side_effect=busy), \
+             patch.object(task_budget, "run_bounded_command") as runner:
+            result = formula.recognize([Path("crop.png")], dsn='host=synthetic')
+        self.assertEqual(result["error_code"], "TASK_BUDGET_BUSY")
+        runner.assert_not_called()
 
     def test_latex_percent_is_numeric_evidence_without_allowing_changed_number(self):
         quote = r"g=\frac{S_t-S_{t-1}}{S_{t-1}}\times100\%"
@@ -84,3 +110,41 @@ class FormulaBoundaryTest(unittest.TestCase):
         draft["claims"][0]["text"] = "同比增长率乘以101%。"
         with self.assertRaisesRegex(ValueError, "RAG_UNSUPPORTED_NUMBER"):
             verify_claims(draft, hits)
+
+    def test_bounded_ocr_returns_blocks_and_maps_runner_outcomes(self):
+        payload = {"status": "ok", "exit_code": 0, "stdout": ocr.OCR_MARKER + json.dumps(
+            {"blocks": [{"page_no": 1, "text": "x"}], "detail": {"page_no": 1}}), "stderr": ""}
+        with patch.object(task_budget, "run_bounded_command", return_value=payload) as runner:
+            blocks, detail = ocr.page_blocks_bounded("doc.pdf", 1, deadline_s=60)
+        self.assertEqual(blocks, [{"page_no": 1, "text": "x"}])
+        self.assertEqual(detail, {"page_no": 1})
+        self.assertTrue(runner.call_args.args[0][1].endswith("ocr_worker.py"))
+        self.assertEqual(runner.call_args.kwargs["deadline_s"], 60)
+        for status, code in (("timeout", "OCR_TIMEOUT"), ("cancelled", "OCR_CANCELLED"),
+                             ("failed", "OCR_FAILED")):
+            with patch.object(task_budget, "run_bounded_command",
+                              return_value={"status": status, "stdout": "", "stderr": ""}):
+                with self.assertRaises(ocr.OcrWorkerError) as caught:
+                    ocr.page_blocks_bounded("doc.pdf", 1, deadline_s=60)
+                self.assertEqual(caught.exception.code, code)
+
+    def test_bounded_ocr_rejects_bad_page_and_missing_result_marker(self):
+        with self.assertRaises(ocr.OcrWorkerError) as caught:
+            ocr.page_blocks_bounded("doc.pdf", 0)
+        self.assertEqual(caught.exception.code, "OCR_PAGE_NUMBER_INVALID")
+        for stdout in ("junk", ocr.OCR_MARKER + "{}", ocr.OCR_MARKER + "not-json"):
+            with patch.object(task_budget, "run_bounded_command",
+                              return_value={"status": "ok", "exit_code": 0, "stdout": stdout, "stderr": ""}):
+                with self.assertRaises(ocr.OcrWorkerError) as caught:
+                    ocr.page_blocks_bounded("doc.pdf", 1, deadline_s=60)
+                self.assertEqual(caught.exception.code, "OCR_FAILED")
+
+    def test_bounded_ocr_busy_slot_does_not_start_a_worker(self):
+        from fastapi import HTTPException
+        busy = HTTPException(503, detail={'error_code': 'TASK_BUDGET_BUSY'})
+        with patch.object(task_budget, "resource_slot", side_effect=busy), \
+             patch.object(task_budget, "run_bounded_command") as runner:
+            with self.assertRaises(ocr.OcrWorkerError) as caught:
+                ocr.page_blocks_bounded("doc.pdf", 1, dsn="host=synthetic", deadline_s=60)
+        self.assertEqual(caught.exception.code, "TASK_BUDGET_BUSY")
+        runner.assert_not_called()

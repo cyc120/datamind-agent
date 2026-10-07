@@ -19,12 +19,14 @@ from pathlib import Path
 
 import psycopg2
 import psycopg2.extras
+from psycopg2.extensions import make_dsn
 import pymupdf
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+from datamind import task_budget
 from ingestion import formula, facts
 KB_DIR = ROOT / "data" / "knowledge_base"
 OHR_DIR = ROOT / "data" / "ohr_bench_samples"
@@ -32,6 +34,9 @@ PAGE_IMG_DIR = ROOT / "data" / "object_store" / "page_images"
 
 PG = dict(host="localhost", port=5432, user="datamind_app",
           password="datamind_app_dev", dbname="datamind_meta")
+META_DSN = make_dsn(**PG)
+FORMULA_SLOTS = 1
+OCR_SLOTS = 2
 QDRANT = "http://localhost:6333"
 COLLECTION = "datamind_knowledge"
 EMBED_MODEL = "BAAI/bge-small-zh-v1.5"
@@ -68,7 +73,8 @@ def detect_heading(span_size):
 
 
 def parse_pdf(pdf_path: Path, doc_id: str, ocr_proxy: Path | None = None, *, include_quality=False,
-              ocr_engine=None, formula_engine=None):
+              ocr_engine=None, formula_engine=None, formula_dsn=None, formula_slots=None,
+              formula_deadline=None, ocr_dsn=None, ocr_deadline=None, ocr_slots=None):
     """Parse native text or original pixels. Reference text is never an input."""
     if ocr_proxy is not None:
         raise ValueError("OCR_REFERENCE_INPUT_FORBIDDEN")
@@ -94,12 +100,19 @@ def parse_pdf(pdf_path: Path, doc_id: str, ocr_proxy: Path | None = None, *, inc
         if native_chars < 30:
             try:
                 from ingestion import ocr
-                page_ocr, page_detail = ocr.page_blocks(page, pno + 1, ocr=ocr_engine)
+                if ocr_deadline is not None:
+                    # Opt-in: the native OCR session runs in its own process group under
+                    # the shared budget instead of the parsing process.
+                    page_ocr, page_detail = ocr.page_blocks_bounded(
+                        pdf_path, pno + 1, dsn=ocr_dsn, deadline_s=ocr_deadline, slots=ocr_slots)
+                else:
+                    page_ocr, page_detail = ocr.page_blocks(page, pno + 1, ocr=ocr_engine)
                 blocks.extend(page_ocr)
                 detail["ocr_model"] = ocr.model_manifest(ocr_engine)
                 detail["pages"].append(page_detail)
             except Exception as exc:
-                detail["pages"].append({"page_no": pno + 1, "route": "pixel_ocr", "error_code": "OCR_FAILED",
+                detail["pages"].append({"page_no": pno + 1, "route": "pixel_ocr",
+                                        "error_code": getattr(exc, "code", None) or "OCR_FAILED",
                                         "exception_type": type(exc).__name__})
             continue
         detail["pages"].append({"page_no": pno + 1, "route": "native_text", "native_chars": native_chars})
@@ -167,7 +180,9 @@ def parse_pdf(pdf_path: Path, doc_id: str, ocr_proxy: Path | None = None, *, inc
             })
 
     if figure_inputs:
-        parsed = (formula_engine or formula.recognize)([path for _, path in figure_inputs])
+        parsed = (formula_engine or (lambda crops: formula.recognize(
+            crops, dsn=formula_dsn, slots=formula_slots, deadline_s=formula_deadline)))(
+                [path for _, path in figure_inputs])
         detail["formula_model"] = parsed.get("manifest")
         detail["formula_error"] = parsed.get("error_code")
         for (block, crop), candidate in zip(figure_inputs, parsed.get("results", [])):
@@ -275,10 +290,32 @@ def build_chunks(blocks, doc_id):
 # 主流程
 # ============================================================
 def main():
+    global FORMULA_SLOTS
     ap = argparse.ArgumentParser()
     ap.add_argument("--reset", action="store_true", help="清空后重建索引")
     ap.add_argument("--refresh", action="store_true", help="保留文档资产，重新解析并刷新切片/向量")
+    ap.add_argument("--formula-slots", type=int, default=FORMULA_SLOTS, metavar="N",
+                    help="跨进程公式会话槽上限（1–8）；无空槽时该文档公式保留为解析缺口")
+    ap.add_argument("--formula-deadline", type=float, metavar="SECONDS",
+                    help="公式会话挂钟时限（0.5–3600），默认 90")
+    ap.add_argument("--ocr-deadline", type=float, metavar="SECONDS",
+                    help="扫描页 OCR 在独立进程组内的挂钟时限（0.5–3600）；默认在解析进程内执行")
+    ap.add_argument("--ocr-slots", type=int, default=OCR_SLOTS, metavar="N",
+                    help="跨进程 OCR 槽上限（1–8）；无空槽时该页保留为解析缺口")
     args = ap.parse_args()
+    if not 1 <= args.formula_slots <= 8:
+        ap.error("--formula-slots must be between 1 and 8")
+    if not 1 <= args.ocr_slots <= 8:
+        ap.error("--ocr-slots must be between 1 and 8")
+    for name in ("formula_deadline", "ocr_deadline"):
+        value = getattr(args, name)
+        if value is None:
+            continue
+        try:
+            setattr(args, name, task_budget.validate_deadline(value))
+        except ValueError:
+            ap.error(f"--{name.replace('_', '-')} must be between 0.5 and 3600 seconds")
+    FORMULA_SLOTS = args.formula_slots
 
     from db.migrate import migrate
     migrate()
@@ -348,7 +385,11 @@ def main():
              digest, str(path), 0, "zh", ["public"], None, None, PARSER_VERSION))
 
         if job["file_type"] == "pdf":
-            blocks, page_count, q_detail = parse_pdf(path, doc_id, include_quality=True)
+            blocks, page_count, q_detail = parse_pdf(path, doc_id, include_quality=True,
+                                                     formula_dsn=META_DSN, formula_slots=FORMULA_SLOTS,
+                                                     formula_deadline=args.formula_deadline,
+                                                     ocr_dsn=META_DSN, ocr_deadline=args.ocr_deadline,
+                                                     ocr_slots=args.ocr_slots)
             q_detail["document_type"] = job["info"].get("type")
             q_score = None  # Model confidence is not a calibrated document quality score.
         else:
