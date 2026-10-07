@@ -18,7 +18,7 @@ worker 默认一项、可并行两项；所有 worker 通过 PostgreSQL 共用�
 
 预写使用小批次和 `wait=true`，随后逐点读取实际 vector/payload，比对完整 ID 集合、维度、值和来源。ack 或点数不算确认。最后再次检查文件/数据库证据、原 owner、目标快照头、预期私有头和 token/租约，同事务提交 published 状态、结果与当前指针。CAS 冲突保留错误，不改旧请求基线，不删除其他请求或旧版本的点。
 
-计划已冻结但进程中断、部分写入或确认失败，可在租约回收/失败项重试后恢复；计划不存在则重新做首次构建。已发布版本的历史不会因为新头而被重放到当前。发布后的外部点丢失或篡改由切片读取对账并拒绝，当前未提供自动修复已发布存储的入口，也没有孤立点/产物回收。普通任务不执行 reset 或删除 collection。
+计划已冻结但进程中断、部分写入或确认失败，可在租约回收/失败项重试后恢复；计划不存在则重新做首次构建。已发布版本的历史不会因为新头而被重放到当前。发布后的外部点丢失或篡改由切片读取对账并拒绝。API 0.21.0 新增受控维护入口：`POST /v1/pdf-knowledge/publications/{id}/repair` 按冻结计划补齐丢失点（不改计划、发布行或当前头），`GET /v1/pdf-knowledge/orphans` 与 `POST /v1/pdf-knowledge/orphans/reclaim` 扫描/回收无任何冻结计划引用的私有集合点（默认 dry-run，仅限 `pdf_private_*`）。见 [向量修复与孤立回收](PDF_VECTOR_MAINTENANCE.md)。普通任务不执行 reset 或删除 collection。
 
 ## 向量 profile 与独立存储
 

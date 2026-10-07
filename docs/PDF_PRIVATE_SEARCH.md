@@ -69,4 +69,4 @@ python scripts/verify_pdf_search_local.py --model-cache /absolute/path/to/existi
 
 检索槽在模型调用前释放，因此生成期间不持有私有检索并发槽；生成后的复核查关闭该窗口。组件与契约报告见 `reports/pdf_answer_verification.json`（15 项新增测试、完整隔离回归 480/480）。
 
-下一阶段为 PDF/OCR 解析的统一资源预算与进程时限，再补已发布存储修复、孤立回收与授权真实输入验收。当前没有新增上传页面；`answer_generated=true` 只表示本次由受控私有证据生成，不是问答准确率或检索相关性成绩。
+已发布存储修复与孤立点回收见 [向量修复与孤立回收](PDF_VECTOR_MAINTENANCE.md)（API 0.21.0）。下一阶段为统一 CPU/内存配额与跨主机租约，再做授权真实输入验收。当前没有新增上传页面；`answer_generated=true` 只表示本次由受控私有证据生成，不是问答准确率或检索相关性成绩。

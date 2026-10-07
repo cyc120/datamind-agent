@@ -547,9 +547,16 @@ def verify_selection(plans, client=None):
 
 
 @_stable
-def write_and_verify(plan, client=None):
+def repair_plan(plan, client=None):
+    """Re-write points the frozen plan defines but the store no longer holds.
+
+    The plan is the only source of content: nothing is invented, and the plan, the
+    publication row and the current head are never modified. Returns bounded counts so
+    the caller can record what was missing before the repair.
+    """
     _checked_plan(plan)
     from qdrant_client import models
+    missing_total = 0
     with _client(client) as connection:
         _collection(connection, plan['collection'], create=True)
         for start in range(0, len(plan['points']), BATCH_SIZE):
@@ -557,8 +564,16 @@ def write_and_verify(plan, client=None):
             present = _records(connection, plan, points, False)
             missing = [models.PointStruct(**point) for point in points if point['id'] not in present]
             if missing:
+                missing_total += len(missing)
                 try:
                     connection.upsert(plan['collection'], missing, wait=True)
                 except Exception:
                     fail('PDF_INDEX_QDRANT_UNAVAILABLE', 503)
             _records(connection, plan, points, True)
+    return {'collection': plan['collection'], 'expected': len(plan['points']),
+            'missing_before': missing_total, 'repaired': missing_total}
+
+
+@_stable
+def write_and_verify(plan, client=None):
+    repair_plan(plan, client=client)

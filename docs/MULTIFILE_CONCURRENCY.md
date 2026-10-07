@@ -98,7 +98,7 @@ python scripts/file_job_worker.py --watch --workers 2
 
 已封存且认证登记的快照可以另提交私有知识发布请求，HTTP 只入队，独立 CLI worker 做本地嵌入/向量预写/逐点确认，最后短事务 CAS 更新私有知识头。独立 outbox 冻结规范输入与完整计划，120 秒 token/lease 和约 40 秒续租防止过期 owner 提交；全 worker 共用最多 2 个 running 槽，原 owner 重试保留基线与计划，不重新嵌入已有冻结输出。准备/登记与知识头是不同命名空间，不覆盖旧知识表或公共向量。
 
-只有新独立带 key、loopback 的 Qdrant 实例可以作为生产连接；Dot/float32、profile/来源/payload/点 ID 均固定，实际逐点 readback 确认而非只看 ack/count。chunk bbox 保持原数值，payload 使用 `bbox_f64_hex` 克服真实服务器 float64 JSON 回读差异。admin 历史切片要求计划摘要并重验快照/实际点；当前元数据在快照头已换版时拒绝。仍 `public_knowledge_visible=false`，没有模型问答、公开 RAG、上传/解析/OCR 队列、发布后损坏自动修复或孤立回收。详见 [私有知识发布说明](PDF_KNOWLEDGE_PUBLICATION.md)。
+只有新独立带 key、loopback 的 Qdrant 实例可以作为生产连接；Dot/float32、profile/来源/payload/点 ID 均固定，实际逐点 readback 确认而非只看 ack/count。chunk bbox 保持原数值，payload 使用 `bbox_f64_hex` 克服真实服务器 float64 JSON 回读差异。admin 历史切片要求计划摘要并重验快照/实际点；当前元数据在快照头已换版时拒绝。仍 `public_knowledge_visible=false`，没有公开 RAG 或上传/解析/OCR 队列；发布后点损失已可按冻结计划受控修复，孤立点可扫描/回收（API 0.21.0，见 [向量修复与孤立回收](PDF_VECTOR_MAINTENANCE.md)）。详见 [私有知识发布说明](PDF_KNOWLEDGE_PUBLICATION.md)。
 
 控制面 31/31、向量 24/24、HTTP 18/18、完整隔离回归 **411/411**，进程退出 0。假向量控制面、内存 Qdrant+合成嵌入、独立真实 Qdrant 7 项、实际本地 BGE/CLI 一个场景分别记录；真实服务器首次精度失败和两个 CLI 验证脚本失败保留，最终修正后才通过。原库/旧模块/冻结 11/13/8 文件未改，临时库/账户/产物/向量服务已清理，无外部模型调用，不作新识别或问答准确率。报告见 `reports/pdf_index_*` 与 `reports/pdf_vectors_*`。
 
@@ -108,7 +108,7 @@ python scripts/file_job_worker.py --watch --workers 2
 
 全部 API 进程共享同一数据库的两个 session advisory 检索槽，忙时 503，模型/文件/向量操作没有长事务；连接失效后探测并拒绝结果。总候选 512、源文本 20 万 UTF-8 字节、DB JSONB 计划 16 MiB，取行时同 SQL 过滤预算并再次核对实际内容。所有文件复核后联合读取完整点集合，再单条 SQL 复核原始 DB JSONB 摘要，响应编码后重查身份。
 
-两个检索槽与两个索引 running 槽独立，数据库断连不能物理取消已进入原生推理的任务，不是全部任务统一 CPU/内存硬隔离或完整 deadline。API 0.19.0 已新增[统一任务预算与进程时限](TASK_BUDGET.md)提供挂钟 deadline、进程组终止与跨进程资源槽，登记 worker、PDF 准备 CLI、扫描页 OCR 与公式会话均可选接入；统一 CPU/内存配额与跨主机租约仍待接入。专项 14/14、联合 capture 8/8、HTTP 32/32，本地真实 BGE/独立认证 Qdrant 的两文件历史场景通过；合成与实际模型记录分别保留。私有模型回答已完成，PDF/OCR 解析队列、自动修复/回收待补，完整限制见 [私有 PDF 检索](PDF_PRIVATE_SEARCH.md)。
+两个检索槽与两个索引 running 槽独立，数据库断连不能物理取消已进入原生推理的任务，不是全部任务统一 CPU/内存硬隔离或完整 deadline。API 0.19.0 已新增[统一任务预算与进程时限](TASK_BUDGET.md)提供挂钟 deadline、进程组终止与跨进程资源槽，登记 worker、PDF 准备 CLI、扫描页 OCR 与公式会话均可选接入；统一 CPU/内存配额与跨主机租约仍待接入。专项 14/14、联合 capture 8/8、HTTP 32/32，本地真实 BGE/独立认证 Qdrant 的两文件历史场景通过；合成与实际模型记录分别保留。私有模型回答、受控向量修复与孤立点回收已完成，PDF/OCR 解析队列与统一 CPU/内存配额待补，完整限制见 [私有 PDF 检索](PDF_PRIVATE_SEARCH.md)。
 
 ## PDF/OCR 完整发布路线（私有索引/冻结计划恢复与检索已实现，解析队列和完整回收待补）
 

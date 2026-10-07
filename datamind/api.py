@@ -162,7 +162,7 @@ class ProfileImportRequest(BaseModel):
     activate_first: bool = False
 
 
-app = FastAPI(title="DataMind Agent", version="0.20.0")
+app = FastAPI(title="DataMind Agent", version="0.21.0")
 
 
 @app.middleware('http')
@@ -343,6 +343,31 @@ def pdf_knowledge_search(payload: PdfKnowledgeSearchRequest, request: Request):
 def pdf_knowledge_answer(payload: PdfKnowledgeSearchRequest, request: Request):
     from .pdf_answer import answer
     result = jsonable_encoder(answer(payload.model_dump(), _write_dsn()))
+    _pdf_snapshot_recheck(request)
+    return result
+
+
+@app.post('/v1/pdf-knowledge/publications/{publication_id}/repair')
+def pdf_knowledge_repair(publication_id: str, request: Request):
+    from .pdf_maintenance import repair_publication
+    result = jsonable_encoder(repair_publication(publication_id, _write_dsn()))
+    _pdf_snapshot_recheck(request)
+    return result
+
+
+@app.get('/v1/pdf-knowledge/orphans')
+def pdf_knowledge_orphans(request: Request):
+    from .pdf_maintenance import orphan_scan
+    result = jsonable_encoder(orphan_scan(_write_dsn()))
+    _pdf_snapshot_recheck(request)
+    return result
+
+
+@app.post('/v1/pdf-knowledge/orphans/reclaim')
+def pdf_knowledge_reclaim(payload: dict, request: Request):
+    from .pdf_maintenance import reclaim_orphans, reclaim_payload
+    body = reclaim_payload(payload)
+    result = jsonable_encoder(reclaim_orphans(body['collection'], _write_dsn(), confirm=body['confirm']))
     _pdf_snapshot_recheck(request)
     return result
 
