@@ -4,6 +4,8 @@
 
 发布只面向 admin 私有空间。`private_indexed=true` 仅表示数据库已提交该私有版本；`public_knowledge_visible=false`、`source_authority_verified=false`。旧公开问答、旧知识表、事实/复核/审批和演示向量 collection 不接入此流程。当前提供状态和带来源的切片读取，没有新增 PDF 上传、操作页面、解析/OCR 队列或私有模型问答入口。
 
+后续 API 0.17.0 增加已发布版本的管理员多文件证据检索，完整计划摘要和历史选择保持本契约；仅返回本地检索证据，未增加模型回答。范围、跨进程检索槽与复核窗口见 [私有 PDF 检索](PDF_PRIVATE_SEARCH.md)。
+
 ## 发布与中断恢复
 
 `pdf_knowledge_requests` 保存原 owner、执行会话摘要、规范请求、目标快照/登记证据、状态/租约、冻结向量计划和发布结果；它同时是持久 outbox。`pdf_knowledge_heads` 保存每文档当前私有 publication ID，复合外键防止指针引用别的文档。新表不给 PUBLIC/readonly 权限；应用读取使用受 admin 接口保护的数据库连接。

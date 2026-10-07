@@ -23,6 +23,7 @@ from .agent import DataMindAgent, _read_dsn, _write_dsn
 from .knowledge import COLLECTIONS, ROOT
 from .pdf_publications import RegistrationRequest as PdfSnapshotRegistrationRequest
 from .pdf_index import PublicationRequest as PdfKnowledgePublicationRequest
+from .pdf_search import SearchRequest as PdfKnowledgeSearchRequest
 from .providers import (OPENAI, PROTOCOLS, list_models as provider_list_models,
                         test_chat as provider_test_chat)
 from .settings_store import (DEFAULT_BASE_URL, DEFAULT_MODEL, PROFILE_FIELDS, activate_profile,
@@ -161,7 +162,7 @@ class ProfileImportRequest(BaseModel):
     activate_first: bool = False
 
 
-app = FastAPI(title="DataMind Agent", version="0.16.0")
+app = FastAPI(title="DataMind Agent", version="0.17.0")
 
 
 @app.middleware('http')
@@ -328,6 +329,14 @@ def pdf_knowledge_current(document_id: str,request: Request):
     result=jsonable_encoder(current(document_id,_write_dsn()))
     _pdf_snapshot_recheck(request)
     return {'publication':result}
+
+
+@app.post('/v1/pdf-knowledge/search')
+def pdf_knowledge_search(payload: PdfKnowledgeSearchRequest, request: Request):
+    from .pdf_search import search
+    result = jsonable_encoder(search(payload.model_dump(), _write_dsn()))
+    _pdf_snapshot_recheck(request)
+    return result
 
 
 @app.get('/v1/drawings/sources')

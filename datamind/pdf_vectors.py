@@ -216,6 +216,37 @@ def _normalize(vector):
         fail('PDF_INDEX_VECTOR_INVALID')
 
 
+def query_embedding(question, profile, embedder=None):
+    """Use the exact frozen publication profile; never silently migrate models.
+
+    The optional synthetic embedder is a Python test seam, never an HTTP option.
+    Query text uses the same exact-text contract as native chunk embeddings.
+    """
+    _validate_profile(profile)
+    try:
+        valid = (isinstance(question, str) and bool(question.strip()) and len(question) <= 2000
+                 and len(question.encode('utf-8')) <= 8000)
+    except UnicodeError:
+        valid = False
+    if not valid:
+        fail('PDF_SEARCH_QUESTION_INVALID', 422)
+    if embedder is None:
+        if profile['synthetic']:
+            fail('PDF_SEARCH_PRODUCTION_PROFILE_REQUIRED')
+        actual_profile, result = _production_embedding([question])
+    else:
+        actual_profile = _profile(synthetic=True)
+        try:
+            result = list(islice(iter(embedder([question])), 2))
+        except Exception:
+            fail('PDF_INDEX_EMBEDDING_FAILED', 503)
+    if _canonical(actual_profile) != _canonical(profile):
+        fail('PDF_SEARCH_PROFILE_MISMATCH')
+    if len(result) != 1:
+        fail('PDF_INDEX_VECTOR_COUNT_INVALID')
+    return _normalize(result[0])
+
+
 def _vector_bytes(vector):
     if (not isinstance(vector, list) or len(vector) != VECTOR_DIM
             or any(type(v) is not float or not math.isfinite(v) for v in vector)):
@@ -486,6 +517,33 @@ def verify_plan(plan, client=None):
         _collection(connection, plan['collection'])
         for start in range(0, len(plan['points']), BATCH_SIZE):
             _records(connection, plan, plan['points'][start:start + BATCH_SIZE], True)
+
+
+@_stable
+def verify_selection(plans, client=None):
+    """Capture the entire bounded selected ID set in one Qdrant retrieval.
+
+    Selection reads use no ANN search and include no unselected/orphan points.
+    A single capture avoids one document changing while other documents are
+    being read in separate requests. Cross-store reads are still not atomic.
+    """
+    if not isinstance(plans, list) or not 1 <= len(plans) <= 4:
+        fail('PDF_SEARCH_SELECTION_INVALID', 422)
+    for plan in plans:
+        _checked_plan(plan)
+    if len({plan['publication_id'] for plan in plans}) != len(plans):
+        fail('PDF_SEARCH_SELECTION_INVALID', 422)
+    first = plans[0]
+    if any(plan['profile'] != first['profile'] or plan['collection'] != first['collection'] for plan in plans):
+        fail('PDF_SEARCH_PROFILE_MISMATCH')
+    points = [point for plan in plans for point in plan['points']]
+    if len(points) > MAX_CHUNKS:
+        fail('PDF_SEARCH_SELECTION_TOO_LARGE', 422)
+    if len({point['id'] for point in points}) != len(points):
+        fail('PDF_SEARCH_SELECTION_INVALID', 422)
+    with _client(client) as connection:
+        _collection(connection, first['collection'])
+        _records(connection, first, points, True)
 
 
 @_stable
