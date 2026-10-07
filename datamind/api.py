@@ -22,6 +22,7 @@ from psycopg2.extras import RealDictCursor
 from .agent import DataMindAgent, _read_dsn, _write_dsn
 from .knowledge import COLLECTIONS, ROOT
 from .pdf_publications import RegistrationRequest as PdfSnapshotRegistrationRequest
+from .pdf_index import PublicationRequest as PdfKnowledgePublicationRequest
 from .providers import (OPENAI, PROTOCOLS, list_models as provider_list_models,
                         test_chat as provider_test_chat)
 from .settings_store import (DEFAULT_BASE_URL, DEFAULT_MODEL, PROFILE_FIELDS, activate_profile,
@@ -160,7 +161,7 @@ class ProfileImportRequest(BaseModel):
     activate_first: bool = False
 
 
-app = FastAPI(title="DataMind Agent", version="0.15.0")
+app = FastAPI(title="DataMind Agent", version="0.16.0")
 
 
 @app.middleware('http')
@@ -171,7 +172,8 @@ async def identity_permissions(request: Request, call_next):
     dimension_path=path.startswith('/v1/dimensions/')
     files_path=path.startswith('/v1/files/')
     pdf_snapshot_path=path=='/v1/pdf-snapshots' or path.startswith('/v1/pdf-snapshots/')
-    permission=('admin' if files_path or pdf_snapshot_path else
+    pdf_knowledge_path=path=='/v1/pdf-knowledge' or path.startswith('/v1/pdf-knowledge/')
+    permission=('admin' if files_path or pdf_snapshot_path or pdf_knowledge_path else
                 'approver' if dimension_path and request.method=='POST' and path.endswith('/approvals') else
                 'admin' if dimension_path and (request.method=='POST' or path.endswith('/sources')) else
                 'reviewer' if cad_path and request.method=='POST' and path.endswith('/reviews') else
@@ -181,16 +183,16 @@ async def identity_permissions(request: Request, call_next):
                 'approver' if authority_path and request.method=='POST' and path.endswith('/events') else
                 'reviewer' if request.method=='POST' and path.endswith('/reviews') else
                 'approver' if request.method=='POST' and path.endswith('/approvals') else None)
-    if permission or authority_path or cad_path or dimension_path or pdf_snapshot_path:
+    if permission or authority_path or cad_path or dimension_path or pdf_snapshot_path or pdf_knowledge_path:
         from .auth import current
         try:
             request.state.identity=await run_in_threadpool(current,request,_write_dsn(),required=True,
                 permission=permission,mutation=request.method not in {'GET','HEAD','OPTIONS'})
         except HTTPException as exc:
             return JSONResponse(status_code=exc.status_code,content={'detail':exc.detail},
-                                headers={'Cache-Control':'no-store'} if pdf_snapshot_path else None)
+                                headers={'Cache-Control':'no-store'} if pdf_snapshot_path or pdf_knowledge_path else None)
     response=await call_next(request)
-    if cad_path or dimension_path or files_path or pdf_snapshot_path:response.headers['Cache-Control']='no-store'
+    if cad_path or dimension_path or files_path or pdf_snapshot_path or pdf_knowledge_path:response.headers['Cache-Control']='no-store'
     return response
 
 
@@ -274,6 +276,58 @@ def pdf_snapshot_bundle(document_id: str,request: Request,version: int=Query(ge=
             'bundle':json.loads(read_artifact(row,'bundle'))}
     _pdf_snapshot_recheck(request)
     return result
+
+
+@app.post('/v1/pdf-knowledge/publications')
+def pdf_knowledge_publish(payload: PdfKnowledgePublicationRequest,request: Request):
+    from .pdf_index import submit
+    result=jsonable_encoder(submit(payload.model_dump(),_write_dsn(),request.state.identity))
+    _pdf_snapshot_recheck(request)
+    return {'publication':result}
+
+
+@app.get('/v1/pdf-knowledge/publications')
+def pdf_knowledge_publications(request: Request,limit: int=Query(default=20,ge=1,le=50),
+                               offset: int=Query(default=0,ge=0,le=10000)):
+    from .pdf_index import listing
+    result=jsonable_encoder(listing(_write_dsn(),limit=limit,offset=offset))
+    _pdf_snapshot_recheck(request)
+    return result
+
+
+@app.get('/v1/pdf-knowledge/publications/{publication_id}')
+def pdf_knowledge_publication(publication_id: str,request: Request):
+    from .pdf_index import poll
+    result=jsonable_encoder(poll(publication_id,_write_dsn()))
+    _pdf_snapshot_recheck(request)
+    return {'publication':result}
+
+
+@app.post('/v1/pdf-knowledge/publications/{publication_id}/retry')
+def pdf_knowledge_retry(publication_id: str,request: Request):
+    from .pdf_index import retry
+    result=jsonable_encoder(retry(publication_id,_write_dsn(),request.state.identity))
+    _pdf_snapshot_recheck(request)
+    return {'publication':result}
+
+
+@app.get('/v1/pdf-knowledge/publications/{publication_id}/chunks')
+def pdf_knowledge_chunks(publication_id: str,request: Request,
+                          expected_plan_sha256: str=Query(pattern=r'^[a-f0-9]{64}$')):
+    from .pdf_index import read_chunks
+    result=jsonable_encoder(read_chunks(publication_id,_write_dsn()))
+    if result['publication']['plan_sha256']!=expected_plan_sha256:
+        raise HTTPException(409,detail={'error_code':'PDF_INDEX_SELECTION_CHANGED'})
+    _pdf_snapshot_recheck(request)
+    return result
+
+
+@app.get('/v1/pdf-knowledge/documents/{document_id}')
+def pdf_knowledge_current(document_id: str,request: Request):
+    from .pdf_index import current
+    result=jsonable_encoder(current(document_id,_write_dsn()))
+    _pdf_snapshot_recheck(request)
+    return {'publication':result}
 
 
 @app.get('/v1/drawings/sources')

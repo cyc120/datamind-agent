@@ -2,8 +2,8 @@
 
 Requires the existing datamind-postgres container and initialized demo data.
 Only datamind_meta connections in this process are redirected; retail/industrial
-SQL stays read-only. Model settings and private PDF registry rows are excluded
-from the database copy.
+SQL stays read-only. Model settings, private PDF registry rows and private
+knowledge publication/outbox rows are excluded from the database copy.
 """
 import argparse
 import json
@@ -39,6 +39,7 @@ def main():
                                    '--exclude-table-data=dimension_approval_events','--exclude-table-data=dimension_comparisons',
                                    '--exclude-table-data=file_jobs','--exclude-table-data=file_job_items',
                                    '--exclude-table-data=pdf_snapshot_assets','--exclude-table-data=pdf_snapshot_versions',
+                                   '--exclude-table-data=pdf_knowledge_requests','--exclude-table-data=pdf_knowledge_heads',
                                    'datamind_meta'],check=True,capture_output=True).stdout
         subprocess.run(['docker','exec','-i',args.container,'pg_restore','-U','postgres','-d',database],
                        input=dump,check=True,capture_output=True)
@@ -82,7 +83,8 @@ def main():
         result=unittest.TextTestRunner(verbosity=2).run(suite)
         print(json.dumps(dict(tests=result.testsRun,failures=len(result.failures),errors=len(result.errors),
                               metadata_isolated=True,model_settings_copied=False,
-                              private_pdf_snapshot_rows_copied=False,source_database_modified=False)))
+                              private_pdf_snapshot_rows_copied=False,private_pdf_knowledge_rows_copied=False,
+                              source_database_modified=False)))
         return 0 if result.wasSuccessful() else 1
     finally:
         psycopg2.connect=original_connect

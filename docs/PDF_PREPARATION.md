@@ -68,4 +68,4 @@ python scripts/prepare_pdf.py --verify \
 
 旧 `document_blocks` 没有版本字段，旧 `chunks` 的 `UNIQUE(document_id,chunk_index)` 不支持两版并存，工业事实提取器也固定输出版本 1。旧 `/v1/documents` 的来源/页图接口只能校验当前版本；API 0.15.0 已以独立登记表和 `/v1/pdf-snapshots` 认证接口补齐新快照的 CAS 与历史读取，保留旧数据及复核/批准快照。新登记仍不发布到 RAG。
 
-快照登记在数据库事务外检查完整清单，再在事务内重验真实账户与预期前版/前源 SHA，以 CAS 追加独立版本并推进其当前指针；解析期间不持有数据库事务。接入 RAG 前仍要建立版本化向量预写/确认、知识元数据发布及恢复对账，检索只接受已发布版本。扫描件需另接有资源槽和子进程时限的 OCR/公式阶段。完整路线见 [多文件并发方案](MULTIFILE_CONCURRENCY.md)。
+快照登记在数据库事务外检查完整清单，再在事务内重验真实账户与预期前版/前源 SHA，以 CAS 追加独立版本并推进其当前指针；解析期间不持有数据库事务。后续 API 0.16.0 已新增 [私有知识版本发布](PDF_KNOWLEDGE_PUBLICATION.md)，用独立向量计划/outbox 完成预写、确认、私有头 CAS 与中断恢复，未接公开 RAG。私有模型问答与已发布存储修复仍需补齐；扫描件需另接有资源槽和子进程时限的 OCR/公式阶段。完整路线见 [多文件并发方案](MULTIFILE_CONCURRENCY.md)。

@@ -61,4 +61,4 @@ API 只读取本检出的 `data/object_store/pdf_prepared/`，不接受自定义
 
 完整隔离回归 **338/338**（原 292 + 服务 27 + HTTP 19）、进程退出 0，见 `reports/pdf_publication_regression.txt`。原库文档/块/切片/事实/复核/模型配置计数未变，新表未在原库创建；临时测试库和账号/产物已清理。测试副本不复制模型设置或私有快照行，原准备模块与 CAD/尺寸/DXF 的 11/13/8 个冻结摘要不变。核查记录见 `reports/pdf_publication_verification.json`；原检出和原 8000 服务未升级。
 
-当前没有 PDF 上传/准备队列或操作页面，HTTP 不运行原生解析、OCR、公式或嵌入模型。旧 `document_assets/blocks/chunks/facts`、复核/审批和 Qdrant 不被登记改动；同字符串文档 ID 在这个独立命名空间中也不会替换原知识库文档。下一阶段需要向量预写/确认、已发布版本映射与恢复对账，以及有资源槽和进程时限的 PDF/OCR worker；普通任务不能调用全局 reset。
+快照登记仍没有 PDF 上传/准备队列或操作页面，HTTP 不运行原生解析、OCR、公式或嵌入模型。旧 `document_assets/blocks/chunks/facts`、复核/审批和 Qdrant 不被登记改动；同字符串文档 ID 在这个独立命名空间中也不会替换原知识库文档。后续 API 0.16.0 已另实现 [私有知识版本发布](PDF_KNOWLEDGE_PUBLICATION.md)，通过独立 outbox/向量存储完成预写、确认、CAS 与冻结计划恢复；快照登记行的标志不随之改写。私有模型问答、有资源槽/时限的 PDF/OCR worker、已发布点修复与孤立回收仍待实现，普通任务不能调用全局 reset。
