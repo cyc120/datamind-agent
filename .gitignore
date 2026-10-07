@@ -50,3 +50,6 @@ spec_text.txt
 /data/cad_demo/authorized/upload-*
 /data/dimension_demo/development/upload-*
 /data/dimension_demo/authorized/upload-*
+
+# Native PDF preparation sources and private attempt products are runtime data.
+/data/object_store/pdf_prepared/
