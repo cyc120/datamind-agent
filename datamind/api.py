@@ -162,7 +162,7 @@ class ProfileImportRequest(BaseModel):
     activate_first: bool = False
 
 
-app = FastAPI(title="DataMind Agent", version="0.17.0")
+app = FastAPI(title="DataMind Agent", version="0.18.0")
 
 
 @app.middleware('http')
@@ -335,6 +335,14 @@ def pdf_knowledge_current(document_id: str,request: Request):
 def pdf_knowledge_search(payload: PdfKnowledgeSearchRequest, request: Request):
     from .pdf_search import search
     result = jsonable_encoder(search(payload.model_dump(), _write_dsn()))
+    _pdf_snapshot_recheck(request)
+    return result
+
+
+@app.post('/v1/pdf-knowledge/answer')
+def pdf_knowledge_answer(payload: PdfKnowledgeSearchRequest, request: Request):
+    from .pdf_answer import answer
+    result = jsonable_encoder(answer(payload.model_dump(), _write_dsn()))
     _pdf_snapshot_recheck(request)
     return result
 
@@ -622,7 +630,7 @@ def health():
             cur.execute("SELECT count(*) FROM document_assets WHERE status='indexed' AND 'public'=ANY(acl) AND NOT needs_review")
             document_count = cur.fetchone()[0]
         return {"status": "ok", "database": "ready", "agent": "sql+rag",
-                "capabilities": ["sql", "rag", "multifile_rag", "industrial_rules", "industrial_nl2sql", "fact_reviews", "local_identity", "fact_approvals", "source_authority", "cad_assets", "cad_dimensions", "file_jobs"],
+                "capabilities": ["sql", "rag", "multifile_rag", "industrial_rules", "industrial_nl2sql", "fact_reviews", "local_identity", "fact_approvals", "source_authority", "cad_assets", "cad_dimensions", "file_jobs", "private_pdf_answer"],
                 "knowledge": "ready" if document_count else "empty", "document_count": document_count}
     except psycopg2.Error:
         raise HTTPException(503, detail={"error_code": "DATABASE_UNAVAILABLE"})

@@ -61,4 +61,12 @@ python scripts/verify_pdf_search_local.py --model-cache /absolute/path/to/existi
 
 真实 smoke 要求已运行的 `datamind-postgres` 和已有 `qdrant/qdrant:v1.12.4` 镜像，用 `--pull=never` 创建独立临时服务。脚本先确认临时数据库，最后清理自有账户、行、源/页图、容器和数据库；不迁移原库或升级原 8000 服务。报告为 `pdf_search_targeted_*`、`pdf_selection_vectors_final.txt`、`pdf_search_api_*`、`pdf_search_real_local_*` 和 `pdf_search_verification.json`。首次并发测试因验证脚本使用已脱敏的 `connection.dsn` 导致 4 个认证错误，原始失败保留；改为保留原连接参数、仅替换实际临时库名后通过，未放宽生产认证。
 
-下一阶段为受控私有模型回答接证据核验/隐私策略、PDF/OCR 解析的统一资源预算和进程时限，再补已发布存储修复、孤立回收与授权真实输入验收。当前没有新增上传页面、生成模型出口或识别/问答准确率。
+## 受控私有模型回答（API 0.18.0）
+
+在检索之上新增 `POST /v1/pdf-knowledge/answer`，请求体与检索相同（`question`、显式 `publications` 与 `limit`）。它先执行同一条有界私有检索，再把**只有本次返回的私有片段**交给生成模型，并复用文档 RAG 的校验：每条事实必须逐字引用所引用私有 chunk 的连续片段，且事实中的数字必须出现在该片段或标题中；未知 chunk、片段不匹配、数字无支持都被拒绝，最多允许一次修复。任一所选文件没有过阈值命中时整体拒答，不用其余文件拼凑答案。
+
+隐私与身份：仅 admin 且需 CSRF/同源，响应 no-store；生成结束后再次重查当前身份，并复核选定 publication 的源/计划/结果摘要与全部 Qdrant 实际点，响应标记 `evidence_integrity_rechecked=true`。不调用公开 RAG、不读公开知识、不做当前头替换、不写向量。`answer_generated=true`、`public_knowledge_visible=false`、`source_authority_verified=false`。
+
+检索槽在模型调用前释放，因此生成期间不持有私有检索并发槽；生成后的复核查关闭该窗口。组件与契约报告见 `reports/pdf_answer_verification.json`（15 项新增测试、完整隔离回归 480/480）。
+
+下一阶段为 PDF/OCR 解析的统一资源预算与进程时限，再补已发布存储修复、孤立回收与授权真实输入验收。当前没有新增上传页面；`answer_generated=true` 只表示本次由受控私有证据生成，不是问答准确率或检索相关性成绩。
