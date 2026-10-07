@@ -781,3 +781,17 @@ def prepare_pdf(source: Path, storage_root: Path, request: dict) -> dict:
                         # Safe fd-relative deletion of our randomly named private temporary subtree.
                         shutil.rmtree(temporary, dir_fd=temporaries)
             return _verify(root, validated.job_id, validated.attempt_token)
+
+
+def prepare_json(source, storage_root, request: dict) -> dict:
+    """JSON-friendly entry point for the bounded worker.
+
+    Paths arrive as strings from the task-budget child process; everything else keeps
+    the exact semantics of `prepare_pdf`, including the main-thread requirement.
+    """
+    return prepare_pdf(Path(source), Path(storage_root), request)
+
+
+def verify_json(storage_root, job_id: str, attempt_token: str) -> dict:
+    """JSON-friendly entry point for verifying a sealed attempt in a bounded worker."""
+    return verify_prepared(Path(storage_root), job_id, attempt_token)

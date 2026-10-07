@@ -82,7 +82,7 @@ python scripts/file_job_worker.py --watch --workers 2
 
 `ingestion/pdf_prepare.py` 与 `scripts/prepare_pdf.py` 已实现按 SHA 固定源、`job_id/attempt_token` 私有产物、版本化文本块/切片和最后写入的封存标记。不同文件通过独立进程准备；同 attempt 和共享源用本地文件锁协调，重放必须核对全部摘要且不覆盖原产物。模块拒绝线程准备、FIFO、加密/缺少原生文本及资源超限，旋转/裁剪定位、inline 图像与 SMask/Mask 纳入验证。
 
-这一步明确 `prepare_only=true`、`indexed=false`、`knowledge_visible=false`。本地声明版本不代表数据库当前头或认证登记；现有 DXF/测量队列没有接入 PDF，原生 PDF 也没有进入问答库。准备没有 OCR/公式/模型调用、工作进程 deadline 或硬内存隔离。使用和具体上限见 [原生 PDF 准备说明](PDF_PREPARATION.md)。
+这一步明确 `prepare_only=true`、`indexed=false`、`knowledge_visible=false`。本地声明版本不代表数据库当前头或认证登记；现有 DXF/测量队列没有接入 PDF，原生 PDF 也没有进入问答库。准备没有 OCR/公式/模型调用与非挂钟硬内存隔离；API 0.19.0 起 `scripts/prepare_pdf.py --deadline` 在独立进程组内运行准备，超时后终止整组（含孙进程），见[统一任务预算与进程时限](TASK_BUDGET.md)。使用和具体上限见 [原生 PDF 准备说明](PDF_PREPARATION.md)。
 
 最终专项 **31/31**、实际 CLI **8/8**、完整隔离回归 **292/292**，进程退出 0。首轮两个共享锁创建竞争错误和诊断日志保留；最终修复和资源/定位边界补测后才通过。原库计数未变，临时数据库与 CLI 产物已删除，冻结 11/13/8 文件摘要一致；报告见 `reports/pdf_prepare_*`。这些结果是合成边界/兼容验证，不是识别准确率。后续完成的私有快照登记和知识发布见下两节，通用解析队列仍待实现。
 
@@ -108,7 +108,7 @@ python scripts/file_job_worker.py --watch --workers 2
 
 全部 API 进程共享同一数据库的两个 session advisory 检索槽，忙时 503，模型/文件/向量操作没有长事务；连接失效后探测并拒绝结果。总候选 512、源文本 20 万 UTF-8 字节、DB JSONB 计划 16 MiB，取行时同 SQL 过滤预算并再次核对实际内容。所有文件复核后联合读取完整点集合，再单条 SQL 复核原始 DB JSONB 摘要，响应编码后重查身份。
 
-两个检索槽与两个索引 running 槽独立，数据库断连不能物理取消已进入原生推理的任务，不是全部任务统一 CPU/内存硬隔离或完整 deadline。专项 14/14、联合 capture 8/8、HTTP 32/32，本地真实 BGE/独立认证 Qdrant 的两文件历史场景通过；合成与实际模型记录分别保留。私有模型回答、PDF/OCR 解析队列、自动修复/回收待补，完整限制见 [私有 PDF 检索](PDF_PRIVATE_SEARCH.md)。
+两个检索槽与两个索引 running 槽独立，数据库断连不能物理取消已进入原生推理的任务，不是全部任务统一 CPU/内存硬隔离或完整 deadline。API 0.19.0 已新增[统一任务预算与进程时限](TASK_BUDGET.md)提供挂钟 deadline、进程组终止与跨进程资源槽，登记 worker 与 PDF 准备 CLI 可选接入；OCR/公式阶段与统一 CPU/内存配额仍待接入。专项 14/14、联合 capture 8/8、HTTP 32/32，本地真实 BGE/独立认证 Qdrant 的两文件历史场景通过；合成与实际模型记录分别保留。私有模型回答已完成，PDF/OCR 解析队列、自动修复/回收待补，完整限制见 [私有 PDF 检索](PDF_PRIVATE_SEARCH.md)。
 
 ## PDF/OCR 完整发布路线（私有索引/冻结计划恢复与检索已实现，解析队列和完整回收待补）
 

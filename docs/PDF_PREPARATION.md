@@ -34,7 +34,7 @@
 
 拒绝加密 PDF、无有效页的文件及超过资源限额的输入。任一页原生非空白文字少于 30 字符时返回 `PDF_OCR_REQUIRED`；本阶段不启动 OCR、表头识别、公式模型或嵌入模型，不用原生对照文件补扫描内容。文本规范换行并去除块首尾空白，保留原生内容、页坐标和块内字符偏移；这些定位不证明完整表格结构、图片/公式含义或自然语言蕴含。
 
-字节、页数和绘制像素限制降低一次准备的工作量，但不是原生库 CPU/内存的硬隔离。文件锁面向本地 macOS/Linux；跨主机任务的租约、资源槽和子进程 deadline 仍需工作器实现。
+字节、页数和绘制像素限制降低一次准备的工作量，但不是原生库 CPU/内存的硬隔离。文件锁面向本地 macOS/Linux；跨主机任务的租约、资源槽和子进程 deadline 仍需工作器实现。API 0.19.0 已由[统一任务预算与进程时限](TASK_BUDGET.md)补齐**挂钟 deadline、进程组终止与跨进程资源槽**：`scripts/prepare_pdf.py --deadline` 在独立进程组内运行准备，`run_bounded` 超时后终止整组（含孙进程）。CPU/内存 cgroup 级硬隔离与跨主机租约仍未实现。
 
 多文件准备使用独立进程，每个进程独立打开文档；模块拒绝在线程中执行准备。[PyMuPDF 官方多进程说明](https://pymupdf.readthedocs.io/en/latest/recipes-multiprocessing.html)明确其不支持线程并发，文件锁不能替代原生库的进程隔离。
 
@@ -68,4 +68,4 @@ python scripts/prepare_pdf.py --verify \
 
 旧 `document_blocks` 没有版本字段，旧 `chunks` 的 `UNIQUE(document_id,chunk_index)` 不支持两版并存，工业事实提取器也固定输出版本 1。旧 `/v1/documents` 的来源/页图接口只能校验当前版本；API 0.15.0 已以独立登记表和 `/v1/pdf-snapshots` 认证接口补齐新快照的 CAS 与历史读取，保留旧数据及复核/批准快照。新登记仍不发布到 RAG。
 
-快照登记在数据库事务外检查完整清单，再在事务内重验真实账户与预期前版/前源 SHA，以 CAS 追加独立版本并推进其当前指针；解析期间不持有数据库事务。后续 API 0.16.0 已新增 [私有知识版本发布](PDF_KNOWLEDGE_PUBLICATION.md)，用独立向量计划/outbox 完成预写、确认、私有头 CAS 与中断恢复，未接公开 RAG。私有模型问答与已发布存储修复仍需补齐；扫描件需另接有资源槽和子进程时限的 OCR/公式阶段。完整路线见 [多文件并发方案](MULTIFILE_CONCURRENCY.md)。
+快照登记在数据库事务外检查完整清单，再在事务内重验真实账户与预期前版/前源 SHA，以 CAS 追加独立版本并推进其当前指针；解析期间不持有数据库事务。后续 API 0.16.0 已新增 [私有知识版本发布](PDF_KNOWLEDGE_PUBLICATION.md)，用独立向量计划/outbox 完成预写、确认、私有头 CAS 与中断恢复，未接公开 RAG。私有模型问答（API 0.18.0）与统一任务预算（API 0.18.0）已补齐；扫描件仍需另接使用同一预算的 OCR/公式阶段。完整路线见 [多文件并发方案](MULTIFILE_CONCURRENCY.md)。

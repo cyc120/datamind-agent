@@ -20,11 +20,25 @@ def main():
     mode.add_argument('--watch', action='store_true', help='Poll until interrupted; recovers expired leases.')
     ap.add_argument('--job-id')
     ap.add_argument('--workers', type=int, choices=range(1, 5), default=2)
+    ap.add_argument('--deadline', type=float, metavar='SECONDS',
+                    help='Run each registration in its own process group under a hard deadline '
+                         '(0.5–3600); default keeps the in-process path.')
+    ap.add_argument('--grace', type=float, metavar='SECONDS',
+                    help='Seconds between SIGTERM and SIGKILL when a deadline expires.')
     args = ap.parse_args()
+    if args.deadline is not None:
+        from datamind.task_budget import validate_deadline
+        try:
+            args.deadline = validate_deadline(args.deadline)
+        except ValueError as error:
+            ap.error(str(error))
+    if args.grace is not None and args.deadline is None:
+        ap.error('--grace requires --deadline')
     if args.watch:
         try:
             while True:
-                result = work_once(_write_dsn(), job_id=args.job_id, workers=args.workers)
+                result = work_once(_write_dsn(), job_id=args.job_id, workers=args.workers,
+                                   deadline_s=args.deadline)
                 if result['claimed']:
                     print(json.dumps(result, ensure_ascii=False), flush=True)
                 else:
@@ -32,7 +46,8 @@ def main():
         except KeyboardInterrupt:
             return
     action = work_once if args.once else drain
-    print(json.dumps(action(_write_dsn(), job_id=args.job_id, workers=args.workers), ensure_ascii=False))
+    print(json.dumps(action(_write_dsn(), job_id=args.job_id, workers=args.workers,
+                            deadline_s=args.deadline), ensure_ascii=False))
 
 
 if __name__ == '__main__':

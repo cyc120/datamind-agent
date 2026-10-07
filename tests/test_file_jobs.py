@@ -304,3 +304,52 @@ class FileJobTests(unittest.TestCase):
         self.assertNotIn('password',json.dumps(result));final=self.poll(job)
         self.assertEqual(final['items'][0]['error_code'],'FILE_JOB_EXECUTION_FAILED')
         self.assertNotIn('private',json.dumps(final,default=str))
+
+    def test_bounded_deadline_routes_the_registration_to_a_child_process(self):
+        # The runner's own hard-deadline behaviour is covered in test_task_budget with
+        # real processes. Here we verify the wiring: the claim, deadline and an explicit
+        # child DSN are handed off instead of using the parent connection.
+        job=self.submit(self.batch(items=[{'item_id':'drawing','type':'drawing','payload':self.payload()}]))
+        captured={}
+        def fake(claim,dsn,deadline_s):
+            captured.update(claim=claim,dsn=dsn,deadline_s=deadline_s)
+            return {'status':'ok','value':{'document_id':claim['payload']['document_id'],'synthetic':True},
+                    'elapsed_ms':1.0,'deadline_seconds':deadline_s}
+        with patch.object(jobs,'_execute_bounded',side_effect=fake):
+            wave=jobs.work_once(self.dsn,deadline_s=60,workers=1)
+        self.assertEqual(wave['outcomes'][0]['outcome'],'succeeded',wave['outcomes'][0])
+        self.assertEqual(captured['deadline_s'],60.0)
+        self.assertEqual(captured['claim']['type'],'drawing')
+        self.assertEqual(captured['claim']['payload']['request_id'],
+                         jobs._child_id(job['job_id'],'drawing'))
+        with psycopg2.connect(captured['dsn']) as conn,conn.cursor() as cur:
+            cur.execute('SELECT current_database()')
+            self.assertTrue(cur.fetchone()[0].startswith('datamind_test_'))
+        final=self.poll(job)
+        self.assertEqual(final['items'][0]['status'],'succeeded')
+
+    def test_expired_deadline_is_recorded_as_a_stable_failure(self):
+        job=self.submit(self.batch(items=[{'item_id':'drawing','type':'drawing','payload':self.payload()}]))
+        timeout={'status':'timeout','error_code':'TASK_DEADLINE_EXCEEDED','elapsed_ms':1000.0,'deadline_seconds':1.0}
+        with patch.object(jobs,'_execute_bounded',return_value=timeout):
+            wave=jobs.work_once(self.dsn,deadline_s=1,workers=1)
+        self.assertEqual(wave['outcomes'][0]['error_code'],'FILE_JOB_DEADLINE_EXCEEDED')
+        final=self.poll(job)
+        self.assertEqual(final['items'][0]['status'],'failed')
+        self.assertEqual(final['items'][0]['error_code'],'FILE_JOB_DEADLINE_EXCEEDED')
+
+    def test_child_error_code_is_propagated_without_internals(self):
+        job=self.submit(self.batch(items=[{'item_id':'drawing','type':'drawing','payload':self.payload()}]))
+        failure={'status':'failed','error_code':'CAD_SYNTHETIC_DENIED','elapsed_ms':5.0,'deadline_seconds':30.0,
+                 'stderr':'private-dsn-password-secret'}
+        with patch.object(jobs,'_execute_bounded',return_value=failure):
+            wave=jobs.work_once(self.dsn,deadline_s=30,workers=1)
+        self.assertEqual(wave['outcomes'][0]['error_code'],'CAD_SYNTHETIC_DENIED')
+        self.assertNotIn('password',json.dumps(wave,default=str))
+        final=self.poll(job)
+        self.assertEqual(final['items'][0]['error_code'],'CAD_SYNTHETIC_DENIED')
+        self.assertNotIn('private',json.dumps(final,default=str))
+
+    def test_invalid_deadline_is_rejected_before_claiming(self):
+        for value in (0,99999,True,'x'):
+            with self.assertRaises(ValueError): jobs.work_once(self.dsn,deadline_s=value)

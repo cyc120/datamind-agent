@@ -19,13 +19,24 @@ from pydantic import Field, model_validator
 
 from ingestion.cad_contract import ContractModel, Sha256
 from .auth import lock_identity
-from . import cad_store, cad_dimensions
+from . import cad_store, cad_dimensions, task_budget
 
 RequestId = Annotated[str, Field(min_length=1, max_length=64, pattern=r'^[A-Za-z0-9_-]+$')]
 JobId = Annotated[str, Field(min_length=1, max_length=64, pattern=r'^[A-Za-z0-9_-]+$')]
 LEASE_SECONDS = 120
 MAX_ATTEMPTS = 3
 GLOBAL_CONCURRENCY = 4
+# Registration targets that can run under the shared process deadline budget.
+_BOUNDED_TARGETS = {'drawing': ('datamind.cad_store', 'register'),
+                    'measurement': ('datamind.cad_dimensions', 'register_measurement')}
+DEADLINE_ERROR_CODE = 'FILE_JOB_DEADLINE_EXCEEDED'
+FALLBACK_ERROR_CODE = 'FILE_JOB_EXECUTION_FAILED'
+
+
+def _safe_code(value, fallback=FALLBACK_ERROR_CODE):
+    if isinstance(value, str) and 0 < len(value) <= 96 and value.replace('_', '').isalnum():
+        return value
+    return fallback
 
 
 class DrawingRegistration(ContractModel):
@@ -329,7 +340,15 @@ def _heartbeat(dsn, claim, stop):
             return
 
 
-def _execute(dsn, claim):
+def _execute_bounded(claim, dsn, deadline_s):
+    """Run one registration in its own process group under the shared deadline budget."""
+    module, function = _BOUNDED_TARGETS[claim['type']]
+    return task_budget.run_bounded(module, function,
+                                   [claim['payload'], dsn, claim['identity']],
+                                   deadline_s=deadline_s, fallback_error_code=FALLBACK_ERROR_CODE)
+
+
+def _execute(dsn, claim, *, deadline_s=None, child_dsn=None):
     stop = threading.Event()
     heartbeat = threading.Thread(target=_heartbeat, args=(dsn, claim, stop), daemon=True)
     heartbeat.start()
@@ -352,28 +371,47 @@ def _execute(dsn, claim):
         if current['cancel_requested']:
             saved = _finish(dsn, claim, 'cancelled')
             return {'outcome': 'cancelled' if saved else 'lease_lost'}
-        register = cad_store.register if claim['type'] == 'drawing' else cad_dimensions.register_measurement
-        result = jsonable_encoder(register(claim['payload'], dsn, claim['identity']))
-        saved = _finish(dsn, claim, 'succeeded', result=result)
-        return {'outcome': 'succeeded' if saved else 'lease_lost'}
+        if deadline_s is None:
+            register = cad_store.register if claim['type'] == 'drawing' else cad_dimensions.register_measurement
+            result = jsonable_encoder(register(claim['payload'], dsn, claim['identity']))
+            saved = _finish(dsn, claim, 'succeeded', result=result)
+            return {'outcome': 'succeeded' if saved else 'lease_lost'}
+        outcome = _execute_bounded(claim, child_dsn or dsn, deadline_s)
+        if outcome['status'] == 'ok':
+            saved = _finish(dsn, claim, 'succeeded', result=outcome['value'])
+            return {'outcome': 'succeeded' if saved else 'lease_lost',
+                    'elapsed_ms': outcome['elapsed_ms']}
+        code = DEADLINE_ERROR_CODE if outcome['status'] == 'timeout' else _safe_code(outcome.get('error_code'))
+        saved = _finish(dsn, claim, 'failed', error_code=code)
+        return {'outcome': 'failed' if saved else 'lease_lost', 'error_code': code,
+                'elapsed_ms': outcome['elapsed_ms'], 'deadline_seconds': outcome['deadline_seconds']}
     except HTTPException as error:
         code = error.detail.get('error_code') if isinstance(error.detail, dict) else None
-        if not isinstance(code, str) or len(code) > 96 or not code.replace('_', '').isalnum():
-            code = 'FILE_JOB_REGISTRATION_FAILED'
+        code = _safe_code(code, 'FILE_JOB_REGISTRATION_FAILED')
         saved = _finish(dsn, claim, 'failed', error_code=code)
         return {'outcome': 'failed' if saved else 'lease_lost', 'error_code': code}
     except Exception:
         # Never return exception text, stack traces, paths or connection secrets.
-        saved = _finish(dsn, claim, 'failed', error_code='FILE_JOB_EXECUTION_FAILED')
-        return {'outcome': 'failed' if saved else 'lease_lost', 'error_code': 'FILE_JOB_EXECUTION_FAILED'}
+        saved = _finish(dsn, claim, 'failed', error_code=FALLBACK_ERROR_CODE)
+        return {'outcome': 'failed' if saved else 'lease_lost', 'error_code': FALLBACK_ERROR_CODE}
     finally:
         stop.set(); heartbeat.join(timeout=1)
 
 
-def work_once(dsn, job_id=None, workers=2):
-    """Claim and finish at most one wave; this never waits for unrelated workers."""
+def work_once(dsn, job_id=None, workers=2, deadline_s=None):
+    """Claim and finish at most one wave; this never waits for unrelated workers.
+
+    Passing `deadline_s` runs each registration in its own process group under the
+    shared task budget; the default keeps the established in-process path.
+    """
     if type(workers) is not int or not 1 <= workers <= GLOBAL_CONCURRENCY:
         raise ValueError('FILE_JOB_WORKER_BOUND_INVALID')
+    child_dsn = None
+    if deadline_s is not None:
+        deadline_s = task_budget.validate_deadline(deadline_s)
+        # Isolated runs redirect metadata connections in-process; the child must be
+        # handed a DSN that already names the same database.
+        child_dsn = task_budget.effective_dsn(dsn)
     claims = []
     for _ in range(workers):
         claim = _claim(dsn, job_id)
@@ -381,15 +419,15 @@ def work_once(dsn, job_id=None, workers=2):
             break
         claims.append(claim)
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        results = list(pool.map(lambda x: _execute(dsn, x), claims))
+        results = list(pool.map(lambda x: _execute(dsn, x, deadline_s=deadline_s, child_dsn=child_dsn), claims))
     return {'claimed': len(claims), 'outcomes': results}
 
 
-def drain(dsn, job_id=None, workers=2):
+def drain(dsn, job_id=None, workers=2, deadline_s=None):
     """Drain currently claimable work; a later invocation recovers expired leases."""
     waves = 0; claimed = 0; outcomes = []
     while True:
-        wave = work_once(dsn, job_id, workers)
+        wave = work_once(dsn, job_id, workers, deadline_s)
         if not wave['claimed']:
             break
         waves += 1; claimed += wave['claimed']; outcomes.extend(wave['outcomes'])
