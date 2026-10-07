@@ -1,6 +1,6 @@
 # DataMind Agent 项目进度
 
-更新日期：2026-10-07。当前代码 API：**0.14.0**，在隔离数据库副本验收；原检出未升级，本轮不启动或升级原 8000 服务。开发分支 `codex/compact-industrial-forms`；上一阶段 API 0.13.0 已提交并推送（功能提交 `a79836a`），本阶段代码不据此声明已发布。仓库：[cyc120/datamind-agent](https://github.com/cyc120/datamind-agent)。
+更新日期：2026-10-07。当前代码 API：**0.14.0**，在隔离数据库副本验收；原检出未升级，本轮不启动或升级原 8000 服务。开发分支 `codex/compact-industrial-forms`；本阶段 API 0.14.0 功能提交 [`91132db`](https://github.com/cyc120/datamind-agent/commit/91132db7eb873ba6e56b88d0cf0e33af775f01c6) 已推送至该分支。仓库：[cyc120/datamind-agent](https://github.com/cyc120/datamind-agent)。
 
 本次推进：认证尺寸服务接入操作页面；新增 DXF/单条测量 JSON 的受控上传与持久登记队列，以及最多 8 份公开文档的显式 RAG 选择、版本门禁与证据覆盖。新增 49 项专项、完整隔离回归 261/261 与前端竞态 5/5 通过；三角色尺寸、混合上传和两文件问答页面已验证。冻结纯契约保持原认证标志，服务认证另列；单次尺寸结果不产生制造授权或整批质量结论。服务流程见 `data/cad_demo/DIMENSION_SERVICE_WORKFLOW.md`，多文件方案见 `docs/MULTIFILE_CONCURRENCY.md`。
 
