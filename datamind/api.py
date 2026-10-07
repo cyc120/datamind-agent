@@ -21,6 +21,7 @@ from psycopg2.extras import RealDictCursor
 
 from .agent import DataMindAgent, _read_dsn, _write_dsn
 from .knowledge import COLLECTIONS, ROOT
+from .pdf_publications import RegistrationRequest as PdfSnapshotRegistrationRequest
 from .providers import (OPENAI, PROTOCOLS, list_models as provider_list_models,
                         test_chat as provider_test_chat)
 from .settings_store import (DEFAULT_BASE_URL, DEFAULT_MODEL, PROFILE_FIELDS, activate_profile,
@@ -159,7 +160,7 @@ class ProfileImportRequest(BaseModel):
     activate_first: bool = False
 
 
-app = FastAPI(title="DataMind Agent", version="0.14.0")
+app = FastAPI(title="DataMind Agent", version="0.15.0")
 
 
 @app.middleware('http')
@@ -169,7 +170,8 @@ async def identity_permissions(request: Request, call_next):
     cad_path=path=='/v1/drawings' or path.startswith('/v1/drawings/')
     dimension_path=path.startswith('/v1/dimensions/')
     files_path=path.startswith('/v1/files/')
-    permission=('admin' if files_path else
+    pdf_snapshot_path=path=='/v1/pdf-snapshots' or path.startswith('/v1/pdf-snapshots/')
+    permission=('admin' if files_path or pdf_snapshot_path else
                 'approver' if dimension_path and request.method=='POST' and path.endswith('/approvals') else
                 'admin' if dimension_path and (request.method=='POST' or path.endswith('/sources')) else
                 'reviewer' if cad_path and request.method=='POST' and path.endswith('/reviews') else
@@ -179,16 +181,99 @@ async def identity_permissions(request: Request, call_next):
                 'approver' if authority_path and request.method=='POST' and path.endswith('/events') else
                 'reviewer' if request.method=='POST' and path.endswith('/reviews') else
                 'approver' if request.method=='POST' and path.endswith('/approvals') else None)
-    if permission or authority_path or cad_path or dimension_path:
+    if permission or authority_path or cad_path or dimension_path or pdf_snapshot_path:
         from .auth import current
         try:
             request.state.identity=await run_in_threadpool(current,request,_write_dsn(),required=True,
                 permission=permission,mutation=request.method not in {'GET','HEAD','OPTIONS'})
         except HTTPException as exc:
-            return JSONResponse(status_code=exc.status_code,content={'detail':exc.detail})
+            return JSONResponse(status_code=exc.status_code,content={'detail':exc.detail},
+                                headers={'Cache-Control':'no-store'} if pdf_snapshot_path else None)
     response=await call_next(request)
-    if cad_path or dimension_path or files_path:response.headers['Cache-Control']='no-store'
+    if cad_path or dimension_path or files_path or pdf_snapshot_path:response.headers['Cache-Control']='no-store'
     return response
+
+
+def _pdf_snapshot_recheck(request):
+    # File verification can outlive the middleware's initial identity check.
+    from .auth import current
+    current(request,_write_dsn(),required=True,permission='admin')
+
+
+@app.post('/v1/pdf-snapshots')
+def pdf_snapshot_register(payload: PdfSnapshotRegistrationRequest,request: Request):
+    from .pdf_publications import register
+    version=jsonable_encoder(register(payload.model_dump(),_write_dsn(),request.state.identity))
+    _pdf_snapshot_recheck(request)
+    return {'version':version,
+            'semantics':'Registered parsing snapshot; not indexed, knowledge-visible, or source-authority approval'}
+
+
+@app.get('/v1/pdf-snapshots')
+def pdf_snapshots(request: Request,limit: int=Query(default=20,ge=1,le=50),offset: int=Query(default=0,ge=0,le=10000)):
+    from .pdf_publications import list_assets
+    result=jsonable_encoder(list_assets(_write_dsn(),limit=limit,offset=offset))
+    _pdf_snapshot_recheck(request)
+    return result
+
+
+@app.get('/v1/pdf-snapshots/{document_id}/versions')
+def pdf_snapshot_versions(document_id: str,request: Request,limit: int=Query(default=20,ge=1,le=50),
+                          offset: int=Query(default=0,ge=0,le=10000)):
+    from .pdf_publications import history
+    result=jsonable_encoder(history(document_id,_write_dsn(),limit=limit,offset=offset))
+    _pdf_snapshot_recheck(request)
+    return result
+
+
+@app.get('/v1/pdf-snapshots/{document_id}')
+def pdf_snapshot_detail(document_id: str,request: Request,version: int | None=Query(default=None,ge=1)):
+    from .pdf_publications import read_version,public_version
+    version_record=jsonable_encoder(public_version(read_version(document_id,_write_dsn(),version)))
+    _pdf_snapshot_recheck(request)
+    return {'version':version_record}
+
+
+def _pdf_snapshot_selected(document_id,version,expected_manifest_sha256):
+    from .pdf_publications import read_version
+    row=read_version(document_id,_write_dsn(),version)
+    if row['manifest_sha256']!=expected_manifest_sha256:
+        raise HTTPException(409,detail={'error_code':'PDF_SNAPSHOT_SELECTION_CHANGED'})
+    return row
+
+
+@app.get('/v1/pdf-snapshots/{document_id}/file')
+def pdf_snapshot_file(document_id: str,request: Request,version: int=Query(ge=1),
+                      expected_manifest_sha256: str=Query(pattern=r'^[a-f0-9]{64}$')):
+    from .pdf_publications import read_artifact
+    row=_pdf_snapshot_selected(document_id,version,expected_manifest_sha256)
+    data=read_artifact(row,'source')
+    _pdf_snapshot_recheck(request)
+    return Response(data,media_type='application/pdf',
+                    headers={'Content-Disposition':f'attachment; filename="document-v{row["document_version"]}.pdf"',
+                             'X-Content-Type-Options':'nosniff','Content-Security-Policy':"sandbox; default-src 'none'"})
+
+
+@app.get('/v1/pdf-snapshots/{document_id}/pages/{page_no}')
+def pdf_snapshot_page(document_id: str,page_no: int,request: Request,version: int=Query(ge=1),
+                      expected_manifest_sha256: str=Query(pattern=r'^[a-f0-9]{64}$')):
+    from .pdf_publications import read_artifact
+    row=_pdf_snapshot_selected(document_id,version,expected_manifest_sha256)
+    data=read_artifact(row,'page_image',page_no)
+    _pdf_snapshot_recheck(request)
+    return Response(data,media_type='image/png',
+                    headers={'X-Content-Type-Options':'nosniff'})
+
+
+@app.get('/v1/pdf-snapshots/{document_id}/bundle')
+def pdf_snapshot_bundle(document_id: str,request: Request,version: int=Query(ge=1),
+                        expected_manifest_sha256: str=Query(pattern=r'^[a-f0-9]{64}$')):
+    from .pdf_publications import read_artifact,public_version
+    row=_pdf_snapshot_selected(document_id,version,expected_manifest_sha256)
+    result={'version':jsonable_encoder(public_version(row)),
+            'bundle':json.loads(read_artifact(row,'bundle'))}
+    _pdf_snapshot_recheck(request)
+    return result
 
 
 @app.get('/v1/drawings/sources')

@@ -1,8 +1,8 @@
 # DataMind Agent 项目进度
 
-更新日期：2026-10-07。当前代码 API：**0.14.0**；本轮新增离线原生 PDF 准备工具，HTTP API 不变。完整回归在隔离数据库副本验收；原检出和原 8000 服务未升级。开发分支 `codex/compact-industrial-forms`；上一阶段 API 0.14.0 功能提交 [`91132db`](https://github.com/cyc120/datamind-agent/commit/91132db7eb873ba6e56b88d0cf0e33af775f01c6) 已推送至该分支。仓库：[cyc120/datamind-agent](https://github.com/cyc120/datamind-agent)。
+更新日期：2026-10-07。当前代码 API：**0.15.0**；新增原生 PDF 私有快照认证登记与历史读取，准备模块保持上一阶段字节。完整回归在隔离数据库副本验收；原检出和原 8000 服务未升级。开发分支 `codex/compact-industrial-forms`；上一准备阶段功能提交 [`96fd7e8`](https://github.com/cyc120/datamind-agent/commit/96fd7e85963fdfeacaf4b8af77edd7047e33d63f) 已推送至该分支。仓库：[cyc120/datamind-agent](https://github.com/cyc120/datamind-agent)。
 
-本次推进：原生 PDF 固定源 SHA、私有 attempt、版本化文本块/切片及原子封存标记，独立进程可并发准备，旋转/裁剪定位与文件/图像资源门禁可验证。新增专项 31/31、实际 CLI 8/8、完整隔离回归 **292/292**；冻结 11/13/8 文件摘要与原库计数一致。产物明确 `prepare_only=true`、`indexed=false`、`knowledge_visible=false`，尚无认证发布、索引或 PDF/OCR 队列接入。见 `docs/PDF_PREPARATION.md` 和技术说明书 §18.30。上一阶段尺寸页面、受控上传队列和显式多文档问答已完成，其 261/261、前端竞态 5/5 与浏览器记录保留于 §18.29。
+本次推进：独立 PDF 版本表、真实 admin 登记、短事务版本 CAS、原请求幂等恢复、不可变版本原文件/页图/bundle 读取；完成后重验当前权限，防读取期间注销/降权泄露。服务专项 27/27、HTTP 19/19、完整隔离回归 **338/338**；冻结 11/13/8 文件及原准备模块摘要保持，原库计数一致且新表未创建。登记明确 `registration_only=true`、`indexed=false`、`knowledge_visible=false`、`source_authority_verified=false`，不进入 RAG，不代表业务批准。见 `docs/PDF_SNAPSHOT_REGISTRY.md` 和 §18.31。此前原生 PDF 准备的 31/31、CLI 8/8 与 292/292 保留于 §18.30；页面/受控队列与多文档问答的 261/261、前端竞态 5/5 及浏览器记录保留于 §18.29。
 
 ## 当前交付范围
 
@@ -12,6 +12,7 @@
 | 多文件登记队列 | DXF/单测量 JSON 上传、逐文件状态、全局/批次限额、租约、幂等、失败重试、协作取消；`/#files` | 必须独立启动 CLI worker；PDF/OCR/Office 未并发化，成功文件不因同批失败回滚 |
 | 显式多文档问答 | 1–8 份无重复公开文件、精确版本/源/解析器、每文件相关片段、生成结束重验、检索/实际引用覆盖 | 已索引文档库范围；不是全文审阅或通用跨文件语义裁决，真实模型评分未在本阶段重跑 |
 | 原生 PDF 离线准备 | 按 SHA 固定源、版本化块/切片、独立 attempt/进程、封存重放与摘要校验、旋转/裁剪坐标和保守图片预算 | 31 项合成边界与 8 项 CLI 验证；不发布到知识库，不替代 OCR/表格/公式模型；尚无硬资源隔离或进程 deadline |
+| PDF 私有快照登记 | admin/CSRF/同源、当前头 CAS、同 owner 原请求恢复、固定版本原文件/页图/bundle、读取后权限重验、分页元数据 | 服务 27/27、HTTP 19/19；不索引、不裁定权威、不接上传/页面；两个验证槽仅单服务进程，5 秒仅单次 DB 锁等待 |
 | 结构化单源问数 | Catalog、Schema Linking、SQL Guard、参数化只读执行、修复、Trace/SSE/回放 | 历史零售 14/14，鲁棒性 4/4；未在本次重跑模型评分 |
 | 文档问答 | Hybrid/RRF 检索、真实模型生成、原文引用/定位与拒答 | 最近完整 RAG 10/12，单题上游错误复测 1/1 单列；语义蕴含未独立验证 |
 | OCR/公式/字段 | 原像素 OCR、隔离公式 worker、表头与字段候选、文件/块/页坐标校验 | 历史扫描表头 5/9、字段 3/15；完整表格关系未达成 |
@@ -34,7 +35,9 @@
 
 ## 本阶段验收与历史证据
 
-原生 PDF 准备完整隔离回归 **292/292**（261 + 31）、进程退出 0，见 `reports/pdf_prepare_regression.txt`。专项最终 31/31、实际 CLI 8/8；不同文件/同 attempt/共享源的独立进程竞争、版本 ID、残缺/篡改、FIFO、加密、旋转/裁剪及真实 inline/SMask/Mask 超限均验证。首次 24 项中两个锁创建竞争错误和诊断失败保留，第二轮 24/24 与补齐边界后的最终 31/31 分列，不视作识别准确率。原库计数未变、临时测试库和 CLI 产物已清理、无新增外部模型调用；见 `reports/pdf_prepare_verification.json`、`reports/pdf_prepare_cli_verification.json`、`reports/pdf_prepare_review.md`。当前实现见 §18.30 和 `docs/PDF_PREPARATION.md`。
+本轮 PDF 私有快照登记完整隔离回归 **338/338**（292 + 服务 27 + HTTP 19）、进程退出 0，见 `reports/pdf_publication_regression.txt`。服务专项最终 27/27、HTTP 最终 19/19；初始 25/25 与 15/15 分别保留，增加锁等待期间过期及读取/提交后权限变化边界后再完整验证。覆盖 CAS 竞争、不同文档、request/owner/attempt 重用、事务回滚、v2 后 v1 字节保持、DB/文件篡改拒绝、实际会话/账户变化、readonly 无访问与旧表不写。原库计数未变、临时测试库/账户/产物已清理；副本不复制模型设置或私有快照行，未调用外部模型。见 `reports/pdf_publication_verification.json`，实现见 §18.31 和 `docs/PDF_SNAPSHOT_REGISTRY.md`。没有新增操作页面，本轮使用真实 HTTP/数据库/文件测试。
+
+上一准备阶段完整隔离回归 **292/292**（261 + 31）、进程退出 0，见 `reports/pdf_prepare_regression.txt`。专项最终 31/31、实际 CLI 8/8；不同文件/同 attempt/共享源的独立进程竞争、版本 ID、残缺/篡改、FIFO、加密、旋转/裁剪及真实 inline/SMask/Mask 超限均验证。首次 24 项中两个锁创建竞争错误和诊断失败保留，第二轮 24/24 与补齐边界后的最终 31/31 分列，不视作识别准确率。原库计数未变、临时测试库和 CLI 产物已清理、无新增外部模型调用；见 `reports/pdf_prepare_verification.json`、`reports/pdf_prepare_cli_verification.json`、`reports/pdf_prepare_review.md`。实现见 §18.30 和 `docs/PDF_PREPARATION.md`。
 
 上一阶段 API 0.14.0 完整隔离回归 **261/261**（212 + 49），进程退出码 0；专项为队列 20、RAG 15、HTTP/SSE 11、上传 3。前端受控竞态检查 **5/5**；浏览器验证尺寸登记/独立批准/撤销/历史回放，混合 DXF/JSON 登记和重复点击幂等，以及两文件问答的检索/实际引用覆盖。见 `reports/next_stage_regression.txt`、`reports/next_stage_browser_verification.json`、`reports/multifile_ui_races.json`。两个一次性预览副本均清理，原数据库前后计数一致；该轮未调用外部模型。实现见技术说明书 §18.29 和 `docs/MULTIFILE_CONCURRENCY.md`。下列数字保留先前阶段原始分母。
 
@@ -87,7 +90,7 @@
 
 1、2 的合成紧凑格式阶段和 3 的本地认证/权限、提取复核与独立字段审批已完成。3 的显式来源权威登记与局部可解释裁决已在合成材料完成机制验证。4 的受控 CAD 契约、原生 DXF、图纸资产/版本、认证关联复核、尺寸绑定与独立使用批准服务已完成；本阶段补尺寸操作页面，并实现受控文件队列与显式多文档问答，合成流程验收完成。授权真实模板和真正的来源裁定依据仍需征集，当前机制验收不等于工厂权威验收。历史新样本由同一实现者编写，共四份原生表单及其扫描变体，不能视作独立工厂盲测。复杂工业 SQL、通用跨源动态计划、通用 CAD/图纸 API、V-CAR、国产小模型和正式竞赛交付包仍待实现，完整 P1/M6 尚未验收。
 
-原生 PDF 版本化离线产物已完成；下一阶段先完成独立登记表、认证短事务 CAS 发布与历史读取，建立向量写入/元数据发布的恢复与对账，再接有资源槽和进程时限的 PDF/OCR worker。现有 `ingestion/ingest.py` 仍是串行离线工具，不能同时启动多个旧摄取进程或在并发任务中执行全局 reset。受控队列登记不自动把图纸与测量配对，也不替人工复核/批准。
+原生 PDF 版本化离线产物及私有认证 CAS 登记/历史读取已完成；下一阶段建立向量预写/确认、知识版本发布与恢复对账，再接有资源槽和进程时限的 PDF/OCR worker。现有 `ingestion/ingest.py` 仍是串行离线工具，不能同时启动多个旧摄取进程或在并发任务中执行全局 reset。受控队列登记不自动把图纸与测量配对，也不替人工复核/批准。
 
 ## 启动与报告复现
 

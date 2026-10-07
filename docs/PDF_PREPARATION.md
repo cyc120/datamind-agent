@@ -1,10 +1,10 @@
 # 原生 PDF 的版本化准备边界
 
-2026-10-07。这一阶段实现离线准备，不修改现有摄取、元数据库、Qdrant 或 HTTP API。API 保持 0.14.0。准备产物明确 `prepare_only=true`、`indexed=false`、`knowledge_visible=false`，不会自动成为问答证据。
+2026-10-07。准备阶段首次交付时 API 为 0.14.0；该离线模块不修改现有摄取、元数据库、Qdrant 或 HTTP API。后续 API 0.15.0 已新增 [私有快照认证登记](PDF_SNAPSHOT_REGISTRY.md)，准备模块字节保持不变。准备产物仍明确 `prepare_only=true`、`indexed=false`、`knowledge_visible=false`，不会自动成为问答证据。
 
 ## 输入、产物和重试
 
-`ingestion/pdf_prepare.py` 接受显式文档 ID、文档版本、源 SHA-256、任务 ID 和 attempt token。输入版本只是这次准备的目标声明；当前还没有数据库当前头、认证发布或版本 CAS，不能把任意本地请求当作正式登记。
+`ingestion/pdf_prepare.py` 接受显式文档 ID、文档版本、源 SHA-256、任务 ID 和 attempt token。输入版本只是这次准备的目标声明，离线模块不检查数据库当前头或真实账户；后续必须由独立认证登记服务执行版本 CAS，不能把任意本地请求当作正式登记。
 
 验证要求清单中的契约、解析器和资源上限与当前实现一致；解析器标识包含实际 PyMuPDF 版本。升级依赖/契约后不自动兼容旧 attempt，应保留原环境用于旧产物核对，而不是改写旧清单。
 
@@ -66,6 +66,6 @@ python scripts/prepare_pdf.py --verify \
 
 ## 后续发布条件
 
-旧 `document_blocks` 没有版本字段，旧 `chunks` 的 `UNIQUE(document_id,chunk_index)` 不支持两版并存，工业事实提取器也固定输出版本 1。现有来源/页图接口只能校验当前版本，尚不是不可变历史读取。因此下一步应新增独立的准备/登记表和认证 API，保留旧数据及复核/批准快照。
+旧 `document_blocks` 没有版本字段，旧 `chunks` 的 `UNIQUE(document_id,chunk_index)` 不支持两版并存，工业事实提取器也固定输出版本 1。旧 `/v1/documents` 的来源/页图接口只能校验当前版本；API 0.15.0 已以独立登记表和 `/v1/pdf-snapshots` 认证接口补齐新快照的 CAS 与历史读取，保留旧数据及复核/批准快照。新登记仍不发布到 RAG。
 
-发布需要事务内重验真实账户、完整清单和预期前版/前源 SHA，再以 CAS 追加新版本并推进当前指针；解析期间不持有数据库事务。接入 RAG 前还要建立版本化向量预写/确认、元数据发布及恢复对账，检索只接受当前已发布版本。扫描件需另接有资源槽和子进程时限的 OCR/公式阶段。完整路线见 [多文件并发方案](MULTIFILE_CONCURRENCY.md)。
+快照登记在数据库事务外检查完整清单，再在事务内重验真实账户与预期前版/前源 SHA，以 CAS 追加独立版本并推进其当前指针；解析期间不持有数据库事务。接入 RAG 前仍要建立版本化向量预写/确认、知识元数据发布及恢复对账，检索只接受已发布版本。扫描件需另接有资源槽和子进程时限的 OCR/公式阶段。完整路线见 [多文件并发方案](MULTIFILE_CONCURRENCY.md)。

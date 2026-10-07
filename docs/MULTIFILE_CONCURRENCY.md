@@ -84,9 +84,17 @@ python scripts/file_job_worker.py --watch --workers 2
 
 这一步明确 `prepare_only=true`、`indexed=false`、`knowledge_visible=false`。本地声明版本不代表数据库当前头或认证登记；现有 DXF/测量队列没有接入 PDF，原生 PDF 也没有进入问答库。准备没有 OCR/公式/模型调用、工作进程 deadline 或硬内存隔离。使用和具体上限见 [原生 PDF 准备说明](PDF_PREPARATION.md)。
 
-最终专项 **31/31**、实际 CLI **8/8**、完整隔离回归 **292/292**，进程退出 0。首轮两个共享锁创建竞争错误和诊断日志保留；最终修复和资源/定位边界补测后才通过。原库计数未变，临时数据库与 CLI 产物已删除，冻结 11/13/8 文件摘要一致；报告见 `reports/pdf_prepare_*`。这些结果是合成边界/兼容验证，不是识别准确率。下面的认证发布和索引方案仍待实现。
+最终专项 **31/31**、实际 CLI **8/8**、完整隔离回归 **292/292**，进程退出 0。首轮两个共享锁创建竞争错误和诊断日志保留；最终修复和资源/定位边界补测后才通过。原库计数未变，临时数据库与 CLI 产物已删除，冻结 11/13/8 文件摘要一致；报告见 `reports/pdf_prepare_*`。这些结果是合成边界/兼容验证，不是识别准确率。后续完成的私有快照认证登记见下一节，知识发布和索引方案仍待实现。
 
-## 后续 PDF/OCR 安全发布方案（正式发布与索引尚未实现）
+## PDF 私有快照认证登记（API 0.15.0，2026-10-07）
+
+新增独立 `pdf_snapshot_assets/pdf_snapshot_versions`，已封存 attempt 通过真实 admin、CSRF/同源与事务内当前身份检查登记；请求/attempt 唯一约束、预期前版/前源 SHA CAS、原请求/原 owner 恢复与不可覆盖历史读取均已实现。`/v1/pdf-snapshots` 全部仅 admin，文件/页图/bundle 必须指定版本及 manifest SHA；返回 bytes 再核对摘要，最终响应前重验真实权限。POST 可能已经提交但最后权限检查失败，恢复身份后必须原请求重试，不能假称回滚。
+
+本阶段仅 `registration_only=true`，继续 `indexed=false`、`knowledge_visible=false`、`source_authority_verified=false`；旧知识表、事实/审批与 Qdrant 不被登记改动，新表不给 SQL readonly 访问。两个验证槽是每服务进程上限，5 秒限于单次 DB 锁等待，尚非整个请求 deadline。使用、分页元数据与实际文件验证的区别见 [PDF 快照登记说明](PDF_SNAPSHOT_REGISTRY.md)。
+
+服务专项最终 **27/27**、HTTP **19/19**、完整隔离回归 **338/338**（292 + 46），进程退出 0。初始服务 25/25 与 HTTP 15/15 保留，新增锁等待/完成后认证变化回归；原库计数未变，新表未在原库创建，原准备模块与冻结 11/13/8 文件未改，临时测试库/账户/产物已清理。报告为 `reports/pdf_publication*`，没有新增浏览器页面或模型评分。知识版本发布、向量对账与 PDF/OCR worker 仍待实现。
+
+## 后续 PDF/OCR 安全发布方案（知识发布与索引尚未实现）
 
 1. 接收每文件源字节到按 SHA 命名的不可变存储，并保留批次/原文件名/独立资产 ID。页图、裁剪和解析产物写入 `job_id/attempt_token` 私有目录，不覆盖当前可见产物。
 2. 在短事务中入队；worker 原子领取后释放数据库事务再做耗时解析。数据库连接不横跨 OCR/模型调用。页数、像素、时间、源总字节及输出产物均有限额，超限文件独立失败。
