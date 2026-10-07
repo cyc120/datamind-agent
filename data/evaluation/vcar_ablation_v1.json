@@ -1,0 +1,344 @@
+{
+  "version": "vcar-ablation-v1",
+  "note": "冻结的合成机制消融集。标签在任何机制实现之前固定；不参与调参。它不是真实工厂数据，也不衡量任何模型精度，只用于对照四条机制臂在同一固定集上的修复与冲突行为。",
+  "labels_frozen_at": "2026-10-07",
+  "cases": [
+    {
+      "case_id": "field-plain-01",
+      "kind": "field",
+      "pre_repair_correct": true,
+      "defect": null,
+      "sources": {
+        "ocr_text": "外径 20.04 mm",
+        "structured_fact": {
+          "value": 20.04,
+          "unit": "mm"
+        },
+        "local_reread": {
+          "value": 20.04,
+          "unit": "mm"
+        }
+      },
+      "truth": {
+        "value": 20.04,
+        "unit": "mm"
+      }
+    },
+    {
+      "case_id": "field-plain-02",
+      "kind": "field",
+      "pre_repair_correct": true,
+      "defect": null,
+      "sources": {
+        "ocr_text": "批次数 9",
+        "structured_fact": {
+          "value": 9,
+          "unit": "count"
+        },
+        "local_reread": {
+          "value": 9,
+          "unit": "count"
+        }
+      },
+      "truth": {
+        "value": 9,
+        "unit": "count"
+      }
+    },
+    {
+      "case_id": "field-unit-01",
+      "kind": "field",
+      "pre_repair_correct": false,
+      "defect": "missing_unit",
+      "sources": {
+        "ocr_text": "温度上限 850",
+        "structured_fact": {
+          "value": 850,
+          "unit": "C"
+        },
+        "local_reread": {
+          "value": 850,
+          "unit": "C"
+        }
+      },
+      "truth": {
+        "value": 850,
+        "unit": "C"
+      }
+    },
+    {
+      "case_id": "field-unit-02",
+      "kind": "field",
+      "pre_repair_correct": false,
+      "defect": "missing_unit",
+      "sources": {
+        "ocr_text": "公差 0.1",
+        "structured_fact": {
+          "value": 0.1,
+          "unit": "mm"
+        },
+        "local_reread": {
+          "value": 0.1,
+          "unit": "mm"
+        }
+      },
+      "truth": {
+        "value": 0.1,
+        "unit": "mm"
+      }
+    },
+    {
+      "case_id": "field-unit-03",
+      "kind": "field",
+      "pre_repair_correct": false,
+      "defect": "unit_conflict",
+      "sources": {
+        "ocr_text": "温度上限 1123.15 K",
+        "structured_fact": {
+          "value": 850,
+          "unit": "C"
+        },
+        "local_reread": {
+          "value": 850,
+          "unit": "C"
+        }
+      },
+      "truth": {
+        "value": 850,
+        "unit": "C"
+      }
+    },
+    {
+      "case_id": "field-binding-01",
+      "kind": "field",
+      "pre_repair_correct": false,
+      "defect": "missing_binding",
+      "sources": {
+        "ocr_text": "外径 20.04",
+        "structured_fact": {
+          "value": 20.04,
+          "unit": "mm",
+          "entity": "A102"
+        },
+        "local_reread": {
+          "value": 20.04,
+          "unit": "mm",
+          "entity": "A102"
+        }
+      },
+      "truth": {
+        "value": 20.04,
+        "unit": "mm",
+        "entity": "A102"
+      }
+    },
+    {
+      "case_id": "field-binding-02",
+      "kind": "field",
+      "pre_repair_correct": false,
+      "defect": "missing_binding",
+      "sources": {
+        "ocr_text": "批次数 12",
+        "structured_fact": {
+          "value": 12,
+          "unit": "count",
+          "entity": "B006"
+        },
+        "local_reread": {
+          "value": 12,
+          "unit": "count",
+          "entity": "B006"
+        }
+      },
+      "truth": {
+        "value": 12,
+        "unit": "count",
+        "entity": "B006"
+      }
+    },
+    {
+      "case_id": "field-local-01",
+      "kind": "field",
+      "pre_repair_correct": false,
+      "defect": "low_confidence",
+      "sources": {
+        "ocr_text": "外径 20.84 mm",
+        "structured_fact": null,
+        "local_reread": {
+          "value": 20.04,
+          "unit": "mm"
+        }
+      },
+      "truth": {
+        "value": 20.04,
+        "unit": "mm"
+      }
+    },
+    {
+      "case_id": "field-local-02",
+      "kind": "field",
+      "pre_repair_correct": false,
+      "defect": "low_confidence",
+      "sources": {
+        "ocr_text": "温度 851 C",
+        "structured_fact": null,
+        "local_reread": {
+          "value": 850,
+          "unit": "C"
+        }
+      },
+      "truth": {
+        "value": 850,
+        "unit": "C"
+      }
+    },
+    {
+      "case_id": "field-local-03",
+      "kind": "field",
+      "pre_repair_correct": true,
+      "defect": null,
+      "sources": {
+        "ocr_text": "公差 0.10 mm",
+        "structured_fact": {
+          "value": 0.1,
+          "unit": "mm"
+        },
+        "local_reread": {
+          "value": 0.4,
+          "unit": "mm"
+        }
+      },
+      "truth": {
+        "value": 0.1,
+        "unit": "mm"
+      }
+    },
+    {
+      "case_id": "field-local-04",
+      "kind": "field",
+      "pre_repair_correct": true,
+      "defect": null,
+      "sources": {
+        "ocr_text": "批次数 9",
+        "structured_fact": {
+          "value": 9,
+          "unit": "count"
+        },
+        "local_reread": {
+          "value": 6,
+          "unit": "count"
+        }
+      },
+      "truth": {
+        "value": 9,
+        "unit": "count"
+      }
+    },
+    {
+      "case_id": "conflict-01",
+      "kind": "conflict",
+      "pre_repair_correct": false,
+      "defect": "source_conflict",
+      "sources": {
+        "ocr_text": "质检报告 850 C",
+        "structured_fact": {
+          "value": 870,
+          "unit": "C"
+        },
+        "local_reread": null,
+        "authority_rule": {
+          "value": 850,
+          "unit": "C",
+          "basis": "registered-temperature-rule"
+        }
+      },
+      "truth": {
+        "value": 850,
+        "unit": "C"
+      }
+    },
+    {
+      "case_id": "conflict-02",
+      "kind": "conflict",
+      "pre_repair_correct": false,
+      "defect": "source_conflict",
+      "sources": {
+        "ocr_text": "质检报告 852 C",
+        "structured_fact": {
+          "value": 870,
+          "unit": "C"
+        },
+        "local_reread": null,
+        "authority_rule": null
+      },
+      "truth": {
+        "value": 870,
+        "unit": "C",
+        "unresolvable": true
+      }
+    },
+    {
+      "case_id": "conflict-03",
+      "kind": "conflict",
+      "pre_repair_correct": false,
+      "defect": "source_conflict",
+      "sources": {
+        "ocr_text": "报告 500 C",
+        "structured_fact": {
+          "value": 855,
+          "unit": "C"
+        },
+        "local_reread": null,
+        "authority_rule": {
+          "value": 855,
+          "unit": "C",
+          "basis": "registered-temperature-rule"
+        }
+      },
+      "truth": {
+        "value": 855,
+        "unit": "C"
+      }
+    },
+    {
+      "case_id": "conflict-04",
+      "kind": "conflict",
+      "pre_repair_correct": false,
+      "defect": "source_conflict",
+      "sources": {
+        "ocr_text": "报告 700 C",
+        "structured_fact": {
+          "value": 855,
+          "unit": "C"
+        },
+        "local_reread": null,
+        "authority_rule": null
+      },
+      "truth": {
+        "value": 855,
+        "unit": "C",
+        "unresolvable": true
+      }
+    },
+    {
+      "case_id": "conflict-05",
+      "kind": "conflict",
+      "pre_repair_correct": false,
+      "defect": "source_conflict",
+      "sources": {
+        "ocr_text": "报告 860 C",
+        "structured_fact": {
+          "value": 860,
+          "unit": "C"
+        },
+        "local_reread": null,
+        "authority_rule": null
+      },
+      "truth": {
+        "value": 860,
+        "unit": "C",
+        "no_conflict": true
+      }
+    }
+  ]
+}
