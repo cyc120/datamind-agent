@@ -1,4 +1,7 @@
-"""First-run fixed-template field/locator checks; labels never enter the parser."""
+"""Frozen form field/locator checks; labels never enter the parser.
+
+Development reruns require an explicit option. Acceptance refuses changed code.
+"""
 import argparse
 from datetime import datetime,timezone
 import hashlib
@@ -17,6 +20,14 @@ from ingestion.industrial_facts import extract,PARSER_VERSION
 def compact(value):return re.sub(r'\s+','',str(value or ''))
 
 
+def same_value(actual, expected):
+    if isinstance(expected, dict):
+        return isinstance(actual, dict) and all(same_value(actual.get(k), v) for k, v in expected.items())
+    if expected is None or isinstance(expected, bool):
+        return actual == expected
+    return compact(actual) == compact(expected)
+
+
 def iou(a,b):
     width=max(0,min(a[2],b[2])-max(a[0],b[0]));height=max(0,min(a[3],b[3])-max(a[1],b[1]))
     inter=width*height;union=(a[2]-a[0])*(a[3]-a[1])+(b[2]-b[0])*(b[3]-b[1])-inter
@@ -24,14 +35,23 @@ def iou(a,b):
 
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('--output',type=Path,default=ROOT/'reports/industrial_forms_initial.json');args=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument('--output',type=Path,default=ROOT/'reports/industrial_forms_initial.json')
+    ap.add_argument('--suite',type=Path,default=ROOT/'data/evaluation/industrial_forms_holdout_v1.json')
+    ap.add_argument('--current-parser',action='store_true',help='Development suite only; record current hashes explicitly')
+    args=ap.parse_args()
     if args.output.exists():
         raise SystemExit('Report already exists; preserve the initial run and use --output with a new path')
-    path=ROOT/'data/evaluation/industrial_forms_holdout_v1.json';suite=json.loads(path.read_text());source=ROOT/suite['source_file']
+    path=args.suite;suite=json.loads(path.read_text());source=ROOT/suite['source_file']
     assert hashlib.sha256(source.read_bytes()).hexdigest()==suite['source_sha256']
+    if args.current_parser and suite.get('stage') != 'development':
+        raise SystemExit('--current-parser is allowed only for a declared development suite')
+    code_hashes={name:hashlib.sha256((ROOT/name).read_bytes()).hexdigest() for name in suite['frozen_parser_code_hashes']}
     for name,sha in suite['frozen_parser_code_hashes'].items():
-        assert hashlib.sha256((ROOT/name).read_bytes()).hexdigest()==sha,'frozen parser changed: '+name
-    assert suite['visual_qa']=='all four pages visually checked'
+        if not args.current_parser:assert code_hashes[name]==sha,'frozen parser changed: '+name
+    evaluator_sha=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    if suite.get('frozen_evaluator_sha256') and not args.current_parser:
+        assert evaluator_sha==suite['frozen_evaluator_sha256'],'frozen evaluator changed'
+    assert suite['visual_qa'] in {'all four pages visually checked','all pages visually checked'}
     started=time.perf_counter();doc_id='forms-holdout-'+suite['source_sha256'][:12]
     # Only original PDF and document identifier reach parse/extract; no fixture, labels or counterparts.
     blocks,count,quality=parse_pdf(source,doc_id,include_quality=True)
@@ -50,36 +70,48 @@ def main():
             if len(raw)==2:diagnostics.setdefault(compact(raw[0]),[]).append((raw[1],b))
         checks=[]
         for gold in case['fields']:
-            ref=refs.get(gold['label']);text=ref['text'].split('：',1)[1] if ref and '：' in ref['text'] else None
+            ref=refs.get(gold['label'])
+            raw=re.split(r'[：:]',ref['text'],maxsplit=1) if ref else []
+            text=raw[1].strip() if len(raw)==2 else None
             position=iou(ref['bbox'],gold['bbox']) if ref else 0
             text_match=compact(text)==compact(gold['value']) if text is not None else False
             candidates=diagnostics.get(gold['label'],[])
             raw_ok=len(candidates)==1 and compact(candidates[0][0])==compact(gold['value'])
             checks.append({'field':gold['label'],'gold_value':gold['value'],'actual_value':text,
                           'text_matches':text_match,'locator_iou':round(position,4),'entity_bound':entity_bound,
-                          'passed':text_match and position>=.5 and entity_bound,
+                          'passed':text_match and position>=.5 and entity_bound and fact['verification_status']=='candidate',
                           'raw_block_diagnostic':{'matched':raw_ok,'candidates':[{'text':v,'bbox':b['bbox'],'confidence':b.get('ocr_confidence')} for v,b in candidates]}})
-        normalized=bool(fact and all(compact(fact.get(k))==compact(v) for k,v in expected.items()))
+        normalized=bool(fact and all(same_value(fact.get(k),v) for k,v in expected.items())
+                        and fact['verification_status']=='candidate')
+        complete=normalized and all(c['passed'] for c in checks)
         cases.append({'case_id':case['case_id'],'carrier':case['carrier'],'template':case['template'],'page':page,
             'field_count':len(checks),'fields_passed':sum(c['passed'] for c in checks),'fields':checks,
-            'fact_exists':fact is not None,'fact_normalization_passed':normalized,
+            'fact_exists':fact is not None,'fact_normalization_passed':normalized,'fact_complete_passed':complete,
+            'actual_fact':fact,
             'parser_errors':[e for e in field_quality['errors'] if e['page_no']==page]})
     strata={carrier:{'passed':sum(c['fields_passed'] for c in cases if c['carrier']==carrier),
-                     'field_count':sum(c['field_count'] for c in cases if c['carrier']==carrier)} for carrier in ('native','scan')}
+                     'field_count':sum(c['field_count'] for c in cases if c['carrier']==carrier),
+                     'facts_passed':sum(c['fact_complete_passed'] for c in cases if c['carrier']==carrier),
+                     'fact_count':sum(c['carrier']==carrier for c in cases)} for carrier in ('native','scan')}
     report={'created_at':datetime.now(timezone.utc).isoformat(),'suite_version':suite['suite_version'],
         'scope':suite['provenance'],'source_file':suite['source_file'],'source_sha256':suite['source_sha256'],
         'suite_sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'parser_version':PARSER_VERSION,
-        'parser_code_hashes':suite['frozen_parser_code_hashes'],'evaluator_version':'industrial-forms-eval-v1',
-        'evaluator_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'field_count':sum(c['field_count'] for c in cases),
-        'fields_passed':sum(c['fields_passed'] for c in cases),'strata':strata,'facts_passed':sum(c['fact_normalization_passed'] for c in cases),
+        'parser_code_hashes':code_hashes,'evaluator_version':'industrial-forms-eval-v2',
+        'evaluator_sha256':evaluator_sha,'field_count':sum(c['field_count'] for c in cases),
+        'fields_passed':sum(c['fields_passed'] for c in cases),'strata':strata,'facts_passed':sum(c['fact_complete_passed'] for c in cases),
+        'normalized_facts_passed':sum(c['fact_normalization_passed'] for c in cases),
         'fact_case_count':len(cases),'cases':cases,'quality':quality,'field_quality':field_quality,
         'elapsed_ms':round((time.perf_counter()-started)*1000,2),'parser_input':'Original PDF only; no gold/reference text',
-        'runtime_indexed':False,'model_used':False,'limitations':['Synthetic authored follow-on templates, not a blind factory benchmark',
-        'Raw-block diagnostics are not accepted fields or fact extraction scores','Missing fields remain in the denominator; no parser tuning in this first report']}
+        'runtime_indexed':False,'model_used':False,'stage':suite.get('stage','historical'),
+        'development_participation':suite.get('development_participation',False),
+        'parser_freeze_overridden_for_development':args.current_parser,
+        'limitations':['Synthetic authored follow-on templates, not a blind factory benchmark',
+        'Raw-block diagnostics are not accepted fields or fact extraction scores',
+        'Missing fields remain in the denominator; complete facts require all field locators and normalization']}
     args.output.parent.mkdir(parents=True,exist_ok=True);
     with args.output.open('x',encoding='utf-8') as stream:stream.write(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
     print(json.dumps({'fields':f"{report['fields_passed']}/{report['field_count']}",'strata':strata,'facts':f"{report['facts_passed']}/{report['fact_case_count']}",'output':str(args.output)},ensure_ascii=False))
-    return 0 if report['fields_passed']==report['field_count'] else 1
+    return 0 if report['fields_passed']==report['field_count'] and report['facts_passed']==report['fact_case_count'] else 1
 
 
 if __name__=='__main__':raise SystemExit(main())

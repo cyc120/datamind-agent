@@ -1,0 +1,23 @@
+{
+  "parser_version": "industrial-labelled-v2",
+  "frozen_parser_code_hashes": {
+    "ingestion/industrial_facts.py": "3d6645c6ffa0c7779ddb29c477cd7004b14f65bb51deb4bf5bb808e8e021a544",
+    "ingestion/ingest.py": "c36262ea2227792661f90e395a006a2c5db9d1142c31f7302360e0ccac046a16",
+    "ingestion/ocr.py": "caebb1038dc865b00a1f76b5ae37475c1b3472d9e7cce4f4623952f46cc4eae2",
+    "ingestion/tables.py": "36eeff85ed5de20ce59516b293a813f5c853dda30bce70c9b3b732b9188d2666",
+    "datamind/field_store.py": "3099f0cc83c17c6596764dae7e204ac4341bd445402737ee986e004934dea31a"
+  },
+  "evaluator_sha256": "3687f0cdbdedbf35c0aa40db67d5f841269a22e545c4d4efd911628313176615",
+  "authoring_builder_sha256": "a92f1999499f26a0e451ce0cb5aab511521a5a92fad5b78b7aba5bdb18022e50",
+  "authoring_builder_snapshot": "data/evaluation/frozen/industrial_labelled_v2/build_industrial_forms_v2.py",
+  "acceptance_suite_sha256": "97ecc7f0d980cf110cb76a4a22bfca4b8d552e723e18dbe1bfd6fd3388b7acf5",
+  "acceptance_report_sha256": "4504fc3f2d2507122a1c69d70e1a5ce5d5f41ec1cd647f0162c15c2e093b65b5",
+  "runtime_snapshots": {
+    "ingestion/industrial_facts.py": "data/evaluation/frozen/industrial_labelled_v2/runtime/ingestion/industrial_facts.py",
+    "ingestion/ingest.py": "data/evaluation/frozen/industrial_labelled_v2/runtime/ingestion/ingest.py",
+    "ingestion/ocr.py": "data/evaluation/frozen/industrial_labelled_v2/runtime/ingestion/ocr.py",
+    "ingestion/tables.py": "data/evaluation/frozen/industrial_labelled_v2/runtime/ingestion/tables.py",
+    "datamind/field_store.py": "data/evaluation/frozen/industrial_labelled_v2/runtime/datamind/field_store.py",
+    "scripts/eval_industrial_forms.py": "data/evaluation/frozen/industrial_labelled_v2/runtime/scripts/eval_industrial_forms.py"
+  }
+}

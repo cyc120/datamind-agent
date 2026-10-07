@@ -146,5 +146,56 @@ th{background:#f3f8f5;color:#3b5e50;position:sticky;top:0}tr:last-child td{borde
 .document-fields td { vertical-align: top; white-space: pre-wrap; }
 .document-fields td:last-child { min-width: 190px; }
 .document-fields td button { font-size: 11px; padding: 5px 7px; margin: 3px; }
+.field-content { overflow-x: auto; }
+.field-content > table { min-width: 740px; }
+.account-panel { font-size: 12px; padding: 12px; border: 1px solid #507469; border-radius: 10px; }
+.account-panel form { display: grid; gap: 8px; margin-top: 10px; }
+.account-panel input { min-width: 0; width: 100%; }
+.account-panel p { margin: 6px 0 0; }
+.account-panel form.hidden { display: none; }
 .review-history { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
 @media(max-width:650px){ .review-form { grid-template-columns: 1fr; } }
+
+.authority-form { display:grid; gap:8px; max-width:760px; margin-top:16px; }
+.authority-form input,.authority-form select,.authority-form textarea { width:100%; min-width:0; }
+.authority-form textarea,.authority-rule textarea { min-height:80px; padding:10px; font:inherit; border:1px solid #cbd5e1; border-radius:8px; }
+.authority-rule { border-top:1px solid #dce5e1; padding:18px 0; }
+.authority-rule pre { white-space:pre-wrap; overflow-wrap:anywhere; }
+.authority-rule label,.authority-rule textarea { display:block; width:100%; margin:8px 0; }
+
+.cad-selectors { display:grid; grid-template-columns:2fr 1fr; gap:16px; margin-top:12px; }
+.cad-selectors select { width:100%; min-width:0; }
+#cadVersionInfo { overflow-wrap:anywhere; }
+#cadFeatures { margin:16px 0; }
+#cadFeatures td { white-space:normal; vertical-align:top; min-width:120px; }
+#cadViewer { width:100%; min-height:690px; border:1px solid #dce5e1; border-radius:8px; background:#f5f8fa; }
+@media(max-width:650px){ .cad-selectors{grid-template-columns:1fr;} }
+
+.cad-review-card { margin:16px 0; padding:16px; border:1px solid #dce5e1; border-radius:8px; overflow-wrap:anywhere; }
+.cad-review-card h3 { margin-top:0; }
+.cad-review-form { display:grid; gap:8px; margin-top:16px; }
+.cad-review-form textarea { min-height:72px; width:100%; }
+.cad-review-history { font-size:13px; color:#52645d; }
+
+.dimension-selectors { display:grid; grid-template-columns:2fr 2fr 1fr; gap:16px; margin:12px 0; }
+.dimension-selectors select { width:100%; min-width:0; }
+.dimension-admin-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+.dimension-admin-grid .card { min-width:0; }
+.dimension-evidence { overflow-wrap:anywhere; margin-top:14px; }
+.dimension-evidence dl { display:grid; grid-template-columns:minmax(100px,150px) 1fr; gap:6px 14px; font-size:13px; }
+.dimension-evidence dt { color:#52645d; }
+.dimension-evidence dd { margin:0; }
+.dimension-evidence details { padding:10px 0; font-size:12px; }
+.dimension-evidence summary { cursor:pointer; }
+.dimension-result { padding:14px 16px; margin:16px 0; border:1px solid #dce5e1; border-radius:8px; background:#f5f8fa; overflow-wrap:anywhere; }
+.dimension-result h3 { margin:0 0 8px; }
+.dimension-result p { margin:7px 0; }
+.dimension-result[data-state="blocked"] { background:#fff7ec; border-color:#ead7b9; }
+.dimension-result[data-state="compared"] { background:#eef7f3; border-color:#bedbce; }
+#dimensionComparisonHistory .dimension-history-item { border-top:1px solid #dce5e1; padding:14px 0; overflow-wrap:anywhere; }
+#dimensionApprovalHistory { font-size:13px; overflow-wrap:anywhere; }
+#dimensionMessage,#dimensionSourceInfo,#dimensionMeasurementBaseline,#dimensionBindingBaseline,#dimensionDrawingInfo,#dimensionFeatureInfo { overflow-wrap:anywhere; }
+@media(max-width:1000px){ .dimension-admin-grid { grid-template-columns:1fr; } }
+@media(max-width:650px){ .dimension-selectors { grid-template-columns:1fr; } .dimension-evidence dl { grid-template-columns:1fr; gap:3px; } .dimension-evidence dd { margin-bottom:7px; } }
+
+.multifile-documents{display:grid;gap:8px;max-height:280px;overflow:auto;margin-top:12px}.multifile-document{display:flex;align-items:flex-start;gap:8px}.multifile-document input{width:auto;margin-top:4px}#fileBatchForm{display:grid;gap:12px}#fileJobs{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}details summary{cursor:pointer;margin:12px 0}

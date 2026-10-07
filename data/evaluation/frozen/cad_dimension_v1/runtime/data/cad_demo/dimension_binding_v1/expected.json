@@ -1,0 +1,27 @@
+{
+  "status": "compared",
+  "reason": null,
+  "comparison": {
+    "status": "within_annotation_range",
+    "measurement_original": {
+      "value": "20.04",
+      "unit": "mm"
+    },
+    "annotation_original": {
+      "raw": "%%c20 +/-0.1",
+      "lower": "19.9",
+      "upper": "20.1",
+      "unit": "mm"
+    },
+    "normalized_mm": {
+      "measurement": "20.04",
+      "lower": "19.9",
+      "upper": "20.1"
+    },
+    "annotation_handle": "3B",
+    "target_handle": "38"
+  },
+  "authentication_verified": false,
+  "formal_drawing_approval": false,
+  "product_quality_conclusion": false
+}

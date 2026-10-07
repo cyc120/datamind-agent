@@ -1,0 +1,15 @@
+{
+  "status": "ready",
+  "features": [
+    {
+      "feature_id": "diameter-1",
+      "nominal_value": "20",
+      "lower": "19.9",
+      "upper": "20.1",
+      "unit": "mm",
+      "annotation_handle": "13",
+      "target_handle": "20"
+    }
+  ],
+  "excluded": []
+}

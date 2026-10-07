@@ -122,7 +122,7 @@ class DataMindAgent:
                     final['sql_result']['bound_params']=_plain(result['bound_params'])
         if result and "retrieval" in result:
             final["rag_result"] = _plain({k: result.get(k) for k in
-                ("retrieval", "claims", "citations", "retrieved_evidence", "attempts", "elapsed_ms", "prompt_version")})
+                ("retrieval", "claims", "citations", "retrieved_evidence", "attempts", "elapsed_ms", "prompt_version", "answer_coverage")})
         if result and result.get('kind') == 'industrial':
             final['industrial_result'] = _plain(result)
         event_type = {"COMPLETED": "answer.completed", "ABSTAINED": "answer.abstained",
@@ -193,8 +193,8 @@ class DataMindAgent:
         self._event("evidence.attached", "rag_agent", "succeeded",
                     output_summary={"chunk_count": len(chunk_nodes), "claim_count": len(result.get("claims", []))})
 
-    def _run_rag(self, question: str, plan: dict, collections, *, generator=None, retriever=None) -> dict:
-        self._event("query.parsed", "query_understanding", "succeeded", output_summary={"route": "rag", "collections": collections})
+    def _run_rag(self, question: str, plan: dict, collections, *, document_refs=None, generator=None, retriever=None) -> dict:
+        self._event("query.parsed", "query_understanding", "succeeded", output_summary={"route": "rag", "collections": collections,"document_refs":document_refs})
         self._event("plan.created", "planner", "succeeded", output_summary={"plan_id": plan["plan_id"], "tasks": plan["tasks"], "route": "rag"})
         self._event("tool.started", "rag_agent", "running", tool_name="knowledge.retrieve")
 
@@ -209,7 +209,8 @@ class DataMindAgent:
                     "model": cfg.get("NEW_API_MODEL"), "protocol": cfg.get("NEW_API_PROTOCOL"),
                     "profile": cfg.get("MODEL_PROFILE_NAME")}), self.run_id))
 
-        result = ask_documents(question, collections=collections, generator=generator, retriever=retriever, on_retrieval=retrieved)
+        kwargs={'document_refs':document_refs} if document_refs is not None else {}
+        result = ask_documents(question, collections=collections, generator=generator, retriever=retriever, on_retrieval=retrieved, **kwargs)
         self._record_document_evidence(result)
         if result["status"] == "abstained":
             self._event("verification.failed", "verification_agent", "warning", error_code=result["error_code"],
@@ -226,14 +227,14 @@ class DataMindAgent:
         return self._finish("COMPLETED", result["answer"], "medium", result=result)
 
     def run(self, question: str, *, database_sources: list[str] | None = None,
-            document_collections: list[str] | None = None, mode: str = "auto",
+            document_collections: list[str] | None = None, document_refs: list[dict] | None = None, mode: str = "auto",
             generator=None, rag_generator=None, retriever=None) -> dict:
         sources = database_sources if database_sources is not None else ["demo_retail", "chinook", "demo_industrial"]
-        route = route_for(question, mode)
+        route = "rag" if document_refs is not None and mode=="auto" else route_for(question, mode)
         tool = "industrial" if route == "industrial" else "rag" if route == "rag" else "sql"
         plan = {"plan_id": "plan-" + uuid.uuid4().hex[:12], "goal": question,
                 "route": route,
-                "budget": {"max_repair": 1, "top_k": 5, "max_claims": 6, "max_output_tokens": 2200} if route == "rag" else
+                "budget": {"max_repair": 1, "top_k": max(5,len(document_refs or [])), "max_claims": 6, "max_output_tokens": 2200} if route == "rag" else
                           {"max_repair": 2, "max_rows": 100, "sql_timeout_ms": 5000},
                 "tasks": [{"task_id": tool, "kind": tool + ".query", "depends_on": [], "status": "pending"},
                           {"task_id": "verify", "kind": "verify", "depends_on": [tool], "status": "pending"},
@@ -253,10 +254,13 @@ class DataMindAgent:
             return self._finish("FAILED_WITH_EVIDENCE", "数据库与文档的联合推理尚未接入，请分别选择数据库问数或文档问答。",
                                 "insufficient", error_code="ROUTE_UNSUPPORTED")
         try:
+            if document_refs is not None and route != 'rag':
+                return self._finish('FAILED_WITH_EVIDENCE','指定文件范围仅用于文档问答，请选择文档模式。',
+                                    'insufficient',error_code='DOCUMENT_SELECTION_MODE_INVALID')
             if route == 'industrial':
                 return self._run_industrial(question, plan, database_sources, document_collections)
             if route == "rag":
-                return self._run_rag(question, plan, document_collections, generator=rag_generator, retriever=retriever)
+                return self._run_rag(question, plan, document_collections, document_refs=document_refs, generator=rag_generator, retriever=retriever)
             if not sources or any(s not in {"demo_retail", "chinook", "demo_industrial"} for s in sources):
                 return self._finish("FAILED_WITH_EVIDENCE", "当前请求范围不允许访问该数据源。",
                                     "insufficient", error_code="SOURCE_NOT_ALLOWED")
@@ -303,6 +307,8 @@ class DataMindAgent:
                                         "validator_findings": result["validator_findings"]})
             return self._finish("COMPLETED", answer, ("medium" if source=='demo_industrial' else "high") if verified else "insufficient", result=result)
         except Exception as exc:
+            if isinstance(exc, ValueError) and str(exc).startswith("DOCUMENT_SELECTION_"):
+                return self._finish("FAILED_WITH_EVIDENCE", "选定文件的版本、状态或范围已变化，请刷新并重新选择。", "insufficient", error_code=str(exc))
             if isinstance(exc, ValueError) and str(exc) == "COLLECTION_NOT_ALLOWED":
                 return self._finish("FAILED_WITH_EVIDENCE", "当前请求范围不允许访问该文档集合。", "insufficient", error_code="COLLECTION_NOT_ALLOWED")
             logging.exception("DataMind Agent run %s failed", self.run_id)
@@ -330,10 +336,12 @@ class DataMindAgent:
         except ValueError as exc:
             code=str(exc)
             return self._finish('FAILED_WITH_EVIDENCE','工业核验证据不可用或超出范围，请查看轨迹并补充来源。','insufficient',error_code=code)
+        parser_versions=sorted({f['parser_version'] for f in result['facts']})
         with self.conn.cursor() as cur:
             cur.execute('UPDATE runs SET status=%s,versions=%s WHERE run_id=%s',('VERIFYING',Json({
-                'rules':result['rule_version'],'dataset':result['dataset'],'sql_snapshot':result['source_snapshot_id'],
-                'parser':'industrial-native-v1','model_used':False}),self.run_id))
+                'rules':result['rule_version'],'authority':result['authority_version'],'dataset':result['dataset'],'sql_snapshot':result['source_snapshot_id'],
+                'parser':parser_versions[0] if len(parser_versions)==1 else 'multiple' if parser_versions else None,
+                'parsers':parser_versions,'model_used':False}),self.run_id))
         self._record_industrial_evidence(result)
         return self._finish('COMPLETED' if result['rows'] else 'ABSTAINED', result['answer'],
                             'medium' if result['rows'] else 'insufficient',
@@ -385,6 +393,12 @@ class DataMindAgent:
                         'rule_id':issue['reason'],'rule_version':result['rule_version'],'resolution_status':issue['status'],
                         'selected_fact_ref':{'fact_id':row['requirement_fact_id']} if issue['kind']=='version_difference' else None,
                         'reason':issue['reason'],'repair_attempt_refs':[]}
+                    if issue.get('authority'):
+                        record.update(rule_id=issue['authority']['rule_id'],rule_version=issue['authority']['rule_version'],
+                                      selected_fact_ref=issue['selected_fact_ref'],authority=issue['authority'])
+                        record['normalized_values'].update(selected=row['selected_value'],selected_unit=row['selected_unit'])
+                    if issue.get('authority_rule_ids'):
+                        record['authority_rule_ids']=issue['authority_rule_ids']
                     cur.execute('''INSERT INTO conflict_records(conflict_id,run_id,entity_key,metric,conflict_type,left_fact_refs,
                                    right_fact_refs,comparison_context,normalized_values,rule_id,rule_version,resolution_status,
                                    selected_fact_ref,reason,payload) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''',
@@ -392,6 +406,9 @@ class DataMindAgent:
                          Json(record['comparison_context']),Json(record['normalized_values']),record['rule_id'],record['rule_version'],
                          record['resolution_status'],Json(record['selected_fact_ref']),record['reason'],Json(record)))
                     cn=node('ConflictRecord',cid,record);edge(cn,vn,'derived_from')
+                    if issue.get('authority'):
+                        authority=issue['authority'];an=node('AuthorityRule',authority['rule_id'],authority)
+                        edge(cn,an,'resolved_by');edge(vn,an,'derived_from')
                 text=f"测量 {row['measurement_id']}：工艺范围核验 {row['compliance']}；来源比较 {row['agreement']}。"
                 claim_id='claim-'+uuid.uuid4().hex[:16];claim_node=node('Claim',claim_id,{'text':text});edge(claim_node,vn,'supports')
                 cur.execute('INSERT INTO claims(claim_id,run_id,text,status,evidence_ids,confidence_level,verification) VALUES (%s,%s,%s,%s,%s,%s,%s)',

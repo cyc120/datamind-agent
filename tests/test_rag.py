@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 from datamind.agent import DataMindAgent, route_for
 from datamind.api import app
 from datamind.knowledge import KnowledgeRetriever, select_documents
-from datamind.rag_engine import ask_documents, verify_claims
+from datamind.rag_engine import ask_documents, verify_claims, PROMPT_VERSION
 from ingestion.ingest import build_chunks
 
 
@@ -151,7 +151,7 @@ class RAGIntegrationTest(unittest.TestCase):
         evidence = self.client.get(f"/v1/runs/{run_id}/evidence").json()
         self.assertEqual(evidence["claims"][0]["status"], "warned")
         self.assertTrue(any(node["node_type"] == "Chunk" for node in evidence["nodes"]))
-        self.assertEqual(self.client.get(f"/v1/runs/{run_id}").json()["versions"]["prompt"], "rag-v2")
+        self.assertEqual(self.client.get(f"/v1/runs/{run_id}").json()["versions"]["prompt"], PROMPT_VERSION)
 
     def test_missing_evidence_abstains_without_model_and_repair_budget_is_bounded(self):
         retriever = self.retrieve()

@@ -1,0 +1,24 @@
+{
+  "contract_version": "cad-dimension-binding-v1",
+  "frozen_at": "2026-10-06T00:00:23.445804+00:00",
+  "ezdxf_version": "1.4.4",
+  "pydantic_version": "2.13.5",
+  "drawing_source": "data/cad_demo/development/dev-mm.dxf",
+  "runtime_snapshot_directory": "data/evaluation/frozen/cad_dimension_v1/runtime",
+  "provenance": "synthetic_demo",
+  "frozen_files": {
+    "ingestion/cad_dimension_contract.py": "f1aa158f34abe59d3354be2df70f873b4d48773ef6422e8f02c7e10ad7d251ae",
+    "ingestion/cad_contract.py": "ce9ecbfdf9751cf8692efad1430d45a2eca1aa01ed1120bcf1b0183b9fcb6ee1",
+    "ingestion/cad_dxf.py": "60f012f98a767d4e355bfde05e74eb6810295046bb33f6d0114b18dd51be48e8",
+    "tests/test_cad_dimension_contract.py": "9442d3849ba5b236037bf3886189c7cd24d90f21a958398422aa7c22c3c39ebb",
+    "tests/cad_dimension_fixtures.py": "b0b952b53df43297ca440660959272f8f429ca353dc23570881ccdde6b3a64e8",
+    "scripts/verify_cad_dimension_contract.py": "2f879eebf84202500715361deb1b2e041afa3cea4528faed2b7b4b9283978246",
+    "requirements-cad.txt": "b6f4066b119c92fec053c457d2b0ed7c80817e547bff35a814ebc98f0857a9cd",
+    "data/cad_demo/development/dev-mm.dxf": "35dff275076412943c4bf37fe5a809c0161efee68f4f852d47930d80f3cb367f",
+    "data/cad_demo/DIMENSION_BINDING_CONTRACT.md": "557dc2a84e8bd9e88bce6e86b3eb019088241f6e8f9dc705dcdd6461e078ded1",
+    "data/cad_demo/dimension_binding_v1/measurement_source.json": "df1694b2b4bed33ce83a9f8b294f7cf61e9ea0b332ebea0cdbba60c5721ea5ba",
+    "data/cad_demo/dimension_binding_v1/evaluation.json": "2f4966dc797862f9f658923a5e5cb74562c9a5db38604ab6182403ccf99cb660",
+    "data/cad_demo/dimension_binding_v1/expected.json": "af52c73a89547a053d07183631f26d124ef6a840e4295cfa30ca4e5b221650ce",
+    "data/cad_demo/dimension_binding_v1/contract.schema.json": "d5401f535ae9afe078a30c25d7ae2e0b794efa898bad013fe0091f1800ffa609"
+  }
+}

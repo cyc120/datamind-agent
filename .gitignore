@@ -31,6 +31,7 @@ spec_text.txt
 
 # 页面预览由摄取/评测生成；历史已跟踪预览不受影响。
 /data/object_store/page_images/
+/data/object_store/cad_sources/
 /tmp/
 
 # ===== gateway（New API 接入基座）本地私有文件 =====
@@ -40,3 +41,15 @@ spec_text.txt
 /gateway/logs/
 /gateway/source/AGENTS.md
 /gateway/source/.agents/
+
+# 本地验证脚本、临时凭据和预览中间文件
+/work/
+
+# 浏览器上传的本地暂存文件不进入版本库
+/data/cad_demo/development/upload-*
+/data/cad_demo/authorized/upload-*
+/data/dimension_demo/development/upload-*
+/data/dimension_demo/authorized/upload-*
+
+# Native PDF preparation sources and private attempt products are runtime data.
+/data/object_store/pdf_prepared/

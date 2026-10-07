@@ -4,8 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>DataMind Agent · 问数与文档问答</title>
-  <link rel="stylesheet" href="/assets/style.css?v=0.7.0">
-  <script src="/assets/app.js?v=0.7.0" defer></script>
+  <link rel="stylesheet" href="/assets/style.css?v=0.14.0">
+  <script src="/assets/app.js?v=0.14.0" defer></script>
+  <script src="/assets/multifile.js?v=0.14.0" defer></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -18,7 +19,21 @@
       <button class="nav-item" data-view="model"><span class="ico">⚙</span>模型接入<span class="badge" id="navModelBadge">未配置</span></button>
       <button class="nav-item" data-view="runs"><span class="ico">↺</span>运行记录</button>
       <button class="nav-item" data-view="fields"><span class="ico">▤</span>字段复核</button>
+      <button class="nav-item" data-view="authority"><span class="ico">◇</span>来源权威规则</button>
+      <button class="nav-item" data-view="cad"><span class="ico">⌖</span>图纸与实体</button>
+      <button class="nav-item" data-view="dimensions"><span class="ico">↔</span>尺寸核验</button>
+      <button class="nav-item" data-view="files"><span class="ico">⇈</span>多文件任务</button>
     </nav>
+    <div class="account-panel">
+      <div id="accountStatus">未登录 · 只读浏览</div>
+      <form id="loginForm">
+        <input id="loginUsername" aria-label="账户" autocomplete="username" placeholder="账户" required>
+        <input id="loginPassword" aria-label="密码" type="password" autocomplete="current-password" placeholder="密码" required>
+        <button type="submit">登录</button>
+      </form>
+      <button id="logout" class="secondary hidden">退出登录</button>
+      <p id="authMessage" role="status"></p>
+    </div>
     <div class="side-foot">
       <div class="pulse warn" id="pulseModel"><span class="dot"></span>模型 <span id="pulseModelText">检测中…</span></div>
       <div class="pulse" id="pulseDb"><span class="dot"></span>数据库 <span id="pulseDbText">检测中…</span></div>
@@ -41,6 +56,7 @@
             <div><label for="question">自然语言问题</label><textarea id="question">2024年一共有多少笔订单？</textarea></div>
             <div><label for="source">问题范围</label><select id="source"><option value="auto">自动选择</option><option value="demo_retail">零售数据库</option><option value="chinook">Chinook 音乐库</option><option value="demo_kb">演示文档知识库</option><option value="ohrbench_kb">OHR-Bench 文档样本</option><option value="demo_industrial">工业合成演示核验</option><option value="industrial_sql">工业生产问数（模型）</option></select></div>
           </div>
+          <details><summary>限定问答文件（最多8份，可跨知识库）</summary><button id="refreshQuestionDocuments" class="secondary" type="button">刷新文件列表</button><div id="questionDocuments" class="multifile-documents"></div><p id="questionDocumentsMessage" class="field-hint"></p></details>
           <div class="chips">
             <button class="chip" data-q="2025年销售额最高的前三个产品是什么？">销售额前三产品</button>
             <button class="chip" data-q="VIP客户有多少人？">VIP 客户数</button>
@@ -73,6 +89,123 @@
     <section class="view" data-view="fields">
       <div class="page-head"><div class="eyebrow">Document Review</div><h1>字段复核</h1><p>打开文档，核对原页并记录字段提取问题。复核记录保留版本和依据。</p></div>
       <section class="card"><div class="actions"><button class="secondary" id="refreshDocuments">刷新文档</button></div><div class="tablewrap" id="documentList">正在读取…</div></section>
+    </section>
+
+    <section class="view" data-view="authority">
+      <div class="page-head"><div class="eyebrow">Source Authority</div><h1>来源权威规则</h1><p>登记具体测量的裁定依据，再由另一账户批准启用。裁决保留双方原值，不能据此宣称来源一致或整体合格。</p></div>
+      <section class="card">
+        <h2>登记规则</h2><p class="field-hint">仅支持工业温度数值冲突。报告字段须先完成认证复核与独立审批；规则绑定当前生产记录、报告版本、有效期和依据页。</p>
+        <label for="authorityQuestion">核验范围</label><input id="authorityQuestion" value="2026年9月A102工序30温度核验，生产记录和质检报告是否一致？">
+        <div class="actions"><button id="loadAuthorityCandidates" class="secondary">读取冲突测量</button></div>
+        <form id="authorityForm" class="authority-form">
+          <label for="authorityCandidate">冲突测量</label><select id="authorityCandidate"></select><p id="authorityCandidateInfo" class="field-hint"></p>
+          <label for="authoritySelected">本次采用的来源</label><select id="authoritySelected"><option value="">请选择来源</option><option value="production">生产记录</option><option value="report">质检报告</option></select>
+          <label for="authorityFrom">有效期起点（含时区，包含）</label><input id="authorityFrom" required>
+          <label for="authorityTo">有效期终点（含时区，不包含）</label><input id="authorityTo" required>
+          <label for="authorityBasis">依据文件（公开 PDF）</label><select id="authorityBasis"></select>
+          <label for="authorityPage">依据页码</label><input id="authorityPage" type="number" min="1" value="1" required>
+          <label for="authorityRationale">裁定依据</label><textarea id="authorityRationale" required minlength="10" maxlength="1000" placeholder="说明依据文件中哪些内容支持采用该来源，以及适用边界。"></textarea>
+          <div class="actions"><button id="registerAuthority" type="submit">登记待审批规则</button></div>
+        </form><p id="authorityMessage" role="status"></p>
+      </section>
+      <section class="card"><div class="actions"><h2>规则与审批历史</h2><button id="refreshAuthority" class="secondary">刷新规则</button></div><p class="field-hint">登记状态不保证当前适用；运行时再次核验版本、审批、依据与重叠规则。</p><div id="authorityRules"></div></section>
+    </section>
+
+    <section class="view" data-view="cad">
+      <div class="page-head"><div class="eyebrow">Drawing Evidence</div><h1>图纸与实体</h1><p>核对原图、尺寸文字和明确对象引用。图纸版本保留历史，登记不代表审批或生产质量结论。</p></div>
+      <section class="card">
+        <div class="actions"><button id="refreshCad" class="secondary">刷新图纸</button></div>
+        <div class="cad-selectors"><div><label for="cadAsset">已登记图纸</label><select id="cadAsset"></select></div><div><label for="cadVersion">查看版本</label><select id="cadVersion"></select></div></div>
+        <p id="cadMessage" role="status"></p><p id="cadVersionInfo" class="field-hint"></p>
+        <a id="cadSourceLink" class="hidden" target="_blank" rel="noopener">下载本版本原 DXF</a>
+        <div id="cadFeatures" class="tablewrap"></div>
+        <section id="cadReviews" aria-label="尺寸对象关联复核"></section>
+        <iframe id="cadViewer" title="本版本图纸原文与实体关联" sandbox="allow-scripts" src="about:blank"></iframe>
+        <p class="field-hint">文字边界和字体近似；原图显示原始提取关联。完成关联复核后，可在「尺寸核验」显式绑定本地测量并申请独立使用批准。</p>
+      </section>
+      <section class="card hidden" id="cadRegistration">
+        <h2>登记本地图纸或新版本</h2><p class="field-hint">素材区中的文件由本地管理员准备；仅支持当前限定 DXF 格式。系统固定源文件和版本，失败不生成图纸记录。</p>
+        <form id="cadForm" class="authority-form">
+          <label for="cadDocumentId">图纸资产 ID</label><input id="cadDocumentId" required maxlength="64" pattern="[A-Za-z0-9][A-Za-z0-9_.-]*" placeholder="drawing-demo-1">
+          <label for="cadTitle">显示名称</label><input id="cadTitle" required maxlength="200" placeholder="合成演示图纸">
+          <label for="cadStagedSource">本地素材</label><select id="cadStagedSource" required></select>
+          <p id="cadRegistrationBaseline" class="field-hint"></p>
+          <div class="actions"><button id="registerCad" type="submit">登记源文件与版本</button></div>
+        </form><p id="cadRegistrationMessage" role="status"></p>
+      </section>
+    </section>
+
+    <section class="view" data-view="dimensions">
+      <div class="page-head"><div class="eyebrow">Dimension Evidence</div><h1>尺寸核验</h1><p>登记测量，明确绑定已复核的标注，再由独立账户批准使用。单次比较保留原值与版本，不代表制造授权或整体质量合格。</p></div>
+      <section class="card">
+        <div class="actions"><h2>测量与绑定</h2><button id="refreshDimensions" class="secondary">刷新尺寸记录</button></div>
+        <p id="dimensionMessage" role="status">登录后可查看尺寸记录。</p>
+        <div class="dimension-selectors">
+          <div><label for="dimensionMeasurement">已登记测量</label><select id="dimensionMeasurement"></select></div>
+          <div><label for="dimensionBinding">已登记绑定</label><select id="dimensionBinding"></select></div>
+          <div><label for="dimensionBindingVersion">绑定版本</label><select id="dimensionBindingVersion"></select></div>
+        </div>
+        <div id="dimensionMeasurementInfo" class="dimension-evidence"></div>
+      </section>
+      <div class="dimension-admin-grid">
+        <section id="dimensionMeasurementRegistration" class="card hidden">
+          <h2>1 · 登记本地测量</h2><p class="field-hint">管理员准备单条测量 JSON 素材，源文件声明测量 ID、记录版本与生产范围。登记固定源文件内容；改版须使用当前基线。</p>
+          <form id="dimensionMeasurementForm" class="authority-form">
+            <label for="dimensionMeasurementId">测量 ID</label><input id="dimensionMeasurementId" required maxlength="128" pattern="[A-Za-z0-9][A-Za-z0-9_.-]*" placeholder="measurement-demo-1">
+            <div class="actions"><button id="dimensionMeasurementBaselineRefresh" type="button" class="secondary">读取测量登记基线</button></div>
+            <p id="dimensionMeasurementBaseline" class="field-hint">输入测量 ID 后读取基线。</p>
+            <label for="dimensionStagedSource">测量素材</label><select id="dimensionStagedSource" required></select>
+            <p id="dimensionSourceInfo" class="field-hint"></p>
+            <div class="actions"><button id="registerDimensionMeasurement" type="submit" disabled>登记固定测量版本</button></div>
+          </form><p id="dimensionMeasurementMessage" role="status"></p>
+        </section>
+        <section id="dimensionBindingRegistration" class="card hidden">
+          <h2>2 · 显式绑定标注</h2><p class="field-hint">仅绑定当前测量和当前图纸中已确认的关联。批次、工序及工艺版次来自所选测量，图纸版次单独保留。</p>
+          <form id="dimensionBindingForm" class="authority-form">
+            <label for="dimensionBindingId">绑定 ID</label><input id="dimensionBindingId" required maxlength="128" pattern="[A-Za-z0-9][A-Za-z0-9_.-]*" placeholder="binding-demo-1">
+            <div class="actions"><button id="dimensionBindingBaselineRefresh" type="button" class="secondary">读取绑定登记基线</button></div>
+            <p id="dimensionBindingBaseline" class="field-hint">输入绑定 ID 后读取基线。</p>
+            <label for="dimensionBindingMeasurement">本次绑定的测量</label><select id="dimensionBindingMeasurement" required></select>
+            <div id="dimensionBindingMeasurementInfo" class="dimension-evidence"></div>
+            <label for="dimensionDrawing">当前图纸资产</label><select id="dimensionDrawing" required></select>
+            <p id="dimensionDrawingInfo" class="field-hint"></p>
+            <label for="dimensionFeature">已确认关联的标注</label><select id="dimensionFeature" required></select>
+            <p id="dimensionFeatureInfo" class="field-hint"></p>
+            <label for="dimensionTarget">本次绑定的已复核对象</label><select id="dimensionTarget" required></select>
+            <label for="dimensionValidFrom">有效期起点（含时区，包含）</label><input id="dimensionValidFrom" required placeholder="2026-09-01T00:00:00+08:00">
+            <label for="dimensionValidTo">有效期终点（含时区，不包含）</label><input id="dimensionValidTo" required placeholder="2026-10-01T00:00:00+08:00">
+            <label for="dimensionBindingRationale">绑定依据</label><textarea id="dimensionBindingRationale" required maxlength="1000" placeholder="说明为何该测量对应所选标注与对象，并说明有效范围。"></textarea>
+            <div class="actions"><button id="registerDimensionBinding" type="submit" disabled>登记待批准绑定</button></div>
+          </form><p id="dimensionBindingMessage" role="status"></p>
+        </section>
+      </div>
+      <section id="dimensionBindingDetail" class="card hidden">
+        <h2>3 · 使用批准与当前核验</h2><div id="dimensionBindingInfo" class="dimension-evidence"></div>
+        <div id="dimensionCurrentResult" class="dimension-result" aria-live="polite"></div>
+        <section id="dimensionApprovalControls" class="hidden">
+          <p class="field-hint">批准人须同时独立于绑定登记人和关联复核人。图纸、测量或复核变化后须重新核对；撤销会阻断后续比较。</p>
+          <form id="dimensionApprovalForm" class="authority-form">
+            <label for="dimensionApprovalDecision">使用批准决定</label><select id="dimensionApprovalDecision" required><option value="">请选择决定</option><option value="approved">批准本版本使用</option><option value="rejected">退回本版本使用</option><option value="revoked">撤销本版本批准</option></select>
+            <label for="dimensionApprovalReason">批准或撤销依据</label><textarea id="dimensionApprovalReason" required maxlength="1000"></textarea>
+            <div class="actions"><button id="saveDimensionApproval" type="submit">保存使用批准决定</button></div>
+          </form>
+        </section>
+        <p id="dimensionApprovalMessage" role="status"></p><div id="dimensionApprovalHistory"></div>
+        <div class="actions"><button id="saveDimensionComparison" class="hidden">保存本次核验快照</button></div><p id="dimensionComparisonMessage" role="status"></p>
+      </section>
+      <section id="dimensionComparisonHistoryCard" class="card hidden">
+        <div class="actions"><h2>4 · 核验历史回放</h2><button id="refreshDimensionHistory" class="secondary">刷新本绑定历史</button></div>
+        <p class="field-hint">回放显示当时的版本、批准与核验结果。旧快照不会因后续撤销而改写，当前能否使用以上方核验为准。</p>
+        <div id="dimensionComparisonHistory"></div>
+        <div class="actions"><button id="dimensionHistoryPrevious" class="secondary" disabled>上一页</button><span id="dimensionHistoryPage"></span><button id="dimensionHistoryNext" class="secondary" disabled>下一页</button></div>
+        <p id="dimensionHistoryMessage" role="status"></p><div id="dimensionReplay" class="dimension-evidence" aria-live="polite"></div>
+      </section>
+    </section>
+
+    <section class="view" data-view="files">
+      <div class="page-head"><div class="eyebrow">File Tasks</div><h1>多文件任务</h1><p>同时上传限定 DXF 图纸和单条尺寸 JSON，逐文件登记、查看结果和重试。图纸与尺寸仍需显式关联及独立批准。</p></div>
+      <section class="card"><form id="fileBatchForm"><label for="uploadProvenance">文件来源</label><select id="uploadProvenance" required><option value="">请选择来源</option><option value="synthetic_demo">合成演示材料</option><option value="authorized_external">已获授权的外部材料</option></select><label for="uploadFiles">选择多份文件（最多20份）</label><input id="uploadFiles" type="file" multiple accept=".dxf,.json"><p class="field-hint">DXF≤2 MiB，JSON≤1 MiB且每份只有一条测量。通用 PDF/OCR 并发导入尚未接入。</p><div id="fileRows"></div><button id="submitFileBatch" type="submit">提交本批登记任务</button></form><p id="fileMessage" role="status"></p></section>
+      <section class="card"><button id="refreshFiles" class="secondary">刷新任务</button><div id="fileJobs"></div><div id="fileJobDetail"></div></section>
     </section>
 
     <!-- ============ 模型接入 ============ -->

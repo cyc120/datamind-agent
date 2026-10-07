@@ -1,0 +1,17 @@
+name: datamind-pdf-private
+
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.12.4
+    container_name: datamind-pdf-qdrant
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6335:6333"
+    environment:
+      QDRANT__SERVICE__HTTP_PORT: 6333
+      QDRANT__SERVICE__API_KEY: ${DATAMIND_PDF_QDRANT_API_KEY:?Set a private PDF Qdrant API key}
+    volumes:
+      - pdf_qdrant_data:/qdrant/storage
+
+volumes:
+  pdf_qdrant_data:
