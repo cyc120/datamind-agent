@@ -341,11 +341,35 @@ def _heartbeat(dsn, claim, stop):
 
 
 def _execute_bounded(claim, dsn, deadline_s):
-    """Run one registration in its own process group under the shared deadline budget."""
+    """Run one registration in its own process group under the shared deadline budget.
+
+    A cooperative cancel request in the database terminates the running group; the
+    outcome is reported as `cancelled` and never claims to undo a committed write.
+    """
     module, function = _BOUNDED_TARGETS[claim['type']]
-    return task_budget.run_bounded(module, function,
-                                   [claim['payload'], dsn, claim['identity']],
-                                   deadline_s=deadline_s, fallback_error_code=FALLBACK_ERROR_CODE)
+    cancel, stop = threading.Event(), threading.Event()
+
+    def watch():
+        while not stop.wait(1.0):
+            try:
+                with psycopg2.connect(dsn) as conn, conn.cursor() as cur:
+                    cur.execute('SELECT cancel_requested FROM file_jobs WHERE job_id=%s', (claim['job_id'],))
+                    row = cur.fetchone()
+            except psycopg2.Error:
+                return
+            if row is None or row[0]:
+                cancel.set()
+                return
+
+    watcher = threading.Thread(target=watch, daemon=True)
+    watcher.start()
+    try:
+        return task_budget.run_bounded(module, function,
+                                       [claim['payload'], dsn, claim['identity']],
+                                       deadline_s=deadline_s, fallback_error_code=FALLBACK_ERROR_CODE,
+                                       cancel_event=cancel)
+    finally:
+        stop.set(); watcher.join(timeout=1)
 
 
 def _execute(dsn, claim, *, deadline_s=None, child_dsn=None):
@@ -381,6 +405,10 @@ def _execute(dsn, claim, *, deadline_s=None, child_dsn=None):
             saved = _finish(dsn, claim, 'succeeded', result=outcome['value'])
             return {'outcome': 'succeeded' if saved else 'lease_lost',
                     'elapsed_ms': outcome['elapsed_ms']}
+        if outcome['status'] == 'cancelled':
+            saved = _finish(dsn, claim, 'cancelled')
+            return {'outcome': 'cancelled' if saved else 'lease_lost',
+                    'error_code': outcome['error_code'], 'elapsed_ms': outcome['elapsed_ms']}
         code = DEADLINE_ERROR_CODE if outcome['status'] == 'timeout' else _safe_code(outcome.get('error_code'))
         saved = _finish(dsn, claim, 'failed', error_code=code)
         return {'outcome': 'failed' if saved else 'lease_lost', 'error_code': code,

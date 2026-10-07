@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import subprocess
 import tempfile
+import threading
 import time
 import unittest
 from unittest.mock import patch
@@ -62,6 +63,20 @@ class TaskBudgetRunnerTests(unittest.TestCase):
         self.assertEqual(result['error_code'], 'TASK_DEADLINE_EXCEEDED')
         self.assertLess(elapsed, 10, 'deadline was not enforced promptly')
         self.assertGreaterEqual(result['elapsed_ms'], 900)
+
+    def test_cancel_event_terminates_the_group_early(self):
+        cancel = threading.Event()
+        timer = threading.Timer(0.5, cancel.set)
+        timer.start()
+        started = time.monotonic()
+        try:
+            result = task_budget.run_bounded('time', 'sleep', [60], deadline_s=30, grace_s=1,
+                                             cancel_event=cancel, poll_interval=0.1)
+        finally:
+            timer.cancel()
+        self.assertEqual(result['status'], 'cancelled', result)
+        self.assertEqual(result['error_code'], 'TASK_CANCELLED')
+        self.assertLess(time.monotonic() - started, 10, 'cancellation was not propagated promptly')
 
     def test_deadline_also_kills_the_grandchild(self):
         directory = Path(tempfile.mkdtemp())
@@ -134,7 +149,8 @@ class TaskBudgetRunnerTests(unittest.TestCase):
 
     def test_invalid_deadline_and_output_bounds_are_rejected(self):
         for kwargs in ({'deadline_s': 0}, {'deadline_s': 99999}, {'deadline_s': 'x'},
-                       {'deadline_s': True}, {'output_limit': 1}, {'grace_s': -1}):
+                       {'deadline_s': True}, {'output_limit': 1}, {'grace_s': -1},
+                       {'poll_interval': 0}, {'poll_interval': 99}):
             with self.assertRaises(ValueError):
                 task_budget.run_bounded('time', 'sleep', [0], **kwargs)
 

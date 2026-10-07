@@ -636,7 +636,7 @@ SQL 源查询使用只读角色；工业 schema 位于元数据库，逻辑上�
 | 图纸资产/关联复核/尺寸服务 | 认证登记与版本历史、reviewer/admin 关联复核、尺寸绑定与独立批准/撤销、历史回放已实现 | 真实 ERP/计量校准/制造授权 |
 | 受控多文件队列 | DXF/单测量 JSON 上传、逐文件状态、限额/租约/幂等/重试/取消已实现 | PDF/OCR/Office 并发化与硬资源隔离 |
 | 原生 PDF 准备/私有发布/检索/回答 | 按 SHA 固定源准备、私有快照登记、私有知识发布、1–4 文件证据检索，以及仅用本次选定片段的受控模型回答已实现 | 点损失修复与孤立回收 |
-| 统一任务预算与进程时限 | 跨进程资源槽、挂钟 deadline、进程组终止（含孙进程）、输出上限与稳定超时码已实现；登记 worker 与 PDF 准备 CLI 可选接入 | OCR/公式阶段接入同一预算、CPU/内存硬隔离与跨主机租约 |
+| 统一任务预算与进程时限 | 跨进程资源槽、挂钟 deadline、进程组终止（含孙进程）、取消传播、输出上限与稳定超时码已实现；登记 worker 与 PDF 准备 CLI 可选接入 | OCR/公式阶段接入同一预算、CPU/内存硬隔离与跨主机租约 |
 | API/前端/Trace | SQL/RAG/限定工业、SSE/回放/引用，新增 `/#cad`、`/#dimensions`、`/#files`、`/#authority` 与多文档问答 | 上传/统一 Adapter/通用 Locator 接口与交互 |
 | Office/工程通用适配 | 未实现 | 各自原生契约、定位、样本与评测 |
 | V-CAR/国产小视觉级联 | 设计阶段；仅有局部 SQL 修复 | 视觉输入、全局预算、局部重识别与消融/资源报告 |
@@ -669,8 +669,8 @@ SQL 源查询使用只读角色；工业 schema 位于元数据库，逻辑上�
 | PDF 私有知识发布 | 411/411 | `reports/pdf_index_regression.txt` |
 | PDF 私有多文件检索 | 465/465（profile/并发 14、联合向量 8、HTTP 32） | `reports/pdf_search_regression.txt`；专项使用合成向量 |
 | PDF 私有模型回答 | 新增 15 项组件/契约测试通过（总 480/480） | `reports/pdf_answer_verification.json`；检索与回复均为合成注入，未调用上游模型 |
-| 统一任务预算与进程时限 | 新增 20 项（task_budget 16、file_jobs +4），总 500/500 | `reports/task_budget_verification.json`；真实子进程 deadline 终止与孙进程清理 |
-| 最新组件/集成回归 | 500/500 | `reports/task_budget_verification.json`；非模型问答准确率 |
+| 统一任务预算与进程时限 | 新增 22 项（task_budget 17、file_jobs +5），总 502/502 | `reports/task_budget_verification.json`；真实子进程 deadline 终止、孙进程清理与取消传播 |
+| 最新组件/集成回归 | 502/502 | `reports/task_budget_verification.json`；非模型问答准确率 |
 
 表中的 Recall@5 11/11 是既有套件的可回答题 gold 命中口径；扩展多证据集须按 §9.2 明确证据覆盖定义，不直接外推。历史报告保留各自模型/提示词/代码版本。四页 v1 材料为解析器完成后编写的合成模板；紧凑格式 v2 由同一实现者编写，均非独立工厂盲测，全部缺失与初始失败保留。
 
@@ -696,4 +696,4 @@ SQL 源查询使用只读角色；工业 schema 位于元数据库，逻辑上�
 
 接入位置：`datamind/file_jobs.py` 的 `work_once`/`drain` 新增可选 `deadline_s`（超时记为 `FILE_JOB_DEADLINE_EXCEEDED`，默认保持原进程内路径）；`scripts/file_job_worker.py` 新增 `--deadline`/`--grace`；`scripts/prepare_pdf.py` 新增 `--deadline`/`--grace`，`ingestion/pdf_prepare.py` 新增 JSON 入口 `prepare_json`/`verify_json`。
 
-新增 16 项 task_budget 测试与 4 项登记接线/映射测试，完整隔离回归 **500/500**、失败/错误 0。真实子进程在 1 秒时限内被终止且孙进程一并消失；洪水输出被截断且无法伪造结果；资源槽占满返回 `503/TASK_BUDGET_BUSY`。真实原生 PDF 在 60 秒时限下经 CLI 准备成功、`verified=true`。边界：这是挂钟 deadline 与进程组终止，不是 CPU/内存 cgroup 级硬隔离；子进程不继承父进程的 monkeypatch 状态；OCR/公式阶段与跨主机租约待接入。见 `docs/TASK_BUDGET.md` 与 `reports/task_budget_verification.json`。
+新增 17 项 task_budget 测试与 5 项登记接线/映射/取消测试，完整隔离回归 **502/502**、失败/错误 0。真实子进程在 1 秒时限内被终止且孙进程一并消失；`cancel_event` 置位后运行中的子进程被立即终止；洪水输出被截断且无法伪造结果；资源槽占满返回 `503/TASK_BUDGET_BUSY`。真实原生 PDF 在 60 秒时限下经 CLI 准备成功、`verified=true`。边界：这是挂钟 deadline 与进程组终止，不是 CPU/内存 cgroup 级硬隔离；子进程不继承父进程的 monkeypatch 状态；OCR/公式阶段与跨主机租约待接入。见 `docs/TASK_BUDGET.md` 与 `reports/task_budget_verification.json`。

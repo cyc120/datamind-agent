@@ -221,17 +221,20 @@ def _terminate_group(process, grace):
 
 
 def run_bounded(module, function, args, *, deadline_s=None, output_limit=None, grace_s=None,
-                env=None, fallback_error_code='TASK_EXECUTION_FAILED', cwd=None):
+                env=None, fallback_error_code='TASK_EXECUTION_FAILED', cwd=None,
+                cancel_event=None, poll_interval=0.5):
     """Run `module.function(*args)` in a separate process group under a hard deadline.
 
     `args` must be JSON-serializable; pass `effective_dsn(dsn)` when the target needs a
     database connection. Output is captured up to `output_limit` bytes per stream and
     never raises for a crash or a timeout: the outcome is returned as a status dict.
+    Setting `cancel_event` terminates the group early and returns `status='cancelled'`.
     """
     deadline = validate_deadline(deadline_s if deadline_s is not None else configured_deadline())
     limit = int(_bounded_number(output_limit if output_limit is not None else configured_output_limit(),
                                 'output', MIN_OUTPUT_BYTES, MAX_OUTPUT_BYTES))
     grace = _bounded_number(grace_s if grace_s is not None else configured_grace(), 'grace', 0.0, 120.0)
+    interval = _bounded_number(poll_interval, 'poll', 0.05, 5.0)
     request = {'module': module, 'function': function, 'args': list(args),
                'fallback_error_code': fallback_error_code}
     child_env = dict(os.environ if env is None else env)
@@ -255,9 +258,22 @@ def run_bounded(module, function, args, *, deadline_s=None, output_limit=None, g
             process.stdin.close()
         except OSError:
             pass
-    timed_out = False
+    timed_out = cancelled = False
     try:
-        process.wait(timeout=deadline)
+        if cancel_event is None:
+            process.wait(timeout=deadline)
+        else:
+            end = time.monotonic() + deadline
+            while True:
+                remaining = end - time.monotonic()
+                if remaining <= 0:
+                    raise subprocess.TimeoutExpired(process.args, deadline)
+                if cancel_event.wait(min(interval, remaining)):
+                    cancelled = True
+                    _terminate_group(process, grace)
+                    break
+                if process.poll() is not None:
+                    break
     except subprocess.TimeoutExpired:
         timed_out = True
         _terminate_group(process, grace)
@@ -267,6 +283,9 @@ def run_bounded(module, function, args, *, deadline_s=None, output_limit=None, g
             'elapsed_ms': round((time.monotonic() - started) * 1000, 1),
             'deadline_seconds': deadline, 'stdout_bytes': out.total, 'stderr_bytes': err.total,
             'output_truncated': out.truncated() or err.truncated()}
+    if cancelled:
+        return {**base, 'status': 'cancelled', 'error_code': 'TASK_CANCELLED',
+                'stdout': out.text(), 'stderr': err.text()}
     if timed_out:
         return {**base, 'status': 'timeout', 'error_code': DEADLINE_ERROR_CODE,
                 'stdout': out.text(), 'stderr': err.text()}

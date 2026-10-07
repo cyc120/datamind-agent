@@ -350,6 +350,16 @@ class FileJobTests(unittest.TestCase):
         self.assertEqual(final['items'][0]['error_code'],'CAD_SYNTHETIC_DENIED')
         self.assertNotIn('private',json.dumps(final,default=str))
 
+    def test_cancel_outcome_marks_the_item_cancelled(self):
+        job=self.submit(self.batch(items=[{'item_id':'drawing','type':'drawing','payload':self.payload()}]))
+        cancelled={'status':'cancelled','error_code':'TASK_CANCELLED','elapsed_ms':10.0,'deadline_seconds':60.0}
+        with patch.object(jobs,'_execute_bounded',return_value=cancelled):
+            wave=jobs.work_once(self.dsn,deadline_s=60,workers=1)
+        self.assertEqual(wave['outcomes'][0]['outcome'],'cancelled')
+        self.assertEqual(wave['outcomes'][0]['error_code'],'TASK_CANCELLED')
+        final=self.poll(job)
+        self.assertEqual(final['items'][0]['status'],'cancelled')
+
     def test_invalid_deadline_is_rejected_before_claiming(self):
         for value in (0,99999,True,'x'):
             with self.assertRaises(ValueError): jobs.work_once(self.dsn,deadline_s=value)

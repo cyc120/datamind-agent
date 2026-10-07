@@ -19,22 +19,24 @@
     "process_group_isolation": "start_new_session=True；子进程及其孙进程一并终止（测试验证）",
     "bounded_output": "stdout/stderr 各上限截断并计数；洪水输出无法伪造结果",
     "cross_process_slots": "PostgreSQL session advisory lock；第三个并发槽立即返回 503/TASK_BUDGET_BUSY",
+    "cancel_propagation": "cancel_event 置位后终止运行中的进程组并返回 TASK_CANCELLED；不声称撤销已提交写入",
     "child_dsn_handoff": "effective_dsn 解析当前实际连接的数据库名，避免子进程写入原库",
     "error_codes": "HTTPException.detail.error_code 或异常 .code 作为稳定错误码上报，不外传堆栈",
     "configurable": ["DATAMIND_TASK_DEADLINE_SECONDS", "DATAMIND_TASK_GRACE_SECONDS",
                      "DATAMIND_TASK_OUTPUT_BYTES", "DATAMIND_TASK_SLOTS"]
   },
   "verification": {
-    "task_budget_tests": {"file": "tests/test_task_budget.py", "tests": 16, "failures": 0, "errors": 0},
-    "file_jobs_tests": {"file": "tests/test_file_jobs.py", "tests": 24, "failures": 0, "errors": 0},
+    "task_budget_tests": {"file": "tests/test_task_budget.py", "tests": 17, "failures": 0, "errors": 0},
+    "file_jobs_tests": {"file": "tests/test_file_jobs.py", "tests": 25, "failures": 0, "errors": 0},
     "deadline_kill_measured": "真实子进程(sleep 60) 在 1s 时限内被终止，孙进程(sh -c sleep)一并消失",
+    "cancel_measured": "cancel_event 0.5s 后置位，sleep 60 子进程被立即终止并返回 TASK_CANCELLED",
     "cli_smoke": {
       "command": "scripts/prepare_pdf.py --source <native.pdf> ... --deadline 60",
       "result": "exit 0，封存 manifest verified=true；非法的 0 秒与孤立 --grace 均 exit 2",
       "artifacts_cleaned": true
     },
-    "full_isolated_regression": {"tests": 500, "failures": 0, "errors": 0, "exit_code": 0,
-                                 "seconds": 146.611, "previous_stage_tests": 480},
+    "full_isolated_regression": {"tests": 502, "failures": 0, "errors": 0, "exit_code": 0,
+                                 "seconds": 147.653, "previous_stage_tests": 480},
     "source_database_modified": false
   },
   "boundaries": [

@@ -13,12 +13,13 @@
 | `effective_dsn(dsn)` | 解析当前进程**实际连接**的数据库名，避免子进程写入原库 |
 | `validate_deadline` / `configured_*` | 参数与环境变量校验（`DATAMIND_TASK_DEADLINE_SECONDS`、`DATAMIND_TASK_GRACE_SECONDS`、`DATAMIND_TASK_OUTPUT_BYTES`、`DATAMIND_TASK_SLOTS`） |
 
-超时处理为 `SIGTERM` 进程组，宽限期后 `SIGKILL`；子进程与其**孙进程**一并终止。结果以状态字典返回，不抛异常、不外传堆栈：
+超时处理为 `SIGTERM` 进程组，宽限期后 `SIGKILL`；子进程与其**孙进程**一并终止。传入 `cancel_event` 时，取消会**传播到运行中的子进程**：轮询期间置位即终止整组并返回 `status=cancelled`。结果以状态字典返回，不抛异常、不外传堆栈：
 
 | status | error_code | 含义 |
 |---|---|---|
 | `ok` | — | 正常返回 `value` |
 | `timeout` | `TASK_DEADLINE_EXCEEDED` | 超过挂钟时限，进程组已终止 |
+| `cancelled` | `TASK_CANCELLED` | 收到取消请求，进程组已终止；不声称撤销已提交写入 |
 | `failed` | 目标的 `detail.error_code` 或异常 `.code` | 目标以稳定错误码失败 |
 | `failed` | `fallback_error_code` / `TASK_RESULT_INVALID` | 子进程无有效结果或输出被截断 |
 
@@ -26,7 +27,7 @@
 
 ## 已接入的位置
 
-- `datamind/file_jobs.py`：`work_once` / `drain` 新增可选 `deadline_s`。设置后每次登记在该预算下的独立进程组执行，超时记为 `FILE_JOB_DEADLINE_EXCEEDED` 并释放租约；不设置时保持原有进程内线程路径。
+- `datamind/file_jobs.py`：`work_once` / `drain` 新增可选 `deadline_s`。设置后每次登记在该预算下的独立进程组执行，超时记为 `FILE_JOB_DEADLINE_EXCEEDED` 并释放租约；数据库中的取消请求会终止运行中的进程组并记为 `cancelled`。不设置时保持原有进程内线程路径。
 - `scripts/file_job_worker.py`：新增 `--deadline`、`--grace`。
 - `scripts/prepare_pdf.py`：新增 `--deadline`、`--grace`，在独立进程组内运行准备；`ingestion/pdf_prepare.py` 新增 JSON 入口 `prepare_json` / `verify_json`。
 
@@ -42,11 +43,12 @@
 
 ## 验证
 
-`tests/test_task_budget.py` **16/16**、`tests/test_file_jobs.py` **24/24**，完整隔离回归见 `reports/task_budget_verification.json`。其中：
+`tests/test_task_budget.py` **17/17**、`tests/test_file_jobs.py` **25/25**，完整隔离回归见 `reports/task_budget_verification.json`。其中：
 
 - 真实子进程（`sleep 60`）在 1 秒时限内被终止，且 `sh -c 'echo $$ > pid; sleep 60'` 的孙进程一并消失。
 - 输出上限：10 万字节 stdout 被截到 4096 字节，`output_truncated=true`，且无法产生结果。
 - 资源槽：两个槽占满后第三个立即 `503/TASK_BUDGET_BUSY`；异常退出后槽释放。
+- 取消传播：`cancel_event` 在 0.5 秒后置位，`sleep 60` 子进程被立即终止并返回 `TASK_CANCELLED`。
 - `effective_dsn` 指向当前数据库；登记接线把 claim、deadline 与该 DSN 交给子进程。
 - CLI 冒烟：真实原生 PDF 在 60 秒时限下准备成功、`verified=true`；非法时限与孤立 `--grace` 均以 exit 2 拒绝。
 
