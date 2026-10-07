@@ -162,7 +162,7 @@ class ProfileImportRequest(BaseModel):
     activate_first: bool = False
 
 
-app = FastAPI(title="DataMind Agent", version="0.22.0")
+app = FastAPI(title="DataMind Agent", version="0.23.0")
 
 
 @app.middleware('http')
@@ -174,7 +174,8 @@ async def identity_permissions(request: Request, call_next):
     files_path=path.startswith('/v1/files/')
     pdf_snapshot_path=path=='/v1/pdf-snapshots' or path.startswith('/v1/pdf-snapshots/')
     pdf_knowledge_path=path=='/v1/pdf-knowledge' or path.startswith('/v1/pdf-knowledge/')
-    permission=('admin' if files_path or pdf_snapshot_path or pdf_knowledge_path else
+    plan_path=path.startswith('/v1/plans')
+    permission=('admin' if plan_path or files_path or pdf_snapshot_path or pdf_knowledge_path else
                 'approver' if dimension_path and request.method=='POST' and path.endswith('/approvals') else
                 'admin' if dimension_path and (request.method=='POST' or path.endswith('/sources')) else
                 'reviewer' if cad_path and request.method=='POST' and path.endswith('/reviews') else
@@ -184,7 +185,7 @@ async def identity_permissions(request: Request, call_next):
                 'approver' if authority_path and request.method=='POST' and path.endswith('/events') else
                 'reviewer' if request.method=='POST' and path.endswith('/reviews') else
                 'approver' if request.method=='POST' and path.endswith('/approvals') else None)
-    if permission or authority_path or cad_path or dimension_path or pdf_snapshot_path or pdf_knowledge_path:
+    if permission or authority_path or cad_path or dimension_path or pdf_snapshot_path or pdf_knowledge_path or plan_path:
         from .auth import current
         try:
             request.state.identity=await run_in_threadpool(current,request,_write_dsn(),required=True,
@@ -193,12 +194,18 @@ async def identity_permissions(request: Request, call_next):
             return JSONResponse(status_code=exc.status_code,content={'detail':exc.detail},
                                 headers={'Cache-Control':'no-store'} if pdf_snapshot_path or pdf_knowledge_path else None)
     response=await call_next(request)
-    if cad_path or dimension_path or files_path or pdf_snapshot_path or pdf_knowledge_path:response.headers['Cache-Control']='no-store'
+    if cad_path or dimension_path or files_path or pdf_snapshot_path or pdf_knowledge_path or plan_path:response.headers['Cache-Control']='no-store'
     return response
 
 
 def _pdf_snapshot_recheck(request):
     # File verification can outlive the middleware's initial identity check.
+    from .auth import current
+    current(request,_write_dsn(),required=True,permission='admin')
+
+
+def _admin_recheck(request):
+    # Long-running work can outlive the middleware's initial identity check.
     from .auth import current
     current(request,_write_dsn(),required=True,permission='admin')
 
@@ -344,6 +351,14 @@ def pdf_knowledge_answer(payload: PdfKnowledgeSearchRequest, request: Request):
     from .pdf_answer import answer
     result = jsonable_encoder(answer(payload.model_dump(), _write_dsn()))
     _pdf_snapshot_recheck(request)
+    return result
+
+
+@app.post('/v1/plans/execute')
+def vcar_plan_execute(payload: dict, request: Request):
+    from .vcar import run_request
+    result = jsonable_encoder(run_request(payload, _write_dsn()))
+    _admin_recheck(request)
     return result
 
 

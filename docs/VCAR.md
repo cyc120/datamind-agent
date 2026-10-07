@@ -2,7 +2,7 @@
 
 2026-10-07，API **0.22.0**。本阶段实现技术设计说明书 §6.1/§6.4 与 §15-P3 记载的通用编排：`Plan → Execute → Verify → Repair → Reverify`。此前只有「限定工业规则 DAG」，通用动态 DAG 与断点恢复为待实现。
 
-实现位于 `datamind/vcar.py`，是编排原语：**它不自己调用工具**，由调用方注入每个工具的执行器。
+实现位于 `datamind/vcar.py`。API 0.23.0 起提供两种执行方式：调用方注入 `(node, inputs) -> dict` 的普通执行器，或用 `bounded_runners` 让**每个节点在自己的进程组内**按统一任务预算执行。前者用于进程内编排，后者用于隔离与资源约束。
 
 ## 节点契约（§6.1）
 
@@ -43,3 +43,34 @@
 - 节点仍在执行进程内运行，**未接入 `task_budget` 的进程组/资源槽**；跨进程节点执行与取消传播待做。
 - **未实现视觉载荷与局部重识别**——§6.4 的机制消融实验（普通 OCR＋检索 / 结构化规则 / 局部重识别 / 完整闭环）与误修复率、错误消解率统计仍待做。
 - 未提供运行/事件的数据库持久化适配层；状态以可 JSON 序列化字典往返。
+
+## 受控节点执行与 HTTP 入口（API 0.23.0）
+
+`bounded_runners(targets, *, dsn, slots, context, grace_s, deadline_s, output_limit, env)` 把「工具 → 可执行文件」的映射交给**服务端**，为每个工具返回一个执行器：
+
+| 属性 | 行为 |
+|---|---|
+| 进程组隔离 | 每个节点经 `task_budget.run_bounded` 在独立进程组执行；`start_new_session`，超时 `SIGTERM`→`SIGKILL` 终止整组 |
+| 节点时限 | `min(调用方给定的节点时限, 全局剩余挂钟时间)`；不足 0.5 秒直接 `PLAN_DEADLINE_EXCEEDED` |
+| 资源槽 | 有 DSN 时按工具取跨进程 advisory lock 槽（默认 2）；无空槽立即 `TASK_BUDGET_BUSY` 并记为节点失败 |
+| 取消传播 | `ExecutionContext.cancel_event` 置位后终止在飞进程组；未派发节点标记 `skipped` / `PLAN_CANCELLED` |
+| 结果预算 | 节点返回的 `rows`/`tokens` 累加进全局预算，超限后未派发节点标记 `budget_exhausted` |
+| 子进程载荷 | 唯一参数是包装体 `{node_id, tool, input, expect, inputs}`，必须返回 JSON 对象 |
+
+`execute` 会自动绑定执行器自带的 `ExecutionContext`，因此调用方忘记共享 context 时**不会**静默退回默认节点时限。
+
+### HTTP
+
+`POST /v1/plans/execute`（admin + CSRF + no-store，完成后重查身份），请求体只包含 `nodes` 与可选 `budget`：
+
+```json
+{"nodes": [{"node_id": "a", "depends_on": [], "tool": "sql",
+            "input": {"ref": "demo"}, "expect": null, "permission": "admin"}],
+ "budget": {"deadline_s": 60}}
+```
+
+**调用方不能指定可执行文件**：工具到模块函数的映射来自服务端环境变量 `DATAMIND_VCAR_TARGETS`（`{"<tool>": ["<module>", "<function>"]}`），模块与函数名受白名单正则约束。未配置即 `503/VCAR_TARGETS_NOT_CONFIGURED`，仓库不附带真实工具注册表。
+
+## 验证（0.23.0 增量）
+
+`tests/test_vcar_bounded.py` **10/10**，完整隔离回归 **549/549**，见 `reports/vcar_bounded_verification.json`。覆盖：子进程 pid 与父进程不同、包装体载荷与依赖 inputs、目标白名单与路径穿越/命令注入样式拒绝、全局预算耗尽时节点被终止（2 秒预算下 `sleep 300` 在 20 秒内返回）、取消传播后子进程 pid 消失且未派发节点 `skipped`、`rows`/`tokens` 累加、资源槽占满返回 `TASK_BUDGET_BUSY`、以及 HTTP 的 401/403、422、未配置 503 fail closed 与配置后真实子进程执行。

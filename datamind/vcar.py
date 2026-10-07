@@ -21,10 +21,14 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 import copy
 import json
+import os
 import re
+import threading
 import time
 
 from fastapi import HTTPException
+
+from . import task_budget
 
 MAX_NODES = 64
 NODE_ID = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$')
@@ -35,6 +39,9 @@ BUDGET_KEYS = frozenset({'deadline_s', 'max_steps', 'max_rows', 'max_tokens', 'm
 DEFAULT_BUDGET = {'deadline_s': 120.0, 'max_steps': 64, 'max_rows': 10000,
                   'max_tokens': 200000, 'max_repair': 2, 'max_parallel': 4}
 EVENT_LIMIT = 512
+DEFAULT_NODE_DEADLINE_SECONDS = 120.0
+DEFAULT_NODE_SLOTS = 2
+_TARGET = re.compile(r'^[A-Za-z_][A-Za-z0-9_.]{0,120}$')
 STATUSES = ('pending', 'running', 'succeeded', 'failed', 'skipped', 'unresolved', 'budget_exhausted')
 TERMINAL = frozenset({'succeeded', 'failed', 'skipped', 'unresolved', 'budget_exhausted'})
 
@@ -259,17 +266,30 @@ class _Run:
                 self.settle(node, 'budget_exhausted', error_code=code)
 
 
-def execute(plan_, runners, *, budget=None, state=None, clock=time.monotonic):
+def execute(plan_, runners, *, budget=None, state=None, clock=time.monotonic,
+            context=None, cancel_event=None):
     """Run a validated plan under one shared budget.
 
     `runners` maps a tool name to `callable(node, inputs) -> dict`. Node failures are
-    returned in the result instead of raised. `state` resumes a previous run.
+    returned in the result instead of raised. `state` resumes a previous run. Passing a
+    shared `ExecutionContext` (or a `cancel_event`) lets bounded runners see the remaining
+    budget and lets a cancellation stop the run and its in-flight process groups.
     """
     if not isinstance(plan_, Plan):
         fail('PLAN_INVALID')
     if budget is not None and not isinstance(budget, dict):
         fail('PLAN_BUDGET_INVALID')
     limits = _merged_budget(budget or {})
+    attached = {getattr(runner, 'vcar_context', None) for runner in runners.values()} if isinstance(runners, dict) else set()
+    attached.discard(None)
+    if context is None and len(attached) == 1:
+        context = next(iter(attached))
+    if context is None:
+        context = ExecutionContext()
+    if not isinstance(context, ExecutionContext):
+        fail('PLAN_CONTEXT_INVALID')
+    if cancel_event is not None:
+        context.cancel_event = cancel_event
     restored = validate_state(plan_, state)
     run = _Run(plan_, limits, clock)
     run.resumed = bool(restored)
@@ -292,9 +312,17 @@ def execute(plan_, runners, *, budget=None, state=None, clock=time.monotonic):
             # pending/failed/skipped/budget_exhausted resume as pending work.
             run.status[node_id] = 'pending'
     run.event('*', 'resumed', restored=len(restored))
+    for item in attached | {context}:
+        item._bind(limits, run.started)
 
     with ThreadPoolExecutor(max_workers=limits['max_parallel']) as pool:
         while True:
+            if context.cancelled:
+                # Cancellation stops the run; in-flight groups are killed by the runners.
+                for node in plan_.nodes:
+                    if run.status[node.node_id] == 'pending':
+                        run.settle(node, 'skipped', error_code='PLAN_CANCELLED')
+                break
             if run.exhausted():
                 run.mark_budget_exhausted('PLAN_DEADLINE_EXCEEDED' if run.expired() else 'PLAN_BUDGET_EXHAUSTED')
                 break
@@ -373,3 +401,158 @@ def _report(plan_, run, limits):
                        'used_steps': run.steps, 'used_rows': run.rows, 'used_tokens': run.tokens},
             'events': run.events,
             'elapsed_ms': round((run.clock() - run.started) * 1000, 1)}
+
+
+class ExecutionContext:
+    """Shared, thread-safe view of one run's remaining budget and cancellation state.
+
+    A caller creates it (optionally with a `cancel_event`), hands it to both
+    `bounded_runners` and `execute`, and can then cancel an in-flight run.
+    """
+
+    def __init__(self, cancel_event=None):
+        self._lock = threading.Lock()
+        self._deadline = None
+        self._budget = None
+        self.cancel_event = cancel_event
+
+    def _bind(self, limits, started, clock=time.monotonic):
+        with self._lock:
+            self._budget = dict(limits)
+            self._deadline = started + limits['deadline_s']
+
+    def remaining(self):
+        """Seconds left in the shared wall-clock budget, or None before a run starts."""
+        with self._lock:
+            deadline = self._deadline
+        return None if deadline is None else max(0.0, deadline - time.monotonic())
+
+    @property
+    def cancelled(self):
+        return bool(self.cancel_event is not None and self.cancel_event.is_set())
+
+    @property
+    def budget(self):
+        with self._lock:
+            return copy.deepcopy(self._budget)
+
+
+def bounded_runners(targets, *, dsn=None, slots=None, context=None, grace_s=None,
+                    deadline_s=None, output_limit=None, env=None):
+    """Build runners that execute each node in its own process group under `task_budget`.
+
+    `targets` maps an allowed tool to `(module, function)` and is resolved server-side, so
+    a plan (or an HTTP caller) can never choose the executable. The child receives exactly
+    one JSON payload with the node id, tool, structured input and dependency results, and
+    must return a JSON object. A node never outlives the remaining shared budget, and a
+    cancellation terminates its process group.
+    """
+    if not isinstance(targets, dict):
+        raise ValueError('VCAR_TARGETS_INVALID')
+    context = context if context is not None else ExecutionContext()
+    runners = {}
+    for tool, target in targets.items():
+        if tool not in TOOLS:
+            raise ValueError('VCAR_TARGET_INVALID')
+        if (not isinstance(target, (list, tuple)) or len(target) != 2
+                or not all(isinstance(part, str) and _TARGET.fullmatch(part) for part in target)):
+            raise ValueError('VCAR_TARGET_INVALID')
+        runners[tool] = _bounded_runner(tool, target[0], target[1], dsn=dsn, slots=slots,
+                                        context=context, grace_s=grace_s, deadline_s=deadline_s,
+                                        output_limit=output_limit, env=env)
+    return runners
+
+
+def _bounded_runner(tool, module, function, *, dsn, slots, context, grace_s, deadline_s,
+                    output_limit, env):
+    slot_name = 'vcar-' + tool
+
+    def runner(node, inputs):
+        if context.cancelled:
+            fail('PLAN_CANCELLED')
+        remaining = context.remaining()
+        if remaining is not None:
+            if remaining <= 0:
+                fail('PLAN_DEADLINE_EXCEEDED')
+            limit = min(deadline_s, remaining) if deadline_s else remaining
+        else:
+            limit = deadline_s or DEFAULT_NODE_DEADLINE_SECONDS
+        if limit < task_budget.MIN_DEADLINE_SECONDS:
+            fail('PLAN_DEADLINE_EXCEEDED')
+        payload = {'node_id': node.node_id, 'tool': tool, 'input': copy.deepcopy(node.input),
+                   'expect': node.expect, 'inputs': copy.deepcopy(inputs)}
+
+        def once():
+            return task_budget.run_bounded(module, function, [payload], deadline_s=limit,
+                                           output_limit=output_limit, grace_s=grace_s, env=env,
+                                           cancel_event=context.cancel_event,
+                                           fallback_error_code='PLAN_NODE_FAILED')
+
+        if dsn:
+            with task_budget.resource_slot(dsn, slot_name,
+                                           slots or task_budget.configured_slots(DEFAULT_NODE_SLOTS)):
+                outcome = once()
+        else:
+            outcome = once()
+        if outcome['status'] == 'timeout':
+            fail('PLAN_DEADLINE_EXCEEDED')
+        if outcome['status'] == 'cancelled':
+            fail('PLAN_CANCELLED')
+        if outcome['status'] != 'ok':
+            fail(outcome.get('error_code') or 'PLAN_NODE_FAILED')
+        return outcome.get('value')
+
+    # Lets `execute` bind the run's budget to the context these runners actually use,
+    # instead of silently falling back to a per-node default deadline.
+    runner.vcar_context = context
+    return runner
+
+
+class PlanRequest:
+    """Validated HTTP payload: a node list plus an optional shared budget.
+
+    The payload never selects an executable; tools are resolved from the server-side
+    registry, so a caller can only choose among already allowed tools.
+    """
+
+    KEYS = frozenset({'nodes', 'budget'})
+
+    @staticmethod
+    def parse(value):
+        if not isinstance(value, dict) or not set(value) <= PlanRequest.KEYS or 'nodes' not in value:
+            fail('PLAN_REQUEST_INVALID')
+        budget_value = value.get('budget')
+        if budget_value is not None:
+            if not isinstance(budget_value, dict) or set(budget_value) - BUDGET_KEYS:
+                fail('PLAN_REQUEST_INVALID')
+        return {'nodes': value['nodes'], 'budget': budget_value}
+
+
+def targets_from_env(value=None):
+    """Resolve the allowlisted tool -> (module, function) registry; fail closed."""
+    raw = value if value is not None else os.environ.get('DATAMIND_VCAR_TARGETS')
+    if not raw or not str(raw).strip():
+        fail('VCAR_TARGETS_NOT_CONFIGURED', 503)
+    try:
+        data = json.loads(raw)
+    except (TypeError, ValueError):
+        fail('VCAR_TARGETS_INVALID', 503)
+    if not isinstance(data, dict) or not data:
+        fail('VCAR_TARGETS_INVALID', 503)
+    return data
+
+
+def run_request(payload, dsn=None, *, context=None, cancel_event=None, child_env=None,
+                targets=None, clock=time.monotonic):
+    """Validate an HTTP plan payload, resolve server-side targets and execute it."""
+    request = PlanRequest.parse(payload)
+    built = plan(request['nodes'])
+    registry = targets_from_env(targets)
+    context = context if context is not None else ExecutionContext()
+    if cancel_event is not None:
+        context.cancel_event = cancel_event
+    try:
+        runners = bounded_runners(registry, dsn=dsn, context=context, env=child_env)
+    except ValueError as error:
+        fail(str(error), 503)
+    return execute(built, runners, budget=request['budget'], context=context, clock=clock)
