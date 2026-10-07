@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 import hashlib
 import hmac
+import os
 import re
 import secrets
 import uuid
@@ -14,6 +15,41 @@ from psycopg2.extras import RealDictCursor
 COOKIE = 'datamind_session'
 SESSION_SECONDS = 8*60*60
 ROLES = {'viewer','reviewer','approver','admin'}
+
+# Local no-login demo: requests coming from this machine act as a provisioned admin so the
+# operator need not type a password. Set DATAMIND_LOCAL_NO_LOGIN=0 to require login again,
+# or =1 to force the bypass for non-loopback clients. Sessions, roles and CSRF stay in place.
+DEMO_USER_ID = 'user-local-admin'
+DEMO_USERNAME = 'local-admin'
+DEMO_DISPLAY = '本机管理员'
+DEMO_CSRF = secrets.token_urlsafe(32)
+_LOOPBACK = {'127.0.0.1','::1','localhost'}
+
+
+def demo_allowed(request):
+    flag=os.environ.get('DATAMIND_LOCAL_NO_LOGIN')
+    if flag is not None:
+        return flag.strip().lower() not in {'','0','false','no','off'}
+    return (request.client.host if request.client else '') in _LOOPBACK
+
+
+def ensure_demo_user(dsn):
+    """Idempotently keep a real admin row so audit columns and joins stay valid."""
+    with psycopg2.connect(dsn) as conn,conn.cursor() as cur:
+        cur.execute('''INSERT INTO auth_users(user_id,username,display_name,password_hash,roles)
+            VALUES (%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING''',
+            (DEMO_USER_ID,DEMO_USERNAME,DEMO_DISPLAY,password_hash(secrets.token_urlsafe(24)),['admin']))
+    return {'user_id':DEMO_USER_ID,'username':DEMO_USERNAME,'display_name':DEMO_DISPLAY,
+            'roles':['admin'],'csrf_token':DEMO_CSRF,'_demo':True}
+
+
+def _demo_identity(request,dsn,mutation):
+    user=ensure_demo_user(dsn)
+    if mutation:
+        origin_check(request)
+        if not hmac.compare_digest(request.headers.get('x-csrf-token','').encode(),user['csrf_token'].encode()):
+            fail('CSRF_REQUIRED',403)
+    return user
 
 
 def fail(code, status=401):
@@ -94,7 +130,9 @@ def login(request,username,password,dsn):
 
 def current(request,dsn,*,required=False,permission=None,mutation=False):
     token=request.cookies.get(COOKIE)
+    demo=demo_allowed(request)
     if not token:
+        if demo:return _demo_identity(request,dsn,mutation)
         if required:fail('LOGIN_REQUIRED')
         return None
     with psycopg2.connect(dsn) as conn,conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -103,6 +141,7 @@ def current(request,dsn,*,required=False,permission=None,mutation=False):
             AND s.expires_at>now() AND u.active''',(hashlib.sha256(token.encode()).hexdigest(),))
         user=cur.fetchone()
     if not user:
+        if demo:return _demo_identity(request,dsn,mutation)
         if required:fail('SESSION_INVALID')
         return None
     user=dict(user)
@@ -116,6 +155,10 @@ def current(request,dsn,*,required=False,permission=None,mutation=False):
 
 def lock_identity(cur,identity,permission):
     """Recheck and lock the session/account in the mutation transaction."""
+    if identity.get('_demo'):
+        if permission and permission not in identity['roles'] and 'admin' not in identity['roles']:
+            fail('PERMISSION_DENIED',403)
+        return {'user_id':identity['user_id'],'display_name':identity['display_name'],'roles':identity['roles']}
     cur.execute('''SELECT u.user_id,u.display_name,u.roles FROM auth_users u JOIN auth_sessions s USING(user_id)
         WHERE u.user_id=%s AND s.token_hash=%s AND u.active AND s.revoked_at IS NULL AND s.expires_at>now()
         FOR SHARE OF u,s''',(identity['user_id'],identity['_session_hash']))
@@ -127,7 +170,9 @@ def lock_identity(cur,identity,permission):
 
 def logout(request,dsn):
     user=current(request,dsn,required=True,mutation=True)
-    with psycopg2.connect(dsn) as conn,conn.cursor() as cur:
-        cur.execute('UPDATE auth_sessions SET revoked_at=now() WHERE token_hash=%s',
-                    (hashlib.sha256(request.cookies[COOKIE].encode()).hexdigest(),))
+    token=request.cookies.get(COOKIE)
+    if token:
+        with psycopg2.connect(dsn) as conn,conn.cursor() as cur:
+            cur.execute('UPDATE auth_sessions SET revoked_at=now() WHERE token_hash=%s',
+                        (hashlib.sha256(token.encode()).hexdigest(),))
     return user

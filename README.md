@@ -322,6 +322,8 @@ API 使用 `mode: sql`、`scope.database_sources: ["demo_industrial"]`；符合�
 
 代码 API **0.9.0**。无匿名注册、默认账户或默认密码；账户由有数据库管理权限的本地操作者交互创建。先应用 `db/migrations/005_identity_and_approvals.sql`（启动脚本会调用迁移），再创建账户：
 
+> **本机免登录（默认）**：服务只绑定 `127.0.0.1`，来自本机的请求会自动以已登记的 `local-admin`（管理员）身份进入，页面与接口都不再要求密码，`/#cad`、`/#dimensions`、`/#files`、`/#authority` 可直接打开。CSRF/同源检查与角色门禁代码仍在；设 `DATAMIND_LOCAL_NO_LOGIN=0` 可恢复强制登录，`=1` 可对非本机客户端也启用。只有需要区分身份（例如“另一账户审批”）时，才用下面的命令创建真实账户并关闭该开关。
+
 ```bash
 .venv/bin/python db/migrate.py
 # 每条 create 会交互输入两次密码（12–256 字符）；不要把密码写入命令行或仓库

@@ -100,6 +100,8 @@
 
 ## 启动与报告复现
 
+**本机免登录（默认）**：服务只绑定 `127.0.0.1`，来自本机的请求自动以已登记的 `local-admin`（admin）身份进入，各页面与接口不再要求密码；CSRF、同源检查与角色门禁代码保留，设 `DATAMIND_LOCAL_NO_LOGIN=0` 即恢复强制登录，`=1` 可对非本机客户端也启用。需要区分身份（如“另一账户审批”）时，按下面步骤创建真实账户并关闭该开关。
+
 ```bash
 bash scripts/start_local.sh --background
 .venv/bin/python scripts/test_isolated.py

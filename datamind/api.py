@@ -551,7 +551,7 @@ def auth_me(request: Request,response: Response):
     from .auth import current
     identity=current(request,_write_dsn())
     response.headers['Cache-Control']='no-store'
-    return {'user':{k:v for k,v in identity.items() if k not in {'csrf_token','_session_hash'}} if identity else None,
+    return {'user':{k:v for k,v in identity.items() if k not in {'csrf_token','_session_hash','_demo'}} if identity else None,
             'csrf_token':identity['csrf_token'] if identity else None}
 
 

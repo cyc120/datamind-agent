@@ -314,7 +314,7 @@ Query Understanding 提取语义与歧义；Planner 产出受约束任务；SQL/
 
 确认表示提取忠于原文，不改变原文审批、不把候选变为权威。最新存疑/退回字段从后续工业规则核验排除，保留字段与历史；证据排除导致缺口，不能据此认定来源一致。载荷/版本变化后旧决定不自动继承；生产 SQL、文档 RAG 和旧运行快照保持各自语义。字段审批（`approvals.py`）与来源权威（`authority.py`＋migration 006）分层：权威规则由 admin 登记、另一审批账户启用/不批准/撤销，精确绑定范围/版本/生产记录/依据页，未登记则保持 `unresolved`。
 
-仍为**本机演示范围**：账户由本地管理员交互创建、无默认密码，身份与依据内容的业务授权含义由人核对，未做真实工厂授权验收。接口追加语义不等于底层数据库具有防篡改保证；缺失字段补录与正式多租户权限尚待实现。
+仍为**本机演示范围**：服务只绑定 `127.0.0.1`，来自本机的请求默认自动以已登记的 `local-admin`（admin）身份进入（`DATAMIND_LOCAL_NO_LOGIN=0` 可恢复强制登录，`=1` 可对非本机客户端也启用），真实账户仍需本地管理员交互创建、无默认密码；身份与依据内容的业务授权含义由人核对，未做真实工厂授权验收。接口追加语义不等于底层数据库具有防篡改保证；缺失字段补录与正式多租户权限尚待实现。
 
 ### 6.4 V-CAR 与恢复预算（规划）
 
@@ -408,9 +408,9 @@ Redis、专用图数据库、监控集群和额外对象存储不是当前核心
 | `GET /v1/documents`、`GET /v1/documents/{id}` | 可访问集合内的资产与状态 |
 | `GET /v1/documents/{id}/file`、`/pages/{page_no}` | 原文件、原页预览；验证源版本与位置 |
 | `GET /v1/documents/{id}/facts` | 当前候选字段与定位 |
-| `GET/POST /v1/documents/{id}/facts/{fact_id}/reviews` | 复核历史/追加决定；需 reviewer/admin 登录 |
+| `GET/POST /v1/documents/{id}/facts/{fact_id}/reviews` | 复核历史/追加决定；需 reviewer/admin（本机默认自动满足） |
 | `/v1/model/profiles` 及配置启用/测试等既有接口 | 多配置文本协议接入；不等于已接视觉模型；仅 admin 可改 |
-| 身份/会话与角色接口（`auth.py`、`scripts/manage_users.py`） | 本机账户登录、CSRF 与角色门禁；无默认密码 |
+| 身份/会话与角色接口（`auth.py`、`scripts/manage_users.py`） | 本机默认免登录（回环自动以 `local-admin` 进入）、账户登录、CSRF 与角色门禁；无默认密码 |
 | 受控队列接口（`file_jobs.py`） | DXF/单测量 JSON 上传、逐文件状态、限额/租约/幂等/重试/取消 |
 | CAD 资产与关联复核接口（`cad_store.py`、`cad_reviews.py`） | 认证登记、版本历史、实体/预览、复核决定 |
 | 尺寸服务接口（`cad_dimensions.py`） | 测量登记/版本、显式绑定、独立批准/撤销、当前核验与历史 |
