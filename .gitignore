@@ -44,3 +44,9 @@ spec_text.txt
 
 # 本地验证脚本、临时凭据和预览中间文件
 /work/
+
+# 浏览器上传的本地暂存文件不进入版本库
+/data/cad_demo/development/upload-*
+/data/cad_demo/authorized/upload-*
+/data/dimension_demo/development/upload-*
+/data/dimension_demo/authorized/upload-*

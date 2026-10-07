@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections import Counter
 from functools import lru_cache
 import hashlib
+import json
 import math
 import os
 from pathlib import Path
@@ -18,8 +19,31 @@ from psycopg2.extras import RealDictCursor
 ROOT = Path(__file__).resolve().parents[1]
 EMBED_MODEL = "BAAI/bge-small-zh-v1.5"
 COLLECTIONS = {"demo_kb", "ohrbench_kb", "industrial_demo"}
-RETRIEVER_VERSION = "hybrid-rrf-v2"
+RETRIEVER_VERSION = "hybrid-rrf-v3"
 _EMBED_LOCK = threading.Lock()
+MAX_SELECTED_DOCUMENTS = 8
+MAX_SCOPE_CHUNKS = 5000
+
+
+def document_selection(refs: list[dict]) -> list[dict]:
+    """Explicit source identities, never inferred from names in the question."""
+    fields = {"document_id", "document_version", "source_sha256", "parser_version"}
+    if not isinstance(refs, list) or not 1 <= len(refs) <= MAX_SELECTED_DOCUMENTS:
+        raise ValueError("DOCUMENT_SELECTION_INVALID")
+    checked = []
+    for ref in refs:
+        if (not isinstance(ref, dict) or set(ref) != fields
+                or not isinstance(ref["document_id"], str)
+                or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}", ref["document_id"])
+                or type(ref["document_version"]) is not int or ref["document_version"] < 1
+                or not isinstance(ref["source_sha256"], str)
+                or not re.fullmatch(r"[a-f0-9]{64}", ref["source_sha256"])
+                or not isinstance(ref["parser_version"], str) or not 1 <= len(ref["parser_version"]) <= 64):
+            raise ValueError("DOCUMENT_SELECTION_INVALID")
+        checked.append(dict(ref))
+    if len({ref["document_id"] for ref in checked}) != len(checked):
+        raise ValueError("DOCUMENT_SELECTION_INVALID")
+    return checked
 
 
 def meta_dsn() -> str:
@@ -84,9 +108,8 @@ class KnowledgeRetriever:
         if self.mode not in {"hybrid", "lexical"}:
             raise ValueError("INVALID_RETRIEVAL_MODE")
 
-    def _rows(self, collections: list[str]) -> list[dict]:
-        with psycopg2.connect(self.dsn) as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("""SELECT c.*, d.title, d.collection, d.origin, d.file_type, d.sha256 AS document_sha256,
+    def _read_rows(self, cur, collections: list[str], ids=None) -> list[dict]:
+        cur.execute("""SELECT c.*, d.title, d.collection, d.origin, d.file_type, d.sha256 AS document_sha256,
                            d.doc_version, d.parser_version, d.quality_detail,
                            COALESCE((SELECT jsonb_agg(jsonb_build_object('block_id',b.block_id,
                              'page_no',b.page_no,'bbox',b.bbox,'content_hash',b.content_hash,
@@ -97,11 +120,54 @@ class KnowledgeRetriever:
                            WHERE d.status='indexed' AND c.document_version=d.doc_version
                              AND 'public'=ANY(c.acl) AND 'public'=ANY(d.acl)
                              AND NOT d.needs_review AND d.collection=ANY(%s)
-                           ORDER BY c.chunk_id LIMIT 5000""", (collections,))
-            rows = [dict(row) for row in cur.fetchall()]
+                             AND (%s::text[] IS NULL OR c.document_id=ANY(%s::text[]))
+                           ORDER BY c.chunk_id LIMIT %s""", (collections, ids, ids, MAX_SCOPE_CHUNKS + (1 if ids else 0)))
+        rows = [dict(row) for row in cur.fetchall()]
+        if ids and len(rows) > MAX_SCOPE_CHUNKS:
+            raise ValueError("DOCUMENT_SELECTION_TOO_LARGE")
         # A changed text cannot retain its old digest and still become evidence.
         return [row for row in rows if row.get("exact_text") and
                 hashlib.sha256(row["exact_text"].encode()).hexdigest() == row["content_hash"]]
+
+    def _rows(self, collections: list[str]) -> list[dict]:
+        with psycopg2.connect(self.dsn) as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+            return self._read_rows(cur, collections)
+
+    def _selected_rows(self, collections: list[str], refs: list[dict]) -> tuple[list[dict], list[dict]]:
+        ids = [ref["document_id"] for ref in refs]
+        with psycopg2.connect(self.dsn) as conn:
+            # The heads and their chunks must be read from the same database snapshot.
+            conn.set_session(isolation_level="REPEATABLE READ", readonly=True)
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("""SELECT document_id,doc_version AS document_version,sha256 AS source_sha256,
+                    parser_version,title,collection FROM document_assets
+                    WHERE document_id=ANY(%s) AND status='indexed' AND 'public'=ANY(acl)
+                    AND NOT needs_review AND collection=ANY(%s)""", (ids, collections))
+                heads = {row["document_id"]: dict(row) for row in cur.fetchall()}
+                if set(heads) != set(ids):
+                    raise ValueError("DOCUMENT_SELECTION_UNAVAILABLE")
+                if any(any(heads[ref["document_id"]][key] != value for key, value in ref.items()) for ref in refs):
+                    raise ValueError("DOCUMENT_SELECTION_CHANGED")
+                rows = self._read_rows(cur, collections, ids)
+        snapshots = []
+        for ref in refs:
+            entries = [{key: row.get(key) for key in ("chunk_id", "content_hash", "document_version",
+                       "parser_version", "page_start", "page_end", "block_ids", "source_blocks", "section_path")}
+                       for row in rows if row["document_id"] == ref["document_id"]]
+            entries.sort(key=lambda item: item["chunk_id"])
+            snapshots.append({**heads[ref["document_id"]], "eligible_chunks": len(entries),
+                "chunks_sha256": hashlib.sha256(json.dumps(entries, ensure_ascii=False,
+                    sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()})
+        return rows, snapshots
+
+    def revalidate_selection(self, collections: list[str], refs: list[dict], snapshots: list[dict]) -> None:
+        """Reject a draft if selected heads/content changed while the model ran."""
+        try:
+            _, current = self._selected_rows(collections, refs)
+        except ValueError as exc:
+            raise ValueError("DOCUMENT_SELECTION_CHANGED") from exc
+        if current != snapshots:
+            raise ValueError("DOCUMENT_SELECTION_CHANGED")
 
     def _dense(self, question: str, collections: list[str]) -> list[tuple[str, float]]:
         from qdrant_client import QdrantClient, models
@@ -121,16 +187,37 @@ class KnowledgeRetriever:
         return [(hit.payload["chunk_id"], float(hit.score)) for hit in hits
                 if hit.payload and hit.payload.get("chunk_id") and hit.score >= 0.35]
 
-    def retrieve(self, question: str, *, collections: list[str] | None = None, limit: int = 5) -> dict:
+    def retrieve(self, question: str, *, collections: list[str] | None = None, limit: int = 5,
+                 document_refs: list[dict] | None = None) -> dict:
         collections = sorted(COLLECTIONS if collections is None else set(collections))
         if not collections or not set(collections) <= COLLECTIONS:
             raise ValueError("COLLECTION_NOT_ALLOWED")
-        rows = select_documents(question, self._rows(collections))
+        if type(limit) is not int or limit < 1 or (document_refs is not None and limit > 8):
+            raise ValueError("RETRIEVAL_LIMIT_INVALID")
+        selected = None
+        if document_refs is None:
+            rows = select_documents(question, self._rows(collections))
+        else:
+            refs = document_selection(document_refs)
+            rows, selected = self._selected_rows(collections, refs)
+            # One relevant chunk per selected document fits even for eight files.
+            limit = max(limit, len(refs))
         row_map = {row["chunk_id"]: row for row in rows}
         snapshot = hashlib.sha256("\n".join(
             f"{r['chunk_id']}:{r['document_version']}:{r['document_sha256']}:{r['content_hash']}" for r in rows
         ).encode()).hexdigest()[:16]
-        lexical = lexical_ranking(question, rows)[:30]
+        all_lexical = lexical_ranking(question, rows)
+        lexical = all_lexical[:30]
+        if selected:
+            # A high scoring long file must not push another file's first hit
+            # outside the fusion candidate budget.
+            represented = set()
+            for key, score in all_lexical:
+                doc_id = row_map[key]["document_id"]
+                if doc_id not in represented:
+                    represented.add(doc_id)
+                    if key not in {item[0] for item in lexical}:
+                        lexical.append((key, score))
         dense, warnings = [], []
         if self.mode == "hybrid" and rows:
             try:
@@ -145,10 +232,26 @@ class KnowledgeRetriever:
             for rank, (key, score) in enumerate(ranked, 1):
                 scores[key] = scores.get(key, 0) + 1 / (60 + rank)
                 evidence_scores.setdefault(key, {})[method] = round(score, 5)
+        ranked_keys = sorted(scores, key=lambda item: (-scores[item], item))
+        keys = []
+        if selected:
+            for ref in refs:
+                first = next((key for key in ranked_keys if row_map[key]["document_id"] == ref["document_id"]), None)
+                if first:
+                    keys.append(first)
+        keys.extend(key for key in ranked_keys if key not in keys)
         hits = []
-        for key in sorted(scores, key=lambda item: (-scores[item], item))[:limit]:
+        for key in keys[:limit]:
             hits.append({**row_map[key], "retrieval_score": round(scores[key], 6),
                          "retrieval_scores": evidence_scores[key]})
-        return {"hits": hits, "snapshot_id": "kb-" + snapshot, "retriever_version": RETRIEVER_VERSION,
+        result = {"hits": hits, "snapshot_id": "kb-" + snapshot, "retriever_version": RETRIEVER_VERSION,
                 "mode": "hybrid" if dense else "lexical", "warnings": warnings,
                 "eligible_chunks": len(rows), "collections": collections}
+        if selected is not None:
+            coverage = [{"document_id": ref["document_id"], "eligible_chunks": ref["eligible_chunks"],
+                         "retrieved_chunks": sum(hit["document_id"] == ref["document_id"] for hit in hits)} for ref in selected]
+            missing = [item["document_id"] for item in coverage if not item["retrieved_chunks"]]
+            result.update(selected_documents=selected, coverage={"documents": coverage,
+                "missing_document_ids": missing, "all_covered": not missing,
+                "semantics": "Relevant excerpts per selected file; no completeness or semantic entailment claim"})
+        return result

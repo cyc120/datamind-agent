@@ -36,6 +36,7 @@ def main():
                                    '--exclude-table-data=dimension_measurements','--exclude-table-data=dimension_measurement_versions',
                                    '--exclude-table-data=dimension_bindings','--exclude-table-data=dimension_binding_versions',
                                    '--exclude-table-data=dimension_approval_events','--exclude-table-data=dimension_comparisons',
+                                   '--exclude-table-data=file_jobs','--exclude-table-data=file_job_items',
                                    'datamind_meta'],check=True,capture_output=True).stdout
         subprocess.run(['docker','exec','-i',args.container,'pg_restore','-U','postgres','-d',database],
                        input=dump,check=True,capture_output=True)
@@ -66,6 +67,14 @@ def main():
             with pymupdf.open(uri) as pdf:
                 for i,page in enumerate(pdf):
                     (directory/f'page_{i+1:03d}.png').write_bytes(page.get_pixmap(dpi=110).tobytes('png'))
+        # ORT's optional telemetry HTTP thread can race interpreter shutdown on
+        # macOS. Keep regression local; this does not change model inference.
+        try:
+            import onnxruntime
+        except ImportError:
+            pass
+        else:
+            onnxruntime.disable_telemetry_events()
         runpy.run_path(str(ROOT/'db/seed_industrial.py'),run_name='__main__')
         suite=unittest.defaultTestLoader.discover(str(ROOT/'tests'),pattern=args.pattern)
         result=unittest.TextTestRunner(verbosity=2).run(suite)

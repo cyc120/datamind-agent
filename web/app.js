@@ -26,6 +26,7 @@ var STATE = { profiles: [], active: null, editingId: null };
 var AUTH = {user:null,csrf:null};
 var AUTHORITY = {candidates:[],documents:[],pending:null};
 var CAD = {assets:[],sources:[],pending:null,token:0,reviewPending:{}};
+var DIM = {token:0,loadingToken:null,loadingActor:null,reads:{},pending:{},busy:{},sources:[],measurements:[],bindings:[],drawings:[],measurement:null,binding:null,formMeasurement:null,drawing:null,feature:null,measurementBaseline:null,bindingBaseline:null,historyOffset:0,historyNext:null,formRevision:0,measurementRevision:0};
 function hasRole(role) { return !!(AUTH.user && (AUTH.user.roles.includes(role) || AUTH.user.roles.includes('admin'))); }
 function renderAuth() {
   var labels={viewer:'浏览',reviewer:'复核',approver:'审批',admin:'管理'};
@@ -34,13 +35,16 @@ function renderAuth() {
   ['saveProfile','saveActivate','testConfig','fetchModels','exportProfiles','importProfiles'].forEach(function(id){$(id).disabled=!hasRole('admin');});
   ['loadAuthorityCandidates','registerAuthority'].forEach(function(id){$(id).disabled=!hasRole('admin');});
   $('cadRegistration').classList.toggle('hidden',!hasRole('admin'));$('registerCad').disabled=!hasRole('admin');
+  renderDimensionPermissions();
+  if(window.renderMultifileAuth){window.renderMultifileAuth();}
   if(!hasRole('admin')){$('navModelBadge').textContent='管理权限';$('pulseModelText').textContent='管理员可查看';}
 }
 async function apiFetch(url,options) {
+  var requestAuth=AUTH;
   options=options || {};var headers=new Headers(options.headers || {});
   if (AUTH.csrf && !['GET','HEAD'].includes((options.method || 'GET').toUpperCase())) { headers.set('X-CSRF-Token',AUTH.csrf); }
   var response=await fetch(url,Object.assign({},options,{headers:headers,credentials:'same-origin'}));
-  if (response.status===401 && url!=='/v1/auth/login') { AUTH={user:null,csrf:null};renderAuth();clearCad();CAD.pending=null; }
+  if (response.status===401 && url!=='/v1/auth/login' && AUTH===requestAuth) { AUTH={user:null,csrf:null};renderAuth();clearCad();CAD.pending=null;clearDimensions();if(window.clearMultifile){window.clearMultifile();} }
   return response;
 }
 async function refreshAuth() {
@@ -55,18 +59,19 @@ async function signIn(event) {
     $('loginPassword').value='';
     if(!r.ok){throw new Error(r.status===429?'登录尝试过多，请稍后再试。':'账号、密码或账户状态不正确。');}
     var data=await r.json();AUTH={user:data.user,csrf:data.csrf_token};renderAuth();$('authMessage').textContent='已登录。';
-    if(hasRole('admin')){loadProfiles();}loadDocuments();loadAuthority();if(location.hash==='#cad'){loadCad();}
+    clearDimensions();if(hasRole('admin')){loadProfiles();}loadDocuments();loadAuthority();if(location.hash==='#cad'){loadCad();}if(location.hash==='#dimensions'){loadDimensions();}if(window.loadMultifile){window.loadMultifile();}
   }catch(error){$('authMessage').textContent=error.message;}
 }
 async function signOut() {
   var r=await apiFetch('/v1/auth/logout',{method:'POST'});
   if(r.ok || r.status===401){AUTH={user:null,csrf:null};renderAuth();$('authMessage').textContent='已退出。';
     loadAuthority();AUTHORITY.pending=null;
-    clearCad();CAD.pending=null;
+    clearCad();CAD.pending=null;clearDimensions();if(window.clearMultifile){window.clearMultifile();}
     document.querySelectorAll('dialog.document-fields').forEach(function(d){d.close();});}
 }
 
 function view(name, fromHash) {
+  if(name!=='dimensions'){DIM.token++;}
   document.querySelectorAll('.view').forEach(function (section) {
     section.classList.toggle('active', section.dataset.view === name);
   });
@@ -80,6 +85,7 @@ function view(name, fromHash) {
   if (name === 'fields') { loadDocuments(); }
   if (name === 'authority') { loadAuthority(); }
   if (name === 'cad') { loadCad(); }
+  if (name === 'dimensions') { loadDimensions(); }
 }
 window.addEventListener('hashchange', function () {
   var name = location.hash.slice(1);
@@ -224,6 +230,296 @@ $('cadVersion').addEventListener('change',showCadVersion);
 $('cadDocumentId').addEventListener('input',cadBaseline);
 $('cadForm').addEventListener('submit',registerCad);
 
+/* ---------------- 本地测量、显式绑定与独立使用批准 ---------------- */
+var DIMENSION_REASONS = {
+  LOGIN_REQUIRED:'请先登录。',SESSION_INVALID:'会话已失效，请重新登录。',PERMISSION_DENIED:'当前账户没有此操作权限。',
+  DIMENSION_RECORD_NOT_FOUND:'没有找到这条尺寸记录。',DIMENSION_SOURCE_CHANGED:'素材已变化，请刷新并重新选择。',
+  DIMENSION_SOURCE_INVALID:'素材的测量 ID、版本或内容不符合单条测量登记要求。',DIMENSION_MEASUREMENT_STATE_CHANGED:'测量当前版本已变化，请重新读取登记基线。',
+  DIMENSION_BINDING_STATE_CHANGED:'绑定当前版本已变化，请刷新并重新读取基线。',DIMENSION_INPUT_VERSION_CHANGED:'图纸或测量版本已变化，请重新选择当前输入。',
+  DIMENSION_REVIEW_STATE_CHANGED:'关联复核已有新记录，请刷新图纸与标注。',DIMENSION_APPROVAL_STATE_CHANGED:'使用批准已有新记录，请刷新后重新决定。',
+  DIMENSION_CONFIRMED_ASSOCIATION_REQUIRED:'需要当前版本已确认的标注关联。',DIMENSION_INDEPENDENT_APPROVER_REQUIRED:'批准人须独立于绑定登记人和关联复核人。',
+  DIMENSION_NO_ACTIVE_APPROVAL_TO_REVOKE:'本版本当前没有可撤销的批准。',DIMENSION_REQUEST_ID_REUSED:'此请求编号已用于其他内容，请刷新后重试。',
+  DIMENSION_MEASUREMENT_IDENTITY_CHANGED:'测量来源或零件身份发生变化，请建立独立测量 ID。',DIMENSION_BINDING_IDENTITY_CHANGED:'绑定所用的图纸或测量身份发生变化，请建立独立绑定 ID。',
+  DIMENSION_MEASUREMENT_VERSION_MISMATCH:'测量版本已更新，当前绑定暂停使用。',DIMENSION_DRAWING_VERSION_MISMATCH:'图纸版本已更新，当前绑定暂停使用。',
+  DIMENSION_CURRENT_HEAD_MISMATCH:'图纸、测量、关联复核或绑定已更新，当前证据不再适用。请重新读取当前版本并建立新绑定。',
+  DIMENSION_REVIEW_VERSION_MISMATCH:'关联复核已变化，当前绑定暂停使用。',DIMENSION_BINDING_VERSION_MISMATCH:'绑定已改版，旧版本暂停使用。',
+  DIMENSION_USE_APPROVAL_REQUIRED:'等待独立账户批准本版本使用。',DIMENSION_USE_APPROVAL_REJECTED:'本版本使用已退回。',DIMENSION_USE_APPROVAL_REVOKED:'本版本使用批准已撤销。',
+  DIMENSION_PRODUCTION_SCOPE_MISMATCH:'测量生产范围与绑定不一致。',DIMENSION_PART_MISMATCH:'测量零件与图纸零件不一致。',DIMENSION_TIMEZONE_REQUIRED:'有效期必须包含时区。',DIMENSION_BINDING_TIME_INVALID:'有效期起点须早于终点。',
+  DIMENSION_OUTSIDE_VALIDITY:'测量时刻不在绑定有效期内。',DIMENSION_MEASUREMENT_VALUE_OR_UNIT_UNKNOWN:'测量值或单位未知，暂停比较。',DIMENSION_MEASUREMENT_IN_FUTURE:'测量时刻晚于核验时刻。',
+  CAD_VALUE_OR_UNIT_UNKNOWN:'标注数值或单位未知，暂停使用。',CAD_GEOMETRY_ANNOTATION_CONFLICT:'几何与标注存在矛盾，暂停使用。',CAD_ASSOCIATION_UNCERTAIN:'标注对象关联尚未确认。'
+};
+function dimensionReason(code) { return DIMENSION_REASONS[code] || ('核验暂停：'+(code||'记录读取失败')); }
+function dimensionAlive(token,actor) { return token===DIM.token && !!AUTH.user && AUTH.user.user_id===actor; }
+function dimensionReadKey(name) { DIM.reads[name]=(DIM.reads[name]||0)+1;return DIM.reads[name]; }
+function dimensionReadAlive(name,key,token,actor) { return dimensionAlive(token,actor)&&DIM.reads[name]===key; }
+function renderDimensionPermissions() {
+  var loading=DIM.loadingToken!==null;
+  ['dimensionMeasurement','dimensionBinding','dimensionBindingVersion'].forEach(function(id){$(id).disabled=!AUTH.user||loading;});
+  $('refreshDimensions').disabled=!AUTH.user||loading;
+  ['dimensionMeasurementRegistration','dimensionBindingRegistration'].forEach(function(id){$(id).classList.toggle('hidden',!hasRole('admin'));});
+  [['dimensionMeasurementForm','admin','measurement'],['dimensionBindingForm','admin','binding'],['dimensionApprovalForm','approver','approval']].forEach(function(form){$(form[0]).querySelectorAll('input,select,textarea').forEach(function(control){control.disabled=!hasRole(form[1])||loading||!!DIM.busy[form[2]];});});
+  $('dimensionApprovalControls').classList.toggle('hidden',!hasRole('approver')||!DIM.binding);
+  $('saveDimensionComparison').classList.toggle('hidden',!hasRole('admin')||!DIM.binding);
+  $('dimensionMeasurementBaselineRefresh').disabled=!hasRole('admin')||loading||!!DIM.busy.measurement;
+  $('dimensionBindingBaselineRefresh').disabled=!hasRole('admin')||loading||!!DIM.busy.binding;
+  $('registerDimensionMeasurement').disabled=!hasRole('admin')||loading||!!DIM.busy.measurement||!DIM.measurementBaseline||DIM.measurementBaseline.id!==$('dimensionMeasurementId').value||!$('dimensionStagedSource').value;
+  $('registerDimensionBinding').disabled=!hasRole('admin')||loading||!!DIM.busy.binding||!DIM.bindingBaseline||DIM.bindingBaseline.id!==$('dimensionBindingId').value||!DIM.formMeasurement||!DIM.drawing||!DIM.feature||!$('dimensionTarget').value;
+  $('saveDimensionApproval').disabled=!hasRole('approver')||loading||!!DIM.busy.approval||!DIM.binding||DIM.binding.binding.payload.registrar_user_id===AUTH.user.user_id;
+  $('saveDimensionComparison').disabled=!hasRole('admin')||loading||!!DIM.busy.comparison||!DIM.binding;
+}
+function dimensionOptions(select,items,empty,selected) {
+  select.replaceChildren();var placeholder=document.createElement('option');placeholder.value='';placeholder.textContent=empty;select.append(placeholder);
+  items.forEach(function(item){var option=document.createElement('option');option.value=item.value;option.textContent=item.text;select.append(option);});
+  if(items.some(function(item){return String(item.value)===String(selected);})){select.value=selected;}
+}
+function clearDimensionBindingDetail() {
+  DIM.binding=null;DIM.historyOffset=0;DIM.historyNext=null;dimensionReadKey('binding');dimensionReadKey('history');dimensionReadKey('replay');
+  ['dimensionBindingInfo','dimensionCurrentResult','dimensionApprovalHistory','dimensionComparisonHistory','dimensionReplay'].forEach(function(id){$(id).replaceChildren();});
+  ['dimensionApprovalMessage','dimensionComparisonMessage','dimensionHistoryMessage','dimensionHistoryPage'].forEach(function(id){$(id).textContent='';});
+  $('dimensionApprovalForm').reset();$('dimensionBindingDetail').classList.add('hidden');$('dimensionComparisonHistoryCard').classList.add('hidden');
+  $('dimensionHistoryPrevious').disabled=true;$('dimensionHistoryNext').disabled=true;renderDimensionPermissions();
+}
+function clearDimensions() {
+  DIM.token++;DIM.loadingToken=null;DIM.loadingActor=null;DIM.reads={};DIM.pending={};DIM.busy={};DIM.sources=[];DIM.measurements=[];DIM.bindings=[];DIM.drawings=[];
+  DIM.measurement=null;DIM.formMeasurement=null;DIM.drawing=null;DIM.feature=null;DIM.measurementBaseline=null;DIM.bindingBaseline=null;DIM.formRevision++;DIM.measurementRevision++;
+  ['dimensionMeasurementForm','dimensionBindingForm','dimensionApprovalForm'].forEach(function(id){$(id).reset();});
+  ['dimensionMeasurement','dimensionBinding','dimensionBindingVersion','dimensionStagedSource','dimensionBindingMeasurement','dimensionDrawing','dimensionFeature','dimensionTarget'].forEach(function(id){$(id).replaceChildren();});
+  ['dimensionMeasurementInfo','dimensionBindingMeasurementInfo'].forEach(function(id){$(id).replaceChildren();});
+  ['dimensionMeasurementMessage','dimensionBindingMessage','dimensionSourceInfo','dimensionDrawingInfo','dimensionFeatureInfo'].forEach(function(id){$(id).textContent='';});
+  $('dimensionMeasurementBaseline').textContent='输入测量 ID 后读取基线。';$('dimensionBindingBaseline').textContent='输入绑定 ID 后读取基线。';
+  $('dimensionMessage').textContent='登录后可查看尺寸记录。';clearDimensionBindingDetail();renderDimensionPermissions();
+}
+async function dimensionResponse(response,allowMissing) {
+  var data=await response.json();
+  if(allowMissing && response.status===404 && data.detail && data.detail.error_code==='DIMENSION_RECORD_NOT_FOUND'){return null;}
+  if(!response.ok){var code=data.detail&&data.detail.error_code;
+    if(response.status===422&&!code){throw new Error('请核对必填字段、时间格式和依据长度。');}
+    throw new Error(code?dimensionReason(code):('尺寸服务读取失败（'+response.status+'）。'));}
+  return data;
+}
+function dimensionEvidence(container,rows,hashes) {
+  container.replaceChildren();var dl=document.createElement('dl');rows.forEach(function(row){var dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=row[0];dd.textContent=row[1]===null?'未知':String(row[1]);dl.append(dt,dd);});container.append(dl);
+  if(hashes&&hashes.length){var details=document.createElement('details'),summary=document.createElement('summary');summary.textContent='版本校验凭据';details.append(summary);hashes.forEach(function(row){var p=document.createElement('p');p.textContent=row[0]+' · SHA-256 '+row[1];details.append(p);});container.append(details);}
+}
+function renderDimensionMeasurement(record,container) {
+  var m=record.payload;dimensionEvidence(container,[['测量',m.measurement_id+' · v'+m.source.record_version],['原始测量值',(m.value===null?'未知':m.value)+' '+m.unit],['零件 / 批次',m.part_id+' / '+m.batch_id],['工序 / 工艺版次',m.operation_no+' / '+m.process_revision],['特征 / 方法',m.feature_role+' / '+m.method],['测量时刻',m.measured_at],['来源',m.source.source_id+' · '+(m.source.provenance==='synthetic_demo'?'合成演示素材':'外部素材（登记声明）')],['登记人',record.actor.label+' · '+record.registered_at]],[['测量记录',record.sha256],['测量源文件',m.source.source_sha256]]);
+}
+async function loadDimensions(preselect) {
+  if(!AUTH.user){clearDimensions();return;}
+  // Login, direct navigation and the following hashchange may request this view together.
+  if(!preselect&&DIM.loadingToken===DIM.token&&DIM.loadingActor===AUTH.user.user_id){return;}
+  preselect=preselect||{};
+  var actor=AUTH.user.user_id,token=++DIM.token,admin=hasRole('admin');
+  DIM.loadingToken=token;DIM.loadingActor=actor;
+  var selected={measurement:preselect.measurement||$('dimensionMeasurement').value,binding:preselect.binding||$('dimensionBinding').value,formMeasurement:preselect.bindingMeasurement||$('dimensionBindingMeasurement').value,drawing:$('dimensionDrawing').value,source:$('dimensionStagedSource').value};
+  DIM.busy={};DIM.measurement=null;DIM.formMeasurement=null;DIM.drawing=null;DIM.feature=null;DIM.measurementBaseline=null;DIM.bindingBaseline=null;DIM.formRevision++;
+  clearDimensionBindingDetail();['dimensionMeasurementInfo','dimensionBindingMeasurementInfo'].forEach(function(id){$(id).replaceChildren();});
+  $('dimensionMeasurementBaseline').textContent='请重新读取测量登记基线。';$('dimensionBindingBaseline').textContent='请重新读取绑定登记基线。';
+  $('dimensionMessage').textContent='正在读取当前尺寸记录，请稍候…';renderDimensionPermissions();
+  try {
+    var requests=[apiFetch('/v1/dimensions/measurements'),apiFetch('/v1/dimensions/bindings'),apiFetch('/v1/drawings')];if(admin){requests.push(apiFetch('/v1/dimensions/sources'));}
+    var responses=await Promise.all(requests);var data=await Promise.all(responses.map(function(r){return dimensionResponse(r);}));
+    if(!dimensionAlive(token,actor)){return;}DIM.measurements=data[0].measurements;DIM.bindings=data[1].bindings;DIM.drawings=data[2].drawings;DIM.sources=admin?data[3].sources:[];
+    var measurements=DIM.measurements.map(function(m){return {value:m.measurement_id,text:m.measurement_id+' · 当前 v'+m.current_version};});
+    dimensionOptions($('dimensionMeasurement'),measurements,'请选择已登记测量',selected.measurement);
+    dimensionOptions($('dimensionBindingMeasurement'),measurements,'请明确选择本次测量',selected.formMeasurement);
+    dimensionOptions($('dimensionBinding'),DIM.bindings.map(function(b){return {value:b.binding_id,text:b.binding_id+' · 当前 v'+b.current_version};}),'请选择绑定查看',selected.binding);
+    dimensionOptions($('dimensionDrawing'),DIM.drawings.map(function(d){return {value:d.document_id,text:d.title+' · 当前 v'+d.document_version};}),'请明确选择当前图纸',selected.drawing);
+    dimensionOptions($('dimensionStagedSource'),DIM.sources.map(function(s,i){return {value:String(i),text:s.name+' · '+(s.provenance==='synthetic_demo'?'合成素材':'外部素材')};}),'请选择测量素材','');
+    dimensionOptions($('dimensionBindingVersion'),[],'先选择绑定');dimensionOptions($('dimensionFeature'),[],'先选择当前图纸');dimensionOptions($('dimensionTarget'),[],'先选择已确认标注');
+    $('dimensionDrawingInfo').textContent='';$('dimensionFeatureInfo').textContent='';$('dimensionSourceInfo').textContent='';
+    $('dimensionMessage').textContent='已读取 '+DIM.measurements.length+' 条测量、'+DIM.bindings.length+' 条绑定。'+((data[0].truncated||data[1].truncated)?'当前列表仅显示前 200 条记录。':'选择记录查看原值、批准与当前结果。');
+    renderDimensionPermissions();
+    await Promise.all([showDimensionMeasurement(),selectDimensionBinding(),readDimensionFormMeasurement(),readDimensionDrawing()]);
+  }catch(error){if(dimensionAlive(token,actor)){$('dimensionMessage').textContent=error.message;}}
+  finally{if(dimensionAlive(token,actor)&&DIM.loadingToken===token){DIM.loadingToken=null;DIM.loadingActor=null;renderDimensionPermissions();}}
+}
+async function showDimensionMeasurement() {
+  DIM.measurement=null;$('dimensionMeasurementInfo').replaceChildren();var id=$('dimensionMeasurement').value,key=dimensionReadKey('measurement');if(!AUTH.user||!id){return;}
+  var token=DIM.token,actor=AUTH.user.user_id;
+  try{var data=await dimensionResponse(await apiFetch('/v1/dimensions/measurements/'+encodeURIComponent(id)));if(!dimensionReadAlive('measurement',key,token,actor)){return;}DIM.measurement=data.measurement;renderDimensionMeasurement(data.measurement,$('dimensionMeasurementInfo'));}
+  catch(error){if(dimensionReadAlive('measurement',key,token,actor)){$('dimensionMeasurementInfo').textContent=error.message;}}
+}
+async function dimensionBaseline(kind) {
+  if(!hasRole('admin')||DIM.loadingToken!==null){return;}var measurement=kind==='measurement',input=measurement?'dimensionMeasurementId':'dimensionBindingId',label=measurement?'dimensionMeasurementBaseline':'dimensionBindingBaseline',name=kind+'Baseline';
+  var id=$(input).value,key=dimensionReadKey(name),token=DIM.token,actor=AUTH.user.user_id;DIM[name]=null;renderDimensionPermissions();
+  if(!id||!$(input).checkValidity()){$(label).textContent='请输入有效的'+(measurement?'测量':'绑定')+' ID。';return;}$(label).textContent='正在读取当前基线…';
+  try{var data=await dimensionResponse(await apiFetch('/v1/dimensions/'+(measurement?'measurements/':'bindings/')+encodeURIComponent(id)),true);
+    if(!dimensionReadAlive(name,key,token,actor)||$(input).value!==id){return;}var record=data?(measurement?data.measurement:data.binding):null;
+    DIM[name]={id:id,version:record?(measurement?record.payload.source.record_version:record.payload.binding_version):0,sha256:record?record.sha256:null};
+    $(label).textContent=record?'已读取当前 v'+DIM[name].version+'；本次将登记 v'+(DIM[name].version+1)+'。':'该 ID 尚未登记；本次将登记 v1。';renderDimensionPermissions();
+  }catch(error){if(dimensionReadAlive(name,key,token,actor)){$(label).textContent=error.message;}}
+}
+function showDimensionSource() {
+  var source=$('dimensionStagedSource').value===''?null:DIM.sources[Number($('dimensionStagedSource').value)];
+  $('dimensionSourceInfo').textContent=source?'源文件 SHA-256 '+source.source_sha256:'';renderDimensionPermissions();
+}
+async function readDimensionFormMeasurement() {
+  DIM.formMeasurement=null;DIM.formRevision++;$('dimensionBindingMeasurementInfo').replaceChildren();renderDimensionPermissions();
+  var id=$('dimensionBindingMeasurement').value,key=dimensionReadKey('formMeasurement');if(!AUTH.user||!id){return;}var token=DIM.token,actor=AUTH.user.user_id;
+  try{var data=await dimensionResponse(await apiFetch('/v1/dimensions/measurements/'+encodeURIComponent(id)));if(!dimensionReadAlive('formMeasurement',key,token,actor)){return;}DIM.formMeasurement=data.measurement;renderDimensionMeasurement(data.measurement,$('dimensionBindingMeasurementInfo'));renderDimensionPermissions();}
+  catch(error){if(dimensionReadAlive('formMeasurement',key,token,actor)){$('dimensionBindingMeasurementInfo').textContent=error.message;}}
+}
+async function readDimensionDrawing() {
+  DIM.drawing=null;DIM.feature=null;DIM.formRevision++;dimensionReadKey('feature');$('dimensionDrawingInfo').textContent='';$('dimensionFeatureInfo').textContent='';
+  dimensionOptions($('dimensionFeature'),[],'先选择当前图纸');dimensionOptions($('dimensionTarget'),[],'先选择已确认标注');renderDimensionPermissions();
+  var id=$('dimensionDrawing').value,key=dimensionReadKey('drawing');if(!AUTH.user||!id){return;}var token=DIM.token,actor=AUTH.user.user_id;
+  $('dimensionDrawingInfo').textContent='正在读取当前图纸与复核…';
+  try{var data=await cadResponse(await apiFetch('/v1/drawings/'+encodeURIComponent(id)+'/features'));if(!dimensionReadAlive('drawing',key,token,actor)){return;}
+    DIM.drawing=data;var v=data.version;var confirmed=data.association_reviews.filter(function(r){return r.latest_review&&r.latest_review.decision==='confirmed';});
+    $('dimensionDrawingInfo').textContent=v.title+' · 图纸 v'+v.document_version+' · 源 SHA-256 '+v.source_sha256;
+    dimensionOptions($('dimensionFeature'),confirmed.map(function(r){var f=data.features.find(function(x){return x.feature_id===r.feature_id;});return {value:r.feature_id,text:f.annotation_raw+' · 标注 '+f.locator.handle+' · 已复核圆 '+r.latest_review.selected_target};}),'请明确选择已确认标注');
+    if(!confirmed.length){$('dimensionFeatureInfo').textContent='本图纸当前版本没有已确认关联；请先在「图纸与实体」完成认证复核。';}
+  }catch(error){if(dimensionReadAlive('drawing',key,token,actor)){$('dimensionDrawingInfo').textContent=error.message;}}
+}
+function canonicalDimensionJson(value) {
+  if(Array.isArray(value)){return '['+value.map(canonicalDimensionJson).join(',')+']';}
+  if(value!==null&&typeof value==='object'){return '{'+Object.keys(value).sort().map(function(k){return JSON.stringify(k)+':'+canonicalDimensionJson(value[k]);}).join(',')+'}';}
+  return JSON.stringify(value);
+}
+async function dimensionDigest(value) {
+  var bytes=new TextEncoder().encode(canonicalDimensionJson(value));var hash=await crypto.subtle.digest('SHA-256',bytes);return Array.from(new Uint8Array(hash)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
+}
+async function selectDimensionFeature() {
+  DIM.feature=null;DIM.formRevision++;var id=$('dimensionFeature').value,key=dimensionReadKey('feature'),token=DIM.token,actor=AUTH.user&&AUTH.user.user_id;
+  $('dimensionFeatureInfo').textContent='';dimensionOptions($('dimensionTarget'),[],'请明确选择已复核对象');renderDimensionPermissions();if(!actor||!id||!DIM.drawing){return;}
+  var drawing=DIM.drawing,feature=drawing.features.find(function(f){return f.feature_id===id;}),state=drawing.association_reviews.find(function(r){return r.feature_id===id;});
+  if(!feature||!state||!state.latest_review||state.latest_review.decision!=='confirmed'){return;}
+  var review=state.latest_review,projection={};['review_id','document_id','document_version','source_sha256','parser_version','bundle_sha256','feature_id','feature_sha256','decision','selected_target','reviewer_user_id','reviewer_roles','reason'].forEach(function(k){projection[k]=review[k];});
+  try{var sha=await dimensionDigest(projection);if(!dimensionReadAlive('feature',key,token,actor)||DIM.drawing!==drawing){return;}
+    DIM.feature={feature:feature,state:state,review:review,reviewSha256:sha};dimensionOptions($('dimensionTarget'),[{value:review.selected_target,text:'圆 '+review.selected_target+' · '+review.reviewer_label+' 已确认'}],'请明确选择本次绑定对象');
+    $('dimensionFeatureInfo').textContent=feature.annotation_raw+' · '+feature.unit+' · 关联复核 '+review.review_id+' · 复核依据：'+review.reason;
+  }catch(error){if(dimensionReadAlive('feature',key,token,actor)){$('dimensionFeatureInfo').textContent='关联校验凭据生成失败，请刷新。';}}
+}
+function dimensionPending(kind,body) {
+  var signature=canonicalDimensionJson(body),actor=AUTH.user.user_id,pending=DIM.pending[kind];
+  if(!pending||pending.signature!==signature||pending.actor!==actor){pending={signature:signature,actor:actor,id:'dimension-'+crypto.randomUUID().replaceAll('-','')};DIM.pending[kind]=pending;}
+  return Object.assign({},body,{request_id:pending.id});
+}
+async function registerDimensionMeasurement(event) {
+  event.preventDefault();if(!hasRole('admin')||DIM.loadingToken!==null||DIM.busy.measurement){return;}var baseline=DIM.measurementBaseline,source=$('dimensionStagedSource').value===''?null:DIM.sources[Number($('dimensionStagedSource').value)];
+  if(!baseline||baseline.id!==$('dimensionMeasurementId').value||!source){$('dimensionMeasurementMessage').textContent='请读取当前登记基线并明确选择素材。';return;}
+  var actor=AUTH.user.user_id,token=DIM.token,revision=DIM.measurementRevision;
+  var body=dimensionPending('measurement',{measurement_id:baseline.id,source_path:source.source_path,source_sha256:source.source_sha256,provenance:source.provenance,previous_version:baseline.version,previous_sha256:baseline.sha256});
+  DIM.busy.measurement=true;renderDimensionPermissions();$('dimensionMeasurementMessage').textContent='正在固定测量源与版本…';
+  try{var data=await dimensionResponse(await apiFetch('/v1/dimensions/measurements',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));
+    if(!dimensionAlive(token,actor)||revision!==DIM.measurementRevision){return;}delete DIM.pending.measurement;DIM.busy.measurement=false;$('dimensionMeasurementForm').reset();
+    var refreshedToken=DIM.token+1;await loadDimensions({measurement:data.measurement.payload.measurement_id});if(!dimensionAlive(refreshedToken,actor)){return;}
+    $('dimensionMeasurementMessage').textContent='已登记 '+data.measurement.payload.measurement_id+' · v'+data.measurement.payload.source.record_version+'，原值与源校验凭据已固定。';
+  }catch(error){if(dimensionAlive(token,actor)&&revision===DIM.measurementRevision){$('dimensionMeasurementMessage').textContent=error.message;}}
+  finally{if(dimensionAlive(token,actor)){DIM.busy.measurement=false;renderDimensionPermissions();}}
+}
+function dimensionTimestamp(id) {
+  var text=$(id).value.trim();if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(text)||!Number.isFinite(Date.parse(text))){throw new Error('有效期请使用包含时区的时间，例如 2026-09-01T00:00:00+08:00。');}return text;
+}
+async function registerDimensionBinding(event) {
+  event.preventDefault();if(!hasRole('admin')||DIM.loadingToken!==null||DIM.busy.binding){return;}var baseline=DIM.bindingBaseline,m=DIM.formMeasurement,d=DIM.drawing,f=DIM.feature;
+  if(!baseline||baseline.id!==$('dimensionBindingId').value||!m||!d||!f||!$('dimensionTarget').value){$('dimensionBindingMessage').textContent='请读取基线，并明确选择测量、当前图纸、已确认标注与对象。';return;}
+  var actor=AUTH.user.user_id,token=DIM.token,revision=DIM.formRevision,body;
+  try{var from=dimensionTimestamp('dimensionValidFrom'),to=dimensionTimestamp('dimensionValidTo');if(Date.parse(from)>=Date.parse(to)){throw new Error('有效期起点须早于终点。');}
+    body=dimensionPending('binding',{binding_id:baseline.id,previous_version:baseline.version,previous_sha256:baseline.sha256,document_id:d.version.document_id,document_version:d.version.document_version,source_sha256:d.version.source_sha256,bundle_sha256:d.version.bundle_sha256,feature_id:f.feature.feature_id,feature_sha256:f.state.feature_sha256,target_handle:$('dimensionTarget').value,measurement_id:m.payload.measurement_id,measurement_record_version:m.payload.source.record_version,measurement_sha256:m.sha256,review_id:f.review.review_id,review_sha256:f.reviewSha256,valid_from:from,valid_to:to,rationale:$('dimensionBindingRationale').value.trim()});
+    if(!body.rationale){throw new Error('请填写绑定依据。');}
+  }catch(error){$('dimensionBindingMessage').textContent=error.message;return;}
+  DIM.busy.binding=true;renderDimensionPermissions();$('dimensionBindingMessage').textContent='正在保存明确绑定与证据版本…';
+  try{var data=await dimensionResponse(await apiFetch('/v1/dimensions/bindings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));
+    if(!dimensionAlive(token,actor)||revision!==DIM.formRevision){return;}delete DIM.pending.binding;DIM.busy.binding=false;$('dimensionBindingForm').reset();
+    var refreshedToken=DIM.token+1;await loadDimensions({binding:data.binding.payload.binding_id});if(!dimensionAlive(refreshedToken,actor)){return;}$('dimensionBindingMessage').textContent='已登记 '+data.binding.payload.binding_id+' · v'+data.binding.payload.binding_version+'，等待独立使用批准。';
+  }catch(error){if(dimensionAlive(token,actor)&&revision===DIM.formRevision){$('dimensionBindingMessage').textContent=error.message;}}
+  finally{if(dimensionAlive(token,actor)){DIM.busy.binding=false;renderDimensionPermissions();}}
+}
+async function selectDimensionBinding() {
+  clearDimensionBindingDetail();var id=$('dimensionBinding').value,item=DIM.bindings.find(function(b){return b.binding_id===id;});
+  if(!id||!item){dimensionOptions($('dimensionBindingVersion'),[],'先选择绑定');return;}
+  var versions=[];for(var n=item.current_version;n>=Math.max(1,item.current_version-199);n--){versions.push({value:String(n),text:'v'+n+(n===item.current_version?' · 当前':' · 历史')});}
+  dimensionOptions($('dimensionBindingVersion'),versions,'请选择绑定版本',String(item.current_version));await showDimensionBinding();
+}
+function renderDimensionResult(container,result,replay) {
+  container.replaceChildren();container.dataset.state=result.status;var title=document.createElement('h3');title.textContent=(replay?'当时核验':'当前核验')+' · '+(result.status==='compared'?'已完成单次比较':'已阻断');container.append(title);
+  var p=document.createElement('p');p.textContent=result.reason?dimensionReason(result.reason):'使用批准与证据版本检查通过。';container.append(p);
+  if(result.comparison){var c=result.comparison;var outcome=document.createElement('p');outcome.textContent=c.status==='within_annotation_range'?'测量值在该标注范围内。':'测量值在该标注范围外。';container.append(outcome);
+    var values=document.createElement('p');values.textContent='测量 '+c.measurement_original.value+' '+c.measurement_original.unit+'；标注原文 '+c.annotation_original.raw+' · '+c.annotation_original.unit;container.append(values);
+    var normalized=document.createElement('p');normalized.textContent='统一到 mm：测量 '+c.normalized_mm.measurement+'，标注范围 ['+c.normalized_mm.lower+', '+c.normalized_mm.upper+']。';container.append(normalized);}
+  var note=document.createElement('p');note.className='field-hint';note.textContent='本地尺寸标注比较；不代表正式图纸审批、制造授权或产品质量结论。';container.append(note);
+}
+async function showDimensionBinding() {
+  clearDimensionBindingDetail();var id=$('dimensionBinding').value,version=$('dimensionBindingVersion').value,key=dimensionReadKey('binding');if(!AUTH.user||!id||!version){return;}var token=DIM.token,actor=AUTH.user.user_id;
+  $('dimensionBindingDetail').classList.remove('hidden');$('dimensionBindingInfo').textContent='正在核对绑定证据与当前状态…';
+  try{var data=await dimensionResponse(await apiFetch('/v1/dimensions/bindings/'+encodeURIComponent(id)+'?version='+encodeURIComponent(version)));
+    if(!dimensionReadAlive('binding',key,token,actor)){return;}DIM.binding=data;var record=data.binding,b=record.payload;
+    dimensionEvidence($('dimensionBindingInfo'),[['绑定',b.binding_id+' · v'+b.binding_version],['图纸',b.document_id+' · v'+b.document_version+' / 图号 '+b.drawing_id+' / 图纸版次 '+b.drawing_revision],['标注 / 对象',b.feature_id+' / 圆 '+b.target_handle],['测量',b.measurement_id+' · v'+b.measurement_record_version],['零件 / 批次',b.part_id+' / '+b.batch_id],['工序 / 工艺版次',b.operation_no+' / '+b.process_revision],['特征 / 方法',b.feature_role+' / '+b.method],['有效期','['+b.valid_from+', '+b.valid_to+')'],['登记人',record.actor.label+' · '+record.registered_at],['绑定依据',b.rationale]],[['绑定',record.sha256],['图纸源文件',b.source_sha256],['测量',b.measurement_sha256],['关联复核',b.review_sha256]]);
+    renderDimensionResult($('dimensionCurrentResult'),data.current_result,false);renderDimensionApprovals(data.approvals);renderDimensionPermissions();
+    if(hasRole('approver')&&b.registrar_user_id===actor){$('saveDimensionApproval').disabled=true;$('dimensionApprovalMessage').textContent='当前账户为绑定登记人；请由独立账户批准。';}
+    $('dimensionComparisonHistoryCard').classList.remove('hidden');await loadDimensionHistory(0);
+  }catch(error){if(dimensionReadAlive('binding',key,token,actor)){$('dimensionBindingInfo').textContent=error.message;}}
+}
+function renderDimensionApprovals(events) {
+  var container=$('dimensionApprovalHistory');container.replaceChildren();var title=document.createElement('h3');title.textContent='本绑定版本的使用批准历史';container.append(title);
+  if(!events.length){var empty=document.createElement('p');empty.textContent='尚无使用批准记录。';container.append(empty);}
+  var labels={approved:'批准',rejected:'退回',revoked:'撤销'};events.forEach(function(item){var e=item.payload,p=document.createElement('p');p.textContent=labels[e.decision]+' · '+e.approver_user_id+' · '+e.created_at+' · '+e.reason;container.append(p);});
+}
+async function saveDimensionApproval(event) {
+  event.preventDefault();if(!hasRole('approver')||DIM.loadingToken!==null||!DIM.binding||DIM.busy.approval){return;}var selected=DIM.binding,b=selected.binding.payload,actor=AUTH.user.user_id,token=DIM.token,key=DIM.reads.binding;
+  var decision=$('dimensionApprovalDecision').value,reason=$('dimensionApprovalReason').value.trim();if(!decision||!reason){$('dimensionApprovalMessage').textContent='请明确选择决定并填写依据。';return;}
+  var last=selected.approvals.length?selected.approvals[selected.approvals.length-1].payload:null;
+  if(decision==='revoked'&&(!last||last.decision!=='approved')){$('dimensionApprovalMessage').textContent='本版本当前没有可撤销的批准。';return;}
+  var body=dimensionPending('approval',{binding_version:b.binding_version,binding_sha256:selected.binding.sha256,previous_approval_id:last?last.approval_id:null,decision:decision,reason:reason});
+  DIM.busy.approval=true;renderDimensionPermissions();$('dimensionApprovalMessage').textContent='正在保存使用批准决定…';
+  try{await dimensionResponse(await apiFetch('/v1/dimensions/bindings/'+encodeURIComponent(b.binding_id)+'/approvals',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));
+    if(!dimensionReadAlive('binding',key,token,actor)){return;}delete DIM.pending.approval;DIM.busy.approval=false;$('dimensionApprovalForm').reset();await showDimensionBinding();
+    if(dimensionAlive(token,actor)&&DIM.binding&&DIM.binding.binding.payload.binding_id===b.binding_id&&DIM.binding.binding.payload.binding_version===b.binding_version){$('dimensionApprovalMessage').textContent='已保存使用批准决定，当前核验已刷新。';}
+  }catch(error){if(dimensionReadAlive('binding',key,token,actor)){$('dimensionApprovalMessage').textContent=error.message;}}
+  finally{if(dimensionAlive(token,actor)){DIM.busy.approval=false;renderDimensionPermissions();}}
+}
+async function saveDimensionComparison() {
+  if(!hasRole('admin')||DIM.loadingToken!==null||!DIM.binding||DIM.busy.comparison){return;}var selected=DIM.binding,b=selected.binding.payload,actor=AUTH.user.user_id,token=DIM.token,key=DIM.reads.binding;
+  var body=dimensionPending('comparison',{binding_version:b.binding_version,binding_sha256:selected.binding.sha256});DIM.busy.comparison=true;renderDimensionPermissions();$('dimensionComparisonMessage').textContent='正在核对当前版本并保存快照…';
+  try{var data=await dimensionResponse(await apiFetch('/v1/dimensions/bindings/'+encodeURIComponent(b.binding_id)+'/comparisons',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));
+    if(!dimensionReadAlive('binding',key,token,actor)){return;}delete DIM.pending.comparison;DIM.busy.comparison=false;renderDimensionResult($('dimensionCurrentResult'),data.payload.result,false);
+    $('dimensionComparisonMessage').textContent='已保存本次核验快照 '+data.payload.comparison_id+'。';await loadDimensionHistory(0);
+  }catch(error){if(dimensionReadAlive('binding',key,token,actor)){$('dimensionComparisonMessage').textContent=error.message;}}
+  finally{if(dimensionAlive(token,actor)){DIM.busy.comparison=false;renderDimensionPermissions();}}
+}
+async function loadDimensionHistory(offset) {
+  if(!AUTH.user||!DIM.binding){return;}var id=DIM.binding.binding.payload.binding_id,token=DIM.token,actor=AUTH.user.user_id,key=dimensionReadKey('history'),bindingKey=DIM.reads.binding;
+  $('dimensionHistoryPrevious').disabled=true;$('dimensionHistoryNext').disabled=true;$('dimensionComparisonHistory').replaceChildren();$('dimensionHistoryMessage').textContent='正在读取核验历史…';
+  try{var data=await dimensionResponse(await apiFetch('/v1/dimensions/bindings/'+encodeURIComponent(id)+'/comparisons?offset='+offset+'&limit=10'));
+    if(!dimensionReadAlive('history',key,token,actor)||bindingKey!==DIM.reads.binding){return;}DIM.historyOffset=offset;DIM.historyNext=data.next_offset;
+    var container=$('dimensionComparisonHistory');if(!data.comparisons.length){container.textContent='本绑定尚无已保存核验快照。';}
+    data.comparisons.forEach(function(item){var row=document.createElement('div');row.className='dimension-history-item';var p=document.createElement('p');p.textContent='v'+item.binding_version+' · '+item.registered_at+' · '+(item.status==='compared'?(item.comparison.status==='within_annotation_range'?'在该标注范围内':'在该标注范围外'):dimensionReason(item.reason));var button=document.createElement('button');button.type='button';button.className='secondary';button.textContent='回放 '+item.comparison_id;button.addEventListener('click',function(){showDimensionReplay(item.comparison_id,id,bindingKey);});row.append(p,button);container.append(row);});
+    $('dimensionHistoryPage').textContent='第 '+(Math.floor(offset/10)+1)+' 页';$('dimensionHistoryPrevious').disabled=offset===0;$('dimensionHistoryNext').disabled=data.next_offset===null;$('dimensionHistoryMessage').textContent='';
+  }catch(error){if(dimensionReadAlive('history',key,token,actor)){$('dimensionHistoryMessage').textContent=error.message;}}
+}
+async function showDimensionReplay(id,bid,bindingKey) {
+  if(!AUTH.user||!DIM.binding||DIM.reads.binding!==bindingKey){return;}var token=DIM.token,actor=AUTH.user.user_id,key=dimensionReadKey('replay');$('dimensionReplay').textContent='正在核验历史快照…';
+  try{var data=await dimensionResponse(await apiFetch('/v1/dimensions/comparisons/'+encodeURIComponent(id)));
+    if(!dimensionReadAlive('replay',key,token,actor)||DIM.reads.binding!==bindingKey||DIM.binding.binding.payload.binding_id!==bid){return;}var p=data.payload,b=p.evaluation.binding.payload,m=p.evaluation.measurement;
+    var container=$('dimensionReplay');dimensionEvidence(container,[['历史快照',p.comparison_id+' · '+data.registered_at],['当时核验时刻',p.evaluation.context.evaluated_at],['绑定 / 图纸版本',b.binding_id+' v'+b.binding_version+' / '+b.document_id+' v'+b.document_version],['原始测量',m.value+' '+m.unit+' · '+m.measurement_id+' v'+m.source.record_version],['当时批准记录',p.evaluation.approvals.length+' 条'],['快照保存人',data.actor.label]],[['完整保存记录',data.record_sha256],['当时绑定',p.evaluation.binding.sha256]]);
+    var result=document.createElement('div');result.className='dimension-result';renderDimensionResult(result,p.result,true);container.append(result);
+  }catch(error){if(dimensionReadAlive('replay',key,token,actor)&&DIM.reads.binding===bindingKey){$('dimensionReplay').textContent=error.message;}}
+}
+$('refreshDimensions').addEventListener('click',function(){loadDimensions();});
+$('dimensionMeasurement').addEventListener('change',showDimensionMeasurement);
+$('dimensionBinding').addEventListener('change',selectDimensionBinding);
+$('dimensionBindingVersion').addEventListener('change',showDimensionBinding);
+$('dimensionMeasurementId').addEventListener('input',function(){DIM.measurementBaseline=null;dimensionReadKey('measurementBaseline');$('dimensionMeasurementBaseline').textContent='请读取当前登记基线。';renderDimensionPermissions();});
+$('dimensionBindingId').addEventListener('input',function(){DIM.bindingBaseline=null;dimensionReadKey('bindingBaseline');$('dimensionBindingBaseline').textContent='请读取当前登记基线。';renderDimensionPermissions();});
+$('dimensionMeasurementBaselineRefresh').addEventListener('click',function(){dimensionBaseline('measurement');});
+$('dimensionBindingBaselineRefresh').addEventListener('click',function(){dimensionBaseline('binding');});
+$('dimensionStagedSource').addEventListener('change',showDimensionSource);
+$('dimensionBindingMeasurement').addEventListener('change',readDimensionFormMeasurement);
+$('dimensionDrawing').addEventListener('change',readDimensionDrawing);
+$('dimensionFeature').addEventListener('change',selectDimensionFeature);
+$('dimensionTarget').addEventListener('change',renderDimensionPermissions);
+$('dimensionMeasurementForm').addEventListener('input',function(){DIM.measurementRevision++;});
+$('dimensionBindingForm').addEventListener('input',function(){DIM.formRevision++;});
+$('dimensionMeasurementForm').addEventListener('submit',registerDimensionMeasurement);
+$('dimensionBindingForm').addEventListener('submit',registerDimensionBinding);
+$('dimensionApprovalForm').addEventListener('submit',saveDimensionApproval);
+$('saveDimensionComparison').addEventListener('click',saveDimensionComparison);
+$('refreshDimensionHistory').addEventListener('click',function(){loadDimensionHistory(0);});
+$('dimensionHistoryPrevious').addEventListener('click',function(){loadDimensionHistory(Math.max(0,DIM.historyOffset-10));});
+$('dimensionHistoryNext').addEventListener('click',function(){if(DIM.historyNext!==null){loadDimensionHistory(DIM.historyNext);}});
+
 /* ---------------- 问数 ---------------- */
 function status(text, kind) {
   var el = $('status'); el.textContent = text; el.className = 'status ' + (kind || '');
@@ -274,6 +570,15 @@ function showDocumentResult(data) {
   $('sqlEvidence').classList.add('hidden'); $('sqlResults').classList.add('hidden');
   var retrieval = data.retrieval || {};
   var notes = [retrieval.snapshot_id || '', retrieval.mode === 'hybrid' ? '文字与向量检索' : '文字检索'];
+  if (retrieval.coverage) {
+    var coverage = retrieval.coverage, rows = coverage.documents || [];
+    notes.push('所选文件 ' + rows.length + ' 份 · 有相关证据 ' + rows.filter(function(row){return row.retrieved_chunks > 0;}).length + ' 份');
+    if (data.answer_coverage) {
+      notes.push('答案引用 ' + (data.answer_coverage.cited_document_ids || []).length + ' 份');
+      if ((data.answer_coverage.uncited_document_ids || []).length) { notes.push('部分所选文件未被答案引用，请逐份核对'); }
+    }
+    if ((coverage.missing_document_ids || []).length) { notes.push('部分所选文件缺少相关证据，本次无法完成联合问答'); }
+  }
   if ((retrieval.warnings || []).length) { notes.push('向量检索暂不可用，本次使用文字检索'); }
   if ((data.claims || []).length) { notes.push('原文与数字已核对；语义支持仍需复核'); }
   $('knowledgeMeta').textContent = notes.filter(Boolean).join(' · ');
@@ -526,6 +831,7 @@ async function run() {
     } else if (selected !== 'auto') {
       request.mode = 'sql'; request.scope = { database_sources: [selected] };
     }
+    if(window.applyDocumentSelection){request=window.applyDocumentSelection(request)||request;}
     var response = await apiFetch('/v1/chat/stream', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(request)
@@ -999,7 +1305,7 @@ $('question').addEventListener('keydown', function (e) {
 });
 renderPresets();
 syncProtocolHint();
-refreshAuth().then(function(){if(hasRole('admin')){loadProfiles();}if(location.hash==='#authority'){loadAuthority();}if(location.hash==='#cad'){loadCad();}});
+refreshAuth().then(function(){if(hasRole('admin')){loadProfiles();}if(location.hash==='#authority'){loadAuthority();}if(location.hash==='#cad'){loadCad();}if(location.hash==='#dimensions'){loadDimensions();}if(window.loadMultifile){window.loadMultifile();}});
 $('loginForm').addEventListener('submit',signIn);
 $('logout').addEventListener('click',signOut);
 refreshPulses();

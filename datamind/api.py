@@ -29,9 +29,19 @@ from .settings_store import (DEFAULT_BASE_URL, DEFAULT_MODEL, PROFILE_FIELDS, ac
                              public_profile, public_profiles, save_model_config, save_profile)
 
 
+class DocumentReference(BaseModel):
+    model_config = {'extra':'forbid','strict':True}
+    document_id: str = Field(min_length=1,max_length=64,pattern=r'^[A-Za-z0-9][A-Za-z0-9_.-]*$')
+    document_version: int = Field(ge=1)
+    source_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+    parser_version: str = Field(min_length=1,max_length=64)
+
+
 class Scope(BaseModel):
+    model_config = {'extra':'forbid'}
     database_sources: list[str] | None = None
     document_collections: list[str] | None = None
+    document_refs: list[DocumentReference] | None = Field(default=None,min_length=1,max_length=8)
 
 
 class ChatRequest(BaseModel):
@@ -149,7 +159,7 @@ class ProfileImportRequest(BaseModel):
     activate_first: bool = False
 
 
-app = FastAPI(title="DataMind Agent", version="0.13.0")
+app = FastAPI(title="DataMind Agent", version="0.14.0")
 
 
 @app.middleware('http')
@@ -158,7 +168,9 @@ async def identity_permissions(request: Request, call_next):
     authority_path=path.startswith('/v1/authority/')
     cad_path=path=='/v1/drawings' or path.startswith('/v1/drawings/')
     dimension_path=path.startswith('/v1/dimensions/')
-    permission=('approver' if dimension_path and request.method=='POST' and path.endswith('/approvals') else
+    files_path=path.startswith('/v1/files/')
+    permission=('admin' if files_path else
+                'approver' if dimension_path and request.method=='POST' and path.endswith('/approvals') else
                 'admin' if dimension_path and (request.method=='POST' or path.endswith('/sources')) else
                 'reviewer' if cad_path and request.method=='POST' and path.endswith('/reviews') else
                 'admin' if path=='/v1/drawings/sources' or (cad_path and request.method=='POST') else
@@ -175,7 +187,7 @@ async def identity_permissions(request: Request, call_next):
         except HTTPException as exc:
             return JSONResponse(status_code=exc.status_code,content={'detail':exc.detail})
     response=await call_next(request)
-    if cad_path or dimension_path:response.headers['Cache-Control']='no-store'
+    if cad_path or dimension_path or files_path:response.headers['Cache-Control']='no-store'
     return response
 
 
@@ -346,6 +358,46 @@ def dimension_comparison_replay(comparison_id: str):
     return replay(comparison_id,_read_dsn())
 
 
+from .file_jobs import FileJobRequest
+
+
+@app.post('/v1/files/uploads')
+async def file_upload(request: Request,filename: str=Query(min_length=1,max_length=200),
+                      provenance: Literal['synthetic_demo','authorized_external']=Query()):
+    from .file_uploads import stage
+    return {'source':await stage(request,filename,provenance,_write_dsn(),request.state.identity)}
+
+
+@app.post('/v1/files/jobs')
+def file_job_submit(payload: FileJobRequest,request: Request):
+    from .file_jobs import submit
+    return submit(payload.model_dump(),_write_dsn(),request.state.identity)
+
+
+@app.get('/v1/files/jobs')
+def file_job_listing(request: Request):
+    from .file_jobs import listing
+    return {'jobs':listing(_write_dsn(),request.state.identity)}
+
+
+@app.get('/v1/files/jobs/{job_id}')
+def file_job_detail(job_id: str,request: Request):
+    from .file_jobs import poll
+    return poll(job_id,_write_dsn(),request.state.identity)
+
+
+@app.post('/v1/files/jobs/{job_id}/cancel')
+def file_job_cancel(job_id: str,request: Request):
+    from .file_jobs import cancel
+    return cancel(job_id,_write_dsn(),request.state.identity)
+
+
+@app.post('/v1/files/jobs/{job_id}/retry')
+def file_job_retry(job_id: str,request: Request):
+    from .file_jobs import retry
+    return retry(job_id,_write_dsn(),request.state.identity)
+
+
 @app.get('/v1/auth/me')
 def auth_me(request: Request,response: Response):
     from .auth import current
@@ -422,7 +474,7 @@ def health():
             cur.execute("SELECT count(*) FROM document_assets WHERE status='indexed' AND 'public'=ANY(acl) AND NOT needs_review")
             document_count = cur.fetchone()[0]
         return {"status": "ok", "database": "ready", "agent": "sql+rag",
-                "capabilities": ["sql", "rag", "industrial_rules", "industrial_nl2sql", "fact_reviews", "local_identity", "fact_approvals", "source_authority"],
+                "capabilities": ["sql", "rag", "multifile_rag", "industrial_rules", "industrial_nl2sql", "fact_reviews", "local_identity", "fact_approvals", "source_authority", "cad_assets", "cad_dimensions", "file_jobs"],
                 "knowledge": "ready" if document_count else "empty", "document_count": document_count}
     except psycopg2.Error:
         raise HTTPException(503, detail={"error_code": "DATABASE_UNAVAILABLE"})
@@ -605,7 +657,8 @@ def chat(request: ChatRequest):
     try:
         return jsonable_encoder(agent.run(request.question,
             mode=request.mode, database_sources=request.scope.database_sources if request.scope else None,
-            document_collections=request.scope.document_collections if request.scope else None))
+            document_collections=request.scope.document_collections if request.scope else None,
+            document_refs=[r.model_dump() for r in request.scope.document_refs] if request.scope and request.scope.document_refs is not None else None))
     finally:
         agent.close()
 
@@ -633,7 +686,8 @@ def chat_stream(request: ChatRequest):
         try:
             agent.run(request.question, mode=request.mode,
                       database_sources=request.scope.database_sources if request.scope else None,
-                      document_collections=request.scope.document_collections if request.scope else None)
+                      document_collections=request.scope.document_collections if request.scope else None,
+            document_refs=[r.model_dump() for r in request.scope.document_refs] if request.scope and request.scope.document_refs is not None else None)
         finally:
             agent.close()
             updates.put(None)
@@ -694,9 +748,19 @@ def _source_path(document: dict) -> Path:
     return path
 
 
+def _expected_document(document,version,sha):
+    if version is not None or sha is not None:
+        if version is None or sha is None:
+            raise HTTPException(422,detail={'error_code':'DOCUMENT_SELECTION_INVALID'})
+        if document['doc_version']!=version or document['sha256']!=sha:
+            raise HTTPException(409,detail={'error_code':'DOCUMENT_SELECTION_CHANGED'})
+
+
 @app.get("/v1/documents/{document_id}/file")
-def document_file(document_id: str):
+def document_file(document_id: str,expected_version: int | None=Query(default=None,ge=1),
+                  expected_sha256: str | None=Query(default=None,pattern=r'^[a-f0-9]{64}$')):
     document = _public_document(document_id)
+    _expected_document(document,expected_version,expected_sha256)
     path = _source_path(document)
     return FileResponse(path, media_type="application/pdf" if document["file_type"] == "pdf" else "application/json",
                         filename=path.name, content_disposition_type="inline")
@@ -769,8 +833,10 @@ def approve_document_fact(document_id: str,fact_id: str,request: FactApprovalReq
 
 
 @app.get("/v1/documents/{document_id}/pages/{page_no}")
-def document_page(document_id: str, page_no: int):
+def document_page(document_id: str,page_no: int,expected_version: int | None=Query(default=None,ge=1),
+                  expected_sha256: str | None=Query(default=None,pattern=r'^[a-f0-9]{64}$')):
     document = _public_document(document_id)
+    _expected_document(document,expected_version,expected_sha256)
     if document["file_type"] != "pdf" or not 1 <= page_no <= (document["page_count"] or 0):
         raise HTTPException(404, detail={"error_code": "SOURCE_PAGE_UNAVAILABLE"})
     _source_path(document)
