@@ -1,6 +1,6 @@
 # DataMind Agent 项目进度
 
-更新日期：2026-10-07。当前代码 API：**0.17.0**；新增私有 PDF 多文件证据检索、全选实际点联合核对与跨进程检索槽，准备/快照登记/发布控制面保持字节。完整回归在隔离数据库副本验收；原检出和原 8000 服务未升级。开发分支 `codex/compact-industrial-forms`；上一知识发布提交 [`6913ccc`](https://github.com/cyc120/datamind-agent/commit/6913ccc9a459b7bd91a72f72ec642d56e92d8a24) 已推送至该分支。仓库：[cyc120/datamind-agent](https://github.com/cyc120/datamind-agent)。
+更新日期：2026-10-07。当前代码 API：**0.17.0**；新增私有 PDF 多文件证据检索、全选实际点联合核对与跨进程检索槽，准备/快照登记/发布控制面保持字节。完整回归在隔离数据库副本验收；原检出和原 8000 服务未升级。设计主入口：[V1.3 技术设计说明书](技术文档/DataMind_Agent_技术设计说明书_V1.3.md)（0.17.0 基线），历史阶段记录保留在 [V1.2 说明书](技术文档/DataMind_Agent_技术设计说明书_V1.2.md) §18.12–18.33。私有知识发布提交 [`6913ccc`](https://github.com/cyc120/datamind-agent/commit/6913ccc9a459b7bd91a72f72ec642d56e92d8a24) 已随 PR #1/#2 并入 `main`。仓库：[cyc120/datamind-agent](https://github.com/cyc120/datamind-agent)，当前只保留 `main` 分支。
 
 本次推进：管理员显式选择 1–4 个已发布 publication/完整计划 SHA，同完整本地 embedding profile 检索，合计候选/文本/计划预算，两个跨进程 session 槽，完整选定 ID 集合的两轮联合 capture，末尾原始 DB JSONB 摘要与真实会话重查。profile/并发专项 14/14、联合向量 8/8、HTTP 32/32，完整隔离回归 **465/465**；本地真实 BGE/独立认证 Qdrant 的两文件/三次发布与历史字节场景通过。`answer_generated=false`、`public_knowledge_visible=false`、`source_authority_verified=false`，未接生成模型、上传页面或 PDF/OCR 解析队列。见 `docs/PDF_PRIVATE_SEARCH.md` 和 §18.33。上一发布 411/411、登记 338/338、准备 292/292、页面/队列 261/261 的记录与原始失败保留，不跨轮拼接为模型成绩。
 
@@ -83,7 +83,7 @@
 - `reports/industrial_forms_initial.json`：首轮 **28/56、2/4**，保留所有缺失和失败。紧凑模板原文块能被读取，但 v1 格式解析未接受；诊断不计字段通过。
 - `reports/industrial_nl2sql_initial.json` 与 `reports/industrial_nl2sql.json`：同一批真实模型输出的初始评分与数值类型复算；不拼接重试成绩。
 - `reports/field_review_current.png`、`reports/field_review_browser.png`：最终页面及隔离副本提交验证。
-- 技术说明书 §18.12–18.19：阶段历史、代码路径、错误、边界和下一步。
+- [V1.2 历史说明书](技术文档/DataMind_Agent_技术设计说明书_V1.2.md) §18.12–18.33：阶段历史、代码路径、错误、边界和下一步；[V1.3 §18](技术文档/DataMind_Agent_技术设计说明书_V1.3.md#18-实施状态历史成绩与修订记录) 集中汇总当前状态与全部分母。
 
 ## 下一阶段顺序与完成条件
 
