@@ -150,3 +150,54 @@ class SQLModuleTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ColumnScopeTest(unittest.TestCase):
+    """F01: column permission must be resolved per query scope, not by a global alias map.
+
+    The two bypasses below were reachable because a projection alias exempted its own
+    column and an inner CTE alias could shadow an outer table alias.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.catalog = Catalog(META, "demo_retail")
+
+    def blocked(self, sql, reason):
+        with self.assertRaises(PolicyError) as cm:
+            guard_sql(sql, self.catalog)
+        self.assertEqual(cm.exception.reason, reason)
+
+    def allowed(self, sql):
+        try:
+            return guard_sql(sql, self.catalog)
+        except PolicyError as error:  # surfaced with the reason, not a bare assertion
+            self.fail(f"正常查询被误拒：{error.reason} :: {sql}")
+
+    def test_projection_alias_cannot_exempt_its_own_column(self):
+        # `c` is the table alias, so this selects the whole row; the alias `c` must not
+        # exempt it from the column check.
+        self.blocked("SELECT c AS c FROM customers c LIMIT 1", "COLUMN_NOT_ALLOWED")
+
+    def test_inner_cte_alias_cannot_shadow_an_outer_table_alias(self):
+        self.blocked("SELECT c.phone FROM customers c WHERE EXISTS (WITH c AS "
+                     "(SELECT customer_id FROM customers) SELECT customer_id FROM c)",
+                     "RESTRICTED_COLUMN")
+
+    def test_restricted_columns_stay_blocked_in_every_shape(self):
+        self.blocked("SELECT customers.phone FROM customers LIMIT 1", "RESTRICTED_COLUMN")
+        self.blocked("SELECT x.phone FROM (SELECT phone FROM customers) x LIMIT 1", "RESTRICTED_COLUMN")
+        self.blocked("SELECT c.* FROM customers c LIMIT 1", "SELECT_STAR")
+
+    def test_sort_clause_aliases_are_not_false_positives(self):
+        self.allowed("SELECT customer_name AS name FROM customers ORDER BY name LIMIT 5")
+        self.allowed("SELECT city, count(*) FROM customers GROUP BY city ORDER BY 2 LIMIT 5")
+        self.allowed("SELECT c.customer_name, c.city FROM customers c ORDER BY c.city LIMIT 5")
+
+    def test_legitimate_cte_references_still_pass(self):
+        self.allowed("WITH c AS (SELECT customer_id, city FROM customers) SELECT customer_id FROM c LIMIT 5")
+        self.allowed("WITH c AS (SELECT customer_id, city FROM customers) SELECT c.city FROM c LIMIT 5")
+
+    def test_a_projection_alias_is_not_a_licence_to_select_the_alias_name(self):
+        # `name` exists only as an output alias, never as a base column.
+        self.blocked("SELECT name FROM customers LIMIT 1", "COLUMN_NOT_ALLOWED")

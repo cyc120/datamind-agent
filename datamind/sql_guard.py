@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from sqlglot import exp, parse
 from sqlglot.errors import ParseError
+from sqlglot.optimizer.scope import Scope, traverse_scope
 
 from .catalog import Catalog
 
@@ -33,6 +34,71 @@ def _comparison_operands(node: exp.Expression) -> list:
     if isinstance(node, exp.In):
         return [node.this, *node.expressions]
     return [node.left, node.right]
+
+
+def _in_sort_clause(column: exp.Column) -> bool:
+    """True when the column sits in the sort/having clause of its own query.
+
+    Only there may a projection alias be referenced by name; in a projection or a WHERE
+    clause the same identifier can mean a table alias or a whole-row reference.
+    """
+    node = column.parent
+    while node is not None:
+        if isinstance(node, (exp.Order, exp.Group, exp.Having)):
+            return True
+        if isinstance(node, (exp.Select, exp.Subquery, exp.Union)):
+            return False
+        node = node.parent
+    return False
+
+
+def _scope_projection_names(scope) -> set[str]:
+    names = set()
+    for projection in scope.expression.selects:
+        name = projection.alias_or_name
+        if name:
+            names.add(name)
+    return names
+
+
+def _check_columns(tree, catalog: Catalog, cte_names: set, base_tables: list) -> None:
+    """Resolve every column against the sources of *its own* query scope.
+
+    A single global alias table is unsafe: an inner CTE alias can shadow an outer table
+    alias, and a projection alias (`SELECT c AS c`) would then exempt the very column it
+    renames. Both were reachable bypasses, so resolution is per scope.
+    """
+    for scope in traverse_scope(tree):
+        sources = {alias: source.name for alias, source in scope.sources.items()
+                   if isinstance(source, exp.Table)}
+        # A CTE reference resolves inside its own scope, which is checked separately; a
+        # derived table stays unverifiable and keeps the historical refusal.
+        unverifiable = {alias for alias, source in scope.sources.items()
+                        if isinstance(source, Scope) and getattr(source, "is_cte", False)}
+        local_aliases = set(scope.expression.selects and _scope_projection_names(scope) or set())
+        for column in scope.columns:
+            if isinstance(column.this, exp.Star):
+                raise PolicyError("SELECT_STAR")
+            if column.table:
+                if column.table in unverifiable:
+                    continue
+                if column.table not in sources:
+                    raise PolicyError("UNKNOWN_TABLE_ALIAS")
+                possible = [sources[column.table]]
+                if possible[0] in cte_names:
+                    continue
+            else:
+                possible = [name for name in sources.values() if name not in cte_names]
+                if not possible:
+                    possible = list(base_tables)
+            matches = [catalog.columns[(name, column.name)] for name in possible
+                       if (name, column.name) in catalog.columns]
+            if not matches:
+                if _in_sort_clause(column) and column.name in local_aliases:
+                    continue
+                raise PolicyError("COLUMN_NOT_ALLOWED")
+            if any(record.get("sensitivity") == "restricted" for record in matches):
+                raise PolicyError("RESTRICTED_COLUMN")
 
 
 def _column_pair(node: exp.Expression, aliases: dict[str, str]):
@@ -97,22 +163,7 @@ def guard_sql(sql: str, catalog: Catalog, max_rows: int = 100) -> SafeSQL:
         aliases[table.alias_or_name] = table.name
     if not base_tables:
         raise PolicyError("NO_BASE_TABLE")
-    for column in tree.find_all(exp.Column):
-        if isinstance(column.this, exp.Star):
-            raise PolicyError("SELECT_STAR")
-        if column.table and column.table not in aliases:
-            raise PolicyError("UNKNOWN_TABLE_ALIAS")
-        possible = [aliases[column.table]] if column.table else base_tables
-        if any(t in cte_names for t in possible):
-            continue
-        matches = [catalog.columns[(t, column.name)] for t in possible if (t, column.name) in catalog.columns]
-        if not matches:
-            # A SELECT alias may be used in ORDER BY / GROUP BY.
-            if column.name in {p.alias for p in tree.find_all(exp.Alias)}:
-                continue
-            raise PolicyError("COLUMN_NOT_ALLOWED")
-        if any(r.get("sensitivity") == "restricted" for r in matches):
-            raise PolicyError("RESTRICTED_COLUMN")
+    _check_columns(tree, catalog, cte_names, base_tables)
     for join in tree.find_all(exp.Join):
         if join.args.get("kind") == "CROSS" or not (join.args.get("on") or join.args.get("using")):
             raise PolicyError("CARTESIAN_JOIN")
