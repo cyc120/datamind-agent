@@ -66,6 +66,16 @@
 
 `tests/test_parse_contract.py` **25/25**，完整隔离回归见 `reports/parse_contract_verification.json`。覆盖：常量与文档一致、摄取状态机放行/拒绝、七类定位器逐一校验与必需字段缺失、页号/bbox 越界与倒置、CAD 句柄、关系端点/类型/状态/证据/恢复方法、结果必需字段与未知字段拒绝、适配器登记/查询/未知与不支持区分，以及用真实 ingest/OCR 块形状做映射往返（字段不丢、缺失保持缺失、页尺寸缺失拒绝）。
 
+## 前端消费定位（API 0.33.0）
+
+`web/app.js` 的引用卡片在存在定位时显示「已验证定位」徽标（`pdf_region · 第 N 页`、`cad_entity · Model · 句柄 X`、`sheet_range · 工作表 A1:B1` 等），并对可映射的 `pdf_region` 提供**区域高亮**：复用既有 `field-page` + SVG 叠加，按 `page_width`/`page_height` 做 viewBox、按 `bbox` 画框。
+
+**只画能画对的**：仅当 `rotation_degrees == 0` 且带 `bbox` 与页尺寸时才绘制——旋转页无法映射到本客户端取到的页面图，**绝不按猜测角度绘制**；`cad_entity`/`sheet_range` 等非页面定位只显示标签。页面图仍走受版本/摘要约束的 `/pages/{n}` 入口。
+
+`web/index.html` 的缓存版本由 `0.14.0` 更新为 `0.33.0`，否则回访浏览器可能继续使用旧脚本、看不到新功能。
+
+`tests/test_frontend_locators.py` 守护这条接缝：前端读取的字段必须与后端实际产出的定位字段一致，并在有 Node 时用 `node --check` 校验语法。
+
 ## 检索侧消费定位（API 0.32.0）
 
 `datamind/rag_engine.py` 的引用现在携带**已验证**的定位：`citation_from_hit(hit, locators=…)` 只附上确实存在于存储中的块定位（`locators: [{block_id, locator, contract_version}]`），缺失即不附——**不从页码或 bbox 推导区域**。
@@ -108,7 +118,7 @@ Office/DXF 的块按 `part`/`paragraph`/`slide`/`sheet`/`handle` 定位，**没�
 - **只有校验过的块才有定位行**：契约出现之前解析的块不写任何行，**不编造 locator**；块与定位行在同一文档重建时一起删除后重插。
 - **已注册 PDF、三种 Office 与原生 DXF**：DOCX/PPTX/XLSX 通过**包内索引**（`word/document.xml`、`ppt/presentation.xml`、`xl/workbook.xml`）区分；不含已知部件的 ZIP 仍报 `application/zip` 并被拒绝，不猜类型。DWG 是专有格式，**不注册假适配器**。
 - **DWG/DGN 未实现**：需要外部转换器；`image/vnd.dwg` 只被识别与拒绝，不做转换猜测。图纸 PDF/扫描区域路径仍走通用 PDF/OCR 链路，未做 CAD 专项关联。
-- **引用已消费定位，界面尚未使用**：引用与证据现在带 `locators`，但前端高亮尚未改用它们；关系也尚未进入检索排序或消解逻辑。
+- **引用与界面均已消费定位**；但 `BlockRelation` 尚未进入检索排序或冲突消解逻辑。
 - **两个存储未合并**：PDF 路径用 `document_blocks` + `document_block_locators`，Office/DXF 用 `document_contract_blocks`，尚未统一为单一契约表。
 - **历史文档没有定位**：契约出现之前解析的 27 份文档没有定位行，其引用自然不带区域（不回填、不推导）。
 

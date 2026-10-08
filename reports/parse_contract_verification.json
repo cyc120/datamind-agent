@@ -1,6 +1,6 @@
 {
   "stage": "parse_contract_and_resource_limits",
-  "api_version": "0.32.0",
+  "api_version": "0.33.0",
   "date": "2026-10-07",
   "scope": "并行推进两条技术实现线：(A) T3 统一解析契约（ParseResult/SourceLocator/Block/Relation/Adapter，§5.2/§5.4）；(B) T5 统一 CPU/内存配额与跨主机租约（§13）。",
   "lines": {
@@ -131,15 +131,34 @@
         "failures": 0,
         "errors": 0
       }
+    },
+    "G_frontend_locators": {
+      "components": {
+        "web/app.js": "citationLocators/locatorLabel/citationRegionFrame：引用卡片显示“已验证定位”徽标，并对可映射的 pdf_region 提供区域高亮（复用 field-page + SVG 叠加）",
+        "web/index.html": "前端缓存版本 0.14.0 → 0.33.0，确保回访浏览器不会继续使用旧脚本",
+        "tests/test_frontend_locators.py": "守护前端读取的 locator 字段与后端实际产出一致，并用 node --check 校验语法"
+      },
+      "implemented": [
+        "只有引用里确实带有 locators 时才显示定位徽标，缺失即不显示",
+        "仅对 **未旋转**（rotation_degrees=0）且带 bbox/页尺寸的 pdf_region 绘制高亮——旋转页无法映射到本客户端取到的页面图，绝不按猜测角度绘制",
+        "非页面定位（cad_entity/sheet_range）只显示为标签（句柄/工作表与区间），不做区域绘制",
+        "高亮帧默认隐藏，按需展开并可收起；页面图仍走受版本/摘要约束的 /pages/{n} 入口"
+      ],
+      "tests": {
+        "file": "tests/test_frontend_locators.py",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0
+      }
     }
   },
   "verification": {
     "full_isolated_regression": {
-      "tests": 659,
+      "tests": 664,
       "failures": 0,
       "errors": 0,
       "exit_code": 0,
-      "previous_stage_tests": 650
+      "previous_stage_tests": 659
     },
     "platform_facts": {
       "rlimit_cpu": "受支持并实测生效（1 秒 CPU 上限下 300 秒自旋被终止）",

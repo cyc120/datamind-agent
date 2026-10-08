@@ -600,6 +600,25 @@ function showDocumentResult(data) {
       pageLink.textContent = '查看第 ' + source.page_start + ' 页'; links.append(pageLink);
     }
     card.append(heading, meta, quote, links);
+    var located = citationLocators(source);
+    if (located.length) {
+      var locatorNote = document.createElement('p'); locatorNote.className = 'field-hint';
+      locatorNote.textContent = '已验证定位：' + located.map(function (item) { return locatorLabel(item.locator); }).join('；');
+      card.insertBefore(locatorNote, links);
+      var regionFrame = citationRegionFrame(source, located);
+      if (regionFrame) {
+        regionFrame.classList.add('hidden');
+        var regionToggle = document.createElement('button'); regionToggle.type = 'button'; regionToggle.className = 'secondary';
+        regionToggle.textContent = '高亮引用区域';
+        regionToggle.addEventListener('click', function () {
+          var hidden = regionFrame.classList.toggle('hidden');
+          regionToggle.textContent = hidden ? '高亮引用区域' : '收起高亮';
+          if (!hidden) { regionFrame.scrollIntoView({ block: 'nearest' }); }
+        });
+        links.append(regionToggle);
+        card.insertBefore(regionFrame, links);
+      }
+    }
     if (source.origin === 'scan' || source.origin === 'ohrbench') {
       var quality = document.createElement('p'); quality.className = 'field-hint';
       var partial = ((source.quality_detail || {}).pages || []).some(function (page) {
@@ -765,6 +784,51 @@ function locateDocumentFact(fact, preview) {
   });
   frame.append(img, svg); preview.append(label, frame);
   label.scrollIntoView({block: 'nearest'});
+}
+function locatorLabel(locator) {
+  if (!locator || !locator.locator_kind) { return ''; }
+  var kind = locator.locator_kind;
+  if (kind === 'pdf_region' || kind === 'image_region') { return kind + ' · 第 ' + locator.page_no + ' 页'; }
+  if (kind === 'cad_entity') { return kind + ' · ' + (locator.layout || 'Model') + ' · 句柄 ' + (locator.handle || '?'); }
+  if (kind === 'office_object') {
+    var anchor = locator.paragraph !== undefined ? ('段 ' + locator.paragraph) :
+      locator.table !== undefined ? ('表 ' + locator.table) :
+      locator.slide !== undefined ? ('幻灯片 ' + locator.slide) : '';
+    return kind + ' · ' + (locator.part || '') + (anchor ? ' ' + anchor : '');
+  }
+  if (kind === 'sheet_range') { return kind + ' · ' + (locator.sheet || '') + ' ' + (locator.range || locator.cell || ''); }
+  return kind;
+}
+function citationLocators(source) {
+  return (source.locators || []).filter(function (item) { return item && item.locator && item.locator.locator_kind; });
+}
+function citationRegionFrame(source, entries) {
+  /* Only a rotation-free pdf_region maps onto the page image this client can fetch.
+     Rotated or non-page locators are shown as a label, never drawn at a guessed angle. */
+  var drawable = entries.filter(function (item) {
+    var locator = item.locator;
+    return locator.locator_kind === 'pdf_region' && !locator.rotation_degrees && locator.bbox &&
+      locator.page_width > 0 && locator.page_height > 0 && locator.page_no >= 1;
+  });
+  if (!drawable.length || !source.page_url) { return null; }
+  var first = drawable[0].locator, page = first.page_no;
+  var frame = document.createElement('div'); frame.className = 'field-page';
+  var img = document.createElement('img');
+  img.src = '/v1/documents/' + encodeURIComponent(source.document_id) + '/pages/' + page +
+    '?expected_version=' + source.document_version + '&expected_sha256=' + source.document_sha256;
+  img.alt = '引用区域所在原页';
+  var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 ' + first.page_width + ' ' + first.page_height);
+  svg.setAttribute('aria-hidden', 'true');
+  drawable.filter(function (item) { return item.locator.page_no === page; }).forEach(function (item) {
+    var box = item.locator.bbox, rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('x', box[0]); rect.setAttribute('y', box[1]);
+    rect.setAttribute('width', Math.max(0, box[2] - box[0])); rect.setAttribute('height', Math.max(0, box[3] - box[1]));
+    rect.setAttribute('fill', 'rgba(220,38,38,0.12)'); rect.setAttribute('stroke', '#dc2626');
+    rect.setAttribute('stroke-width', '1.5'); svg.append(rect);
+  });
+  frame.append(img, svg);
+  return frame;
 }
 function showIndustrialResult(data) {
   $('industrialEvidence').classList.remove('hidden'); $('sqlEvidence').classList.add('hidden'); $('sqlResults').classList.add('hidden');
