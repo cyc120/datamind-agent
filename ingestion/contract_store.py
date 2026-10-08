@@ -63,18 +63,31 @@ def persist_result(cur, *, document_id, payload):
 
 
 def read_result(document_id, dsn, *, limit=2000):
-    """Read back the stored contract blocks and relations for one document."""
+    """Read back everything the contract stored for one document.
+
+    Two stores exist on purpose: page-shaped PDF parses keep their blocks in
+    `document_blocks` with the validated locator in `document_block_locators`, while formats
+    without a page concept (Office, DXF) land in `document_contract_blocks`. Returning only
+    one of them would report "nothing stored" for a document that does have validated
+    locators, so both are read here and reported under their own keys.
+    """
     with psycopg2.connect(dsn) as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute('''SELECT block_id, contract_version, block_type, text, reading_order,
             native_attributes, locator, content_hash FROM document_contract_blocks
             WHERE document_id=%s ORDER BY reading_order LIMIT %s''', (document_id, limit))
         blocks = [dict(row) for row in cur.fetchall()]
+        cur.execute('''SELECT b.block_id, l.contract_version, b.block_type, b.text,
+            b.reading_order, b.page_no, b.bbox, b.content_hash, l.locator
+            FROM document_block_locators l JOIN document_blocks b USING(block_id)
+            WHERE l.document_id=%s ORDER BY b.reading_order LIMIT %s''', (document_id, limit))
+        locators = [dict(row) for row in cur.fetchall()]
         cur.execute('''SELECT relation_id, source_block_id, target_block_id, relation_type,
             relation_state, recovery_method, evidence FROM document_block_relations
             WHERE document_id=%s ORDER BY relation_id''', (document_id,))
         relations = [dict(row) for row in cur.fetchall()]
     return {'document_id': document_id, 'blocks': blocks, 'relations': relations,
-            'block_count': len(blocks), 'relation_count': len(relations)}
+            'locators': locators, 'block_count': len(blocks), 'locator_count': len(locators),
+            'relation_count': len(relations)}
 
 
 MAX_LOCATOR_QUERY = 512

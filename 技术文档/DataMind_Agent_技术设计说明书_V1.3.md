@@ -873,3 +873,13 @@ Office/DXF 的块按 `part`/`paragraph`/`slide`/`sheet`/`handle` 定位，**没�
 **一处值得记录的假警报**：用 `urllib` 直连时曾报 `CERTIFICATE_VERIFY_FAILED`（自签证书链），一度怀疑环境存在 TLS 拦截；改用 **httpx（应用真正使用的客户端）** 后返回 200 —— 这是该环境下 `urllib` 的 CA 路径差异导致的假警报，应用不受影响。**未据此做任何"降低证书校验"的改动。**
 
 边界：移除后失去渠道池、令牌配额与调用审计（可自行在前置一层网关恢复，仓库不再内置）；`tests/` 中的 `localhost:4000` 仅作为"本机地址"样例验证代理绕过逻辑，与网关无关，刻意未改。
+
+### 18.25 运行验收与契约读接口缺陷修复（API 0.37.0，2026 年 10 月 8 日）
+
+按文档化方式完整启动（`bash scripts/start_local.sh --background`）：依赖检查、容器、**16 个迁移**、目录与评测种子、真实摄取、工业种子全部通过，服务在 `http://127.0.0.1:8000/` 就绪（`/health` = `status=ok, database=ready, agent=sql+rag, knowledge=ready, document_count=30`；前端与 `/assets/app.js` 均 200）。网关已移除，真实模型调用经 8000 直连上游：NL2SQL `COMPLETED`、3 行、无 finding。
+
+**运行带出一个真实世界的确认**：切片数由 169 升至 184、文档由 27 升至 30。这是 R1 修复后的实际效果——OHR-Bench JSON 分支此前因缺少 `block_id` 在 `build_chunks` 处 `KeyError` 而中断整轮摄取，现已正常完成。（另核实 `doc-industrial-0ac6c55838c3` 状态 `indexed` 但无 chunks **不是缺陷**：由 `db/seed_industrial.py` 有意注册并持有 17 条 `document_facts`，工业路径查事实而非切片。）
+
+**运行中发现并修复我自己实现的一处缺陷**：`GET /v1/documents/{document_id}/contract` 原先只读 `document_contract_blocks`（Office/DXF 路径），而 PDF 的已验证定位存放在 `document_block_locators`。后果是对一个**证据完整定位**的 PDF 返回 `block_count: 0`——等于谎报「什么都没存」；接口 docstring 还进一步夸大了覆盖范围。现 `contract_store.read_result()` 同时读两套存储并分别以 `blocks`（无页概念的格式）与 `locators`（页面形状的 PDF）返回，附 `locator_count`，docstring 如实说明「一个文档可能只有其一」。**实机验证**：该 PDF 返回 `locator_count=11`，首条为 `pdf_region` 第 1 页 `bbox [35.0, 21.33, 168.3, 31.22]`。
+
+新增 1 项守护测试（插入 page-shaped 定位后断言接口返回定位，原先该场景返回 0），完整隔离回归 **845/845**。边界：**两套存储仍未合并**为单一契约表，本次只让读接口如实覆盖两者。

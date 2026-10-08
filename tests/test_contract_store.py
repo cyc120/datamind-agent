@@ -120,9 +120,47 @@ class ContractEndpointTests(unittest.TestCase):
 
     def cleanup(self):
         with psycopg2.connect(self.dsn) as conn, conn.cursor() as cur:
+            cur.execute('DELETE FROM document_block_locators WHERE document_id=%s', (self.document_id,))
+            cur.execute('DELETE FROM document_blocks WHERE document_id=%s', (self.document_id,))
             cur.execute('DELETE FROM document_contract_blocks WHERE document_id=%s', (self.document_id,))
             cur.execute('DELETE FROM document_block_relations WHERE document_id=%s', (self.document_id,))
             cur.execute('DELETE FROM document_assets WHERE document_id=%s', (self.document_id,))
+
+    def test_endpoint_also_returns_page_shaped_locators(self):
+        """A PDF parse keeps its locator in the other store; the endpoint must show it.
+
+        Regression: the endpoint used to read only `document_contract_blocks`, so a PDF
+        with 33 validated locators reported `block_count: 0` — "nothing stored" for a
+        document whose evidence was fully located.
+        """
+        page_block = 'blk-pdf-locator-test'
+        with psycopg2.connect(self.dsn) as conn, conn.cursor() as cur:
+            cur.execute("""INSERT INTO document_blocks(block_id, document_id, page_no, bbox,
+                block_type, text, reading_order, parser_version, content_hash)
+                VALUES (%s, %s, 1, '[1,2,3,4]', 'paragraph', '正文', 0, 'pdf-ocr-0.4', %s)
+                ON CONFLICT (block_id) DO NOTHING""",
+                        (page_block, self.document_id, 'f' * 64))
+            cur.execute("""INSERT INTO document_block_locators(block_id, document_id,
+                contract_version, locator) VALUES (%s, %s, %s, %s)
+                ON CONFLICT (block_id) DO UPDATE SET locator=EXCLUDED.locator""",
+                        (page_block, self.document_id, contract.CONTRACT_VERSION,
+                         json.dumps({'locator_kind': 'pdf_region', 'document_id': self.document_id,
+                                     'source_version': 'v1', 'page_no': 1, 'page_width': 595.0,
+                                     'page_height': 842.0, 'bbox': [1.0, 2.0, 3.0, 4.0],
+                                     'unit': 'point', 'coordinate_system': 'top-left',
+                                     'rotation_degrees': 0})))
+        self.addCleanup(self.drop_page_block, page_block)
+        response = self.client.get(f'/v1/documents/{self.document_id}/contract')
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        self.assertEqual(body['locator_count'], 1)
+        self.assertEqual(body['locators'][0]['locator']['locator_kind'], 'pdf_region')
+        self.assertEqual(body['locators'][0]['page_no'], 1)
+
+    def drop_page_block(self, block_id):
+        with psycopg2.connect(self.dsn) as conn, conn.cursor() as cur:
+            cur.execute('DELETE FROM document_block_locators WHERE block_id=%s', (block_id,))
+            cur.execute('DELETE FROM document_blocks WHERE block_id=%s', (block_id,))
 
     def test_endpoint_returns_locators_and_relations(self):
         response = self.client.get(f'/v1/documents/{self.document_id}/contract')

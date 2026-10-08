@@ -343,12 +343,12 @@
       "tests.test_model_profile_proxy": "9/9"
     },
     "full_isolated_regression": {
-      "tests": 844,
+      "tests": 845,
       "failures": 0,
       "errors": 0,
       "exit_code": 0,
-      "previous_stage_tests": 839,
-      "note": "新增依赖锁守护测试（5 项）后的完整隔离回归；本项不改变 API 行为，版本仍为 0.37.0"
+      "previous_stage_tests": 844,
+      "note": "运行验收中发现并修复契约读接口缺陷（+1 守护测试）后的完整隔离回归"
     }
   },
   "concurrency_note": "另有 Codex（ChatGPT 桌面版 CLI）在同一检出与同一 PostgreSQL 上并行工作，此前已造成一次提交被其产物污染、一次回归被其并发测试干扰（30 个连接错误）。本轮所有提交只按显式路径 add，并在提交前核对 git diff --cached。",
@@ -523,6 +523,32 @@
         "技术文档 V1.2 属冻结历史记录，未改"
       ],
       "user_decision": "用户选择\"迁移密钥到应用配置 + 停用并移除容器 + 删除 gateway/\""
+    }
+  },
+  "runtime_acceptance": {
+    "documented_startup": {
+      "status": "done",
+      "command": "bash scripts/start_local.sh --background",
+      "result": [
+        "依赖检查 → 容器（postgres/qdrant）→ 16 个迁移全部 applied → catalog/eval 种子 → 真实摄取 → 工业种子，全部通过；服务在 http://127.0.0.1:8000/ 就绪",
+        "GET /health: status=ok, database=ready, agent=sql+rag, knowledge=ready, document_count=30",
+        "API 版本 0.37.0；前端 / 与 /assets/app.js 均 200",
+        "数据：30 文档 / 184 切片（curated 14、ohrbench 14、scan 2）；document_block_locators 33 行",
+        "真实模型调用（经 8000，直连上游、网关已移除）：NL2SQL status=COMPLETED、3 行、validator_findings=[]"
+      ],
+      "observation": "切片数由 169 升至 184、文档由 27 升至 30：这是 R1 修复后的**真实世界确认**——OHR-Bench JSON 分支此前会因缺少 block_id 在 build_chunks 处 KeyError 而中断整轮摄取，现已正常完成。",
+      "reviewed_not_a_defect": "doc-industrial-0ac6c55838c3 状态 indexed 但无 chunks：由 db/seed_industrial.py 有意注册，持有 17 条 document_facts（工业路径查 document_facts 而非 chunks），非缺陷。",
+      "defect_found_and_fixed": {
+        "title": "契约读接口只读一套存储，对 PDF 谎报「未存定位」",
+        "impact": "GET /v1/documents/{id}/contract 对 PDF 返回 block_count: 0，而该文档在 document_block_locators 中有 11 条已验证定位；接口 docstring 还进一步夸大了覆盖范围",
+        "root_cause": "两套存储（PDF 的 document_blocks+document_block_locators 与 Office/DXF 的 document_contract_blocks）未合并，而读接口只实现了后者",
+        "fix": "contract_store.read_result() 同时读两套存储，分别以 blocks 与 locators 返回并给出 locator_count；接口 docstring 如实说明两套存储与「可能只有其一」",
+        "guard": "tests/test_contract_store.py 新增：插入 page-shaped 定位后断言接口返回 locator_count>=1 与 pdf_region —— 原先该场景会返回 0",
+        "live_verification": "重启服务后对真实 PDF 文档请求：locator_count=11，首条 pdf_region 第 1 页 bbox [35.0, 21.33, 168.3, 31.22]"
+      },
+      "not_done": [
+        "两套存储仍未合并为单一契约表（本次只让读接口如实覆盖两者）"
+      ]
     }
   }
 }

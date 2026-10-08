@@ -993,15 +993,23 @@ def document_file(document_id: str,expected_version: int | None=Query(default=No
 
 @app.get("/v1/documents/{document_id}/contract")
 def document_contract(document_id: str):
-    """Validated contract blocks (with locators) and relations for one document."""
+    """Everything the contract stored for one document, from both stores.
+
+    `blocks` holds the contract blocks of formats without a page concept (Office, DXF);
+    `locators` holds the validated locators of page-shaped PDF parses, which live beside
+    `document_blocks`. A document may have either or both; returning only one would report
+    "nothing stored" for a document that does have validated locators.
+    """
     from ingestion.contract_store import read_result
     document = _public_document(document_id)
     stored = read_result(document_id, _read_dsn())
     return {"document_id": document_id, "document_version": document["doc_version"],
             "source_sha256": document["sha256"], "parser_version": document["parser_version"],
             "contract_version": document.get("contract_version"),
-            "block_count": stored["block_count"], "relation_count": stored["relation_count"],
+            "block_count": stored["block_count"], "locator_count": stored["locator_count"],
+            "relation_count": stored["relation_count"],
             "blocks": jsonable_encoder(stored["blocks"]),
+            "locators": jsonable_encoder(stored["locators"]),
             "relations": jsonable_encoder(stored["relations"])}
 
 
