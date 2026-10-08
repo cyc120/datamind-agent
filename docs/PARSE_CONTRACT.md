@@ -27,6 +27,10 @@
 | `office_object` | `part` 加 `paragraph`/`table`/`slide`/`shape` 之一 |
 | `sheet_range` | `sheet` 加 `cell`（A1 形式）或 `range` |
 | `cad_entity` | `layout`、`handle`（十六进制）、`layer`、`model_xy`、`unit` |
+
+## 写入存储
+
+`ingestion/ingest.py` 在重建某文档的块时：先删除该文档的 `document_blocks` 与 `document_block_locators`，再按 `BLOCK_INSERT_SQL`（13 列，历史形状不变）写入块，最后对**有校验定位的块**执行 `LOCATOR_INSERT_SQL` 写入 `(block_id, document_id, contract_version, locator)`。缺少定位的块不写行。
 | `temporal_segment` | `start < end`、`time_unit`、`time_base` |
 | `model_spatial_object` | `object_id`、`coordinate_reference`、`unit` |
 
@@ -65,7 +69,8 @@
 ## 边界
 
 - **已接入解析出口**：`parse_pdf` 在返回前把真实块映射进契约并校验，结果记录为 `detail['parse_contract']`（`parsed`/`failed`/`skipped` + 稳定错误码）。契约违反**不会中断摄取**，而是带错误码写入质量明细保持可见。
-- **尚未接入存储列**：契约结果未写入 `document_blocks`（现有存储列仍是原格式），只在质量明细中保留。
+- **定位写入独立表**：契约 locator 落在 `document_block_locators(block_id, document_id, contract_version, locator)`，与 `document_blocks` 分列存放。原因是基表 `document_blocks` 属主为 `postgres`，而迁移以应用角色运行——项目既有迁移从不 ALTER 基表，因此遵循既有模式另建应用所有的表，而不是变更表属主。
+- **只有校验过的块才有定位行**：契约出现之前解析的块不写任何行，**不编造 locator**；块与定位行在同一文档重建时一起删除后重插。
 - **只注册了 PDF 一个适配器**：ZIP 类（DOCX/XLSX/PPTX）只被识别为 `application/zip`，没有更深的内容判定与适配器。
 - **未实现 Office/CAD 新解析器**：`office_object`/`sheet_range`/`cad_entity` 只是可校验的定位器契约，尚无产出它们的解析器。
 - **`Chunk`、`DocumentFact`、`DrawingFeature` 未纳入本契约**：现有存储与检索尚未统一，留待后续阶段。

@@ -1,6 +1,6 @@
 {
   "stage": "parse_contract_and_resource_limits",
-  "api_version": "0.27.0",
+  "api_version": "0.28.0",
   "date": "2026-10-07",
   "scope": "并行推进两条技术实现线：(A) T3 统一解析契约（ParseResult/SourceLocator/Block/Relation/Adapter，§5.2/§5.4）；(B) T5 统一 CPU/内存配额与跨主机租约（§13）。",
   "lines": {
@@ -19,14 +19,16 @@
         "适配器登记：同名 media type 不得重复；未登记类型 PARSE_ADAPTER_UNKNOWN（不返回空解析成功）；能力查询与 UNKNOWN/UNSUPPORTED 区分",
         "from_pdf_blocks 用真实 ingest/OCR 块形状映射：只搬运解析器实际产出的键，页尺寸缺失/页号非法/bbox 越界即拒绝",
         "API 0.26.0：parse_pdf 在返回前实际产出并校验契约，写入质量明细 parse_contract（parsed/failed/skipped + 稳定错误码）；契约违反不中断摄取但保持可见；真实原生/扫描/公式 PDF 均验证为 parsed",
+        "API 0.28.0：契约 locator 写入 document_block_locators（应用所有的新表）；块表 INSERT 保持历史 13 列不变；缺少定位的块不写行；迁移未 ALTER postgres 所有的基表",
         "API 0.27.0：签名探测 detect_media_type（PDF/PNG/JPEG/ZIP，未知为 octet-stream，不可读报 PARSE_MEDIA_UNREADABLE）；register_adapter 接受 handler；dispatch 按类型路由、调用 handler 并校验返回值，未登记/无 handler/签名不符/异常各有稳定错误码；parse_pdf 经该路由执行并在明细回报 adapter=pdf-native"
       ],
-      "tests": {"file": "tests/test_parse_contract.py", "tests": 36, "failures": 0, "errors": 0}
+      "tests": {"file": "tests/test_parse_contract.py", "tests": 42, "failures": 0, "errors": 0}
     },
     "B_resource_limits_and_leases": {
       "components": {
         "datamind/task_budget.py": "cpu_seconds（RLIMIT_CPU）与 memory_bytes（RLIMIT_AS）限额、平台能力探测、稳定错误码、PostgreSQL 租约 API",
         "db/migrations/013_task_leases.sql": "task_leases(name, token, holder, fence, acquired_at, renewed_at, expires_at)，fence 随接管递增",
+        "db/migrations/014_block_contract.sql": "document_block_locators(block_id, document_id, contract_version, locator)，应用所有，只有校验过的块才写行",
         "tests/budget_targets.py": "子进程目标夹具（echo/spin/allocate）"
       },
       "implemented": [
@@ -39,7 +41,7 @@
     }
   },
   "verification": {
-    "full_isolated_regression": {"tests": 614, "failures": 0, "errors": 0, "exit_code": 0, "previous_stage_tests": 607},
+    "full_isolated_regression": {"tests": 620, "failures": 0, "errors": 0, "exit_code": 0, "previous_stage_tests": 614},
     "platform_facts": {
       "rlimit_cpu": "受支持并实测生效（1 秒 CPU 上限下 300 秒自旋被终止）",
       "rlimit_as": "本机 macOS 不支持（setrlimit 返回 EINVAL），因此内存上限按失败关闭处理",

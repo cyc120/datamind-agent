@@ -4,6 +4,7 @@ These tests are the review of the contract: they pin the documented constants, t
 per-kind locator requirements, relation integrity, the ingest state machine, the adapter
 registry (including explicit refusal) and the mapping of real ingest block shapes.
 """
+import json
 import tempfile
 from pathlib import Path
 import unittest
@@ -464,3 +465,89 @@ class RoutingTests(unittest.TestCase):
             contract.register_adapter('bad-handler', media_types=['application/pdf'],
                                       capabilities=['x'], handler='not-callable')
         self.assertEqual(caught.exception.detail['error_code'], 'PARSE_RESULT_INVALID')
+
+
+class StorageColumnTests(unittest.TestCase):
+    """The validated locator must reach the block table, and history must stay NULL."""
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.patch = patch.object(ingest, 'PAGE_IMG_DIR', Path(self.directory.name))
+        self.patch.start()
+        self.addCleanup(self.patch.stop)
+
+    def native_pdf(self):
+        return ROOT / 'data/knowledge_base/04_售后服务与退款管理制度.pdf'
+
+    def test_parsed_blocks_carry_a_validated_locator_and_version(self):
+        blocks, _, detail = ingest.parse_pdf(self.native_pdf(), 'store-native', include_quality=True)
+        self.assertTrue(blocks)
+        for block in blocks:
+            locator = block['contract_locator']
+            self.assertIsNotNone(locator, block['block_id'])
+            self.assertEqual(locator['locator_kind'], 'pdf_region')
+            self.assertEqual(locator['page_no'], block['page_no'])
+            self.assertEqual(locator['bbox'], [float(v) for v in block['bbox']])
+            self.assertEqual(block['contract_version'], contract.CONTRACT_VERSION)
+        self.assertEqual(detail['parse_contract']['locators_written'], len(blocks))
+
+    def locator_block(self, block_id='blk-x'):
+        return {'block_id': block_id, 'page_no': 1, 'bbox': [1.0, 2.0, 3.0, 4.0],
+                'block_type': 'paragraph', 'text': '正文', 'table_cells': None,
+                'formula_latex': None, 'reading_order': 0, 'heading_level': None,
+                'ocr_confidence': None, 'contract_version': contract.CONTRACT_VERSION,
+                'contract_locator': contract.validate_locator(locator()).payload}
+
+    def test_block_row_keeps_the_historical_shape(self):
+        row = ingest._block_row(self.locator_block(), 'doc-1')
+        self.assertEqual(len(row), 13)
+        self.assertEqual(ingest.BLOCK_INSERT_SQL.count('%s'), 13)
+        self.assertNotIn('locator', ingest.BLOCK_INSERT_SQL)
+
+    def test_locator_row_carries_version_and_json_locator(self):
+        row = ingest._locator_row(self.locator_block(), 'doc-1')
+        self.assertEqual(len(row), 4)
+        self.assertEqual(row[1], 'doc-1')
+        self.assertEqual(row[2], contract.CONTRACT_VERSION)
+        self.assertEqual(json.loads(row[3])['locator_kind'], 'pdf_region')
+        self.assertEqual(ingest.LOCATOR_INSERT_SQL.count('%s'), 4)
+        self.assertIn('document_block_locators', ingest.LOCATOR_INSERT_SQL)
+
+    def test_block_without_a_locator_writes_no_row(self):
+        block = self.locator_block()
+        block.pop('contract_locator')
+        block.pop('contract_version')
+        self.assertIsNone(ingest._locator_row(block, 'doc-1'), '不得为历史块编造 locator')
+
+    def test_statements_actually_fit_the_live_schema(self):
+        """Insert the real rows inside a rolled-back transaction: proves column match."""
+        import psycopg2
+        from datamind.agent import _write_dsn
+        block = self.locator_block('blk-schema-check')
+        with psycopg2.connect(_write_dsn()) as conn, conn.cursor() as cur:
+            cur.execute("""INSERT INTO document_assets(document_id, title, file_type, sha256)
+                VALUES ('doc-schema-check','schema check','pdf',%s) ON CONFLICT DO NOTHING""",
+                        ('c' * 64,))
+            cur.execute(ingest.BLOCK_INSERT_SQL, ingest._block_row(block, 'doc-schema-check'))
+            cur.execute(ingest.LOCATOR_INSERT_SQL, ingest._locator_row(block, 'doc-schema-check'))
+            cur.execute("""SELECT contract_version, locator->>'locator_kind'
+                FROM document_block_locators WHERE block_id=%s""", (block['block_id'],))
+            row = cur.fetchone()
+            conn.rollback()
+        self.assertEqual(row, (contract.CONTRACT_VERSION, 'pdf_region'))
+
+    def test_migration_created_the_locator_table(self):
+        import psycopg2
+        from datamind.agent import _write_dsn
+        with psycopg2.connect(_write_dsn()) as conn, conn.cursor() as cur:
+            cur.execute("""SELECT column_name, data_type FROM information_schema.columns
+                WHERE table_name='document_block_locators'""")
+            found = dict(cur.fetchall())
+            cur.execute("""SELECT tableowner FROM pg_tables
+                WHERE tablename='document_block_locators'""")
+            owner = cur.fetchone()
+        self.assertEqual(found.get('contract_version'), 'character varying')
+        self.assertEqual(found.get('locator'), 'jsonb')
+        self.assertEqual(found.get('block_id'), 'character varying')
+        self.assertIsNotNone(owner)

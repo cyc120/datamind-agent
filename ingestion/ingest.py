@@ -110,6 +110,40 @@ def _ensure_pdf_adapter():
             handler=_pdf_contract_payload)
 
 
+BLOCK_INSERT_SQL = """
+    INSERT INTO document_blocks(block_id, document_id, page_no, bbox, block_type,
+        text, table_cells, formula_latex, reading_order, heading_level,
+        ocr_confidence, parser_version, content_hash)
+    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"""
+
+LOCATOR_INSERT_SQL = """
+    INSERT INTO document_block_locators(block_id, document_id, contract_version, locator)
+    VALUES (%s,%s,%s,%s)"""
+
+
+def _block_row(block, doc_id):
+    """Row for `document_blocks`; unchanged historical shape (no contract columns)."""
+    return (block["block_id"], doc_id, block["page_no"],
+            json.dumps(block["bbox"]), block["block_type"], block["text"],
+            json.dumps(block["table_cells"], ensure_ascii=False) if block.get("table_cells") else None,
+            block.get("formula_latex"), block["reading_order"], block.get("heading_level"),
+            block.get("ocr_confidence"), PARSER_VERSION,
+            hashlib.sha256(block["text"].encode()).hexdigest())
+
+
+def _locator_row(block, doc_id):
+    """Row for `document_block_locators`, or None when the block has no validated locator.
+
+    A block parsed before the contract existed writes nothing instead of a fabricated
+    locator, so `document_block_locators` only ever holds validated rows.
+    """
+    locator = block.get("contract_locator")
+    if not locator:
+        return None
+    return (block["block_id"], doc_id, block["contract_version"],
+            json.dumps(locator, ensure_ascii=False))
+
+
 def _contract_summary(document, pdf_path, doc_id, blocks, detail):
     """Route the parsed blocks through the registered adapter for this media type.
 
@@ -137,9 +171,16 @@ def _contract_summary(document, pdf_path, doc_id, blocks, detail):
         return {"contract_version": version, "validation": "failed",
                 "error_code": code or "PARSE_CONTRACT_FAILED", "blocks": len(blocks)}
     payload = result.payload
+    locators = {block["block_id"]: block["locator"] for block in payload["blocks"]}
+    for block in blocks:
+        # Carry the validated locator with the block so persistence writes the same object
+        # that was validated, instead of a re-derived copy.
+        block["contract_locator"] = locators.get(block.get("block_id"))
+        block["contract_version"] = payload["contract_version"]
     return {"contract_version": payload["contract_version"], "validation": "parsed",
             "adapter": _PDF_ADAPTER, "parse_status": payload["parse_status"],
             "blocks": len(payload["blocks"]),
+            "locators_written": sum(1 for block in blocks if block.get("contract_locator")),
             "locator_kinds": sorted({block["locator"]["locator_kind"] for block in payload["blocks"]})}
 
 
@@ -272,6 +313,8 @@ def parse_pdf(pdf_path: Path, doc_id: str, ocr_proxy: Path | None = None, *, inc
     blocks.sort(key=lambda b: (b["page_no"], b["bbox"][1], b["bbox"][0]))
     for i, b in enumerate(blocks):
         b["reading_order"] = i
+        # Assigned here so the contract mapping and the database row share one identity.
+        b["block_id"] = f"blk-{md5(doc_id + str(i))}"
     detail["parse_contract"] = _contract_summary(doc, pdf_path, doc_id, blocks, detail)
     doc.close()
     return (blocks, page_count, detail) if include_quality else (blocks, page_count)
@@ -477,19 +520,13 @@ def main():
 
         # document_blocks
         cur.execute("DELETE FROM document_blocks WHERE document_id=%s", (doc_id,))
+        cur.execute("DELETE FROM document_block_locators WHERE document_id=%s", (doc_id,))
         for b in blocks:
-            b["block_id"] = f"blk-{md5(doc_id + str(b['reading_order']))}"
-            cur.execute("""
-                INSERT INTO document_blocks(block_id, document_id, page_no, bbox, block_type,
-                    text, table_cells, formula_latex, reading_order, heading_level,
-                    ocr_confidence, parser_version, content_hash)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-                (b["block_id"], doc_id, b["page_no"],
-                 json.dumps(b["bbox"]), b["block_type"], b["text"],
-                 json.dumps(b["table_cells"], ensure_ascii=False) if b.get("table_cells") else None,
-                 b.get("formula_latex"), b["reading_order"], b.get("heading_level"),
-                 b.get("ocr_confidence"), PARSER_VERSION,
-                 hashlib.sha256(b["text"].encode()).hexdigest()))
+            cur.execute(BLOCK_INSERT_SQL, _block_row(b, doc_id))
+        cur.execute("DELETE FROM document_block_locators WHERE document_id=%s", (doc_id,))
+        for b in blocks:
+            if (locator_row := _locator_row(b, doc_id)) is not None:
+                cur.execute(LOCATOR_INSERT_SQL, locator_row)
 
         extracted, field_detail = facts.extract(blocks, document_id=doc_id, source_sha256=digest,
                                                parser_version=PARSER_VERSION)
