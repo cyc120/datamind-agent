@@ -75,3 +75,25 @@ def read_result(document_id, dsn, *, limit=2000):
         relations = [dict(row) for row in cur.fetchall()]
     return {'document_id': document_id, 'blocks': blocks, 'relations': relations,
             'block_count': len(blocks), 'relation_count': len(relations)}
+
+
+MAX_LOCATOR_QUERY = 512
+
+
+def read_locators(block_ids, dsn):
+    """Validated locators for the given block ids, keyed by id.
+
+    Only rows written by a contract-validated parse exist here, so a missing id means
+    "no validated locator" and must not be filled in by the caller. Bounded to
+    `MAX_LOCATOR_QUERY` ids so a citation cannot ask for an unbounded lookup.
+    """
+    ids = sorted({str(value) for value in (block_ids or []) if value})
+    if not ids:
+        return {}
+    if len(ids) > MAX_LOCATOR_QUERY:
+        raise ValueError('CONTRACT_LOCATOR_QUERY_TOO_LARGE')
+    with psycopg2.connect(dsn) as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute('''SELECT block_id, locator, contract_version FROM document_block_locators
+            WHERE block_id=ANY(%s)''', (ids,))
+        return {row['block_id']: {'locator': row['locator'], 'contract_version': row['contract_version']}
+                for row in cur.fetchall()}

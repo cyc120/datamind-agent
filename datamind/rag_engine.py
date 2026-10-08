@@ -89,19 +89,38 @@ def verify_claims(draft: dict, hits: list[dict]) -> list[dict]:
     return checked
 
 
-def citation_from_hit(hit: dict, *, quote: str = "") -> dict:
+def citation_from_hit(hit: dict, *, quote: str = "", locators: dict | None = None) -> dict:
     version_query = f"expected_version={hit['document_version']}&expected_sha256={hit['document_sha256']}"
+    # Only locators that a contract-validated parse wrote are attached; a block without a
+    # stored locator contributes nothing rather than a derived or defaulted region.
+    cited = [{"block_id": block_id, **locators[block_id]}
+             for block_id in (hit.get("block_ids") or []) if locators and block_id in locators]
     return {key: hit.get(key) for key in ("chunk_id", "document_id", "title", "collection", "origin",
             "document_version", "document_sha256", "content_hash", "parser_version", "quality_detail",
             "page_start", "page_end", "block_ids", "source_blocks", "section_path", "retrieval_score", "retrieval_scores")} | {
-        "quote": quote, "source_url": f"/v1/documents/{hit['document_id']}/file?{version_query}",
+        "quote": quote, "locators": cited,
+        "source_url": f"/v1/documents/{hit['document_id']}/file?{version_query}",
         "page_url": (f"/v1/documents/{hit['document_id']}/pages/{hit['page_start']}?{version_query}"
                      if hit["file_type"] == "pdf" else None)}
 
 
+def _locator_map(hits: list[dict], lookup: Callable | None) -> tuple[dict, str | None]:
+    """Fetch validated locators for every cited block; a failure is recorded, not fatal."""
+    if lookup is None:
+        return {}, None
+    block_ids = sorted({block_id for hit in hits for block_id in (hit.get("block_ids") or [])})
+    if not block_ids:
+        return {}, None
+    try:
+        return {key: value for key, value in (lookup(block_ids) or {}).items()}, None
+    except Exception as error:  # locators enrich evidence; they never block an answer
+        return {}, getattr(error, "code", None) or type(error).__name__
+
+
 def ask_documents(question: str, *, collections: list[str] | None = None,
                   retriever: KnowledgeRetriever | None = None, generator: Callable | None = None,
-                  on_retrieval: Callable | None = None, document_refs: list[dict] | None = None) -> dict:
+                  on_retrieval: Callable | None = None, document_refs: list[dict] | None = None,
+                  locator_lookup: Callable | None = None) -> dict:
     started = time.monotonic()
     retriever = retriever or KnowledgeRetriever()
     kwargs = {"collections": collections, "limit": 5}
@@ -109,8 +128,11 @@ def ask_documents(question: str, *, collections: list[str] | None = None,
         kwargs["document_refs"] = document_refs
     retrieved = retriever.retrieve(question, **kwargs)
     hits = retrieved.pop("hits")
+    locators, locator_error = _locator_map(hits, locator_lookup)
     result = {"prompt_version": PROMPT_VERSION, "retrieval": retrieved, "attempts": [],
-              "retrieved_evidence": [citation_from_hit(hit) for hit in hits]}
+              "retrieved_evidence": [citation_from_hit(hit, locators=locators) for hit in hits]}
+    if locator_error:
+        result["locator_lookup_error"] = locator_error
     if on_retrieval:
         on_retrieval(result)
     if document_refs is not None and not retrieved["coverage"]["all_covered"]:
@@ -137,7 +159,8 @@ def ask_documents(question: str, *, collections: list[str] | None = None,
                     if key not in index:
                         index[key] = len(citations) + 1
                         hit = next(h for h in hits if h["chunk_id"] == key)
-                        citations.append({"number": index[key], **citation_from_hit(hit, quote=citation["quote"])})
+                        citations.append({"number": index[key], **citation_from_hit(
+                            hit, quote=citation["quote"], locators=locators)})
                     elif citation["quote"] not in citations[index[key] - 1]["quote"]:
                         citations[index[key] - 1]["quote"] += "\n" + citation["quote"]
             answer = "\n".join(claim["text"] + " " + "".join(
