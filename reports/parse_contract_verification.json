@@ -22,7 +22,12 @@
         "API 0.28.0：契约 locator 写入 document_block_locators（应用所有的新表）；块表 INSERT 保持历史 13 列不变；缺少定位的块不写行；迁移未 ALTER postgres 所有的基表",
         "API 0.27.0：签名探测 detect_media_type（PDF/PNG/JPEG/ZIP，未知为 octet-stream，不可读报 PARSE_MEDIA_UNREADABLE）；register_adapter 接受 handler；dispatch 按类型路由、调用 handler 并校验返回值，未登记/无 handler/签名不符/异常各有稳定错误码；parse_pdf 经该路由执行并在明细回报 adapter=pdf-native"
       ],
-      "tests": {"file": "tests/test_parse_contract.py", "tests": 42, "failures": 0, "errors": 0}
+      "tests": {
+        "file": "tests/test_parse_contract.py",
+        "tests": 42,
+        "failures": 0,
+        "errors": 0
+      }
     },
     "C_office_adapters": {
       "components": {
@@ -37,8 +42,13 @@
         "XLSX：按行一块，locator=sheet_range(sheet, range)，保留真实电子表格行号（跳过空行但不重编号）",
         "有界而非静默截断：超 MAX_BLOCKS 或单表行数上限时 parse_status=partial 并记录 block_limit_reached / sheet_row_limit_reached"
       ],
-      "tests": {"file": "tests/test_office_adapter.py", "tests": 10, "failures": 0, "errors": 0,
-                "skips_without_optional_libraries": True}
+      "tests": {
+        "file": "tests/test_office_adapter.py",
+        "tests": 10,
+        "failures": 0,
+        "errors": 0,
+        "skips_without_optional_libraries": true
+      }
     },
     "B_resource_limits_and_leases": {
       "components": {
@@ -53,11 +63,22 @@
         "平台能力探测并缓存：macOS 拒绝 RLIMIT_AS/RLIMIT_DATA，请求内存上限时**失败关闭**返回 TASK_BUDGET_RLIMIT_UNSUPPORTED，绝不静默忽略",
         "租约：acquire（占用或接管，接管递增 fence）、renew、release、holder（含 expired）、sweep；过期接管后旧 token 无法续期或释放"
       ],
-      "tests": {"file": "tests/test_task_budget_resources.py", "tests": 11, "failures": 0, "errors": 0}
+      "tests": {
+        "file": "tests/test_task_budget_resources.py",
+        "tests": 11,
+        "failures": 0,
+        "errors": 0
+      }
     }
   },
   "verification": {
-    "full_isolated_regression": {"tests": 630, "failures": 0, "errors": 0, "exit_code": 0, "previous_stage_tests": 620},
+    "full_isolated_regression": {
+      "tests": 632,
+      "failures": 0,
+      "errors": 0,
+      "exit_code": 0,
+      "previous_stage_tests": 630
+    },
     "platform_facts": {
       "rlimit_cpu": "受支持并实测生效（1 秒 CPU 上限下 300 秒自旋被终止）",
       "rlimit_as": "本机 macOS 不支持（setrlimit 返回 EINVAL），因此内存上限按失败关闭处理",
@@ -68,7 +89,8 @@
   "incidents": [
     "并行子代理在实现期间对仓库执行了越界的自动改写（删除 web/app.js 中一行行为代码、删除 style.css 的 .step/.num 规则、批量移除 import 与 requirements 条目）。已中断该子代理、逐项回退全部 33 个受影响文件，并只保留受控改动；回退后完整回归通过。",
     "该子代理产出的 1234 行 parse_contract.py 因与本规范偏差较大且无任何测试，已弃用并改为受控实现（本文件的 A 线）。",
-    "租约跨进程测试首轮误用父进程的原始 DSN，子进程因此在隔离回归中连到真实库并成功取租约；改为使用 effective_dsn 后通过——这同时验证了 effective_dsn 存在的必要性。"
+    "租约跨进程测试首轮误用父进程的原始 DSN，子进程因此在隔离回归中连到真实库并成功取租约；改为使用 effective_dsn 后通过——这同时验证了 effective_dsn 存在的必要性。",
+    "报告 JSON 一度被写坏：用字符串替换向 reports/parse_contract_verification.json 写入时用了 Python 字面量 True（JSON 要求 true），该文件已推送。已修正，并新增 tests/test_reports.py 守护（所有 reports/*.json 必须是合法 JSON，且不得出现 : True/: False/: None）。"
   ],
   "boundaries": [
     "解析契约仅描述与校验，未接入统一 Adapter 路由，未改造 ingestion/ingest.py 的生产链路。",
