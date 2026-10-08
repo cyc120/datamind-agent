@@ -78,6 +78,7 @@ def read_result(document_id, dsn, *, limit=2000):
 
 
 MAX_LOCATOR_QUERY = 512
+MAX_RELATION_QUERY = MAX_LOCATOR_QUERY
 
 
 def read_locators(block_ids, dsn):
@@ -97,3 +98,41 @@ def read_locators(block_ids, dsn):
             WHERE block_id=ANY(%s)''', (ids,))
         return {row['block_id']: {'locator': row['locator'], 'contract_version': row['contract_version']}
                 for row in cur.fetchall()}
+
+
+def read_relations(block_ids, dsn):
+    """Validated relations touching the given block ids, grouped by block id.
+
+    A relation is stored only when the parse contract validated it (evidence is required and
+    a self-reference is refused), so only stored rows are returned and a block without rows
+    simply has no key here — nothing is derived to fill a gap. An id matches whichever end of
+    the relation it is, and `direction` records that role ('source' when the queried block is
+    the source, 'target' when it is the target) while `peer_block_id` is the other end. The
+    name differs from the locator payload on purpose: there `block_id` is the cited block,
+    here it is the far end of the relation, and conflating the two would mislabel evidence. Bounded to
+    `MAX_RELATION_QUERY` ids so a citation cannot ask for an unbounded lookup.
+    """
+    ids = sorted({str(value) for value in (block_ids or []) if value})
+    if not ids:
+        return {}
+    if len(ids) > MAX_RELATION_QUERY:
+        raise ValueError('CONTRACT_RELATION_QUERY_TOO_LARGE')
+    with psycopg2.connect(dsn) as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute('''SELECT relation_id, document_id, source_block_id, target_block_id,
+            relation_type, relation_state, recovery_method, evidence
+            FROM document_block_relations
+            WHERE source_block_id=ANY(%s) OR target_block_id=ANY(%s)
+            ORDER BY relation_id''', (ids, ids))
+        rows = cur.fetchall()
+    grouped = {}
+    wanted = set(ids)
+    for row in rows:
+        stored = {key: row[key] for key in ('relation_id', 'document_id', 'relation_type',
+                                            'relation_state', 'recovery_method', 'evidence')}
+        if row['source_block_id'] in wanted:
+            grouped.setdefault(row['source_block_id'], []).append(
+                {**stored, 'direction': 'source', 'peer_block_id': row['target_block_id']})
+        if row['target_block_id'] in wanted:
+            grouped.setdefault(row['target_block_id'], []).append(
+                {**stored, 'direction': 'target', 'peer_block_id': row['source_block_id']})
+    return grouped

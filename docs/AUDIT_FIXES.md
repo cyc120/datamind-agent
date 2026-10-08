@@ -11,14 +11,15 @@
 |---|---|---|---|
 | F01 | SQL 列权限按全局别名表判定（两条越权路径） | P1 | **已修复** |
 | F02 | 指标表达式只校验列名；非空即 verified | P1 | **已修复**（含提示类语义补充） |
-| F03 | 存储服务绑定全部网卡 | P1' | **配置已改，待重建容器生效** |
+| F03 | 存储服务绑定全部网卡 | P1' | **已修复并生效** |
 | F04 | stdin 写入绕过 deadline | P2+ | **已修复** |
-| F05 | 无密钥导出残留认证材料 | P2 | **已修复** |
+| F05 | 无密钥导出残留认证材料 | P2 | **已修复**（写侧 + 读取侧） |
 | F06 | 探活与问答链路 profile 解析不一致 | P2 | **已修复** |
 | F07 | V-CAR 恢复状态不绑定计划 | P2 | **已修复** |
 | F08 | 前端运行/回放串屏 | P2 | **已修复** |
 | F09 | Office 保真（block_id 截断、正文顺序、公式无缓存静默通过） | P2（XLSX 部分 P2+） | **已修复** |
-| F10 | 摄取跨存储一致性（Qdrant 先写、PG 后提交） | P2（设计性） | **明确延后**，见下 |
+| F10 | 摄取跨存储一致性（Qdrant 先写、PG 后提交） | P2（设计性） | **已修复** |
+| R1 | 块标识只在 `parse_pdf` 内赋值，OHR-Bench 分支的块缺 `block_id`（**我自己重构时引入**） | 回归 | **已修复 + 加守护** |
 | F11 | 验证脚本污染真实库并硬编码规模 | P1' | **已修复** |
 | F12 | 本机地址在配置显式 proxy 时仍走代理（修复 F06 时自查发现） | P2（同族可用性） | **已修复** |
 
@@ -42,14 +43,19 @@
 
 ### F03 默认回环绑定（P1'）
 `deploy/compose.yaml` 三处发布端口改为 `127.0.0.1:…`（PostgreSQL、Qdrant 6333/6334），并在文末写明已知安全边界（Qdrant 无认证、`01_roles.sql` 与 compose 默认口令为明文）。
-**尚未生效**：只改了配置，未重建容器；`docker ps` 仍显示 `0.0.0.0`/`[::]`。需下一次 `docker compose -f deploy/compose.yaml up -d` 重建后才收敛为仅回环。跨机部署还需防火墙或反向代理，认证与口令方案本轮**未动**（改动会破坏本机正在运行的栈）。
+**已生效**：已执行 `docker compose -f deploy/compose.yaml up -d` 重建两个容器（复用既有卷 `datamind-db_*`）——`docker ps` 现在显示 `127.0.0.1:5432` 与 `127.0.0.1:6333-6334`，数据完好（27 文档 / 169 切片），Qdrant green 169 点，API 健康 200。
+
+**执行前先核对了归属**：compose 文件首行 `name: datamind-db` 与 `container_name` 使项目名与卷得以复用；若以默认项目名（目录名 `deploy`）贸然 `up` 会创建**空数据库**。跨机部署仍需防火墙或反向代理；认证与明文口令方案本轮**未动**。
 
 ### F04 deadline 覆盖 stdin 写入（P2+）
 原实现先同步 `write` 子进程 stdin，再进入 `wait(timeout=deadline)`；子进程若不读 stdin，管道写满即无限阻塞，deadline 根本来不及生效。
 现 deadline 起点提前到 spawn 之后，stdin 由守护线程写入，主路径按**同一**预算轮询并在超时/取消时终止整个进程组。8 MiB stdin + 永不读 stdin 的子进程在 `deadline_s=1` 下实测 < 6 秒返回 `TASK_DEADLINE_EXCEEDED`（修复前会永久阻塞）；正常读取 stdin 的子进程与大载荷（4 MiB）仍完整送达。
 
-### F05 无密钥导出脱敏（P2）
-新增唯一脱敏入口 `redact_profile()`：移除 `api_key`、剔除敏感头（`authorization`/`api-key`/`x-api-key`/`cookie` 及 `*-key/-token/-secret/-password` 规则）、去掉 `proxy` 的 userinfo（无法安全解析则整条丢弃），并以 `_scrub_secrets()` 兜底替换任何字段中残留的密钥值。`/v1/model/profiles/export` 在 `include_keys=False` 时走它。
+### F05 无密钥导出脱敏（P2，写侧 + 读取侧）
+**写侧**：新增唯一脱敏入口 `redact_profile()`：移除 `api_key`、剔除敏感头（`authorization`/`api-key`/`x-api-key`/`cookie` 及 `*-key/-token/-secret/-password` 规则）、去掉 `proxy` 的 userinfo（无法安全解析则整条丢弃），并以 `_scrub_secrets()` 兜底替换任何字段中残留的密钥值。`/v1/model/profiles/export` 在 `include_keys=False` 时走它。
+**读取侧（本轮补齐）**：`public_profile()` 不再回传敏感头原值——敏感头**只出键名**（`header_keys`），非敏感头照旧；`proxy` 去掉 userinfo，并给出 `has_proxy`/`proxy_has_credentials` 布尔提示。
+**保存语义同步改造**（否则脱敏会让下一次保存写回脱敏值、**丢掉真实凭据**）：敏感头缺失/空白 → 沿用已存值；非空新值 → 替换；删除只能提交哨兵 `__clear__`。前端为每个敏感头键名生成空输入框（占位「留空表示保持不变」），未改动就整体不回传 `headers`/`proxy`。
+**刻意保留**：`include_keys=True` 仍原样输出 `api_key`、敏感头值与含 userinfo 的 proxy——那是 admin 显式索取的「带密钥搬迁」路径，不加遮蔽；但它一旦被调用就是完整凭据外带。
 
 ### F06 profile 解析统一（P2）
 `api.py` 内统一为唯一入口 `resolve_profile(request, *, stored=None)`，探活、模型列表与 `_stored_config()` 共用，`headers`/`proxy` 与 `api_key` 同一套合并规则。
@@ -75,10 +81,23 @@
 
 **解析器版本**：`CONTRACT_PARSER_VERSION` 由 `office-adapter-v1` 升为 **`v2`**——block id 方案、DOCX 顺序与 XLSX 状态语义都变了，升版才会触发既有 Office 文档重新解析。
 
-### F10 摄取跨存储一致性（P2，延后）
-`ingestion/ingest.py` 先对 Qdrant 执行 delete+upsert（非事务），随后才写 `chunks` 并 `meta.commit()`；PG 提交失败时 Qdrant 已是新向量而 PG 仍是旧 chunk，检索可能用旧文本配新向量。
-**延后原因**：修复需要 outbox/状态机式的多存储协议并改动摄取主链路，而该链路依赖 Qdrant 与嵌入模型，本轮预算内无法给出充分验证。**不把未验证的改动放进生产摄取路径**。
-**既定修复方案**：摄取前先把文档置为不可检索状态并提交 → 写 Qdrant → 写 PG chunks 并置 `indexed` 提交；任何失败都停在「不可检索」，重试入口复用既有孤儿回收路径。
+### F10 摄取跨存储一致性（P2）
+抽出 `publish_document(cur, qc, doc_id, collection, points, write_metadata, *, commit, …)` 作为顺序协议：先 `UPDATE status='parsing'` 并**立即 commit**（该文档在解析/嵌入/向量写入全程都不可检索）→ Qdrant delete+upsert → `write_metadata()`（blocks/locators/facts/chunks）→ 置 `'indexed'`/`'failed'` 并 commit。第 2/3 步不捕获异常，**异常上抛前绝不会执行任何 indexed 提交**。
+
+状态取值有实测依据而非臆造：`document_assets` 上**没有** status 的 CHECK 约束（只有主键与 `collection+sha256` 唯一键），且 `'parsing'` 是本文件原有就写入的值；可见性一律由 `status='indexed'` 过滤（`knowledge.py` 等 6 处）。
+
+**这不是分布式事务**：Qdrant 写成功而 PG 最终失败会留下**孤儿向量**；它们不影响检索内容（dense 命中会被按 `status='indexed'` 构建的 `row_map` 过滤），代价只是向量存储多于元数据。重试入口是重跑 `ingestion/ingest.py`（不加 `--reset`，失败文档不会被跳过分支跳过，第 2 步先按 `document_id` 清掉上次孤儿）。`pdf_maintenance` 的孤儿回收只覆盖私有 PDF 集合，**不覆盖** demo 集合，属兜底。并发两次摄取同一文档无锁，状态机可能交错。
+
+### R1 我自己引入的回归：OHR-Bench 分支缺 `block_id`（回归，已修复 + 加守护）
+我在提交 `3a2ab33`（契约定位写入存储）把 `block_id` 赋值从 `main()` 的写入循环**移进** `parse_pdf`，以便契约映射与数据库行共用同一身份。但**不走 `parse_pdf` 的生产者**——OHR-Bench JSON 分支直接构造块——因此失去 id，`build_chunks` 在 `b['block_id']` 处 `KeyError`；`data/ohr_bench_samples/` 有 15 个样张，**完整摄取会在 OHR 段中断**。
+
+**发现方式**：修 F10 的子代理用纯函数复现并报告，但把它归因为「预先存在的崩溃」。**该归因不成立**——我核对了重构前的 `main()`，它确实给每个块赋了 id。这正是"子代理的结论也要自己验证"的例证。
+
+**修复**：新增 `ingest.ensure_block_ids(blocks, doc_id)`，在 `facts.extract`/`build_chunks` 之前调用：只为缺失 id 的块按**位置**生成稳定 id，已有 id 一律不改。
+
+**修复时又发现第二个缺陷（由新写的测试当场抓出）**：首版按 `reading_order` 派生 id，而两个块可以合法共享 `reading_order`（OHR 分支每条记录一块、值为 0）→ 生成**相同 id**、会撞主键。改为按位置派生并在冲突时加后缀，保证唯一。
+
+**守护**：`tests/test_ingest_block_identity.py`（6 项）——无 id 则赋、已有 id 不改、稳定且唯一、无 `reading_order` 仍互不相同、OHR 形状块可正常切片，以及**未命名的块切片仍是文档化的失败**（不能靠让 `build_chunks` 静默容忍来"修复"）。
 
 ### F11 验证脚本不再污染真实库（P1'）
 删除 `conn.autocommit = True`（污染根因），越权探针改为在 `SAVEPOINT` 内执行且必回滚；新增 `verify_readonly_isolation()` 在 `try/finally` 中统一 `rollback` + `close`（可注入假连接便于断言）；新增 `derive_expectations()` 动态推导期望，删掉 `== 2` 源 / `== 26` 文档等全部硬编码，改为与规模无关的自洽不变量；`reset_demo.sh` 的 `py -3.13` 改为 `.venv/bin/python`。
@@ -86,9 +105,10 @@
 
 ## 未完成与后续建议
 
-1. **F06 剩余**：问答链路（`sql_engine`/`rag_engine`/`pdf_answer`）仍不含 proxy，需统一到共享解析函数。
-2. **F10 延后**：按上述 outbox 方案单独任务实施。
-3. **读取侧同类暴露**：`settings_store.public_profile()`（`GET /v1/model/profiles`，admin-only）仍原样回传 `headers`/`proxy`；前端表单会回填并回传，直接脱敏会让保存写回脱敏值，需同步改 UI 与保存语义（建议：敏感头只回显键名，空值表示保持不变）。
+1. **关系未进入排序/消解**：契约关系已随引用提供（可追溯），但**不参与**检索排序、打分、重排或冲突消解；前端也尚未渲染该字段。
+2. **视觉模型缺失（外部依赖）**：本机网关仅 `deepseek-flash`（纯文本）、仓库无权重目录 → V-CAR「真实视觉载荷与模型规模对比」**不可执行**，需外部提供视觉模型；与 T6 授权真实输入同属外部依赖。
+3. **F10 的残余窗口**：Qdrant 孤儿向量（不影响检索内容）、并发摄取同一文档无锁、`pdf_maintenance` 孤儿回收不覆盖 demo 集合。
+4. **`include_keys=True` 导出**：仍明文外带全部凭据（设计如此，admin 显式参数）。
 4. **F03 生效窗口**：需重建 Postgres/Qdrant 容器；认证与明文口令方案待统一走 secret 注入。
 5. **F06 解析实现未合并**：`sql_engine.settings()` 与 `api.resolve_profile()` 仍是两套代码（行为已一致，实现未统一）。
 6. **F02 覆盖仍窄**：仅销售额别名族走注册表结构校验；业绩、销量、退款额、订单量、客户总量未强制；复合指标未做递归展开比对。

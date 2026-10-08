@@ -837,3 +837,17 @@ Office/DXF 的块按 `part`/`paragraph`/`slide`/`sheet`/`handle` 定位，**没�
 **F12（自查发现）**：补 F06 时写传输层测试才发现 `providers.make_client()` 先判断显式 `proxy`、再判断 `is_local`，因此 profile 里一旦配置 proxy，连 `http://localhost` 网关也会被塞进代理——正是该函数注释要避免的挂起或 502；而 F06 把 proxy 带进问答链路后该**暴露面反而变大**。现改为 `is_local(url)` 优先：本机地址一律直连且不使用任何来源的代理（含显式 profile proxy），远端 URL 才使用显式 proxy，无 proxy 时维持尊重系统/环境代理的原行为。
 
 新增 11 项测试，完整隔离回归见 `reports/audit_fix_verification.json`。见 `docs/AUDIT_FIXES.md`。
+
+### 18.22 F10 摄取顺序、读取侧脱敏与契约关系消费（API 0.36.0，2026 年 10 月 8 日）
+
+**F10 摄取跨存储一致性**：`ingestion/ingest.py` 抽出 `publish_document(...)` 顺序协议——先置 `status='parsing'` 并立即提交（该文档在解析/嵌入/向量写入全程不可检索）→ Qdrant delete+upsert → 写 PG（blocks/locators/facts/chunks）→ 置 `'indexed'`/`'failed'` 并提交；第 2/3 步不捕获异常，异常上抛前绝不执行 indexed 提交。**这不是分布式事务**：Qdrant 写成功而 PG 最终失败会留下孤儿向量，它们因 `status='indexed'` 的检索门而不影响回答内容，代价是向量存储多于元数据；重试入口是重跑摄取（失败文档不会被跳过分支跳过）。并发摄取同一文档无锁，属已知边界。
+
+**profile 读取侧脱敏**：`public_profile()` 不再回传敏感头原值，敏感头**只出键名**（`header_keys`）、`proxy` 去掉 userinfo 并给出 `has_proxy`/`proxy_has_credentials`；保存路径新增键级合并（敏感头缺失/空白=保持原值，删除需显式哨兵），前端为每个敏感头键名生成空输入框（占位「留空表示保持不变」），避免"脱敏值被写回、真实凭据丢失"。`include_keys=True` 的带密钥搬迁路径**刻意保持原样**。
+
+**契约关系消费**：`contract_store.read_relations` 按 source/target 两向命中并归组；`citation_from_hit(..., relations=…)` 与 `ask_documents(..., relation_lookup=…)` 沿用 locator 的纪律（只附存储中确有的、一次查询、失败记录 `relation_lookup_error` 而不阻断）。对端字段命名 `peer_block_id`，刻意区别于 locator 载荷中表示**被引块**的 `block_id`。迁移 016 为 `target_block_id` 补索引。关系目前**只是可追溯元数据**，不参与排序、打分、重排或冲突消解，前端亦未渲染。
+
+**F03 生效**：已重建 Postgres/Qdrant 容器（复用既有卷），端口现仅 `127.0.0.1`，数据完好（27 文档 / 169 切片）。
+
+**诚实记录——我自己引入的回归 R1（已修复并加守护）**：提交 `3a2ab33` 把 `block_id` 赋值从 `main()` 移进 `parse_pdf`，使不走该函数的生产者（OHR-Bench JSON 分支）失去 id，`build_chunks` 会 `KeyError`、完整摄取在该段中断。发现该问题的子代理把它归因为"预先存在"，**该归因不成立**——重构前的 `main()` 确实给每个块赋了 id。修复为 `ingest.ensure_block_ids`（按位置派生、已有 id 不改）；修复中新写的测试又当场抓出第二处缺陷（按 `reading_order` 派生会让共享该序号的两个块撞主键），改为位置派生 + 冲突后缀。守护见 `tests/test_ingest_block_identity.py`。
+
+新增 44 项测试，完整隔离回归 **804/804**、失败/错误 0。边界：关系未进入排序/消解、前端未渲染；`include_keys=True` 仍明文外带凭据；本机无视觉模型，V-CAR 真实视觉载荷与模型规模对比不可执行。

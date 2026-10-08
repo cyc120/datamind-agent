@@ -22,7 +22,8 @@ var PRESETS = [
   { name: '本地网关 4000', protocol: 'openai', base: 'http://localhost:4000/v1', model: 'deepseek-flash' },
   { name: '自定义', protocol: 'openai', base: '', model: '' }
 ];
-var STATE = { profiles: [], active: null, editingId: null };
+var STATE = { profiles: [], active: null, editingId: null, secretHeaders: [],
+              proxyDisplayed: '', proxyHasCredentials: false, headersDisplayed: '' };
 var AUTH = {user:null,csrf:null};
 var AUTHORITY = {candidates:[],documents:[],pending:null};
 var CAD = {assets:[],sources:[],pending:null,token:0,reviewPending:{}};
@@ -1183,12 +1184,82 @@ async function loadProfiles() {
     renderProfileList(); renderActive();
   } catch (err) { notice('bad', '读取接入配置失败：' + err.message); }
 }
+/* 敏感请求头 / 代理：服务端只回显键名与非敏感值，真实凭据不下发，
+   所以表单对这些字段只提供空输入框——留空表示保持不变（保存时不回传空值，
+   服务端沿用已存值）；要主动删除必须显式提交清除哨兵。 */
+var KEEP_HINT = '留空表示保持不变';
+var CLEAR_TOKEN = '__clear__';
+function secretHeaderBox() {
+  var box = document.getElementById('secretHeaderFields');
+  if (box) { return box; }
+  var anchor = $('extraHeaders');
+  if (!anchor) { return null; }
+  box = document.createElement('div');
+  box.id = 'secretHeaderFields';
+  box.className = 'full';
+  var host = anchor.parentNode;
+  if (host && host.parentNode) { host.parentNode.insertBefore(box, host.nextSibling); }
+  else if (host) { host.appendChild(box); }
+  return box;
+}
+function secretHeaderInputs() {
+  return document.querySelectorAll('#secretHeaderFields input[data-header-name]');
+}
+function renderSecretHeaders(profile) {
+  STATE.secretHeaders = (profile && profile.header_keys) ? profile.header_keys.slice() : [];
+  var box = secretHeaderBox();
+  if (!box) { return; }
+  box.replaceChildren();
+  if (!STATE.secretHeaders.length) { box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  var label = document.createElement('label');
+  label.textContent = '已配置的敏感请求头（值不下发）';
+  box.appendChild(label);
+  var hint = document.createElement('p');
+  hint.className = 'field-hint';
+  hint.textContent = '这些头的值保存在服务端，浏览器看不到：' + KEEP_HINT +
+    '；填写新的非空值即替换；填 ' + CLEAR_TOKEN + ' 表示删除该头。';
+  box.appendChild(hint);
+  STATE.secretHeaders.forEach(function (name) {
+    var row = document.createElement('div');
+    row.className = 'key-row';
+    var tag = document.createElement('span');
+    tag.className = 'field-hint';
+    tag.textContent = name;
+    var input = document.createElement('input');
+    input.type = 'password';
+    input.autocomplete = 'off';
+    input.setAttribute('data-header-name', name);
+    input.placeholder = KEEP_HINT;
+    row.appendChild(tag);
+    row.appendChild(input);
+    box.appendChild(row);
+  });
+}
+function syncSecretFields(profile) {
+  var proxy = (profile && profile.proxy) || '';
+  STATE.proxyDisplayed = proxy;
+  STATE.proxyHasCredentials = !!(profile && profile.proxy_has_credentials);
+  $('proxy').value = proxy;
+  if (profile && profile.has_proxy) {
+    $('proxy').placeholder = STATE.proxyHasCredentials
+      ? '已配置代理（含凭据，凭据不下发）：不改动请保持原样；清空后保存 = 删除代理'
+      : '已配置代理：不改动请保持原样；清空后保存 = 删除代理';
+  } else {
+    $('proxy').placeholder = '留空 = 本机直连，远端跟随系统代理；例：http://127.0.0.1:7897';
+  }
+  STATE.headersDisplayed = (profile && profile.headers && Object.keys(profile.headers).length)
+    ? JSON.stringify(profile.headers) : '';
+  $('extraHeaders').value = STATE.headersDisplayed;
+  renderSecretHeaders(profile || {});
+}
 function resetForm() {
   STATE.editingId = null;
   $('profileName').value = ''; $('baseUrl').value = ''; $('modelName').value = '';
   $('apiKey').value = ''; $('apiKey').placeholder = '留空表示保持当前密钥';
-  $('maxTokens').value = ''; $('timeoutS').value = ''; $('extraHeaders').value = ''; $('proxy').value = '';
+  $('maxTokens').value = ''; $('timeoutS').value = '';
   $('protocol').value = 'openai'; $('authStyle').value = 'both';
+  syncSecretFields({});
   $('editorTitle').textContent = '新增配置';
   $('modelPicks').replaceChildren();
   document.querySelectorAll('.preset').forEach(function (b) { b.classList.remove('active'); });
@@ -1205,12 +1276,45 @@ function editProfile(profile) {
   $('authStyle').value = profile.auth_style || 'both';
   $('maxTokens').value = profile.max_tokens || '';
   $('timeoutS').value = profile.timeout_s || '';
-  $('proxy').value = profile.proxy || '';
-  $('extraHeaders').value = profile.headers && Object.keys(profile.headers).length ? JSON.stringify(profile.headers) : '';
+  syncSecretFields(profile);
   $('editorTitle').textContent = '编辑配置：' + profile.name;
   syncProtocolHint();
   notice('info', '正在编辑「' + profile.name + '」；保存后立即生效。');
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function collectHeaders() {
+  /* 非敏感头以表单为准；敏感头由服务端合并，未改动就整体不回传。 */
+  var raw = $('extraHeaders').value.trim();
+  var edited = raw !== (STATE.headersDisplayed || '');
+  var headers = null;
+  if (raw) {
+    try { headers = JSON.parse(raw); }
+    catch (err) { throw new Error('额外请求头不是合法 JSON'); }
+    if (!headers || typeof headers !== 'object' || Array.isArray(headers)) {
+      throw new Error('额外请求头必须是 JSON 对象');
+    }
+  }
+  var typed = false;
+  secretHeaderInputs().forEach(function (input) {
+    var value = input.value.trim();
+    if (!value) { return; }                     // 留空表示保持不变：不回传空值覆盖真实凭据
+    typed = true;
+    if (!headers) { headers = {}; }
+    headers[input.getAttribute('data-header-name')] = value;
+  });
+  if (!edited && !typed) { return null; }       // 未改动 → 不回传 headers，服务端沿用已存配置
+  return headers || {};
+}
+function proxyFieldValue() {
+  var current = $('proxy').value.trim();
+  if (current === (STATE.proxyDisplayed || '')) { return null; }  // 未改动 → 不回传，保留已存凭据
+  if (!current) { return CLEAR_TOKEN; }          // 清空已显示的代理 = 显式删除
+  return current;
+}
+function proxyDropsCredentials(payload) {
+  if (!STATE.proxyHasCredentials || payload.proxy === undefined) { return false; }
+  if (payload.proxy === CLEAR_TOKEN) { return false; }
+  return String(payload.proxy).indexOf('@') < 0;
 }
 function formPayload() {
   var payload = {
@@ -1220,16 +1324,14 @@ function formPayload() {
     model: $('modelName').value.trim(),
     max_tokens: Number($('maxTokens').value || 0),
     timeout_s: Number($('timeoutS').value || 0),
-    auth_style: $('authStyle').value,
-    proxy: $('proxy').value.trim()
+    auth_style: $('authStyle').value
   };
   var key = $('apiKey').value.trim();
   if (key) { payload.api_key = key; }
-  var headers = $('extraHeaders').value.trim();
-  if (headers) {
-    try { payload.headers = JSON.parse(headers); }
-    catch (err) { throw new Error('额外请求头不是合法 JSON'); }
-  }
+  var headers = collectHeaders();
+  if (headers) { payload.headers = headers; }
+  var proxy = proxyFieldValue();
+  if (proxy !== null) { payload.proxy = proxy; }
   if (STATE.editingId) { payload.profile_id = STATE.editingId; }
   return payload;
 }
@@ -1242,6 +1344,10 @@ async function saveProfile(activate) {
   try { payload = formPayload(); }
   catch (err) { notice('bad', err.message); return; }
   if (!payload.name) { notice('bad', '请先填写配置名称。'); return; }
+  if (proxyDropsCredentials(payload) &&
+      !window.confirm('该配置的代理地址里保存着账号口令（浏览器看不到）；用不含凭据的新地址保存会丢弃原凭据。确认继续？')) {
+    return;
+  }
   $('saveProfile').disabled = true; $('saveActivate').disabled = true;
   try {
     var editing = STATE.editingId;
@@ -1259,6 +1365,7 @@ async function saveProfile(activate) {
     $('editorTitle').textContent = '编辑配置：' + data.name;
     $('apiKey').value = '';
     $('apiKey').placeholder = data.has_key ? ('已保存 ' + data.key_masked + '，留空表示不修改') : '尚未配置密钥';
+    syncSecretFields(data);   // 保存后只回填服务端下发的非敏感视图（敏感头只留键名、代理去掉 userinfo）
     notice('ok', '配置「' + data.name + '」已保存' + (activate || !STATE.active ? '并启用' : '') + '，密钥 ' + (data.key_masked || '未设置') + '。');
   } catch (err) { notice('bad', '保存失败：' + err.message); }
   finally { $('saveProfile').disabled = false; $('saveActivate').disabled = false; }

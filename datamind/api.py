@@ -163,7 +163,7 @@ class ProfileImportRequest(BaseModel):
     activate_first: bool = False
 
 
-app = FastAPI(title="DataMind Agent", version="0.35.0")
+app = FastAPI(title="DataMind Agent", version="0.36.0")
 
 
 @app.middleware('http')
@@ -739,7 +739,12 @@ def resolve_profile(request: ProfileRequest | None = None, *, stored: dict | Non
 
 @app.get("/v1/model/profiles")
 def get_profiles():
-    """已保存的接入配置列表（密钥只回显掩码）+ 可选协议。"""
+    """已保存的接入配置列表（密钥只回显掩码）+ 可选协议。
+
+    读取侧不下发任何凭据值：敏感请求头只回显键名（``header_keys``），``proxy``
+    去掉 userinfo。表单因此看不到真实值，留空即可；保存时由 settings_store 做
+    键级合并，不会用空值覆盖已存的真实凭据。
+    """
     return _profiles_safe()
 
 

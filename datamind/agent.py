@@ -215,9 +215,17 @@ class DataMindAgent:
             from ingestion.contract_store import read_locators
             return read_locators(block_ids, _read_dsn())
 
+        def relation_lookup(block_ids):
+            # Stored relations come from the contract store too; a document whose parse
+            # produced no validated relation simply has none, and the citation carries an
+            # empty list. They are shown with the citation, never used to rank evidence.
+            from ingestion.contract_store import read_relations
+            return read_relations(block_ids, _read_dsn())
+
         kwargs={'document_refs':document_refs} if document_refs is not None else {}
         result = ask_documents(question, collections=collections, generator=generator, retriever=retriever,
-                               on_retrieval=retrieved, locator_lookup=locator_lookup, **kwargs)
+                               on_retrieval=retrieved, locator_lookup=locator_lookup,
+                               relation_lookup=relation_lookup, **kwargs)
         self._record_document_evidence(result)
         if result["status"] == "abstained":
             self._event("verification.failed", "verification_agent", "warning", error_code=result["error_code"],

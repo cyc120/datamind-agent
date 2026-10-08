@@ -75,12 +75,39 @@
     },
     "F10": {
       "title": "公开摄取跨存储一致性（Qdrant 先写、PG 后提交）",
-      "severity_after_review": "P2（设计性缺口）",
-      "status": "deferred_with_reason",
-      "by": "主代理",
-      "mechanism": "ingestion/ingest.py 先对 Qdrant 执行 delete+upsert（非事务），随后才写 chunks 并 meta.commit()；PG 提交失败时 Qdrant 已是新向量而 PG 仍是旧 chunk，检索可能用旧文本配新向量",
-      "reason": "修复需要 outbox/状态机式的多存储协议并改动摄取主链路；该链路依赖 Qdrant 与嵌入模型，本轮预算内无法给出充分验证，故不改动，避免把未验证的改动放进生产摄取路径。",
-      "planned_fix": "按复审建议复用 outbox 模式：摄取前先把文档置为不可检索状态并提交 → 写 Qdrant → 写 PG chunks 并置 indexed 提交；任何失败都停在“不可检索”，并提供一个可由既有孤儿回收路径驱动的重试入口。"
+      "severity_after_review": "P2（设计性）",
+      "status": "fixed",
+      "by": "子代理（主代理复核并补回归守护）",
+      "files": [
+        "ingestion/ingest.py",
+        "tests/test_ingest_ordering.py",
+        "tests/test_ingest_block_identity.py"
+      ],
+      "fix": [
+        "新增 publish_document(cur, qc, doc_id, collection, points, write_metadata, *, commit, …) 顺序协议：先 UPDATE status='parsing' 并**立即 commit**（不可检索）→ Qdrant delete+upsert → write_metadata()（写 blocks/locators/facts/chunks）→ 置 'indexed'/'failed' 并 commit",
+        "登记资产后立即 commit，使解析/嵌入/向量写入全程该文档都选不中",
+        "第 2/3 步不捕获异常：异常上抛前不会执行任何 indexed 的 UPDATE/commit",
+        "选定的不可检索状态 'parsing' 有实测依据：document_assets 无 status CHECK 约束（只有 pkey 与 collection+sha256 唯一键），且 'parsing' 是本文件原有就写入的值；可见性一律由 status='indexed' 过滤（knowledge.py 等 6 处）",
+        "顺手删除重复的 DELETE FROM document_block_locators（纯冗余）"
+      ],
+      "acceptance": [
+        "非检索 commit 早于第一次 Qdrant 调用；indexed commit 晚于 Qdrant 且晚于元数据写入（mock 记录语句顺序）",
+        "Qdrant delete/upsert 抛错、元数据写抛错、**终态 PG commit 抛错（F10 原场景）** 时都不出现 indexed 提交，已提交状态只剩 'parsing'",
+        "非检索 commit 自身失败则不触碰 Qdrant",
+        "无切片时终态 'failed' 且 needs_review",
+        "用 mock 证明协议不构造真实 Qdrant 客户端"
+      ],
+      "residual_risk": [
+        "不是分布式事务：Qdrant 写成功而 PG 最终失败会留下孤儿向量；它们不影响检索内容（dense 命中被 row_map 按 status='indexed' 过滤），代价是向量存储多于元数据",
+        "重试入口：重跑 ingestion/ingest.py（不加 --reset）；失败文档 status≠'indexed' 不会被跳过，publish_document 会先按 document_id 清掉上次孤儿",
+        "pdf_maintenance 的 orphan_scan/reclaim_orphans 只覆盖私有 PDF 集合，不覆盖 demo 集合 datamind_knowledge，属兜底而非本路径回收器",
+        "并发两次 ingest 同一文档无锁，状态机可能交错"
+      ],
+      "tests": {
+        "file": "tests/test_ingest_ordering.py",
+        "added": 11,
+        "suite_result": "11/11 通过"
+      }
     },
     "F02": {
       "title": "指标表达式只校验列名、且非空结果即视为已验证",
@@ -304,12 +331,12 @@
       "tests.test_model_profile_proxy": "9/9"
     },
     "full_isolated_regression": {
-      "tests": 743,
+      "tests": 804,
       "failures": 0,
       "errors": 0,
       "exit_code": 0,
-      "previous_stage_tests": 734,
-      "note": "补齐 F06 剩余部分并修复自查发现的 F12 后的完整隔离回归"
+      "previous_stage_tests": 743,
+      "note": "合并 F10、读取侧脱敏与关系消费三条线后的完整隔离回归；首次运行出现 1 个瞬时错误，重跑 804/804 全绿（与容器重建/并发干扰有关，未复现）"
     }
   },
   "concurrency_note": "另有 Codex（ChatGPT 桌面版 CLI）在同一检出与同一 PostgreSQL 上并行工作，此前已造成一次提交被其产物污染、一次回归被其并发测试干扰（30 个连接错误）。本轮所有提交只按显式路径 add，并在提交前核对 git diff --cached。",
@@ -321,10 +348,48 @@
     "compose 回环绑定需重建容器才生效；跨机部署还需防火墙/反代",
     "F10 延后：摄取跨存储一致性需 outbox 模式"
   ],
-  "api_version": "0.35.0",
+  "api_version": "0.36.0",
   "version_changes": {
     "datamind/api.py": "0.33.0 → 0.34.0",
     "web/index.html": "前端缓存版本 0.33.0 → 0.34.0（app.js 与 multifile.js 均变更，不提升会让回访浏览器继续用旧脚本、F08 修复不生效）",
     "ingestion/office.py": "CONTRACT_PARSER_VERSION 'office-adapter-v1' → 'v2'（block id 方案、DOCX 顺序与 XLSX 状态语义变化，诚实升版以触发重新解析）"
+  },
+  "regressions_introduced_and_fixed": [
+    {
+      "id": "R1",
+      "title": "块标识只在 parse_pdf 内赋值，导致 OHR-Bench JSON 分支的块没有 block_id",
+      "introduced_by": "主代理（提交 3a2ab33 的 _block_row 重构：把 block_id 赋值从 main() 写入循环移进 parse_pdf）",
+      "impact": "不走 parse_pdf 的生产者（OHR-Bench JSON 分支）构造的块缺少 block_id，build_chunks 在 b['block_id'] 处 KeyError；data/ohr_bench_samples/ 有 15 个样张，完整摄取会在 OHR 段中断",
+      "how_found": "子代理在修 F10 时用纯函数复现并报告（但它归因为“预先存在”——该归因不成立：重构前的 main() 会给每个块赋 id）",
+      "fix": "新增 ingest.ensure_block_ids(blocks, doc_id) 并在 facts.extract/build_chunks 之前调用：只为缺失 id 的块按**位置**生成稳定 id，已有 id 一律不改（契约映射与数据库行必须共用同一身份）",
+      "second_defect_found_by_the_new_test": "首版 ensure_block_ids 用 reading_order 派生 id，而两个块可以合法共享 reading_order（OHR 分支每记录一块、reading_order=0）→ 生成相同 id、会撞主键。改为按位置派生并在冲突时加后缀，保证唯一。",
+      "guard": "tests/test_ingest_block_identity.py（6 项）：无 id 则赋 id、已有 id 不改、稳定且唯一、无 reading_order 仍互不相同、OHR 形状块可正常切片、未命名的块切片仍是文档化的失败（不能靠 build_chunks 静默容忍）"
+    }
+  ],
+  "roadmap_progress": {
+    "relations_consumed": {
+      "status": "done",
+      "files": [
+        "ingestion/contract_store.py",
+        "datamind/rag_engine.py",
+        "datamind/agent.py"
+      ],
+      "detail": "read_relations 按 source/target 两向命中、空输入不查库、512 上限；citation_from_hit(relations=…) 只附存储中确有的；ask_documents(relation_lookup=…) 一次查询、失败记 relation_lookup_error 且不阻断；未注入时行为不变",
+      "hardening_by_coordinator": [
+        "对端字段更名 block_id → peer_block_id：locator 载荷里 block_id 是被引块，关系载荷里同名字段是对端，语义相反必须断开",
+        "迁移 016 为 target_block_id 补索引（原按对端查询是顺序扫描），实测走 Index Scan",
+        "文档写明关系只是可追溯元数据，不参与排序/打分/重排/冲突消解，前端未展示"
+      ],
+      "boundary": "关系尚未进入检索排序或冲突消解；前端未渲染该字段"
+    },
+    "F03_effectiveness": {
+      "status": "done",
+      "detail": "已用 docker compose -f deploy/compose.yaml up -d 重建两个容器（复用既有卷 datamind-db_*）；docker ps 显示仅 127.0.0.1:5432 与 127.0.0.1:6333-6334；数据完好（27 文档 / 169 切片）；Qdrant green 169 点；API 健康 200",
+      "note": "compose 文件首行 name: datamind-db 与 container_name 使项目名与卷得以复用——若此前贸然以默认项目名 up 会创建空库，故先核对了容器标签与卷归属"
+    },
+    "vision_model_blocker": {
+      "status": "blocked_external",
+      "detail": "本机网关仅 deepseek-flash（纯文本），仓库无权重目录 → V-CAR“真实视觉载荷与模型规模对比”不可执行，需外部提供视觉模型；与 T6 授权真实输入同属外部依赖"
+    }
   }
 }

@@ -48,6 +48,20 @@ CHUNK_MAX = 800
 CHUNK_OVERLAP = 80
 PARSER_VERSION = "pdf-ocr-0.4"
 
+# ---------- 摄取顺序协议（审计 F10 / outbox-lite，不引入新表） ----------
+# 依据（实测，不是推测）：`document_assets` 上**没有** status 的 CHECK 约束
+# （在库中查 pg_constraint 只得到 document_assets_pkey 与
+# document_assets_collection_sha256_key），所以复用既有值即可，无需迁移。
+# 对外可见性一律由 `status='indexed'` 过滤：datamind/knowledge.py、
+# datamind/api.py（文档检索/统计）、datamind/authority.py、
+# datamind/industrial.py、datamind/approvals.py、datamind/fact_reviews.py。
+# 选 'parsing' 作"不可检索"状态：它是**本文件既有**写入的值
+# （登记资产的 INSERT ... ON CONFLICT 已经写 'parsing'），且非 'indexed'，
+# 因此任何检索入口都选不中它。不臆造新状态。
+NON_SEARCHABLE_STATUS = "parsing"
+SEARCHABLE_STATUS = "indexed"
+FAILED_STATUS = "failed"
+
 
 def sha256_file(p: Path) -> str:
     h = hashlib.sha256()
@@ -402,6 +416,84 @@ def build_chunks(blocks, doc_id):
 
 
 # ============================================================
+# 发布顺序协议（一次性写完向量 + 元数据，任何失败都停在"不可检索"）
+# ============================================================
+def ensure_block_ids(blocks, doc_id):
+    """Give every block a stable id before it is chunked or written.
+
+    Ids are normally assigned where the blocks are parsed, so the contract mapping and the
+    database row share one identity. Other producers build blocks directly — the OHR-Bench
+    JSON branch does — and used to rely on the write loop to name them. This keeps that
+    guarantee in one place instead of depending on each producer remembering.
+    """
+    used = {block["block_id"] for block in blocks if block.get("block_id")}
+    for position, block in enumerate(blocks):
+        if block.get("block_id"):
+            continue
+        # Position, not reading_order: two blocks can legitimately share a reading_order
+        # (the OHR branch emits one per record with 0), and an id collision would collide
+        # on the primary key and silently merge two blocks.
+        candidate = f"blk-{md5(doc_id + str(position))}"
+        attempt = 0
+        while candidate in used:
+            attempt += 1
+            candidate = f"blk-{md5(doc_id + str(position) + '#' + str(attempt))}"
+        used.add(candidate)
+        block["block_id"] = candidate
+    return blocks
+
+
+def publish_document(cur, qc, doc_id, collection, points, write_metadata, *, commit,
+                     page_count, quality_score, quality_detail, parser_version=PARSER_VERSION):
+    """按 F10 复审给出的顺序发布一个文档：非检索提交 → Qdrant → PG 元数据 + 终态提交。
+
+    `write_metadata()` 是写 PG 的 blocks/locators/facts/chunks 的回调，返回落库的
+    chunk 数（0 表示没有可检索切片）。`commit` 传连接上的提交函数。
+
+    顺序与保证：
+    1. 先把 `document_assets.status` 置为 NON_SEARCHABLE_STATUS 并**立即 commit**，
+       这一步发生在第一次 Qdrant 调用之前。因此从此刻到第 3 步提交之间，所有
+       检索入口（`status='indexed'` 过滤）都选不中该文档，不会出现"旧文本 + 新
+       向量"或"新文本 + 旧向量"的对外可见组合——任何失败都停在这个不可检索态。
+    2. 执行 Qdrant 的 delete(document_id) + upsert(points)。
+    3. 调 `write_metadata()`，再按 chunk 数把终态置为 'indexed' / 'failed' 并 commit。
+
+    异常传播：第 2、3 步抛错时本函数不捕获、也不执行终态 UPDATE/commit，异常直接
+    向上传，已提交的库里状态仍是 NON_SEARCHABLE_STATUS，绝不会被置成 'indexed'。
+
+    诚实边界（这不是分布式事务）：第 2 步成功而第 3 步最终失败时，PG 收敛在
+    不可检索态，但 Qdrant 里会留下这一版新写入的向量（孤儿向量），检索侧读不到
+    旧文本配新向量，代价是向量存储可能短暂多于元数据。重试入口是既有的：重跑本
+    文件（默认不加 --reset）——失败文档的 status != 'indexed'，不会被跳过分支跳过，
+    第 2 步的 delete(document_id) 会先清掉上次的孤儿向量再重写；私有 PDF 集合另有
+    datamind/pdf_maintenance.py 的 orphan_scan / reclaim_orphans
+    （HTTP /v1/pdf-knowledge/orphans 与 /v1/pdf-knowledge/orphans/reclaim）兜底。
+    """
+    # 1) 先落"不可检索"状态并提交（提交后 Qdrant 才可能被改动）
+    cur.execute("UPDATE document_assets SET status=%s, parser_version=%s WHERE document_id=%s",
+                (NON_SEARCHABLE_STATUS, parser_version, doc_id))
+    commit()
+
+    # 2) Qdrant 覆盖式重建该文档的向量
+    from qdrant_client.models import FieldCondition, Filter, FilterSelector, MatchValue
+    qc.delete(collection, points_selector=FilterSelector(filter=Filter(must=[
+        FieldCondition(key="document_id", match=MatchValue(value=doc_id))])), wait=True)
+    if points:
+        qc.upsert(collection, points)
+
+    # 3) PG 元数据 + 终态提交（只有走到这里才可能变成 'indexed'）
+    chunk_count = write_metadata() or 0
+    cur.execute("""
+        UPDATE document_assets SET status=%s, needs_review=%s, page_count=%s,
+               quality_score=%s, quality_detail=%s, doc_version=1, parser_version=%s
+        WHERE document_id=%s""",
+        (SEARCHABLE_STATUS if chunk_count else FAILED_STATUS, not chunk_count, page_count,
+         quality_score, json.dumps(quality_detail, ensure_ascii=False), parser_version, doc_id))
+    commit()
+    return chunk_count
+
+
+# ============================================================
 # 主流程
 # ============================================================
 def main():
@@ -498,6 +590,9 @@ def main():
             ON CONFLICT (document_id) DO UPDATE SET status='parsing'""",
             (doc_id, job["title"], job["collection"], job["file_type"], job["origin"],
              digest, str(path), 0, "zh", ["public"], None, None, PARSER_VERSION))
+        # F10 第 1 步（提前）：登记为非检索状态后**立即提交**，让解析/嵌入这段
+        # 长事务期间该文档也选不中；失败时不会退回旧的已提交状态。
+        meta.commit()
 
         if job["file_type"] == "pdf":
             blocks, page_count, q_detail = parse_pdf(path, doc_id, include_quality=True,
@@ -518,23 +613,13 @@ def main():
                         "note": "OHR-Bench 人工校准 gt_text（原始样本转录，不是本项目 OCR）"}
             q_score = 1.0
 
-        # document_blocks
-        cur.execute("DELETE FROM document_blocks WHERE document_id=%s", (doc_id,))
-        cur.execute("DELETE FROM document_block_locators WHERE document_id=%s", (doc_id,))
-        for b in blocks:
-            cur.execute(BLOCK_INSERT_SQL, _block_row(b, doc_id))
-        cur.execute("DELETE FROM document_block_locators WHERE document_id=%s", (doc_id,))
-        for b in blocks:
-            if (locator_row := _locator_row(b, doc_id)) is not None:
-                cur.execute(LOCATOR_INSERT_SQL, locator_row)
-
+        ensure_block_ids(blocks, doc_id)
         extracted, field_detail = facts.extract(blocks, document_id=doc_id, source_sha256=digest,
                                                parser_version=PARSER_VERSION)
-        facts.persist(cur, doc_id, extracted)
         q_detail["fact_extraction"] = field_detail
         chunks = build_chunks(blocks, doc_id)
 
-        # 嵌入 + Qdrant
+        # 嵌入（纯计算，不碰存储）
         texts = [c["text_for_embedding"] for c in chunks]
         vectors = list(model.embed(texts)) if texts else []
         points = []
@@ -549,36 +634,41 @@ def main():
                 "document_version": 1, "embedding_model": EMBED_MODEL,
                 "title": job["title"], "origin": job["origin"],
             }))
-        from qdrant_client.models import FieldCondition, Filter, FilterSelector, MatchValue
-        qc.delete(COLLECTION, points_selector=FilterSelector(filter=Filter(must=[
-            FieldCondition(key="document_id", match=MatchValue(value=doc_id))])), wait=True)
-        if points:
-            qc.upsert(COLLECTION, points)
 
-        # chunks 表
-        cur.execute("DELETE FROM chunks WHERE document_id=%s", (doc_id,))
-        for ci, c in enumerate(chunks):
-            cur.execute("""
-                INSERT INTO chunks(chunk_id, document_id, document_version, chunk_index,
-                    chunk_type, section_path, page_start, page_end, block_ids,
-                    text_for_embedding, exact_text, table_json, token_count,
-                    quality_score, acl, embedding_model, vector_id, content_hash)
-                VALUES (%s,%s,1,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-                (c["chunk_id"], doc_id, ci, c["chunk_type"], c["section_path"],
-                 c["page_start"], c["page_end"], c["block_ids"],
-                 c["text_for_embedding"], c["exact_text"],
-                 json.dumps(c["table_json"], ensure_ascii=False) if c.get("table_json") else None,
-                 int(len(c["exact_text"]) * 0.6), q_score, ["public"], EMBED_MODEL,
-                 c["vector_id"], hashlib.sha256(c["exact_text"].encode()).hexdigest()))
+        def write_metadata():
+            """第 3 步：Qdrant 写成功后再落 PG 的 blocks/locators/facts/chunks。
 
-        cur.execute("""
-            UPDATE document_assets SET status=%s, needs_review=%s, page_count=%s,
-                   quality_score=%s, quality_detail=%s, doc_version=1, parser_version=%s
-            WHERE document_id=%s""", ('indexed' if chunks else 'failed', not bool(chunks), page_count,
-                q_score, json.dumps(q_detail, ensure_ascii=False), PARSER_VERSION, doc_id))
-        meta.commit()
-        total_chunks += len(chunks)
-        print(f"  [{job['origin']:8s}] {job['title'][:44]:46s} blocks={len(blocks):3d} chunks={len(chunks):3d}")
+            返回落库的 chunk 数，供终态判断使用。
+            """
+            cur.execute("DELETE FROM document_blocks WHERE document_id=%s", (doc_id,))
+            cur.execute("DELETE FROM document_block_locators WHERE document_id=%s", (doc_id,))
+            for b in blocks:
+                cur.execute(BLOCK_INSERT_SQL, _block_row(b, doc_id))
+            for b in blocks:
+                if (locator_row := _locator_row(b, doc_id)) is not None:
+                    cur.execute(LOCATOR_INSERT_SQL, locator_row)
+            facts.persist(cur, doc_id, extracted)
+            cur.execute("DELETE FROM chunks WHERE document_id=%s", (doc_id,))
+            for ci, c in enumerate(chunks):
+                cur.execute("""
+                    INSERT INTO chunks(chunk_id, document_id, document_version, chunk_index,
+                        chunk_type, section_path, page_start, page_end, block_ids,
+                        text_for_embedding, exact_text, table_json, token_count,
+                        quality_score, acl, embedding_model, vector_id, content_hash)
+                    VALUES (%s,%s,1,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                    (c["chunk_id"], doc_id, ci, c["chunk_type"], c["section_path"],
+                     c["page_start"], c["page_end"], c["block_ids"],
+                     c["text_for_embedding"], c["exact_text"],
+                     json.dumps(c["table_json"], ensure_ascii=False) if c.get("table_json") else None,
+                     int(len(c["exact_text"]) * 0.6), q_score, ["public"], EMBED_MODEL,
+                     c["vector_id"], hashlib.sha256(c["exact_text"].encode()).hexdigest()))
+            return len(chunks)
+
+        chunk_count = publish_document(cur, qc, doc_id, COLLECTION, points, write_metadata,
+                                       commit=meta.commit, page_count=page_count,
+                                       quality_score=q_score, quality_detail=q_detail)
+        total_chunks += chunk_count
+        print(f"  [{job['origin']:8s}] {job['title'][:44]:46s} blocks={len(blocks):3d} chunks={chunk_count:3d}")
 
     # 汇总
     cur.execute("""SELECT origin, count(*), sum(page_count) FROM document_assets GROUP BY origin""")

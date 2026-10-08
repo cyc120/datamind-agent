@@ -66,6 +66,17 @@
 
 `tests/test_parse_contract.py` **25/25**，完整隔离回归见 `reports/parse_contract_verification.json`。覆盖：常量与文档一致、摄取状态机放行/拒绝、七类定位器逐一校验与必需字段缺失、页号/bbox 越界与倒置、CAD 句柄、关系端点/类型/状态/证据/恢复方法、结果必需字段与未知字段拒绝、适配器登记/查询/未知与不支持区分，以及用真实 ingest/OCR 块形状做映射往返（字段不丢、缺失保持缺失、页尺寸缺失拒绝）。
 
+## 关系被检索侧消费（API 0.36.0）
+
+`document_block_relations` 里的契约关系（例如原生 DXF 的尺寸标注 → 目标圆）现在随引用一并提供，纪律与定位**完全一致**：
+
+- `contract_store.read_relations(block_ids, dsn)`：按 `source_block_id` **或** `target_block_id` 命中给定块，按块归组；空输入不查库，超过 `MAX_RELATION_QUERY`（512）拒绝。返回行含存储列 + `direction`（被查询块是 `source` 还是 `target`）+ **`peer_block_id`**（对端）。
+- **命名刻意不同**：locator 载荷里的 `block_id` 是**被引块**，而关系载荷里的 `peer_block_id` 是**对端**。两者语义相反，因此不共用键名，避免消费方把证据标错方向。
+- `citation_from_hit(..., relations=…)` 只附上存储中确实存在的关系；`ask_documents(..., relation_lookup=…)` 一次性查询全部命中块，失败**不阻断回答**并写入独立的 `relation_lookup_error`（与 locator 的错误互不影响）；未注入时行为与之前完全一致。
+- 索引：迁移 016 为 `target_block_id` 补索引，按对端查询不再是顺序扫描（实测执行计划为 `Index Scan using document_block_relations_target_idx`）。
+
+**关系目前只是可追溯元数据**：它**不参与**检索排序、打分、重排或冲突消解，前端也尚未展示该字段。
+
 ## 前端消费定位（API 0.33.0）
 
 `web/app.js` 的引用卡片在存在定位时显示「已验证定位」徽标（`pdf_region · 第 N 页`、`cad_entity · Model · 句柄 X`、`sheet_range · 工作表 A1:B1` 等），并对可映射的 `pdf_region` 提供**区域高亮**：复用既有 `field-page` + SVG 叠加，按 `page_width`/`page_height` 做 viewBox、按 `bbox` 画框。

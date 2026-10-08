@@ -101,6 +101,10 @@ _CREDENTIAL_HINT = re.compile(
 
 _REDACTED = "[REDACTED]"
 
+#: 显式删除哨兵。读取侧不再下发敏感值，所以「空值」只能表示「保持不变」；
+#: 要主动删除一个敏感头或一个代理，必须显式提交这个哨兵（见下方合并规则）。
+CLEAR_SENTINEL = "__clear__"
+
 
 def is_sensitive_header(name) -> bool:
     """判断一个请求头是否属于认证材料（authorization/api-key/cookie/token 等）。"""
@@ -236,6 +240,125 @@ def redact_profile(payload: dict) -> dict:
     return _scrub_secrets(redacted, secrets)
 
 
+# ---------- 读取侧「敏感头只回显键名」+ 保存侧「键级合并」 ----------
+#
+# 读取侧（public_profile）不再下发任何凭据值：敏感头只回显键名（header_keys），
+# proxy 去掉 userinfo。浏览器因此看不到 Authorization / api-key / Cookie 的值，
+# 保存时也就无法把它们原样回传，所以保存侧必须做键级合并，规则如下：
+#   * 敏感头缺失 / None / 空白串 → 沿用已存值（绝不用空值覆盖真实凭据）；
+#   * 敏感头提交了新的非空值 → 替换；
+#   * 已存但本次未提交的敏感头 → 原样保留；
+#   * 敏感头提交 CLEAR_SENTINEL → 显式删除（唯一删除通道）；
+#   * 非敏感头保持旧语义：以提交的字典为准（缺失即删除）。
+# proxy 同理：缺失 / 空白 / 等于已存值的脱敏视图 → 保持原值（含 userinfo）；
+# 提交新的非空值 → 替换；提交 CLEAR_SENTINEL → 清空。
+
+
+def _iter_header_pairs(text):
+    """逐行解析 ``Name: value`` 形态的原始请求头文本；没有冒号的行一律丢弃。"""
+    for line in str(text or "").splitlines():
+        name, sep, value = line.partition(":")
+        name = name.strip()
+        if sep and name:
+            yield name, value.strip()
+
+
+def _headers_dict(headers) -> dict:
+    """把 headers 归一成键值字典；``{"__raw__": "<文本>"}`` 按行解析成键值。"""
+    if isinstance(headers, dict):
+        pairs: dict = {}
+        raw = headers.get("__raw__")
+        if raw is not None:
+            pairs.update(_iter_header_pairs(raw))
+        for name, value in headers.items():
+            if name != "__raw__":
+                pairs[str(name)] = value
+        return pairs
+    if isinstance(headers, str):
+        return dict(_iter_header_pairs(headers))
+    return {}
+
+
+def split_public_headers(headers) -> tuple[dict, list[str]]:
+    """把 headers 拆成「可回显的非敏感键值」与「只回显键名的敏感头」。
+
+    敏感头（``is_sensitive_header``）的值永远不进返回值；原始文本里没有冒号、
+    无法命名的行也一律丢弃，宁可少回显也不冒险下发凭据。
+    """
+    visible: dict = {}
+    secret_names: list[str] = []
+    for name, value in _headers_dict(headers).items():
+        if is_sensitive_header(name):
+            if name not in secret_names:
+                secret_names.append(name)
+        else:
+            visible[name] = value
+    return visible, secret_names
+
+
+def merge_sensitive_headers(incoming, existing) -> dict:
+    """敏感头的键级合并（保存语义）：读取侧看不到的值不会被空值抹掉。
+
+    规则见本段开头的注释；``existing`` 中的键做大小写不敏感匹配。
+    """
+    submitted = _headers_dict(incoming)
+    stored = _headers_dict(existing)
+    stored_by_key = {name.lower(): (name, value) for name, value in stored.items()}
+    submitted_keys = {name.lower() for name in submitted}
+    merged: dict = {}
+    for name, value in submitted.items():
+        if not is_sensitive_header(name):
+            merged[name] = value
+            continue
+        text = "" if value is None else str(value).strip()
+        if text == CLEAR_SENTINEL:
+            continue                      # 显式删除
+        if text:
+            merged[name] = value          # 显式新值：替换
+            continue
+        previous = stored_by_key.get(name.lower())
+        if previous:
+            merged[previous[0]] = previous[1]   # 空值 = 保持已存值不变
+    for name, value in stored.items():
+        if is_sensitive_header(name) and name.lower() not in submitted_keys:
+            merged.setdefault(name, value)      # 未提交的敏感头：保留，不带出也不清空
+    return merged
+
+
+def proxy_has_userinfo(proxy) -> bool:
+    """proxy 里是否含 userinfo（凭据）或无法解析的 ``@``。"""
+    value = str(proxy or "").strip()
+    if not value:
+        return False
+    candidate = value if "://" in value else "//" + value
+    try:
+        parts = urlsplit(candidate)
+    except ValueError:
+        return "@" in value
+    if parts.username is not None or parts.password is not None:
+        return True
+    return "@" in value
+
+
+def merge_proxy_value(incoming, existing) -> str:
+    """proxy 的保存合并：读取侧只下发去掉 userinfo 的地址，空值/脱敏值不得覆盖凭据。
+
+    ``CLEAR_SENTINEL`` 是唯一的清空通道；提交其他非空值即视为替换（若想保留
+    代理凭据，请在新值里带上 userinfo）。
+    """
+    current = str(existing or "").strip()
+    if incoming is None:
+        return current
+    text = str(incoming).strip()
+    if not text or text == current:
+        return current                    # 空值 / 原样回传 = 保持不变
+    if text == CLEAR_SENTINEL:
+        return ""
+    if current and text == redact_proxy(current):
+        return current                    # 提交的是脱敏视图（不含 userinfo）→ 保留原值
+    return text
+
+
 def _clean_profile(raw: dict, *, existing: dict | None = None) -> dict:
     merged = dict(existing or {})
     for field in PROFILE_FIELDS:
@@ -260,7 +383,13 @@ def _clean_profile(raw: dict, *, existing: dict | None = None) -> dict:
     headers = merged.get("headers")
     if isinstance(headers, str):
         headers = {"__raw__": headers}
+    if isinstance(headers, dict) and isinstance(existing, dict) and "headers" in raw:
+        # 读取侧不下发敏感头值：浏览器回传的 headers 里敏感头缺失或为空 = 保持不变
+        headers = merge_sensitive_headers(headers, existing.get("headers"))
     merged["headers"] = headers if isinstance(headers, dict) else {}
+    if isinstance(existing, dict) and "proxy" in raw:
+        # 同理：空白或脱敏视图不得覆盖已存的代理凭据
+        merged["proxy"] = merge_proxy_value(raw.get("proxy"), existing.get("proxy"))
     merged["proxy"] = (merged.get("proxy") or "").strip()
     merged["note"] = (merged.get("note") or "").strip()
     return merged
@@ -356,16 +485,29 @@ def active_profile() -> dict:
 
 
 def public_profile(profile: dict, *, active: bool = False) -> dict:
-    """浏览器安全视图：不含明文密钥。"""
+    """浏览器安全视图：不下发任何凭据值。
+
+    * ``api_key`` 只回掩码；
+    * 敏感头（authorization / api-key / cookie 等）**只回显键名**（``header_keys``），
+      值一律不下发；非敏感头继续以 ``headers`` 回显键值；
+    * ``proxy`` 去掉 userinfo（``redact_proxy``）；``has_proxy`` /
+      ``proxy_has_credentials`` 两个布尔量只告诉表单「代理已配置 / 凭据不下发」。
+    表单因此不会（也无法）回传真实凭据值，保存侧靠 ``_clean_profile`` 的
+    键级合并把「缺失或空值」解释为「保持不变」。
+    """
     key = profile.get("api_key") or ""
+    headers, header_keys = split_public_headers(profile.get("headers"))
+    proxy = str(profile.get("proxy") or "").strip()
     return {"id": profile.get("id"), "name": profile.get("name"),
             "protocol": profile.get("protocol") or OPENAI,
             "protocol_label": PROTOCOLS.get(profile.get("protocol") or OPENAI, ""),
             "base_url": profile.get("base_url"), "model": profile.get("model"),
             "has_key": bool(key), "key_masked": mask_key(key),
             "max_tokens": profile.get("max_tokens"), "timeout_s": profile.get("timeout_s"),
-            "auth_style": profile.get("auth_style") or "both", "headers": profile.get("headers") or {},
-            "proxy": profile.get("proxy") or "",
+            "auth_style": profile.get("auth_style") or "both",
+            "headers": headers, "header_keys": header_keys,
+            "has_proxy": bool(proxy), "proxy_has_credentials": proxy_has_userinfo(proxy),
+            "proxy": redact_proxy(proxy),
             "note": profile.get("note") or "", "updated_at": profile.get("updated_at"),
             "active": active}
 
