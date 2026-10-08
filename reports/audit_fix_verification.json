@@ -343,12 +343,12 @@
       "tests.test_model_profile_proxy": "9/9"
     },
     "full_isolated_regression": {
-      "tests": 839,
+      "tests": 844,
       "failures": 0,
       "errors": 0,
       "exit_code": 0,
-      "previous_stage_tests": 804,
-      "note": "合并前端呈现（12）与 profile 解析收敛（19）及可见性真实验证（4）后的完整隔离回归"
+      "previous_stage_tests": 839,
+      "note": "新增依赖锁守护测试（5 项）后的完整隔离回归；本项不改变 API 行为，版本仍为 0.37.0"
     }
   },
   "concurrency_note": "另有 Codex（ChatGPT 桌面版 CLI）在同一检出与同一 PostgreSQL 上并行工作，此前已造成一次提交被其产物污染、一次回归被其并发测试干扰（30 个连接错误）。本轮所有提交只按显式路径 add，并在提交前核对 git diff --cached。",
@@ -465,5 +465,31 @@
   "incidents": [
     "Docker daemon 中途停止：所有容器（含 datamind-postgres/qdrant、new-api-local）一并不可达，测试与 API 均受影响。已 open -a Docker 恢复；容器重启后**端口仍仅绑定 127.0.0.1**（F03 的配置变更持久），数据完好（27 文档 / 169 切片），API 重启后健康 200。",
     "推送在 GitHub 抖动期间多次失败（Empty reply from server / 无法连接 443）；重试与直接重推后成功，main 与远端 0/0 同步。"
-  ]
+  ],
+  "repo_governance": {
+    "dependency_lock": {
+      "status": "done",
+      "files": [
+        "requirements.lock",
+        "tests/test_dependency_lock.py",
+        "README.md"
+      ],
+      "detail": [
+        "审计 §5 指出仓库\"无 CI、无依赖锁\"。已生成 requirements.lock（65 个固定版本，覆盖 fastapi/uvicorn/psycopg2-binary/sqlglot/httpx/qdrant-client/pymupdf 等关键运行时依赖）",
+        "守护测试断言：每行都是 name==version、关键依赖齐备、**锁文件与实际安装版本一致**（漂移即失败）、且该漂移检查非空转",
+        "README 快速开始补充\"需要严格复现隔离回归环境时用锁文件安装\"",
+        "CI 仍未添加（需要 Postgres/Qdrant 服务容器，属部署决策），已如实保留为未做项"
+      ]
+    },
+    "progress_integrity": {
+      "status": "done",
+      "files": [
+        "PROGRESS.md"
+      ],
+      "detail": [
+        "审计 §5 指出 PROGRESS.md 分母互相矛盾（同一文件既写 549/549 又写 643/650）。已建立**唯一的权威当前状态块**（API 版本、当前回归分母、审计缺陷状态、未决外部依赖、设计入口），把陈旧值显式标注为\"历史值，当前值见文首\"",
+        "并在块内写明\"新增测试会改变这个分母，每次都要同步本表\"——本轮随即因新增 5 项测试把分母从 839 更新为 844，避免再次制造同类不一致"
+      ]
+    }
+  }
 }

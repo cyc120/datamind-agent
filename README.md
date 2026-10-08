@@ -46,6 +46,8 @@
 ```bash
 python -m venv .venv
 .venv/bin/pip install -r requirements-sql.txt
+# 需要严格复现隔离回归所用的环境时，用固定版本的锁文件：
+.venv/bin/pip install -r requirements.lock
 docker compose -f deploy/compose.yaml up -d postgres
 # 全新数据库首次启动后，加载演示数据、Catalog 和评测用例：
 docker cp db/chinook/Chinook_PostgreSql.sql datamind-postgres:/tmp/chinook.sql
