@@ -38,6 +38,14 @@
 - 两端必须在**同一结果内存在**；`evidence` 必须非空。
 - `name_similarity`、`proximity`、`adjacency`、`guess` 作为 `recovery_method` 一律拒绝——名称相近或位置相邻不足以确认关系。
 
+## 媒体类型探测与 Adapter 路由（API 0.27.0）
+
+- `detect_media_type(path)` 按**文件签名**判断类型（PDF、PNG、JPEG、ZIP），未知内容返回 `application/octet-stream`，不可读则 `PARSE_MEDIA_UNREADABLE`。**扩展名只作声明，从不作为答案**；`application/zip` 无法区分 DOCX/XLSX/PPTX，这是刻意的保守结论。
+- `register_adapter(name, media_types=…, capabilities=…, handler=…)`：`handler(**kwargs)` 负责真正的映射并返回 `ParseResult` 载荷；不给 handler 时仍可声明能力，但**分发会被拒绝**。
+- `dispatch(media_type, **kwargs)`：按探测到的类型找到适配器，调用其 handler，并对返回值执行 `validate_parse_result`。未登记类型 → `PARSE_ADAPTER_UNKNOWN`；无 handler → `PARSE_ADAPTER_UNSUPPORTED`；handler 签名不符 → `PARSE_RESULT_INVALID`；handler 抛其它异常 → `PARSE_ADAPTER_UNSUPPORTED`；handler 主动抛 `HTTPException` 则原样透传其错误码。
+
+`ingestion/ingest.py` 注册了 `pdf-native`（capabilities：`native_text`/`pixel_ocr`/`tables`/`formula`），`parse_pdf` 经 `dispatch` 走这条路由，因此质量明细里会出现 `adapter: pdf-native`——这是路由**真的被走到**的证据，而不只是登记表里有一行。
+
 ## Adapter 能力登记
 
 `register_adapter(name, media_types=…, capabilities=…)` 登记进程内契约（**不是生产路由表**）；同一 media type 不能重复登记。`adapter_for(media_type)` 对未登记类型抛 `PARSE_ADAPTER_UNKNOWN`，**绝不返回「空解析成功」**。`require_capability` 区分「适配器未知」（`PARSE_ADAPTER_UNKNOWN`）与「能力不支持」（`PARSE_ADAPTER_UNSUPPORTED`）。
@@ -57,7 +65,8 @@
 ## 边界
 
 - **已接入解析出口**：`parse_pdf` 在返回前把真实块映射进契约并校验，结果记录为 `detail['parse_contract']`（`parsed`/`failed`/`skipped` + 稳定错误码）。契约违反**不会中断摄取**，而是带错误码写入质量明细保持可见。
-- **尚未接入路由与存储**：Adapter 登记仍是进程内契约，没有按 media type 路由 Adapter 的分发器；契约结果也未写入 `document_blocks`（现有存储列仍是原格式）。
+- **尚未接入存储列**：契约结果未写入 `document_blocks`（现有存储列仍是原格式），只在质量明细中保留。
+- **只注册了 PDF 一个适配器**：ZIP 类（DOCX/XLSX/PPTX）只被识别为 `application/zip`，没有更深的内容判定与适配器。
 - **未实现 Office/CAD 新解析器**：`office_object`/`sheet_range`/`cad_entity` 只是可校验的定位器契约，尚无产出它们的解析器。
 - **`Chunk`、`DocumentFact`、`DrawingFeature` 未纳入本契约**：现有存储与检索尚未统一，留待后续阶段。
 - 契约版本为 `parse-contract-v1`；变更契约需同时更新测试与本文件。

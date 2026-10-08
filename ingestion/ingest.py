@@ -72,8 +72,46 @@ def detect_heading(span_size):
     return 0
 
 
+_PDF_ADAPTER = 'pdf-native'
+
+
+def _pdf_contract_payload(*, pdf_path, doc_id, blocks, page_sizes, detail, parser_version):
+    """Adapter handler: map real PDF blocks into a contract payload.
+
+    `dispatch` validates whatever this returns; it never fills a missing value in.
+    """
+    from datamind import parse_contract
+
+    mapped = parse_contract.from_pdf_blocks(
+        blocks, page_sizes=page_sizes, parser_version=parser_version, document_id=doc_id,
+        source_version=detail["source_sha256"])
+    return {
+        "classification": {"detected_media_type": "application/pdf", "source_name": pdf_path.name},
+        "adapter_capabilities": sorted({block["block_type"] for block in blocks if block.get("block_type")}) or ["text"],
+        "blocks": mapped, "relations": [],
+        "parsed_scope": [{"kind": "page", "ref": page, "status": "parsed"} for page in sorted(page_sizes)],
+        "failed_scope": [{"kind": "page", "ref": page["page_no"], "status": "failed",
+                          "detail": page.get("error_code")}
+                         for page in detail["pages"] if page.get("error_code")],
+        "quality_findings": [], "unsupported_features": [], "artifact_refs": [],
+        "manifest": {"parser_version": parser_version, "source_sha256": detail["source_sha256"]},
+        "parse_status": detail["parse_status"],
+    }
+
+
+def _ensure_pdf_adapter():
+    """Register the PDF adapter once; routing then finds it by detected media type."""
+    from datamind import parse_contract
+
+    if _PDF_ADAPTER not in parse_contract.registered_adapters():
+        parse_contract.register_adapter(
+            _PDF_ADAPTER, media_types=["application/pdf"],
+            capabilities=["native_text", "pixel_ocr", "tables", "formula"],
+            handler=_pdf_contract_payload)
+
+
 def _contract_summary(document, pdf_path, doc_id, blocks, detail):
-    """Map the parsed blocks into the unified parse contract and record the outcome.
+    """Route the parsed blocks through the registered adapter for this media type.
 
     Ingestion is never aborted by a contract violation: the stable error code is written
     into the quality detail so the gap stays visible instead of being hidden, and the
@@ -88,29 +126,20 @@ def _contract_summary(document, pdf_path, doc_id, blocks, detail):
         return {"contract_version": version, "validation": "skipped", "reason": "no_blocks"}
     page_sizes = {index + 1: (float(page.rect.width), float(page.rect.height))
                   for index, page in enumerate(document)}
+    _ensure_pdf_adapter()
     try:
-        mapped = parse_contract.from_pdf_blocks(
-            blocks, page_sizes=page_sizes, parser_version=PARSER_VERSION, document_id=doc_id,
-            source_version=detail["source_sha256"])
-        result = parse_contract.validate_parse_result({
-            "classification": {"detected_media_type": "application/pdf", "source_name": pdf_path.name},
-            "adapter_capabilities": sorted({block["block_type"] for block in blocks if block.get("block_type")}) or ["text"],
-            "blocks": mapped, "relations": [],
-            "parsed_scope": [{"kind": "page", "ref": page, "status": "parsed"} for page in sorted(page_sizes)],
-            "failed_scope": [{"kind": "page", "ref": page["page_no"], "status": "failed",
-                              "detail": page.get("error_code")}
-                             for page in detail["pages"] if page.get("error_code")],
-            "quality_findings": [], "unsupported_features": [], "artifact_refs": [],
-            "manifest": {"parser_version": PARSER_VERSION, "source_sha256": detail["source_sha256"]},
-            "parse_status": detail["parse_status"],
-        })
+        detected = parse_contract.detect_media_type(pdf_path)
+        result = parse_contract.dispatch(detected, pdf_path=pdf_path, doc_id=doc_id, blocks=blocks,
+                                        page_sizes=page_sizes, detail=detail,
+                                        parser_version=PARSER_VERSION)
     except HTTPException as error:
         code = error.detail.get("error_code") if isinstance(error.detail, dict) else None
         return {"contract_version": version, "validation": "failed",
                 "error_code": code or "PARSE_CONTRACT_FAILED", "blocks": len(blocks)}
     payload = result.payload
     return {"contract_version": payload["contract_version"], "validation": "parsed",
-            "parse_status": payload["parse_status"], "blocks": len(payload["blocks"]),
+            "adapter": _PDF_ADAPTER, "parse_status": payload["parse_status"],
+            "blocks": len(payload["blocks"]),
             "locator_kinds": sorted({block["locator"]["locator_kind"] for block in payload["blocks"]})}
 
 

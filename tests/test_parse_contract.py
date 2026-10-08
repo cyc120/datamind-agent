@@ -351,6 +351,8 @@ class IngestIntegrationTests(unittest.TestCase):
         self.assertEqual(summary['blocks'], len(blocks))
         self.assertEqual(summary['locator_kinds'], ['pdf_region'])
         self.assertEqual(summary['parse_status'], detail['parse_status'])
+        # The result came through the registered adapter dispatch, not a direct call.
+        self.assertEqual(summary['adapter'], 'pdf-native')
 
     def test_scanned_pdf_ocr_blocks_are_validated_too(self):
         blocks, _, detail = ingest.parse_pdf(self.scanned_pdf(), 'contract-scan', include_quality=True)
@@ -379,3 +381,86 @@ class IngestIntegrationTests(unittest.TestCase):
             summary = ingest._contract_summary(document, path, 'contract-empty', [], detail)
         self.assertEqual(summary['validation'], 'skipped', summary)
         self.assertEqual(summary['reason'], 'no_blocks')
+
+
+class RoutingTests(unittest.TestCase):
+    """Media sniffing and the adapter dispatch seam."""
+
+    def setUp(self):
+        contract._ADAPTERS.clear()
+
+    def tearDown(self):
+        contract._ADAPTERS.clear()
+
+    def test_pdf_and_png_are_sniffed_from_signatures(self):
+        base = ROOT / 'data/knowledge_base'
+        self.assertEqual(contract.detect_media_type(base / '04_售后服务与退款管理制度.pdf'),
+                         'application/pdf')
+        self.assertEqual(contract.detect_media_type(base / 'f_yoy.png'), 'image/png')
+        self.assertEqual(contract.detect_media_type(ROOT / 'requirements.txt'), contract.OCTET_STREAM)
+
+    def test_unreadable_path_is_reported_not_guessed(self):
+        with self.assertRaises(HTTPException) as caught:
+            contract.detect_media_type(ROOT / 'data/does-not-exist.pdf')
+        self.assertEqual(caught.exception.detail['error_code'], 'PARSE_MEDIA_UNREADABLE')
+
+    def test_dispatch_routes_to_the_registered_handler_and_validates(self):
+        seen = {}
+
+        def handler(**kwargs):
+            seen.update(kwargs)
+            return parse_result()
+
+        contract.register_adapter('demo', media_types=['application/pdf'],
+                                  capabilities=['native_text'], handler=handler)
+        result = contract.dispatch('application/pdf', marker='x')
+        self.assertEqual(seen, {'marker': 'x'})
+        self.assertEqual(result.parse_status, 'parsed')
+        self.assertEqual(len(result.blocks), 2)
+
+    def test_dispatch_refuses_unknown_media_and_handlerless_adapters(self):
+        with self.assertRaises(HTTPException) as caught:
+            contract.dispatch('image/tiff')
+        self.assertEqual(caught.exception.detail['error_code'], 'PARSE_ADAPTER_UNKNOWN')
+        contract.register_adapter('declared-only', media_types=['application/pdf'],
+                                  capabilities=['native_text'])
+        with self.assertRaises(HTTPException) as caught:
+            contract.dispatch('application/pdf')
+        self.assertEqual(caught.exception.detail['error_code'], 'PARSE_ADAPTER_UNSUPPORTED')
+
+    def test_dispatch_validates_the_handler_output(self):
+        contract.register_adapter('bad', media_types=['application/pdf'], capabilities=['x'],
+                                  handler=lambda **_: {'classification': {}, 'blocks': []})
+        with self.assertRaises(HTTPException) as caught:
+            contract.dispatch('application/pdf')
+        self.assertEqual(caught.exception.detail['error_code'], 'PARSE_RESULT_INVALID')
+
+    def test_handler_errors_are_mapped_to_stable_codes(self):
+        def rejected(**_):
+            raise HTTPException(422, detail={'error_code': 'PARSE_LOCATOR_INVALID'})
+
+        contract.register_adapter('rejecting', media_types=['application/pdf'], capabilities=['x'],
+                                  handler=rejected)
+        with self.assertRaises(HTTPException) as caught:
+            contract.dispatch('application/pdf')
+        self.assertEqual(caught.exception.detail['error_code'], 'PARSE_LOCATOR_INVALID')
+
+        contract._ADAPTERS.clear()
+        contract.register_adapter('wrong-signature', media_types=['application/pdf'], capabilities=['x'],
+                                  handler=lambda required_positional: parse_result())
+        with self.assertRaises(HTTPException) as caught:
+            contract.dispatch('application/pdf', unexpected=True)
+        self.assertEqual(caught.exception.detail['error_code'], 'PARSE_RESULT_INVALID')
+
+        contract._ADAPTERS.clear()
+        contract.register_adapter('exploding', media_types=['application/pdf'], capabilities=['x'],
+                                  handler=lambda **_: (_ for _ in ()).throw(RuntimeError('boom')))
+        with self.assertRaises(HTTPException) as caught:
+            contract.dispatch('application/pdf')
+        self.assertEqual(caught.exception.detail['error_code'], 'PARSE_ADAPTER_UNSUPPORTED')
+
+    def test_handler_must_be_callable(self):
+        with self.assertRaises(HTTPException) as caught:
+            contract.register_adapter('bad-handler', media_types=['application/pdf'],
+                                      capabilities=['x'], handler='not-callable')
+        self.assertEqual(caught.exception.detail['error_code'], 'PARSE_RESULT_INVALID')

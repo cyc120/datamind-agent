@@ -77,6 +77,10 @@ _TIME_UNITS = ('s', 'ms', 'us', 'ns', 'iso8601', 'frame')
 _BBOX_EPSILON = 0.5
 
 _ADAPTERS: dict = {}
+# Signature sniffing answers "what is this really"; the extension is only a declared hint.
+_MAGIC = ((b'%PDF-', 'application/pdf'), (b'\x89PNG\r\n\x1a\n', 'image/png'),
+          (b'\xff\xd8\xff', 'image/jpeg'), (b'PK\x03\x04', 'application/zip'))
+OCTET_STREAM = 'application/octet-stream'
 
 
 def fail(code, **context):
@@ -417,17 +421,24 @@ def _normalize_media_type(media_type):
     return f'{top}/{sub}'
 
 
-def register_adapter(name, *, media_types, capabilities):
-    """Register an in-process adapter contract (not a production routing table)."""
+def register_adapter(name, *, media_types, capabilities, handler=None):
+    """Register an in-process adapter contract and its optional dispatch handler.
+
+    A `handler(**kwargs)` performs the actual mapping and must return a ParseResult
+    payload; `dispatch` validates whatever it returns. Without a handler the adapter can
+    still declare capabilities, but a dispatch to it is refused.
+    """
     if not _text(name) or not _sequence(media_types) or not _sequence(capabilities):
         fail('PARSE_RESULT_INVALID', subject='adapter', reason='shape')
+    if handler is not None and not callable(handler):
+        fail('PARSE_RESULT_INVALID', subject='adapter', reason='handler_must_be_callable')
     if not media_types or not capabilities:
         fail('PARSE_RESULT_INVALID', subject='adapter', reason='empty_sequence')
     normalized = tuple(_normalize_media_type(item) for item in media_types)
     if not all(_text(item) for item in capabilities):
         fail('PARSE_RESULT_INVALID', subject='adapter', reason='capability_must_be_text')
     record = {'name': name.strip(), 'media_types': normalized,
-              'capabilities': tuple(capabilities)}
+              'capabilities': tuple(capabilities), 'handler': handler}
     for media_type in normalized:
         if media_type in _ADAPTERS:
             fail('PARSE_RESULT_INVALID', subject='adapter', reason='media_type_already_registered',
@@ -435,6 +446,44 @@ def register_adapter(name, *, media_types, capabilities):
     for media_type in normalized:
         _ADAPTERS[media_type] = record
     return record
+
+
+def detect_media_type(path):
+    """Sniff a file signature; unknown content is reported, never guessed from a name."""
+    try:
+        with open(path, 'rb') as handle:
+            head = handle.read(8)
+    except OSError:
+        fail('PARSE_MEDIA_UNREADABLE', path=str(path))
+    for magic, media_type in _MAGIC:
+        if head.startswith(magic):
+            return media_type
+    return OCTET_STREAM
+
+
+def dispatch(media_type, **kwargs):
+    """Route a media type to its registered handler and validate the returned result.
+
+    This is the seam a new format plugs into: register an adapter with a handler and the
+    router will find it; an unregistered type or a handler-less adapter is refused rather
+    than silently producing an empty parse.
+    """
+    record = adapter_for(media_type)
+    handler = record.get('handler')
+    if handler is None:
+        fail('PARSE_ADAPTER_UNSUPPORTED', subject='adapter', adapter=record['name'],
+             reason='no_handler')
+    try:
+        payload = handler(**kwargs)
+    except HTTPException:
+        raise
+    except TypeError as error:
+        fail('PARSE_RESULT_INVALID', subject='adapter', adapter=record['name'],
+             reason='handler_signature', detail=str(error))
+    except Exception:
+        fail('PARSE_ADAPTER_UNSUPPORTED', subject='adapter', adapter=record['name'],
+             reason='handler_failed')
+    return validate_parse_result(payload)
 
 
 def adapter_for(media_type):
