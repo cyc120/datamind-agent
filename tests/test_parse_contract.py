@@ -833,11 +833,18 @@ class CadLocatorProjectionTests(unittest.TestCase):
         from ingestion import cad_contract_v2
         self.assertEqual(set(contract.CAD_SOURCE_LOCATOR_V2_FIELDS),
                          set(contract.CAD_SOURCE_LOCATOR_FIELDS) | {'block_path'})
-        self.assertEqual(set(contract.CAD_SOURCE_LOCATOR_V2_FIELDS),
+        # The positional identity is the second declared extension of the v2 locator: a
+        # handle-less source names its entity by `entity_index` + `handle_source` instead
+        # of a handle. Together the two extensions are exactly the v2 source locator.
+        self.assertEqual(set(contract.CAD_POSITIONAL_LOCATOR_FIELDS),
+                         {'entity_index', 'handle_source'})
+        self.assertEqual(set(contract.CAD_SOURCE_LOCATOR_V2_FIELDS)
+                         | set(contract.CAD_POSITIONAL_LOCATOR_FIELDS),
                          set(cad_contract_v2.Locator.model_fields))
         covered = set(contract.LOCATOR_REQUIRED_FIELDS['cad_entity']) \
             | set(contract.LOCATOR_OPTIONAL_FIELDS['cad_entity'])
-        self.assertEqual(sorted(set(contract.CAD_SOURCE_LOCATOR_V2_FIELDS) - covered), [])
+        self.assertEqual(sorted((set(contract.CAD_SOURCE_LOCATOR_V2_FIELDS)
+                                 | set(contract.CAD_POSITIONAL_LOCATOR_FIELDS)) - covered), [])
 
     def test_the_v2_block_path_is_validated_when_it_is_carried(self):
         carried = contract.validate_locator(locator('cad_entity', block_path=['2AF', '3B']))

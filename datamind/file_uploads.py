@@ -72,6 +72,7 @@ def publish(data,filename,provenance,dsn,identity):
         lock_identity(cur,identity,'admin')
         target=_write(data,directory,sha,suffix)
     return {'type':kind,'name':filename,'source_path':str(target.relative_to(ROOT)),
+            'absolute_path':str(target.resolve()),
             'source_sha256':sha,'provenance':provenance,'bytes':len(data)}
 
 
@@ -93,6 +94,7 @@ def publish_upload(data,filename,provenance,dsn,identity):
         lock_identity(cur,identity,'admin')
         target=_write(data,directory,sha,suffix)
     return {'type':kind,'name':filename,'suffix':suffix,'source_path':str(target.relative_to(ROOT)),
+            'absolute_path':str(target.resolve()),
             'source_sha256':sha,'provenance':provenance,'bytes':len(data)}
 
 

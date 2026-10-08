@@ -84,6 +84,40 @@ def fake_bundle_v2(*, target_handle='38', block_path=None):
                          'identity': {}, 'views': []}}
 
 
+def fake_bundle_positional(entities=2):
+    """A v2 bundle from a source whose entity records carry no `code 5` handle at all.
+
+    The reader declares `identity.mode='positional'`; every entity keeps `handle=None`
+    (the library's synthesised handle is never adopted) and carries the declared
+    `entity_index` instead.
+    """
+    source = {'document_id': 'doc-x', 'document_version': 1, 'source_sha256': 'c' * 64,
+              'format': 'dxf', 'parser_version': 'dxf-native-v2', 'provenance': 'synthetic_demo',
+              'insunits': 0, 'insunits_modelled': True, 'unit': 'unknown', 'encoding': 'utf-8',
+              'coordinate_system': 'WCS_XY', 'layout': 'Model'}
+    built = [{'handle': None, 'entity_index': index + 1, 'handle_source': 'positional',
+              'layer': '0', 'view_id': 'model', 'block_path': [],
+              'anchor': {'x': float(index), 'y': 0.0}, 'entity_type': 'POLYLINE',
+              'vertices': [{'x': float(index), 'y': 0.0}, {'x': float(index) + 1, 'y': 0.0}],
+              'closed': False}
+             for index in range(entities)]
+    return {'metadata': {'profile': 'datamind-2d-engineering-dxf-v2',
+                         'parser_version': 'dxf-native-v2', 'ezdxf_version': '1.4.4',
+                         'dxf_version': 'AC1009', 'encoding': 'utf-8',
+                         'warnings': ['CAD_SINGLE_MODEL_VIEW_ONLY', 'CAD_UNIT_UNKNOWN',
+                                      'CAD_IDENTITY_MODE_POSITIONAL'],
+                         'unsupported_features': ['CAD_SOURCE_HANDLE_UNAVAILABLE:2'],
+                         'unsupported': [{'code': 'CAD_SOURCE_HANDLE_UNAVAILABLE',
+                                          'entity_type': None, 'handle': None,
+                                          'entity_index': None, 'block_path': [],
+                                          'detail': '2'}],
+                         'identity': {'mode': 'positional', 'handling_declared': None,
+                                      'source_handle_records': 0, 'positional_records': entities},
+                         'limits': {'max_bytes': 1}, 'counts': {}},
+            'snapshot': {'contract_version': 'cad-contract-v2', 'source': source,
+                         'entities': built, 'features': [], 'identity': {}, 'views': []}}
+
+
 class CadDetectionTests(unittest.TestCase):
     def test_a_real_dxf_is_detected(self):
         self.assertEqual(contract.detect_media_type(DXF), contract.DXF_MEDIA_TYPE)
@@ -370,6 +404,53 @@ class DrawingCliTests(unittest.TestCase):
                  '--document-id', 'doc-cli-dwg'], cwd=str(ROOT), capture_output=True, text=True, timeout=120)
             self.assertEqual(refused.returncode, 1)
             self.assertIn('CAD_DWG_CONVERTER_UNAVAILABLE', refused.stderr)
+
+
+class PositionalIdentityAdapterTests(unittest.TestCase):
+    """A handle-less (positional) source projects into the unified contract honestly."""
+
+    def setUp(self):
+        contract._ADAPTERS.clear()
+        cad_adapter.register_cad_adapters()
+
+    def tearDown(self):
+        contract._ADAPTERS.clear()
+
+    def parse(self, bundle):
+        with patch.object(cad_adapter.cad_dxf_v2, 'parse_file', return_value=bundle):
+            return cad_adapter.parse(DXF, document_id='doc-x')
+
+    def test_positional_locators_declare_the_index_and_never_a_handle(self):
+        result = self.parse(fake_bundle_positional())
+        payload = result.payload
+        self.assertEqual(payload['parse_status'], 'partial')
+        self.assertEqual(payload['manifest']['identity_mode'], 'positional')
+        self.assertEqual(payload['manifest']['source_identity']['positional_records'], 2)
+        self.assertIn('CAD_SOURCE_HANDLE_UNAVAILABLE:2', payload['unsupported_features'])
+        self.assertIn('CAD_IDENTITY_MODE_POSITIONAL', payload['quality_findings'])
+        self.assertIn('CAD_SOURCE_HANDLE_UNAVAILABLE:2', payload['quality_findings'])
+        self.assertEqual(len(payload['blocks']), 2)
+        for index, block in enumerate(payload['blocks'], start=1):
+            locator = block['locator']
+            self.assertNotIn('handle', locator)
+            self.assertEqual(locator['handle_source'], 'positional')
+            self.assertEqual(locator['entity_index'], index)
+            self.assertEqual(locator['unit'], 'unknown')
+        # The result is contract-valid by construction (dispatch validated it).
+        self.assertEqual(len(contract.validate_parse_result(payload).payload['blocks']), 2)
+
+    def test_a_source_handle_bundle_still_reports_the_source_mode(self):
+        result = self.parse(fake_bundle_v2())
+        self.assertEqual(result.payload['manifest']['identity_mode'], 'source')
+        self.assertNotIn('CAD_IDENTITY_MODE_POSITIONAL', result.payload['quality_findings'])
+        for block in result.payload['blocks']:
+            self.assertNotIn('entity_index', block['locator'])
+
+    def test_a_v1_bundle_reports_the_source_mode_without_metadata_identity(self):
+        # The frozen v1 reader has no positional mode at all; the fallback must still
+        # answer `source` rather than leaving the manifest without an identity mode.
+        result = self.parse(fake_bundle())
+        self.assertEqual(result.payload['manifest']['identity_mode'], 'source')
 
 
 if __name__ == '__main__':

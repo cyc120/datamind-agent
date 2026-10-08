@@ -29,6 +29,10 @@ Relationship to other contracts:
   (`db/migrations/015_contract_store.sql` and `017_contract_block_shape.sql`), and every
   identifier is checked against that column's width (`BLOCK_COLUMN_WIDTHS`) so a block
   that passes validation cannot then fail its INSERT.
+* A `cad_entity` locator under a handle-less (positional) source names its entity with
+  `entity_index` + `handle_source='positional'` instead of `handle`. The mode is explicit
+  so nothing downstream has to guess whether a missing handle means "unknown" or "the
+  source has none"; a positional locator may not carry a handle at all.
 """
 from __future__ import annotations
 
@@ -65,7 +69,7 @@ LOCATOR_REQUIRED_FIELDS = {
     'image_region': _LOCATOR_COMMON + ('image_id', 'image_width', 'image_height', 'bbox', 'unit', 'coordinate_system'),
     'office_object': _LOCATOR_COMMON + ('part',),
     'sheet_range': _LOCATOR_COMMON + ('sheet',),
-    'cad_entity': _LOCATOR_COMMON + ('layout', 'handle', 'layer', 'model_xy', 'unit'),
+    'cad_entity': _LOCATOR_COMMON + ('layout', 'layer', 'model_xy', 'unit'),
     'temporal_segment': _LOCATOR_COMMON + ('start', 'end', 'time_unit', 'time_base'),
     'model_spatial_object': _LOCATOR_COMMON + ('object_id', 'coordinate_reference', 'unit'),
 }
@@ -80,14 +84,18 @@ LOCATOR_OPTIONAL_FIELDS = {
     # revision instead of dropping it (see CAD_SOURCE_LOCATOR_FIELDS).
     # `block_path` is the v2 source locator's INSERT chain (see CAD_SOURCE_LOCATOR_V2_FIELDS):
     # a block-internal handle is only unique together with the references that reach it.
+    # `handle` is optional because a handle-less source has no handle to carry: the identity
+    # is then the declared positional `entity_index` with `handle_source='positional'` (see
+    # CAD_POSITIONAL_LOCATOR_FIELDS). At least one of the two must be present, and positional
+    # mode may not carry a handle at all, which `_validate_cad` enforces.
     'cad_entity': ('view', 'view_id', 'render_ref', 'model_z', 'coordinate_system',
-                   'source_sha256', 'block_path'),
+                   'source_sha256', 'block_path', 'handle', 'entity_index', 'handle_source'),
     'temporal_segment': ('speaker', 'frame_ref'),
     'model_spatial_object': ('transform', 'view'),
 }
 # Source locator of the frozen CAD contract (`ingestion/cad_contract.py`), field by field.
-# The unified `cad_entity` locator is its projection: `locator_kind`/`layout`/`handle`/
-# `layer` are required here, `view_id`/`coordinate_system`/`source_sha256` are optional
+# The unified `cad_entity` locator is its projection: `locator_kind`/`layout`/`layer` are
+# required here, `handle`/`view_id`/`coordinate_system`/`source_sha256` are optional
 # (accepted so the projection can carry them through), while `model_xy` and `unit` are
 # added from the drawing's insertion/bbox and INSUNITS because the source locator has no
 # such fields. tests/test_parse_contract.py asserts this set is fully covered above.
@@ -99,6 +107,14 @@ CAD_SOURCE_LOCATOR_FIELDS = ('locator_kind', 'source_sha256', 'handle', 'layer',
 # optional here (a Model-space entity has an empty chain) but when it is present it must
 # be a bounded list of well-formed handles, validated in `_validate_cad`.
 CAD_SOURCE_LOCATOR_V2_FIELDS = CAD_SOURCE_LOCATOR_FIELDS + ('block_path',)
+# The declared identity mode of a handle-less source. `handle_source` is explicit so a
+# reader that could not read a source handle never leaves the identity implicit: with
+# `handle_source='positional'` the locator must carry an `entity_index` and must **not**
+# carry a `handle` (a handle there could only be a value the DXF library synthesised).
+# Omitting `handle_source` keeps the historical meaning: a `handle`-bearing locator is
+# `source` mode, so the frozen v1 locators keep validating unchanged.
+CAD_HANDLE_SOURCES = ('source', 'positional')
+CAD_POSITIONAL_LOCATOR_FIELDS = ('entity_index', 'handle_source')
 MAX_CAD_BLOCK_PATH = 32
 # Source fields the projection deliberately discards, with the reason. Empty on purpose:
 # nothing in the frozen source locator is dropped today. A new entry here is a contract
@@ -287,11 +303,45 @@ def _validate_region(payload, kind):
 
 
 def _validate_cad(payload):
+    """Validate a `cad_entity` locator under either declared identity mode.
+
+    The historical rule is unchanged for a handle-bearing locator: a `handle` must be a
+    well-formed DXF handle (`[1-9A-F][0-9A-F]*`). The new positional mode exists for a
+    source that carries no handle at all: the locator then declares
+    `handle_source='positional'`, **must** carry an `entity_index` (int >= 1) and **must
+    not** carry a `handle`, because any handle there could only be a value the DXF library
+    synthesised for a file that has none. A locator that names neither a handle nor an
+    index is refused: it would locate nothing. Leaving `handle_source` out keeps the old
+    meaning exactly, so every existing v1/v2 locator still validates unchanged.
+    """
     subject = 'locator.cad_entity'
     if not _text(payload.get('layout')) or not _text(payload.get('layer')):
         fail('PARSE_LOCATOR_INVALID', subject=subject, reason='layout_or_layer')
-    if not isinstance(payload.get('handle'), str) or not _HANDLE.fullmatch(payload['handle']):
+    handle = payload.get('handle')
+    entity_index = payload.get('entity_index')
+    declared = payload.get('handle_source')
+    if declared is not None and declared not in CAD_HANDLE_SOURCES:
+        fail('PARSE_LOCATOR_INVALID', subject=subject, reason='handle_source', value=repr(declared))
+    if entity_index is not None and (isinstance(entity_index, bool)
+                                     or not isinstance(entity_index, int) or entity_index < 1):
+        fail('PARSE_LOCATOR_INVALID', subject=subject, reason='entity_index',
+             value=repr(entity_index))
+    if declared == 'positional':
+        # The mode is explicit, so the report names exactly what positional mode needs.
+        if handle is not None:
+            fail('PARSE_LOCATOR_INVALID', subject=subject, reason='positional_handle_forbidden')
+        if entity_index is None:
+            fail('PARSE_LOCATOR_INVALID', subject=subject, reason='entity_index')
+    elif declared == 'source':
+        if not isinstance(handle, str) or not _HANDLE.fullmatch(handle):
+            fail('PARSE_LOCATOR_INVALID', subject=subject, reason='handle')
+    elif handle is None:
+        # No mode declared and no handle: the only possible identity is a positional index.
+        if entity_index is None:
+            fail('PARSE_LOCATOR_INVALID', subject=subject, reason='handle_or_entity_index')
+    elif not isinstance(handle, str) or not _HANDLE.fullmatch(handle):
         fail('PARSE_LOCATOR_INVALID', subject=subject, reason='handle')
+    mode = declared or ('source' if handle is not None else 'positional')
     xy = payload.get('model_xy')
     if not _sequence(xy) or len(xy) != 2 or any(not _number(v) for v in xy):
         fail('PARSE_LOCATOR_INVALID', subject=subject, reason='model_xy')
@@ -312,6 +362,9 @@ def _validate_cad(payload):
             # A repeated reference would mean the entity is inside the same INSERT twice,
             # which cannot happen in a real INSERT chain and would make the key ambiguous.
             fail('PARSE_LOCATOR_INVALID', subject=subject, reason='block_path_cycle')
+        if mode == 'positional' and block_path:
+            # `block_path` can only hold handles; a positional locator must not smuggle one.
+            fail('PARSE_LOCATOR_INVALID', subject=subject, reason='positional_block_path_forbidden')
 
 
 def _validate_office(payload):

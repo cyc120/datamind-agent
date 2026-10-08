@@ -246,6 +246,25 @@ class UploadPipelineTests(unittest.TestCase):
         self.assertIn(stored['parse_contract']['parse_status'], ('parsed', 'partial'))
         self.assertEqual(stored['parse_contract']['adapter'], 'dxf-native')
 
+    def test_object_uri_is_stored_as_an_absolute_path(self):
+        """Regression: a repository-relative uri broke the isolated runner's clone guard.
+
+        Every other `document_assets` row stores an absolute path, and the regression
+        runner relocates rows by the `/data/` marker. The upload pipeline wrote
+        `data/cad_demo/...` instead, so the runner's fail-closed guard reported
+        "Clone source unavailable" and the entire regression could not start.
+        """
+        import os
+        created = self.dxf()
+        self.assertEqual(created.status_code, 201, created.text)
+        document_id = self.docs[-1]
+        with psycopg2.connect(self.dsn) as conn, conn.cursor() as cur:
+            cur.execute('SELECT object_uri FROM document_assets WHERE document_id=%s', (document_id,))
+            uri = cur.fetchone()[0]
+        self.assertTrue(os.path.isabs(uri), uri)
+        self.assertIn('/data/', uri, uri)
+        self.assertTrue(os.path.isfile(uri), uri)
+
     # ------------------------------------------------------------- 4. the review gate
     def test_unapproved_upload_is_hidden_and_approve_records_the_operator(self):
         created = self.dxf()

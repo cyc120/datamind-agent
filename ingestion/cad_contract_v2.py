@@ -18,6 +18,14 @@ What v2 changes, and why each change is safe to make in a new version:
   and a missing title is reported as "not declared", never fabricated.
 * `unit` still comes from `$INSUNITS` alone. Codes other than 0/1/4 are reported as
   `unknown` (`insunits_modelled=False`) and never guessed into `mm`.
+* **Two explicit identity modes.** A source whose entity/block records really carry
+  `code 5` is read in `handle_source='source'` mode and the raw handle is the identity,
+  exactly as before. A source whose entity records carry **no** `code 5` at all (an old
+  R2.x/R12 drawing exported with `$HANDLING` off) is read in `handle_source='positional'`
+  mode: the entity keeps `handle=None` -- the library's synthetic handle is never adopted
+  as if it came from the source -- and gets a deterministic, 1-based `entity_index`
+  instead. `handle_source`/`entity_index` are only serialised in positional mode, so a
+  source-handle snapshot keeps its previous shape.
 * Native dimensions separate the **geometric measurement** of the dimension from the
   **text the drafter declared**. `value_authority` records which one a value is, so
   `declared_sizes()` can refuse to promote a measurement into a manufacturing size.
@@ -33,12 +41,23 @@ import math
 import re
 from typing import Annotated, Literal, Union
 
-from pydantic import Field, model_validator
+from pydantic import Field, model_serializer, model_validator
 
 from .cad_contract import (AssociationEvidence, Box, ContractModel, DecimalText, Handle,
                            Identifier, Number, Point, Sha256, Text, Unit, View)
 
 CONTRACT_VERSION = 'cad-contract-v2'
+# The two declared identity modes. `source` means every entity is located by the raw
+# `code 5` handle the source itself carries; `positional` means the source carries no
+# handle at all and the entity is located by its `entity_index`. They are mutually
+# exclusive per drawing and are never mixed.
+IDENTITY_MODES = ('source', 'positional')
+# Declared gaps: the source has no handles at all (`CAD_SOURCE_HANDLE_UNAVAILABLE`,
+# counted, never silent), and a block reference inside such a source cannot be expanded
+# because a block-internal entity has no handle to disambiguate repeated INSERTs
+# (`CAD_POSITIONAL_BLOCK_UNSUPPORTED`).
+SOURCE_HANDLE_UNAVAILABLE = 'CAD_SOURCE_HANDLE_UNAVAILABLE'
+POSITIONAL_BLOCK_UNSUPPORTED = 'CAD_POSITIONAL_BLOCK_UNSUPPORTED'
 # Ceilings the contract itself enforces. The reader's tunable limits
 # (`DATAMIND_CAD_MAX_ENTITIES` and friends) may not exceed them, so a "validated"
 # snapshot always fits the model that validated it.
@@ -54,6 +73,33 @@ DimensionType = Literal['linear', 'aligned', 'angular', 'diameter', 'radius',
 DIAMETER_ANNOTATION = re.compile(r'%%c([0-9]+(?:\.[0-9]+)?) \+/-([0-9]+(?:\.[0-9]+)?)')
 PLAIN_NUMBER = re.compile(r'^-?(0|[1-9][0-9]*)(\.[0-9]+)?$')
 _UNIT_BY_INSUNITS = {0: 'unknown', 1: 'in', 4: 'mm'}
+# A positional identity is a 1-based ordinal of the entity's own primary record inside
+# the source's ENTITIES section (see `ingestion/cad_dxf_v2.py` for the exact counting
+# rule). It is an int, never the library's synthetic handle string.
+EntityIndex = Annotated[int, Field(strict=True, ge=1)]
+HandleSource = Literal['source', 'positional']
+
+
+def identity_mode(handle, entity_index, handle_source):
+    """Return the declared identity mode, refusing a half-declared or forged one.
+
+    * `source` (the default when a handle is present): the raw `code 5` handle is the
+      identity and it is required; a positional index is not part of this mode.
+    * `positional`: an `entity_index` is required and a `handle` is **refused**, because
+      a handle in a handle-less source could only be a value the library invented.
+    """
+    if handle_source is not None and handle_source not in IDENTITY_MODES:
+        raise ValueError('CAD_HANDLE_SOURCE_INVALID')
+    if handle is None and entity_index is None:
+        raise ValueError('CAD_ENTITY_IDENTITY_MISSING')
+    mode = handle_source or ('source' if handle is not None else 'positional')
+    if mode == 'source':
+        if handle is None:
+            raise ValueError('CAD_SOURCE_HANDLE_REQUIRED')
+    elif handle is not None or entity_index is None:
+        # A handle may not appear in positional mode: see `CAD_ENTITY_HANDLE_INVALID`.
+        raise ValueError('CAD_POSITIONAL_IDENTITY_INVALID')
+    return mode
 
 
 class Source(ContractModel):
@@ -86,25 +132,64 @@ class Source(ContractModel):
         return self
 
 
-class Locator(ContractModel):
+class _Identified(ContractModel):
+    """Base of the two records that carry an identity, in one of the two declared modes.
+
+    Only the identity fields a record actually uses are serialised. A `source`-mode record
+    therefore dumps exactly the keys it dumped before positional identity existed (no
+    `entity_index`/`handle_source: null` noise), and a `positional`-mode record dumps
+    `entity_index`/`handle_source` with **no** `handle` key at all -- so a snapshot can
+    never be read as if a handle were present.
+    """
+
+    @model_serializer(mode='wrap')
+    def _identity_only_when_declared(self, handler):
+        data = handler(self)
+        if isinstance(data, dict):
+            for key in ('handle', 'entity_index', 'handle_source'):
+                if data.get(key) is None:
+                    data.pop(key, None)
+        return data
+
+
+class Locator(_Identified):
     """A v2 source locator: a v1 locator plus the INSERT chain of an expanded entity.
 
     ``block_path`` is the ordered list of INSERT handles from the Model-space reference
     down to the block that contains the entity; an empty list means the entity lives
-    directly in Model space. ``(handle, block_path)`` is unique inside one drawing.
+    directly in Model space. In ``source`` mode ``(handle, block_path)`` is unique inside
+    one drawing; in ``positional`` mode the identity is the ``entity_index`` and
+    ``handle`` is absent (a positional locator never carries a handle, and a non-empty
+    ``block_path`` is impossible because block expansion is refused in that mode).
     """
     locator_kind: Literal['cad_entity']
     source_sha256: Sha256
-    handle: Handle
+    handle: Handle | None = None
+    entity_index: EntityIndex | None = None
+    handle_source: HandleSource | None = None
     layer: Text
     view_id: Identifier
     coordinate_system: Literal['WCS_XY']
     layout: Literal['Model']
     block_path: Annotated[list[Handle], Field(max_length=MAX_BLOCK_PATH)]
 
+    @model_validator(mode='after')
+    def identity(self):
+        mode = identity_mode(self.handle, self.entity_index, self.handle_source)
+        if mode == 'positional' and self.block_path:
+            # `block_path` can only name INSERT handles, so a positional locator may not
+            # carry one: it would smuggle a handle into a handle-less identity.
+            raise ValueError('CAD_POSITIONAL_BLOCK_PATH_FORBIDDEN')
+        return self
 
-class Entity(ContractModel):
-    handle: Handle
+    def key(self):
+        return (self.handle, self.entity_index, tuple(self.block_path))
+
+
+class Entity(_Identified):
+    handle: Handle | None = None
+    entity_index: EntityIndex | None = None
+    handle_source: HandleSource | None = None
     layer: Text
     view_id: Identifier
     block_path: Annotated[list[Handle], Field(max_length=MAX_BLOCK_PATH)]
@@ -113,11 +198,18 @@ class Entity(ContractModel):
     # computed centre of an invented bounding box.
     anchor: Point
 
+    @model_validator(mode='after')
+    def identity(self):
+        mode = identity_mode(self.handle, self.entity_index, self.handle_source)
+        if mode == 'positional' and self.block_path:
+            raise ValueError('CAD_POSITIONAL_BLOCK_PATH_FORBIDDEN')
+        return self
+
     def bounds(self):
         raise NotImplementedError
 
     def key(self):
-        return (self.handle, tuple(self.block_path))
+        return (self.handle, self.entity_index, tuple(self.block_path))
 
 
 def _ordered(values):
@@ -428,9 +520,11 @@ class DrawingSnapshot(ContractModel):
         views = {v.view_id: v for v in self.views}
         if len(views) != len(self.views):
             raise ValueError('CAD_DUPLICATE_VIEW')
-        located = {entity.key(): entity for entity in self.entities}
-        if len(located) != len(self.entities):
-            raise ValueError('CAD_DUPLICATE_HANDLE_OR_BLOCK_PATH')
+        located = {}
+        for entity in self.entities:
+            if entity.key() in located:
+                raise ValueError('CAD_DUPLICATE_HANDLE_OR_BLOCK_PATH')
+            located[entity.key()] = entity
         if len({f.feature_id for f in self.features}) != len(self.features):
             raise ValueError('CAD_DUPLICATE_FEATURE')
         for entity in self.entities:
@@ -438,7 +532,7 @@ class DrawingSnapshot(ContractModel):
                 raise ValueError('CAD_ENTITY_OUTSIDE_VIEW')
 
         def located_entity(locator):
-            entity = located.get((locator.handle, tuple(locator.block_path)))
+            entity = located.get(locator.key())
             if (entity is None or locator.source_sha256 != self.source.source_sha256
                     or locator.layer != entity.layer or locator.view_id != entity.view_id):
                 raise ValueError('CAD_LOCATOR_STALE_OR_INVALID')
@@ -458,7 +552,8 @@ class DrawingSnapshot(ContractModel):
                 for handle in feature.target_candidates:
                     # Explicit references name a Model-space circle; a handle inside a
                     # block names every copy of it, so it is not a usable target here.
-                    target = located.get((handle, ()))
+                    # A positional source has no handles, so no candidate can exist.
+                    target = located.get((handle, None, ()))
                     if not isinstance(target, Circle) or target.view_id != entity.view_id:
                         raise ValueError('CAD_TARGET_MISSING_WRONG_TYPE_OR_VIEW')
                 evidence = feature.association_evidence
@@ -526,7 +621,7 @@ def declared_sizes(payload: dict) -> dict:
             elif feature.nominal_value is None or drawing.source.unit == 'unknown':
                 reason = 'CAD_VALUE_OR_UNIT_UNKNOWN'
             else:
-                circle = located[(feature.selected_target, ())]
+                circle = located[(feature.selected_target, None, ())]
                 factor = Decimal('25.4') if drawing.source.unit == 'in' else Decimal('1')
                 with localcontext() as ctx:
                     ctx.prec = 160

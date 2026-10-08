@@ -26,7 +26,7 @@
 | `image_region` | `image_id`、图像尺寸、`bbox` 在内、`unit`、`coordinate_system` |
 | `office_object` | `part` 加 `paragraph`/`table`/`slide`/`shape` 之一 |
 | `sheet_range` | `sheet` 加 `cell`（A1 形式）或 `range` |
-| `cad_entity` | `layout`、`handle`（十六进制）、`layer`、`model_xy`、`unit` |
+| `cad_entity` | `layout`、`layer`、`model_xy`、`unit`，加**两种互斥身份**之一：`handle`（十六进制，`handle_source` 缺省或为 `source`）或 `entity_index ≥ 1` + `handle_source='positional'` |
 | `temporal_segment` | `start < end`、`time_unit`、`time_base` |
 | `model_spatial_object` | `object_id`、`coordinate_reference`、`unit` |
 
@@ -69,6 +69,24 @@
 ## 版本追加记录
 
 以下小节按**新→旧**追加，记录各 API 版本对契约的增补；正文（上文）描述的是当前契约。
+
+## 无句柄老图纸的"位置身份"（API 0.39.0）
+
+老 ASCII DXF（R2.x/R12，`$HANDLING` 未启用）的实体记录**一个 `code 5` 都没有**。此前 `cad_entity` 要求 `handle`，这类图纸被整图拒绝（`CAD_ENTITY_HANDLE_INVALID`）；直接采信 `ezdxf` 的 `entity.dxf.handle` 更糟——库会给无句柄文件**补造**句柄（`'2'`、`'31E'`…），那不是源里的值。
+
+`cad_entity` 现在有**两种显式且互斥**的身份：
+
+| 模式 | 声明 | 身份 | 拒绝规则 |
+|---|---|---|---|
+| source（既有，缺省） | `handle`（`handle_source` 缺省或 `source`） | 源 `code 5` 句柄 | 句柄**存在但非法或重复**仍整图拒绝（`PARSE_LOCATOR_INVALID` / 读取器的 `CAD_ENTITY_HANDLE_INVALID`、`CAD_DUPLICATE_SOURCE_HANDLE`） |
+| positional（新增） | `handle_source='positional'` + `entity_index ≥ 1` | ENTITIES 段内主实体记录的 1-based 序号 | **必须**有 `entity_index`，**不得**出现 `handle`（`positional_handle_forbidden`）、不得带非空 `block_path`（`positional_block_path_forbidden`）；两者皆无则 `handle_or_entity_index` |
+
+- `entity_index` 的定义：**源 ENTITIES 段内主实体记录的文件顺序 1-based 序号**，`VERTEX`/`SEQEND`/`ATTRIB` 等子记录不占号（一个三顶点 `POLYLINE` 只占一个号）。同一输入两次解析序号完全一致。块定义内的实体不在此序号空间：无句柄时一个块内实体在多次 INSERT 下无法唯一，读取器因此**逐项声明** `CAD_POSITIONAL_BLOCK_UNSUPPORTED` 而不是猜。
+- **兼容**：只给 `handle`（不给 `handle_source`）的既有 v1/v2 定位器**校验行为不变**；`CAD_SOURCE_LOCATOR_FIELDS`、其它六类定位器与所有既有校验规则未动。新增 `CAD_HANDLE_SOURCES`、`CAD_POSITIONAL_LOCATOR_FIELDS` 两个常量。
+- **诚实传播**：缺口以 `CAD_SOURCE_HANDLE_UNAVAILABLE:<n>` 进入 `unsupported_features`（`n` 为源中本应带句柄的记录数，含 BLOCKS 内实体），`parse_status` 降为 `partial`；`manifest.identity_mode` 与 `manifest.source_identity` 记录模式，`quality_findings` 记 `CAD_IDENTITY_MODE_POSITIONAL`。上层不会把位置身份当成普通 `parsed`。
+- **单位纪律不变**：`$INSUNITS` 缺失 = DXF 默认 0 = `unit='unknown'`，**不猜 mm**。注意 `ezdxf` 对缺失的 `$INSUNITS` 会返回自己的默认值 `6`（米），该补造值一律不采信。
+
+配套读取器修复（`ingestion/cad_dxf_v2.py`）：传给 `ezdxf.read` 的文本做**换行归一化**。`io.StringIO` 不翻译换行而 `ascii_tags_loader` 只 `rstrip('\n')`，CRLF 源会让每个值带尾部 `\r`、section 名成 `'ENTITIES\r'`，整个 ENTITIES 段被忽略（Windows CAD 导出普遍是 CRLF）。`ingestion/cad_dxf.py`（v1，哈希冻结）有**同一个** `io.StringIO` 缺陷，但冻结不可改，因此老图纸在 v1 路径上仍会因 CRLF 失败（见 `data/cad_demo/DXF_PROFILE_V2.md` 的边界）。
 
 ## 关系被检索侧消费（API 0.36.0）
 

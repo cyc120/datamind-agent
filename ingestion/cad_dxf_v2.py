@@ -26,6 +26,28 @@ Two decisions shape this reader:
 All limits are parameterised (`DATAMIND_CAD_MAX_BYTES`, `..._MAX_ENTITIES`,
 `..._MAX_EXPANDED_ENTITIES`, `..._MAX_BLOCK_DEPTH`) and bounded by the contract's own
 ceilings, so a validated snapshot always fits the model that validated it.
+
+3. **Two explicit identity modes; no handle is ever invented.** Whether the *source*
+   carries handles is decided from the raw tags, never from the value `ezdxf` reports:
+   a source whose entity/block records really contain a `code 5` tag is read in
+   `handle_source='source'` mode, and a source in which **no** such record carries a
+   `code 5` tag is read in `handle_source='positional'` mode. `ezdxf` silently
+   synthesises handles for a handle-less file (`'2'`, `'31E'`, ...); those values are
+   never adopted as if they came from the source. In positional mode each entity is
+   located by a deterministic `entity_index` -- the 1-based ordinal of the entity's own
+   **primary record inside the source ENTITIES section**, counted in file order over
+   records that are not inline sub-records (`VERTEX`/`SEQEND`/`ATTRIB`); a three-vertex
+   `POLYLINE` therefore occupies exactly one number -- and the missing handle evidence is
+   declared as `CAD_SOURCE_HANDLE_UNAVAILABLE:<n>` with `parse_status='partial'`. Block
+   references cannot be expanded in positional mode (a block-internal entity has no
+   handle to disambiguate repeated INSERTs), so they are declared item by item as
+   `CAD_POSITIONAL_BLOCK_UNSUPPORTED` instead of being guessed at.
+
+The `$INSUNITS`/`$HANDLING` values are read from the **source header tags**, not from
+`ezdxf`'s defaulted header: `ezdxf` answers `6` (metres) for a file that declares no
+`$INSUNITS` at all, and adopting that default would turn "undeclared" into a unit the
+source never stated. An absent `$INSUNITS` is the documented DXF default of 0, which is
+`unit='unknown'` and never a guessed millimetre.
 """
 from __future__ import annotations
 
@@ -41,8 +63,9 @@ import re
 
 from pydantic import ValidationError
 
-from .cad_contract_v2 import (CONTRACT_VERSION, DIAMETER_ANNOTATION, MAX_ANNOTATION,
-                              PLAIN_NUMBER, DrawingSnapshot, arc_bounds, padded_box)
+from .cad_contract_v2 import (CONTRACT_VERSION, DIAMETER_ANNOTATION, IDENTITY_MODES,
+                              MAX_ANNOTATION, PLAIN_NUMBER, POSITIONAL_BLOCK_UNSUPPORTED,
+                              SOURCE_HANDLE_UNAVAILABLE, DrawingSnapshot, arc_bounds, padded_box)
 from .cad_dxf import TITLE_LAYERS, CadReadError
 
 PARSER_VERSION = 'dxf-native-v2'
@@ -210,15 +233,58 @@ def _scan_source_records(pairs):
     return entities, blocks
 
 
+def _header_values(pairs):
+    """The `HEADER` section's `$NAME -> value` pairs, straight from the raw tags.
+
+    `ezdxf` fills a missing header variable with its own default (`$INSUNITS` becomes 6,
+    `$HANDLING` becomes 1), so the only honest source of "what did the file declare" is
+    the file's own tags. Only the `HEADER` section is inspected: a `code 9` string also
+    occurs in other sections (a `DIMSTYLE`'s variables), and those are not header vars.
+    """
+    values, section, index = {}, None, 0
+    while index < len(pairs):
+        code, value = pairs[index]
+        if code == 0 and value == 'SECTION':
+            section = pairs[index + 1][1] if (index + 1 < len(pairs)
+                                              and pairs[index + 1][0] == 2) else None
+            index += 2
+            continue
+        if code == 0 and value == 'ENDSEC':
+            section = None
+        elif section == 'HEADER' and code == 9 and index + 1 < len(pairs):
+            values[value] = pairs[index + 1][1]
+        index += 1
+    return values
+
+
+def _declared_flag(value):
+    """A raw header flag: absent or `0` is off, anything else is on."""
+    if value is None:
+        return False
+    return str(value).strip() not in ('', '0')
+
+
 def _validate_source_records(entities, blocks, limits):
+    """Check the raw records and return the source identity mode.
+
+    `'source'` means every record the drawing would locate carries a real `code 5`
+    handle; `'positional'` means **no** record carries one, so the source has no handle
+    evidence to trust and the reader will use a declared positional identity instead.
+    A source that mixes both (some records with a handle, some without) is internally
+    inconsistent and is refused: positional identity could only cover part of the
+    drawing, and the handle-bearing part would be silently reinterpreted.
+    """
     if not entities:
         raise CadReadError('CAD_ENTITY_COUNT_INVALID', {'entities': 0})
     total = len(entities) + len(blocks)
     if total > limits.max_entities:
         raise CadReadError('CAD_ENTITY_COUNT_INVALID',
                            {'records': total, 'max': limits.max_entities})
+    records = entities + blocks
+    if not any(handle is not None for _kind, handle in records):
+        return 'positional'
     handles = []
-    for kind, handle in entities + blocks:
+    for kind, handle in records:
         if handle is None or not _HANDLE.fullmatch(handle):
             raise CadReadError('CAD_ENTITY_HANDLE_INVALID', {'type': kind, 'handle': handle})
         handles.append(handle)
@@ -226,6 +292,35 @@ def _validate_source_records(entities, blocks, limits):
     if duplicates:
         raise CadReadError('CAD_DUPLICATE_SOURCE_HANDLE',
                            {'handles': duplicates[:10], 'count': len(duplicates)})
+    return 'source'
+
+
+def _positional_indices(read_records, source_records, doc):
+    """`{id(entity): entity_index}` for a handle-less source, or refuse the drawing.
+
+    `entity_index` is the 1-based ordinal of the entity's own primary record inside the
+    source `ENTITIES` section (see the module docstring). The mapping is built from the
+    *type multiset* of the records the library read versus the records the raw tags
+    declare: if the two disagree, an entity was lost or reordered in a way that would
+    make a positional identity point at the wrong record, so the drawing is refused
+    rather than given a plausible-but-wrong index.
+    """
+    read_types = Counter(kind for kind, _handle in read_records)
+    source_types = Counter(record[0] for record in source_records)
+    if read_types != source_types:
+        raise CadReadError('CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED',
+                           {'reason': 'source_entity_types_not_reproducible',
+                            'raw': sum(source_types.values()), 'read': sum(read_types.values())})
+    positions = {}
+    for position, (kind, _handle) in enumerate(source_records, start=1):
+        positions.setdefault(kind, []).append(position)
+    seen, indices = Counter(), {}
+    for layout in doc.layouts:
+        for entity in layout:
+            kind = entity.dxftype()
+            indices[id(entity)] = positions[kind][seen[kind]]
+            seen[kind] += 1
+    return indices
 
 
 def _dxf(entity, name, default=None):
@@ -258,6 +353,24 @@ def _finite2(point):
 
 def _box_tuple(box):
     return (box['xmin'], box['ymin'], box['xmax'], box['ymax'])
+
+
+def _record_key(record):
+    """A stable in-memory key for one emitted record, in either identity mode.
+
+    Source mode returns the raw handle unchanged, so every existing key (`model_circles`,
+    `diameter_texts`, feature ids) is byte-for-byte what it was. Positional mode returns
+    `i<entity_index>`, which is a declared identity and never a synthesised handle.
+    """
+    handle = record.get('handle')
+    if handle:
+        return handle
+    index = record.get('entity_index')
+    if index is None:
+        # Every emitted record has exactly one of the two identities; reaching here would
+        # mean a record with no identity at all, which must never be keyed silently.
+        raise CadReadError('CAD_ENTITY_IDENTITY_MISSING')
+    return 'i' + str(index)
 
 
 def _sub_entities(entity, name):
@@ -298,8 +411,15 @@ def _visited(entity):
 class _Extractor:
     """One pass over one drawing; every gap is recorded, never guessed."""
 
-    def __init__(self, doc, *, limits, sha, unit, bbox_module):
+    def __init__(self, doc, *, limits, sha, unit, bbox_module, identity_mode='source',
+                 index_by_id=None):
         self.doc, self.limits, self.sha, self.unit = doc, limits, sha, unit
+        if identity_mode not in IDENTITY_MODES:
+            raise CadReadError('CAD_HANDLE_SOURCE_INVALID', {'mode': repr(identity_mode)})
+        self.identity_mode = identity_mode
+        self.positional = identity_mode == 'positional'
+        # `{id(entity): entity_index}` for a handle-less source; empty in source mode.
+        self.index_by_id = index_by_id or {}
         self.bbox = bbox_module
         self.entities, self.bounds, self.features, self.identity = [], [], [], {}
         self.unsupported, self.counts, self.warnings = [], Counter(), ['CAD_SINGLE_MODEL_VIEW_ONLY']
@@ -307,21 +427,58 @@ class _Extractor:
         self.emitted = 0
         self.limit_declared = False
 
+    def entity_index(self, entity):
+        """The declared positional ordinal of one source entity, or `None` in source mode."""
+        if not self.positional or entity is None:
+            return None
+        return self.index_by_id.get(id(entity))
+
+    def entity_label(self, entity):
+        """A non-fabricated label for a warning or detail string.
+
+        Source mode keeps the raw handle; positional mode uses `#<entity_index>` and
+        never the handle `ezdxf` synthesised, so no warning can leak an invented handle.
+        """
+        if self.positional:
+            return '#' + str(self.entity_index(entity))
+        return str(entity.dxf.handle)
+
     # -- declarations ----------------------------------------------------------------
     def declare(self, code, *, entity=None, handle=None, entity_type=None, block_path=(),
-                detail=None):
-        handle = handle or (entity.dxf.get('handle') if entity is not None else None)
-        entity_type = entity_type or (entity.dxftype() if entity is not None else None)
+                detail=None, entity_index=None):
+        """Record one declared gap.
+
+        In positional mode the library's synthetic handle is **never** emitted: the
+        declaration carries `handle=None` and the entity's `entity_index` instead, so a
+        gap cannot reintroduce a value the source does not contain.
+        """
+        if entity is not None:
+            entity_type = entity_type or entity.dxftype()
+            if entity_index is None:
+                entity_index = self.entity_index(entity)
+            if not self.positional and handle is None:
+                handle = entity.dxf.get('handle')
+        if self.positional:
+            handle = None
         self.counts[code] += 1
         if len(self.unsupported) < self.limits.max_declared_items:
-            self.unsupported.append({'code': code, 'entity_type': entity_type, 'handle': handle,
-                                     'block_path': list(block_path), 'detail': detail})
+            item = {'code': code, 'entity_type': entity_type, 'handle': handle,
+                    'block_path': list(block_path), 'detail': detail}
+            if self.positional:
+                item['entity_index'] = entity_index
+            self.unsupported.append(item)
 
     def locator(self, record):
-        return {'locator_kind': 'cad_entity', 'source_sha256': self.sha,
-                'handle': record['handle'], 'layer': record['layer'], 'view_id': VIEW_ID,
-                'coordinate_system': 'WCS_XY', 'layout': 'Model',
-                'block_path': list(record['block_path'])}
+        locator = {'locator_kind': 'cad_entity', 'source_sha256': self.sha,
+                   'layer': record['layer'], 'view_id': VIEW_ID,
+                   'coordinate_system': 'WCS_XY', 'layout': 'Model',
+                   'block_path': list(record['block_path'])}
+        if self.positional:
+            locator['entity_index'] = record['entity_index']
+            locator['handle_source'] = 'positional'
+        else:
+            locator['handle'] = record['handle']
+        return locator
 
     # -- geometry helpers ------------------------------------------------------------
     def _linear(self, chain):
@@ -393,6 +550,12 @@ class _Extractor:
         if not self._usable(entity, block_path):
             return []
         if kind == 'INSERT':
+            if self.positional:
+                # A block-internal entity has no source handle, so repeated INSERTs of the
+                # same block would share one positional identity. Declare the reference as
+                # skipped instead of reporting an ambiguous expansion.
+                return self._skipped_insert(entity, block_path, POSITIONAL_BLOCK_UNSUPPORTED,
+                                            detail='source has no entity handles')
             return self._insert(entity, chain, block_path, block_names)
         handler = {'LINE': self._line, 'CIRCLE': self._circle, 'ARC': self._arc,
                    'LWPOLYLINE': self._lwpolyline, 'POLYLINE': self._polyline,
@@ -438,8 +601,21 @@ class _Extractor:
         return record
 
     def _base(self, entity, block_path, anchor):
-        return {'handle': entity.dxf.handle, 'layer': entity.dxf.layer, 'view_id': VIEW_ID,
-                'block_path': list(block_path), '_anchor': anchor}
+        """The identity common to every emitted entity record.
+
+        Source mode keeps the raw `code 5` handle exactly as before. Positional mode
+        drops `entity.dxf.handle` (a value `ezdxf` synthesised for a handle-less file)
+        and carries the declared `entity_index`/`handle_source` instead.
+        """
+        record = {'layer': entity.dxf.layer, 'view_id': VIEW_ID,
+                  'block_path': list(block_path), '_anchor': anchor}
+        if self.positional:
+            record['handle'] = None
+            record['entity_index'] = self.entity_index(entity)
+            record['handle_source'] = 'positional'
+        else:
+            record['handle'] = entity.dxf.handle
+        return record
 
     @staticmethod
     def _point_box(points):
@@ -478,7 +654,7 @@ class _Extractor:
         record = dict(self._base(entity, block_path, center), entity_type='CIRCLE',
                       center=center, radius=float(radius))
         if not block_path:
-            self.model_circles[record['handle']] = record
+            self.model_circles[_record_key(record)] = record
         return [self._emit(record, (center['x'] - radius, center['y'] - radius,
                                     center['x'] + radius, center['y'] + radius))]
 
@@ -579,7 +755,7 @@ class _Extractor:
                 points.append(self._map(linear, float(x), float(y)))
             self.warnings.append('CAD_TEXT_BOUNDS_APPROXIMATE')
         else:
-            self.warnings.append('CAD_TEXT_BOUNDS_UNAVAILABLE:' + str(entity.dxf.handle))
+            self.warnings.append('CAD_TEXT_BOUNDS_UNAVAILABLE:' + self.entity_label(entity))
         return padded_box([[x, y, x, y] for x, y in points])
 
     def _text(self, entity, chain, block_path):
@@ -609,7 +785,7 @@ class _Extractor:
                       bbox=self._text_bbox(entity, linear, insertion))
         if record['layer'] == 'DM_DIAMETER':
             record['_entity'] = entity
-            self.diameter_texts[record['handle'] + ':' + '/'.join(record['block_path'])] = record
+            self.diameter_texts[_record_key(record) + ':' + '/'.join(record['block_path'])] = record
         return [self._emit(record, _box_tuple(record['bbox']))]
 
     def _mtext(self, entity, chain, block_path):
@@ -700,7 +876,7 @@ class _Extractor:
         measurement = self._decimal_text(record['geometry_measurement'])
         authority = ('declared_text' if declared_text is not None
                      else ('dimension_measurement' if measurement is not None else 'unavailable'))
-        return {'feature_id': 'dimension-' + record['handle'], 'feature_type': 'native_dimension',
+        return {'feature_id': 'dimension-' + _record_key(record), 'feature_type': 'native_dimension',
                 'locator': self.locator(record), 'dimension_type': record['dimension_type'],
                 'unit': self.unit, 'declared_text': declared_text, 'declared_value': declared_value,
                 'geometry_measurement': measurement, 'value_authority': authority}
@@ -782,7 +958,15 @@ class _Extractor:
     def _diameter_feature(self, record):
         entity, annotation = record['_entity'], record['text']
         candidates, evidence, selected = sorted(self.model_circles), None, None
-        if entity.has_xdata('DATAMIND'):
+        if self.positional:
+            # A target candidate is an explicit **source handle**; a handle-less source
+            # has none, so no association can be confirmed from XDATA here. The
+            # annotation text itself is still read (it is text, not an identity).
+            candidates = []
+            if entity.has_xdata('DATAMIND'):
+                self.declare('CAD_REFERENCE_TARGET_INVALID', entity=entity,
+                             detail='source has no entity handles')
+        elif entity.has_xdata('DATAMIND'):
             tags = list(entity.get_xdata('DATAMIND'))
             if not tags or tags[0] != (1000, 'diameter_target') \
                     or any(tag.code != 1005 for tag in tags[1:]):
@@ -818,8 +1002,8 @@ class _Extractor:
                     nominal, lower, upper = (format(size, 'f'), format(-tolerance, 'f'),
                                              format(tolerance, 'f'))
         if nominal is None:
-            self.warnings.append('CAD_DIMENSION_VALUE_UNKNOWN:' + entity.dxf.handle)
-        return {'feature_id': 'diameter-' + entity.dxf.handle, 'feature_type': 'diameter',
+            self.warnings.append('CAD_DIMENSION_VALUE_UNKNOWN:' + _record_key(record))
+        return {'feature_id': 'diameter-' + _record_key(record), 'feature_type': 'diameter',
                 'annotation_raw': annotation, 'locator': self.locator(record),
                 'nominal_value': nominal, 'tolerance_lower': lower, 'tolerance_upper': upper,
                 'unit': self.unit, 'association_status': state, 'target_candidates': candidates,
@@ -863,6 +1047,10 @@ def _feature_string(item):
         parts.append(str(item['entity_type']))
     if item.get('handle'):
         parts.append(str(item['handle']))
+    elif item.get('entity_index') is not None:
+        # Positional mode names the entity by its declared ordinal; the string is
+        # `CODE:TYPE:#<index>[:DETAIL]` and never carries a synthesised handle.
+        parts.append('#' + str(item['entity_index']))
     text = ':'.join(parts)
     if item.get('detail') is not None:
         text += ':' + str(item['detail'])
@@ -880,11 +1068,24 @@ def parse_bytes(data, *, document_id, document_version=1, provenance='synthetic_
     if data.startswith(b'AutoCAD Binary DXF') or b'\x00' in data:
         raise CadReadError('CAD_BINARY_DXF_UNSUPPORTED')
     text, encoding = _decode(data)
-    entities, blocks = _scan_source_records(_tags(text))
-    _validate_source_records(entities, blocks, limits)
+    pairs = _tags(text)
+    entities, blocks = _scan_source_records(pairs)
+    identity_mode = _validate_source_records(entities, blocks, limits)
+    # `ezdxf.read(io.StringIO(...))` performs no newline translation and its
+    # `ascii_tags_loader` only strips a trailing '\n', so a CRLF source would hand every
+    # value a trailing '\r' (the section name becomes 'ENTITIES\r' and the whole ENTITIES
+    # section is ignored). Windows CAD exports are routinely CRLF, so the text handed to
+    # the library is newline-normalised; the raw tags, the digest and the decoded text
+    # are untouched.
+    header = _header_values(pairs)
+    # Tri-state on purpose: `None` means the source does not declare `$HANDLING` at all,
+    # which is not a contradiction with anything (ezdxf's own writer omits the variable).
+    # Only an *explicit* flag that disagrees with the record tags is worth reporting.
+    declared_handling = header.get('$HANDLING')
+    handling_declared = None if declared_handling is None else _declared_flag(declared_handling)
     ezdxf, bbox_module = _library()
     try:
-        doc = ezdxf.read(io.StringIO(text))
+        doc = ezdxf.read(io.StringIO(text.replace('\r\n', '\n').replace('\r', '\n')))
     except (ezdxf.DXFError, ValueError, TypeError) as error:
         raise CadReadError('CAD_DXF_INVALID') from error
     # Integrity is checked against what `ezdxf.read` produced, *before* `audit()` is given
@@ -896,8 +1097,36 @@ def parse_bytes(data, *, document_id, document_version=1, provenance='synthetic_
                    for block in doc.blocks
                    if not block.name.startswith(('*Model_Space', '*Paper_Space'))
                    for entity in block]
-    reachable = {handle for layout in doc.layouts for entity in layout for handle in _visited(entity)}
-    reachable |= {handle for block in doc.blocks for entity in block for handle in _visited(entity)}
+    source_records = [record for record in entities if record[0] not in _SUB_ENTITY_TYPES]
+    source_blocks = [record for record in blocks if record[0] not in _SUB_ENTITY_TYPES]
+    index_by_id = {}
+    if identity_mode == 'positional':
+        # A handle-less source is compared by entity *type*: the handles `ezdxf` reports
+        # here are synthesised, so they are evidence of nothing.
+        index_by_id = _positional_indices(read_records, source_records, doc)
+        if Counter(kind for kind, _handle in read_blocks) \
+                != Counter(record[0] for record in source_blocks):
+            raise CadReadError('CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED',
+                               {'raw': len(source_blocks), 'read': len(read_blocks)})
+    else:
+        if set(read_records) != set(source_records):
+            raise CadReadError('CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED',
+                               {'raw': len(entities), 'read': len(read_records)})
+        if set(read_blocks) != set(source_blocks):
+            raise CadReadError('CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED',
+                               {'raw': len(blocks), 'read': len(read_blocks)})
+    if identity_mode == 'source':
+        # Only a handle-bearing source can be checked for entity loss by handle; for a
+        # handle-less one `_positional_indices` already proved the type multiset matches,
+        # and `_visited` would read back the very synthetic handles this mode rejects.
+        reachable = {handle for layout in doc.layouts for entity in layout
+                     for handle in _visited(entity)}
+        reachable |= {handle for block in doc.blocks for entity in block
+                      for handle in _visited(entity)}
+        lost = sorted({handle for _kind, handle in entities + blocks} - reachable)
+        if lost:
+            raise CadReadError('CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED',
+                               {'lost_handles': lost[:10], 'count': len(lost)})
     before_handles = {handle for _kind, handle in read_records + read_blocks}
     insert_names = {entity.dxf.get('handle'): entity.dxf.get('name')
                     for layout in doc.layouts for entity in layout
@@ -906,34 +1135,43 @@ def parse_bytes(data, *, document_id, document_version=1, provenance='synthetic_
     if audit.errors:
         raise CadReadError('CAD_DXF_AUDIT_ERRORS',
                            {'errors': len(audit.errors), 'fixes': len(audit.fixes)})
-    if set(read_records) != {record for record in entities
-                             if record[0] not in _SUB_ENTITY_TYPES}:
-        raise CadReadError('CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED',
-                           {'raw': len(entities), 'read': len(read_records)})
-    if set(read_blocks) != {record for record in blocks
-                            if record[0] not in _SUB_ENTITY_TYPES}:
-        raise CadReadError('CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED',
-                           {'raw': len(blocks), 'read': len(read_blocks)})
-    lost = sorted({handle for _kind, handle in entities + blocks} - reachable)
-    if lost:
-        raise CadReadError('CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED',
-                           {'lost_handles': lost[:10], 'count': len(lost)})
 
     sha = hashlib.sha256(data).hexdigest()
-    raw_unit = doc.header.get('$INSUNITS', 0)
-    try:
-        unit_code = int(raw_unit)
-    except (TypeError, ValueError):
-        unit_code = 0
+    # The unit comes from the *source* header, never from `ezdxf`'s header: ezdxf answers
+    # 6 (metres) for a file that declares no `$INSUNITS` at all. An absent variable is the
+    # documented DXF default 0, which stays `unknown` and is never guessed into millimetres.
+    declared_unit = header.get('$INSUNITS')
+    unit_code = 0
+    if declared_unit is not None:
+        try:
+            unit_code = int(str(declared_unit).strip())
+        except (TypeError, ValueError):
+            unit_code = 0
     insunits_modelled = unit_code in (0, 1, 4)
     unit = {0: 'unknown', 1: 'in', 4: 'mm'}.get(unit_code, 'unknown')
-    extractor = _Extractor(doc, limits=limits, sha=sha, unit=unit, bbox_module=bbox_module)
-    if not isinstance(raw_unit, int) or isinstance(raw_unit, bool):
-        extractor.declare('CAD_INSUNITS_INVALID', detail=repr(raw_unit))
+    extractor = _Extractor(doc, limits=limits, sha=sha, unit=unit, bbox_module=bbox_module,
+                           identity_mode=identity_mode, index_by_id=index_by_id)
+    if declared_unit is not None:
+        try:
+            int(str(declared_unit).strip())
+        except (TypeError, ValueError):
+            extractor.declare('CAD_INSUNITS_INVALID', detail=repr(declared_unit))
     if not insunits_modelled:
         extractor.declare('CAD_UNIT_CODE_NOT_MODELLED', detail=str(unit_code))
     if unit == 'unknown':
         extractor.warnings.append('CAD_UNIT_UNKNOWN')
+    if handling_declared is not None and handling_declared != (identity_mode == 'source'):
+        # The `$HANDLING` flag and the record tags disagree; the tags decide, and the
+        # disagreement is reported instead of being silently resolved either way. An
+        # absent flag is *not* a disagreement and is not reported.
+        extractor.warnings.append('CAD_HANDLING_FLAG_INCONSISTENT')
+    if identity_mode == 'positional':
+        # The declared gap: no entity record in the source carries a handle at all, so the
+        # drawing is located by `entity_index`. The count is the number of records that
+        # would have carried a handle.
+        extractor.declare(SOURCE_HANDLE_UNAVAILABLE,
+                          detail=str(len(source_records) + len(source_blocks)))
+        extractor.warnings.append('CAD_IDENTITY_MODE_POSITIONAL')
     if encoding != 'utf-8':
         extractor.warnings.append('CAD_ENCODING_FALLBACK:' + encoding)
     if audit.fixes:
@@ -942,12 +1180,15 @@ def parse_bytes(data, *, document_id, document_version=1, provenance='synthetic_
         after_handles |= {entity.dxf.get('handle') for block in doc.blocks for entity in block}
         for handle in sorted(before_handles - after_handles):
             name = insert_names.get(handle)
-            extractor.declare('CAD_DXF_AUDIT_ENTITY_REMOVED', handle=handle,
+            # In positional mode the library's synthesised handle is not a source value,
+            # so it is not carried into the declaration; the removal is still counted.
+            reported = None if extractor.positional else handle
+            extractor.declare('CAD_DXF_AUDIT_ENTITY_REMOVED', handle=reported,
                               entity_type='INSERT' if name else None,
                               detail=f'block {name!r}' if name else None)
             if name and name not in {block.name for block in doc.blocks}:
                 # The repair deleted a reference to a block the file never defines.
-                extractor.declare('CAD_BLOCK_MISSING', handle=handle, entity_type='INSERT',
+                extractor.declare('CAD_BLOCK_MISSING', handle=reported, entity_type='INSERT',
                                   detail=f'block {name!r} is not defined')
         if after_handles - before_handles:
             extractor.declare('CAD_DXF_AUDIT_ENTITY_ADDED',
@@ -971,7 +1212,8 @@ def parse_bytes(data, *, document_id, document_version=1, provenance='synthetic_
     if not extractor.entities:
         raise CadReadError('CAD_NO_SUPPORTED_ENTITIES',
                            {'unsupported': extractor.unsupported,
-                            'unsupported_features': declarations})
+                            'unsupported_features': declarations,
+                            'identity': identity_mode})
     payload = {'contract_version': CONTRACT_VERSION,
                'source': {'document_id': document_id, 'document_version': document_version,
                           'source_sha256': sha, 'format': 'dxf', 'parser_version': PARSER_VERSION,
@@ -991,6 +1233,14 @@ def parse_bytes(data, *, document_id, document_version=1, provenance='synthetic_
         'unsupported': extractor.unsupported, 'unsupported_features': declarations,
         'unsupported_counts': dict(sorted(extractor.counts.items())),
         'first_unsupported': extractor.unsupported[0] if extractor.unsupported else None,
+        # The identity mode and *why* it was chosen. `handling_declared` is the raw
+        # `$HANDLING` header flag; `source_handle_records` is how many raw records really
+        # carry a `code 5` tag. The tags decide the mode, the flag is only recorded.
+        'identity': {'mode': identity_mode, 'handling_declared': handling_declared,
+                     'source_handle_records': sum(1 for _kind, handle in entities + blocks
+                                                  if handle is not None),
+                     'positional_records': (len(source_records) + len(source_blocks)
+                                            if identity_mode == 'positional' else 0)},
         'limits': {'max_bytes': limits.max_bytes, 'max_entities': limits.max_entities,
                    'max_expanded_entities': limits.max_expanded_entities,
                    'max_block_depth': limits.max_block_depth,

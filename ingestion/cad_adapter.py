@@ -100,16 +100,26 @@ def _locator(document_id, source_version, entity, *, unit, layout, coordinate_sy
              source_sha256=None):
     """Project a source locator into the unified `cad_entity` locator.
 
-    Every field of the source locator is accounted for: `handle`/`layer`/`layout` are the
-    required ones, `view_id`/`coordinate_system`/`source_sha256` are carried through,
+    Every field of the source locator is accounted for: `layer`/`layout` are the required
+    ones, `handle`/`view_id`/`coordinate_system`/`source_sha256` are carried through,
     `block_path` is carried through when the source has one (v2), and `model_xy`/`unit`
     are added because the source locator has no equivalent for them (its coordinates live
     in the drawing's WCS and its unit in the source's INSUNITS). Nothing is discarded.
+
+    A handle-less (positional) source entity has `handle=None`: the projection then sends
+    `entity_index` + `handle_source='positional'` and **omits** `handle` entirely, so the
+    unified locator cannot be read as if a source handle existed.
     """
     payload = {'locator_kind': 'cad_entity', 'document_id': document_id,
                'source_version': source_version, 'layout': layout or 'Model',
-               'handle': entity['handle'], 'layer': entity['layer'],
-               'model_xy': _model_xy(entity), 'unit': unit}
+               'layer': entity['layer'], 'model_xy': _model_xy(entity), 'unit': unit}
+    if entity.get('handle'):
+        payload['handle'] = entity['handle']
+        if entity.get('handle_source'):
+            payload['handle_source'] = entity['handle_source']
+    elif entity.get('entity_index') is not None:
+        payload['handle_source'] = entity.get('handle_source') or 'positional'
+        payload['entity_index'] = entity['entity_index']
     if view_id:
         payload['view_id'] = view_id
     if coordinate_system:
@@ -122,6 +132,33 @@ def _locator(document_id, source_version, entity, *, unit, layout, coordinate_sy
     return parse_contract.validate_locator(payload).payload
 
 
+def _snapshot_identity_mode(snapshot):
+    """The identity mode a snapshot itself declares, for a bundle without `metadata.identity`.
+
+    The v1 reader has no positional mode, so its snapshot answers `source`; the v2 reader
+    states the mode in `metadata['identity']` and this fallback only covers a bundle that
+    was assembled by hand (every test fixture does).
+    """
+    for entity in snapshot.get('entities') or ():
+        if entity.get('handle'):
+            return 'source'
+        if entity.get('entity_index') is not None:
+            return 'positional'
+    return 'source'
+
+
+def _locator_identity(locator):
+    """The locator's own identity token, used as a content-hash input.
+
+    A positional locator has no handle; its declared `entity_index` stands in so two
+    different entities never hash to the same identity by accident.
+    """
+    if locator.get('handle'):
+        return locator['handle']
+    index = locator.get('entity_index')
+    return None if index is None else 'i' + str(index)
+
+
 def _block(document_id, source_version, parser_version, index, block_type, text, locator, *,
            native=None, heading_level=None):
     payload = {'block_id': _block_identifier(document_id, index),
@@ -130,7 +167,7 @@ def _block(document_id, source_version, parser_version, index, block_type, text,
                'text': text or '', 'native_attributes': native or {}, 'reading_order': index,
                'locator': locator, 'quality': {},
                'content_hash': _content_hash(document_id, source_version, parser_version,
-                                             block_type, locator.get('handle'), text)}
+                                             block_type, _locator_identity(locator), text)}
     if heading_level is not None:
         payload['heading_level'] = heading_level
     return payload
@@ -195,6 +232,7 @@ def _unsupported_result(*, source_name, profile, parser_version, declarations,
             'quality_findings': [], 'unsupported_features': features, 'artifact_refs': [],
             'manifest': {'parser_version': parser_version, 'profile': cad_dxf_v2.PROFILE,
                          'cad_contract_version': 'cad-contract-v2', 'source_sha256': None,
+                         'identity_mode': declarations.get('identity') or 'source',
                          **(manifest_extra or {})},
             'parse_status': 'unsupported'}
 
@@ -241,7 +279,11 @@ def parse_dxf(path, *, document_id, source_version=None, provenance='synthetic_d
     version = source_version or source_sha256
     if not version:
         parse_contract.fail('PARSE_BLOCK_INVALID', subject='cad', reason='source_version')
-    blocks, by_key, index = [], {}, 0
+    blocks, by_key, by_handle, index = [], {}, {}, 0
+    # The reader declares its identity mode explicitly; it is carried into the manifest so
+    # nothing downstream reads a positional drawing as an ordinary source-handle one.
+    identity = metadata.get('identity') or {}
+    identity_mode = identity.get('mode') or _snapshot_identity_mode(snapshot)
     # Everything the reader could not model is already declared with a stable code, an
     # entity type and a source handle; the adapter carries those declarations forward.
     unsupported = list(metadata.get('unsupported_features') or [])
@@ -268,7 +310,10 @@ def parse_dxf(path, *, document_id, source_version=None, provenance='synthetic_d
         block = add_block(_entity_block_type(entity, profile),
                           entity.get('text') or '', locator, _entity_native(entity, profile),
                           heading_level=1 if entity['layer'] in _TITLE_LAYERS else None)
-        by_key.setdefault((entity['handle'], tuple(entity.get('block_path') or [])), block)
+        by_key.setdefault((entity.get('handle'), entity.get('entity_index'),
+                           tuple(entity.get('block_path') or [])), block)
+        if entity.get('handle'):
+            by_handle.setdefault(entity['handle'], block)
     native_dimensions = 0
     relations = []
     for feature in snapshot['features']:
@@ -276,14 +321,20 @@ def parse_dxf(path, *, document_id, source_version=None, provenance='synthetic_d
             declare('block_limit_reached')
             break
         locator_payload = feature['locator']
-        key = (locator_payload['handle'], tuple(locator_payload.get('block_path') or []))
+        key = (locator_payload.get('handle'), locator_payload.get('entity_index'),
+               tuple(locator_payload.get('block_path') or []))
         # The feature's own entity supplies the representative point (`insertion`/`anchor`),
         # so the projection adds `model_xy` from the source, never from the annotation text.
-        entity = by_key.get(key) or {'handle': locator_payload['handle'],
-                                     'layer': locator_payload['layer'],
+        entity = by_key.get(key) or {'layer': locator_payload['layer'],
                                      'block_path': locator_payload.get('block_path')}
-        entity = {**entity, 'handle': locator_payload['handle'], 'layer': locator_payload['layer'],
+        entity = {**entity, 'layer': locator_payload['layer'],
                   'block_path': locator_payload.get('block_path')}
+        if locator_payload.get('handle'):
+            entity['handle'] = locator_payload['handle']
+        if locator_payload.get('entity_index') is not None:
+            entity['entity_index'] = locator_payload['entity_index']
+            entity['handle_source'] = (locator_payload.get('handle_source')
+                                       or 'positional')
         locator = _locator(document_id, version, entity, unit=feature.get('unit') or unit,
                            layout=layout, coordinate_system=coordinate_system,
                            view_id=locator_payload.get('view_id'), source_sha256=source_sha256)
@@ -295,7 +346,7 @@ def parse_dxf(path, *, document_id, source_version=None, provenance='synthetic_d
         target = feature.get('selected_target')
         if not target:
             continue
-        target_block = by_key.get((target, ()))
+        target_block = by_handle.get(target)
         if target_block is None:
             # The referenced entity is not in this bounded read; keep the gap visible
             # instead of reporting a relation whose target does not exist.
@@ -312,19 +363,34 @@ def parse_dxf(path, *, document_id, source_version=None, provenance='synthetic_d
                                       or f'源 DXF 中显式 XDATA 引用句柄 {target}'})
     return _payload(path=path, profile=profile, reader=reader, metadata=metadata, snapshot=snapshot,
                     blocks=blocks, relations=relations, unsupported=unsupported,
-                    native_dimensions=native_dimensions, source_sha256=source_sha256)
+                    native_dimensions=native_dimensions, source_sha256=source_sha256,
+                    identity_mode=identity_mode, identity=identity)
 
 
 def _payload(*, path, profile, reader, metadata, snapshot, blocks, relations, unsupported,
-             native_dimensions, source_sha256):
+             native_dimensions, source_sha256, identity_mode='source', identity=None):
     quality = list(metadata.get('warnings') or [])
+    if identity_mode == 'positional':
+        # The mode is stated in the *manifest* as well as in every locator, so a consumer
+        # that only reads the manifest cannot mistake a positional drawing for an ordinary
+        # source-handle parse. The reader already warns about the mode, so it is not repeated.
+        if 'CAD_IDENTITY_MODE_POSITIONAL' not in quality:
+            quality.append('CAD_IDENTITY_MODE_POSITIONAL')
+        if identity.get('positional_records'):
+            quality.append('CAD_SOURCE_HANDLE_UNAVAILABLE:'
+                           + str(identity['positional_records']))
     if native_dimensions:
         # The reader never ties a native dimension to the geometry it measures; saying so
         # as a quality finding keeps it out of the "declared gap" status while staying visible.
         quality.append(f'CAD_NATIVE_DIMENSION_ASSOCIATION_NOT_RECOVERED:{native_dimensions}')
     manifest = {'parser_version': reader.PARSER_VERSION, 'profile': metadata.get('profile'),
                 'cad_contract_version': snapshot.get('contract_version'),
-                'source_sha256': source_sha256}
+                'source_sha256': source_sha256, 'identity_mode': identity_mode}
+    if identity:
+        # Deliberately *not* `manifest['identity']`: `identity` in this contract is the
+        # drawing's business identity (`DM_DRAWING_ID` and friends), so the source's
+        # handle/positional identity is named `source_identity` to keep the two apart.
+        manifest['source_identity'] = identity
     for key in ('encoding', 'limits', 'unsupported_counts', 'counts'):
         if metadata.get(key) is not None:
             manifest[key] = metadata[key]

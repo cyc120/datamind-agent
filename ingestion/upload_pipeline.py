@@ -205,11 +205,20 @@ def enqueue(staged, provenance, dsn, identity):
     suffix = staged['suffix']
     media_type = MEDIA_TYPES[suffix]
     ids = identities(staged['source_sha256'])
+    # `document_assets.object_uri` follows the repository-wide convention of an **absolute**
+    # path (every other row, e.g. the knowledge base, stores an absolute path). The old
+    # `/v1/files/uploads` contract keeps returning a repository-relative `source_path` for
+    # `file_jobs`, which matches that endpoint's allow-list, so the absolute form is derived
+    # here instead of changing that contract. A relative uri also broke the isolated
+    # regression runner, whose fail-closed guard relocates rows by the `/data/` marker.
+    # 绝对路径必须由**拥有暂存根的一方**计算（`file_uploads` 的 ROOT 可能被测试打桩）；
+    # 用导入到本模块的 ROOT 去拼会在暂存根被重定向时算出错误路径。
+    source_uri = staged.get('absolute_path') or str((ROOT / staged['source_path']).resolve())
     with psycopg2.connect(dsn) as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
         actor = lock_identity(cur, identity, 'admin')
         upload = {'upload_id': ids['upload_id'], 'job_id': ids['job_id'],
                   'filename': staged['name'], 'media_type': media_type,
-                  'provenance': provenance, 'source_path': staged['source_path'],
+                  'provenance': provenance, 'source_path': source_uri,
                   'source_sha256': staged['source_sha256'], 'bytes': staged['bytes'],
                   'submitted_by': {'user_id': actor['user_id'],
                                    'display_name': actor['display_name'],
@@ -217,7 +226,7 @@ def enqueue(staged, provenance, dsn, identity):
                   'submitted_at': datetime.now(timezone.utc).isoformat()}
         cur.execute(ASSET_UPSERT, (ids['document_id'], staged['name'], COLLECTION,
                                    suffix.lstrip('.'), ORIGIN, staged['source_sha256'],
-                                   staged['source_path'], ['public'], Json({'upload': upload})))
+                                   source_uri, ['public'], Json({'upload': upload})))
         cur.execute(JOB_UPSERT, (ids['job_id'], ids['document_id'], QUEUE_JOB_TYPE))
     return {'upload_id': ids['upload_id'], 'job_id': ids['job_id'], 'filename': staged['name'],
             'media_type': media_type, 'status': 'queued', 'review_required': True}
@@ -611,10 +620,16 @@ def approve(upload_id, dsn, identity, *, reason=None):
 # --------------------------------------------------------------------------------------
 
 def _staged_path(claim):
-    relative = claim.get('source_path') or ''
-    if Path(relative).is_absolute():
-        fail('UPLOAD_STAGED_SOURCE_INVALID', 409)
-    path = (ROOT / relative).resolve()
+    """Resolve the staged source, accepting both uri forms the repository uses.
+
+    `document_assets.object_uri` follows the repository-wide convention of an absolute
+    path, while the legacy `/v1/files/uploads` contract hands `file_jobs` a
+    repository-relative one. Both must resolve to a file inside the checkout; the
+    containment check below is what actually keeps this safe, so the form is normalised
+    rather than trusted.
+    """
+    raw = claim.get('source_path') or ''
+    path = (Path(raw) if Path(raw).is_absolute() else (ROOT / raw)).resolve()
     if (not path.is_relative_to(ROOT.resolve()) or not path.is_file()
             or path.suffix.lower() != claim['suffix']):
         fail('UPLOAD_STAGED_SOURCE_INVALID', 409)
