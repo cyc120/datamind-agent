@@ -1,6 +1,6 @@
 {
   "stage": "parse_contract_and_resource_limits",
-  "api_version": "0.30.0",
+  "api_version": "0.31.0",
   "date": "2026-10-07",
   "scope": "并行推进两条技术实现线：(A) T3 统一解析契约（ParseResult/SourceLocator/Block/Relation/Adapter，§5.2/§5.4）；(B) T5 统一 CPU/内存配额与跨主机租约（§13）。",
   "lines": {
@@ -91,15 +91,36 @@
         "failures": 0,
         "errors": 0
       }
+    },
+    "E_contract_store": {
+      "components": {
+        "db/migrations/015_contract_store.sql": "document_contract_blocks（非页面形状的契约块）与 document_block_relations（关系，evidence 非空且禁止自引用）",
+        "ingestion/contract_store.py": "persist_result（再次校验后按文档整体替换块/定位/关系）与 read_result",
+        "scripts/import_contract.py": "把任意可路由文件（PDF/Office/DXF）解析并持久化；--dry-run 只校验",
+        "datamind/api.py": "GET /v1/documents/{id}/contract 返回契约块（含 locator）与关系"
+      },
+      "implemented": [
+        "Office/DXF 块按 part/paragraph/slide/sheet/handle 定位，无 page 概念，因此不写入页面形状的 document_blocks（否则要编造页码），改存 document_contract_blocks",
+        "persist_result 写入前再次 validate_parse_result；无效结果（如给 cad_entity 塞 bbox）在写库前被拒绝",
+        "按 document_id 整体替换块与关系，重复导入不产生重复行",
+        "relation_id 由 (document_id, 源, 目标, 类型) 决定，可复现；evidence 非空与禁止自引用由数据库 CHECK 兜底",
+        "读接口返回块（含 locator）、关系与计数，供检索/证据定位消费"
+      ],
+      "tests": {
+        "file": "tests/test_contract_store.py",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0
+      }
     }
   },
   "verification": {
     "full_isolated_regression": {
-      "tests": 643,
+      "tests": 650,
       "failures": 0,
       "errors": 0,
       "exit_code": 0,
-      "previous_stage_tests": 632
+      "previous_stage_tests": 643
     },
     "platform_facts": {
       "rlimit_cpu": "受支持并实测生效（1 秒 CPU 上限下 300 秒自旋被终止）",

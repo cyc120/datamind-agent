@@ -66,6 +66,20 @@
 
 `tests/test_parse_contract.py` **25/25**，完整隔离回归见 `reports/parse_contract_verification.json`。覆盖：常量与文档一致、摄取状态机放行/拒绝、七类定位器逐一校验与必需字段缺失、页号/bbox 越界与倒置、CAD 句柄、关系端点/类型/状态/证据/恢复方法、结果必需字段与未知字段拒绝、适配器登记/查询/未知与不支持区分，以及用真实 ingest/OCR 块形状做映射往返（字段不丢、缺失保持缺失、页尺寸缺失拒绝）。
 
+## 契约存储与读接口（API 0.31.0）
+
+| 表 | 用途 |
+|---|---|
+| `document_contract_blocks` | 非页面形状的契约块（Office/DXF）：`block_id`、`contract_version`、`block_type`、`text`、`reading_order`、`native_attributes`、`locator`、`content_hash` |
+| `document_block_relations` | 关系：`relation_type`、`relation_state`、`recovery_method`、`evidence`；`evidence` 非空与禁止自引用由 CHECK 兜底 |
+| `document_block_locators` | PDF 路径的 locator（块同时存在于 `document_blocks`） |
+
+Office/DXF 的块按 `part`/`paragraph`/`slide`/`sheet`/`handle` 定位，**没有页概念**，因此不写入页面形状的 `document_blocks`（那需要编造页码）；PDF 路径继续用 `document_blocks` + `document_block_locators`。
+
+`ingestion/contract_store.py`：`persist_result(cur, document_id=…, payload=…)` 在写库前**再次** `validate_parse_result`，然后按文档整体替换块与关系——重复导入不产生重复行，半成品不会残留。`relation_id` 由 `(document_id, 源, 目标, 类型)` 决定，可复现。
+
+入口：`scripts/import_contract.py`（`--dry-run` 只校验）与 `GET /v1/documents/{id}/contract`（返回契约块含 locator、关系与计数）。
+
 ## 图纸适配器（API 0.30.0）
 
 `ingestion/cad_adapter.py` 把 `ingestion/cad_dxf.py`（冻结 profile `datamind-2d-labelled-dxf-v1`）的结果映射进统一契约，并注册 `dxf-native`（媒体类型 `image/vnd.dxf`，探测支持 ASCII 与二进制 DXF）。入口：`scripts/parse_drawing.py`。
@@ -88,6 +102,7 @@
 - **只有校验过的块才有定位行**：契约出现之前解析的块不写任何行，**不编造 locator**；块与定位行在同一文档重建时一起删除后重插。
 - **已注册 PDF、三种 Office 与原生 DXF**：DOCX/PPTX/XLSX 通过**包内索引**（`word/document.xml`、`ppt/presentation.xml`、`xl/workbook.xml`）区分；不含已知部件的 ZIP 仍报 `application/zip` 并被拒绝，不猜类型。DWG 是专有格式，**不注册假适配器**。
 - **DWG/DGN 未实现**：需要外部转换器；`image/vnd.dwg` 只被识别与拒绝，不做转换猜测。图纸 PDF/扫描区域路径仍走通用 PDF/OCR 链路，未做 CAD 专项关联。
+- **检索侧消费有限**：读接口已提供 locator 与关系，但问答/引用链路尚未改用它们定位证据；两个存储（PDF 与 Office/DXF）也尚未合并为单一契约表。
 
 ## Office 适配器（API 0.29.0）
 

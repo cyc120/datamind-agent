@@ -162,7 +162,7 @@ class ProfileImportRequest(BaseModel):
     activate_first: bool = False
 
 
-app = FastAPI(title="DataMind Agent", version="0.30.0")
+app = FastAPI(title="DataMind Agent", version="0.31.0")
 
 
 @app.middleware('http')
@@ -960,6 +960,20 @@ def document_file(document_id: str,expected_version: int | None=Query(default=No
     path = _source_path(document)
     return FileResponse(path, media_type="application/pdf" if document["file_type"] == "pdf" else "application/json",
                         filename=path.name, content_disposition_type="inline")
+
+
+@app.get("/v1/documents/{document_id}/contract")
+def document_contract(document_id: str):
+    """Validated contract blocks (with locators) and relations for one document."""
+    from ingestion.contract_store import read_result
+    document = _public_document(document_id)
+    stored = read_result(document_id, _read_dsn())
+    return {"document_id": document_id, "document_version": document["doc_version"],
+            "source_sha256": document["sha256"], "parser_version": document["parser_version"],
+            "contract_version": document.get("contract_version"),
+            "block_count": stored["block_count"], "relation_count": stored["relation_count"],
+            "blocks": jsonable_encoder(stored["blocks"]),
+            "relations": jsonable_encoder(stored["relations"])}
 
 
 @app.get("/v1/documents/{document_id}/facts")
