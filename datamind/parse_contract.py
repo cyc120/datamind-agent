@@ -55,7 +55,7 @@ LOCATOR_OPTIONAL_FIELDS = {
     'image_region': ('rotation_degrees', 'transform_chain', 'page_no'),
     'office_object': ('paragraph', 'table', 'cell', 'slide', 'shape', 'workbook', 'sheet'),
     'sheet_range': ('cell', 'range', 'formula', 'hidden'),
-    'cad_entity': ('view', 'render_ref', 'model_z'),
+    'cad_entity': ('view', 'view_id', 'render_ref', 'model_z', 'coordinate_system'),
     'temporal_segment': ('speaker', 'frame_ref'),
     'model_spatial_object': ('transform', 'view'),
 }
@@ -83,6 +83,9 @@ _ADAPTERS: dict = {}
 _MAGIC = ((b'%PDF-', 'application/pdf'), (b'\x89PNG\r\n\x1a\n', 'image/png'),
           (b'\xff\xd8\xff', 'image/jpeg'), (b'PK\x03\x04', 'application/zip'))
 OCTET_STREAM = 'application/octet-stream'
+# 二维图纸：DXF 可原生读取；DWG 是专有二进制格式，需要外部转换器。
+DXF_MEDIA_TYPE = 'image/vnd.dxf'
+DWG_MEDIA_TYPE = 'image/vnd.dwg'
 # OOXML packages are all ZIP containers, so the subtype needs the archive index, not the
 # leading bytes. Anything unrecognised stays a plain ZIP instead of being guessed.
 OOXML_MEDIA_TYPES = {
@@ -476,9 +479,18 @@ def detect_media_type(path):
     """Sniff a file signature; unknown content is reported, never guessed from a name."""
     try:
         with open(path, 'rb') as handle:
-            head = handle.read(8)
+            head = handle.read(512)
     except OSError:
         fail('PARSE_MEDIA_UNREADABLE', path=str(path))
+    if head.startswith(b'AutoCAD Binary DXF'):
+        return DXF_MEDIA_TYPE
+    if head[:4] == b'AC10' and b'SECTION' not in head.upper():
+        # A DWG also starts with its version tag; without an external converter it is
+        # reported as DWG rather than being mistaken for a readable DXF.
+        return DWG_MEDIA_TYPE
+    stripped = head.lstrip()[:64].upper()
+    if stripped.startswith(b'0') and b'SECTION' in head.upper():
+        return DXF_MEDIA_TYPE
     for magic, media_type in _MAGIC:
         if head.startswith(magic):
             if media_type == 'application/zip':

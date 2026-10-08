@@ -66,12 +66,28 @@
 
 `tests/test_parse_contract.py` **25/25**，完整隔离回归见 `reports/parse_contract_verification.json`。覆盖：常量与文档一致、摄取状态机放行/拒绝、七类定位器逐一校验与必需字段缺失、页号/bbox 越界与倒置、CAD 句柄、关系端点/类型/状态/证据/恢复方法、结果必需字段与未知字段拒绝、适配器登记/查询/未知与不支持区分，以及用真实 ingest/OCR 块形状做映射往返（字段不丢、缺失保持缺失、页尺寸缺失拒绝）。
 
+## 图纸适配器（API 0.30.0）
+
+`ingestion/cad_adapter.py` 把 `ingestion/cad_dxf.py`（冻结 profile `datamind-2d-labelled-dxf-v1`）的结果映射进统一契约，并注册 `dxf-native`（媒体类型 `image/vnd.dxf`，探测支持 ASCII 与二进制 DXF）。入口：`scripts/parse_drawing.py`。
+
+| 产出 | 规则 |
+|---|---|
+| 实体块 | 身份层（`DM_DRAWING_ID`/`DM_REVISION`/`DM_PART_ID`）→ `title`（`heading_level=1`）；`LINE`/`CIRCLE` → `figure`（无文本）；其余 `TEXT` → `paragraph` |
+| 尺寸块 | 每个特征一块 `dimension`，`native_attributes` 携带 `nominal_value`/`tolerance_lower`/`tolerance_upper`/`unit`/`association_status` |
+| locator | `cad_entity`：`layout`、`handle`、`layer`、`model_xy`（插入点或 bbox 中心）、`unit`，附 `view_id` 与坐标系 |
+| 关系 | 源 DXF 的**显式 XDATA** 引用：`relation_type=references`、`recovery_method=native_reference`、`confirmed → state=verified`，`evidence` 为源依据文本 |
+
+**有界与诚实**：引用目标不在本次有界读取内时记录 `dimension_target_not_included` 并把 `parse_status` 置 `partial`，**不编造关系**；超 `MAX_BLOCKS` 记录 `block_limit_reached`；CAD 解析告警进入 `quality_findings`。
+
+**DWG**：专有二进制格式，需要外部转换器。**不注册无能力的假适配器**——`parse` 直接返回 `CAD_DWG_CONVERTER_UNAVAILABLE`，直接 `dispatch` 则返回 `PARSE_ADAPTER_UNKNOWN`。
+
 ## 边界
 
 - **已接入解析出口**：`parse_pdf` 在返回前把真实块映射进契约并校验，结果记录为 `detail['parse_contract']`（`parsed`/`failed`/`skipped` + 稳定错误码）。契约违反**不会中断摄取**，而是带错误码写入质量明细保持可见。
 - **定位写入独立表**：契约 locator 落在 `document_block_locators(block_id, document_id, contract_version, locator)`，与 `document_blocks` 分列存放。原因是基表 `document_blocks` 属主为 `postgres`，而迁移以应用角色运行——项目既有迁移从不 ALTER 基表，因此遵循既有模式另建应用所有的表，而不是变更表属主。
 - **只有校验过的块才有定位行**：契约出现之前解析的块不写任何行，**不编造 locator**；块与定位行在同一文档重建时一起删除后重插。
-- **已注册 PDF 与三种 Office 适配器**：DOCX/PPTX/XLSX 通过**包内索引**（`word/document.xml`、`ppt/presentation.xml`、`xl/workbook.xml`）区分；不含已知部件的 ZIP 仍报 `application/zip` 并被拒绝，不猜类型。
+- **已注册 PDF、三种 Office 与原生 DXF**：DOCX/PPTX/XLSX 通过**包内索引**（`word/document.xml`、`ppt/presentation.xml`、`xl/workbook.xml`）区分；不含已知部件的 ZIP 仍报 `application/zip` 并被拒绝，不猜类型。DWG 是专有格式，**不注册假适配器**。
+- **DWG/DGN 未实现**：需要外部转换器；`image/vnd.dwg` 只被识别与拒绝，不做转换猜测。图纸 PDF/扫描区域路径仍走通用 PDF/OCR 链路，未做 CAD 专项关联。
 
 ## Office 适配器（API 0.29.0）
 

@@ -1,6 +1,6 @@
 {
   "stage": "parse_contract_and_resource_limits",
-  "api_version": "0.29.0",
+  "api_version": "0.30.0",
   "date": "2026-10-07",
   "scope": "并行推进两条技术实现线：(A) T3 统一解析契约（ParseResult/SourceLocator/Block/Relation/Adapter，§5.2/§5.4）；(B) T5 统一 CPU/内存配额与跨主机租约（§13）。",
   "lines": {
@@ -69,15 +69,37 @@
         "failures": 0,
         "errors": 0
       }
+    },
+    "D_cad_adapter": {
+      "components": {
+        "ingestion/cad_adapter.py": "DXF 实体/尺寸/引用映射进统一契约并注册 dxf-native 适配器；DWG 不登记，由 parse 给出明确拒绝原因",
+        "scripts/parse_drawing.py": "CLI：探测→路由→校验，打印契约汇总；DWG 返回 1 并给出 CAD_DWG_CONVERTER_UNAVAILABLE",
+        "datamind/parse_contract.py": "新增 DXF/DWG 签名探测（ASCII/二进制 DXF、AC10xx 版本头）与 cad_entity 可选字段 view_id/coordinate_system"
+      },
+      "implemented": [
+        "每个实体一块：身份层（DM_DRAWING_ID/DM_REVISION/DM_PART_ID）为 title 且 heading_level=1，LINE/CIRCLE 为 figure（无文本），其余 TEXT 为 paragraph",
+        "尺寸特征为 dimension 块，native_attributes 携带 nominal/tolerance/unit/association_status",
+        "locator 为 cad_entity（layout/handle/layer/model_xy/unit，含 view_id 与坐标系），坐标取插入点或 bbox 中心",
+        "关联来自源 DXF 的显式 XDATA：relation_type=references、recovery_method=native_reference、confirmed→state=verified，evidence 为源依据",
+        "引用目标不在本次有界读取内时记录 dimension_target_not_included 并将 parse_status 置 partial，不编造关系",
+        "超 MAX_BLOCKS 记录 block_limit_reached；CAD 解析告警进入 quality_findings",
+        "DWG 需要外部转换器：不注册假适配器，parse 直接返回 CAD_DWG_CONVERTER_UNAVAILABLE，dispatch 返回 PARSE_ADAPTER_UNKNOWN"
+      ],
+      "tests": {
+        "file": "tests/test_cad_adapter.py",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0
+      }
     }
   },
   "verification": {
     "full_isolated_regression": {
-      "tests": 632,
+      "tests": 643,
       "failures": 0,
       "errors": 0,
       "exit_code": 0,
-      "previous_stage_tests": 630
+      "previous_stage_tests": 632
     },
     "platform_facts": {
       "rlimit_cpu": "受支持并实测生效（1 秒 CPU 上限下 300 秒自旋被终止）",
@@ -90,7 +112,8 @@
     "并行子代理在实现期间对仓库执行了越界的自动改写（删除 web/app.js 中一行行为代码、删除 style.css 的 .step/.num 规则、批量移除 import 与 requirements 条目）。已中断该子代理、逐项回退全部 33 个受影响文件，并只保留受控改动；回退后完整回归通过。",
     "该子代理产出的 1234 行 parse_contract.py 因与本规范偏差较大且无任何测试，已弃用并改为受控实现（本文件的 A 线）。",
     "租约跨进程测试首轮误用父进程的原始 DSN，子进程因此在隔离回归中连到真实库并成功取租约；改为使用 effective_dsn 后通过——这同时验证了 effective_dsn 存在的必要性。",
-    "报告 JSON 一度被写坏：用字符串替换向 reports/parse_contract_verification.json 写入时用了 Python 字面量 True（JSON 要求 true），该文件已推送。已修正，并新增 tests/test_reports.py 守护（所有 reports/*.json 必须是合法 JSON，且不得出现 : True/: False/: None）。"
+    "报告 JSON 一度被写坏：用字符串替换向 reports/parse_contract_verification.json 写入时用了 Python 字面量 True（JSON 要求 true），该文件已推送。已修正，并新增 tests/test_reports.py 守护（所有 reports/*.json 必须是合法 JSON，且不得出现 : True/: False/: None）。",
+    "报告守护测试首版对整份文件做子串匹配（: True/: False/: None），把说明文字里的同样字符误判为 Python 字面量并误报；已改为只对**解析失败**的文件给出该提示，合法文件不再误报。"
   ],
   "boundaries": [
     "解析契约仅描述与校验，未接入统一 Adapter 路由，未改造 ingestion/ingest.py 的生产链路。",
