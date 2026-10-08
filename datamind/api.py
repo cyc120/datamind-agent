@@ -26,11 +26,11 @@ from .pdf_index import PublicationRequest as PdfKnowledgePublicationRequest
 from .pdf_search import SearchRequest as PdfKnowledgeSearchRequest
 from .providers import (OPENAI, PROTOCOLS, list_models as provider_list_models,
                         test_chat as provider_test_chat)
-from .settings_store import (DEFAULT_BASE_URL, DEFAULT_MODEL, PROFILE_FIELDS, activate_profile,
-                             active_profile, clear_model_config, delete_profile, list_profiles,
-                             load_model_config, normalize_base_url, public_model_config,
-                             public_profile, public_profiles, redact_profile, save_model_config,
-                             save_profile)
+from .settings_store import (DEFAULT_BASE_URL, DEFAULT_MODEL, PROFILE_FIELDS, PROFILE_VALUE_FIELDS,
+                             activate_profile, active_profile, clear_model_config, delete_profile,
+                             list_profiles, load_model_config, normalize_base_url,
+                             public_model_config, public_profile, public_profiles, redact_profile,
+                             resolve_profile_values, save_model_config, save_profile)
 
 
 class DocumentReference(BaseModel):
@@ -163,7 +163,7 @@ class ProfileImportRequest(BaseModel):
     activate_first: bool = False
 
 
-app = FastAPI(title="DataMind Agent", version="0.36.0")
+app = FastAPI(title="DataMind Agent", version="0.37.0")
 
 
 @app.middleware('http')
@@ -685,9 +685,8 @@ def _stored_config() -> dict:
 
 
 def _config_source(stored: dict) -> str:
-    if stored.get("api_key"):
-        return "app_settings"
-    return "environment" if os.environ.get("NEW_API_KEY") else "unset"
+    # 与 sql_engine.settings() 的 MODEL_CONFIG_SOURCE 同一份判定（唯一解析入口）。
+    return resolve_profile_values(stored=stored)["source"]
 
 
 def _profiles_safe() -> dict:
@@ -709,31 +708,33 @@ def _select_stored_profile(profile_id: str | None = None) -> dict:
     return dict(load_model_config())
 
 
-def resolve_profile(request: ProfileRequest | None = None, *, stored: dict | None = None) -> dict:
+def resolve_profile(request: ProfileRequest | None = None, *, stored: dict | None = None,
+                    inherit_sensitive_headers: bool = True) -> dict:
     """api.py 内唯一的 profile 解析入口（探活、模型列表等共用）。
 
-    优先级：请求显式字段 > 指定/启用配置 > 环境变量 > 默认值。
-    ``headers`` / ``proxy`` 与 ``api_key`` 走同一套合并规则，因此同一份输入
-    在任何入口都会解析出同一结果（含代理）。``stored`` 可显式注入已保存配置，
-    便于测试与无数据库场景。
+    字段拼装只有一份实现：``settings_store.resolve_profile_values()``（问数链路的
+    ``sql_engine.settings()`` 是同一份结果的 NEW_API_* 视图），本函数只把它铺回既有
+    的 profile 结构，因此同一份输入在任何入口都解析出同一结果（含 proxy / headers）。
+    优先级：请求显式字段 > 指定/启用配置 > 环境变量 > 默认值。``stored`` 可显式注入
+    已保存配置，便于测试与无数据库场景。
+
+    敏感头补回（**无条件**，不因调用方式而异）：请求头来自浏览器脱敏表单，只提交非敏感
+    头的请求会丢掉未提交的 Authorization / api-key / Cookie，导致「编辑非敏感头后测试
+    连接」401。因此统一用 ``merge_sensitive_headers()`` 从已存配置补回敏感头，请求显式
+    提交的值优先，已存没有的不凭空造；删除敏感头只有提交 ``__clear__`` 哨兵一条通道。
+    这个行为**不随 ``stored`` 是否注入而改变**——让参数悄悄翻转合并语义会把同一个逻辑
+    操作变成两种含义，正是本缺陷的成因之一。
     """
     if stored is None:
         try:
             stored = _select_stored_profile(getattr(request, "profile_id", None))
         except psycopg2.Error:
             stored = {}
-    base = dict(stored or {})
-    profile = dict(base)
-    if request is not None:
-        for field in ("protocol", "base_url", "model", "auth_style", "headers", "proxy",
-                      "max_tokens", "timeout_s"):
-            value = getattr(request, field, None)
-            if value is not None:
-                profile[field] = value
-        profile["api_key"] = (request.api_key or "").strip() or base.get("api_key", "")
-    profile["base_url"] = profile.get("base_url") or os.environ.get("NEW_API_BASE_URL") or DEFAULT_BASE_URL
-    profile["model"] = profile.get("model") or os.environ.get("NEW_API_MODEL") or DEFAULT_MODEL
-    profile["api_key"] = profile.get("api_key") or os.environ.get("NEW_API_KEY") or ""
+    resolved = resolve_profile_values(request, stored=stored,
+                                      inherit_sensitive_headers=inherit_sensitive_headers)
+    profile = dict(stored or {})
+    for field in PROFILE_VALUE_FIELDS:
+        profile[field] = resolved[field]
     return profile
 
 

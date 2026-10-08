@@ -359,6 +359,128 @@ def merge_proxy_value(incoming, existing) -> str:
     return text
 
 
+# ---------- 唯一解析入口（探活 / 问数链路共用） ----------
+#
+# 此前有两套实现各写一遍字段拼装：api.resolve_profile()（探活与模型列表）与
+# sql_engine.settings() + model_profile()（SQL/RAG/PDF 问数）。两套已经出现过一次
+# 不一致（proxy 只在探活侧生效）。现在两边都只调用 resolve_profile_values()：
+#   * api.resolve_profile()  → PROFILE_VALUE_FIELDS 的规范化视图；
+#   * sql_engine.settings()  → 同一结果的 NEW_API_* 视图（键名沿用历史契约）。
+# 优先级：请求显式字段 > 指定/启用配置 > 环境变量 > 默认值。
+
+#: resolve_profile_values() 产出的规范化 profile 字段（协议层直接消费的键名）
+PROFILE_VALUE_FIELDS = ("protocol", "base_url", "model", "api_key", "max_tokens",
+                        "timeout_s", "auth_style", "headers", "proxy")
+
+#: 规范化字段 → 环境变量名（sql_engine.settings() 的 NEW_API_* 视图）
+ENV_FIELD_NAMES = {"protocol": "NEW_API_PROTOCOL", "base_url": "NEW_API_BASE_URL",
+                   "model": "NEW_API_MODEL", "api_key": "NEW_API_KEY",
+                   "max_tokens": "NEW_API_MAX_TOKENS", "timeout_s": "NEW_API_TIMEOUT",
+                   "auth_style": "NEW_API_AUTH_STYLE", "headers": "NEW_API_HEADERS",
+                   "proxy": "NEW_API_PROXY"}
+
+
+def _request_value(request, field):
+    """从请求对象（ProfileRequest 或同形映射）取显式字段；未提供返回 None。"""
+    if request is None:
+        return None
+    if isinstance(request, dict):
+        return request.get(field)
+    return getattr(request, field, None)
+
+
+def _missing(value) -> bool:
+    """None / 空白串视为「未提供」；0 与 {} 是显式值，不算缺失。"""
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return not value.strip()
+    return False
+
+
+def _stored_is_active(stored) -> bool:
+    """存储配置是否自带密钥（决定它是否参与解析，见 resolve_profile_values）。"""
+    return bool(isinstance(stored, dict) and str(stored.get("api_key") or "").strip())
+
+
+def _config_source_value(base: dict, env) -> str:
+    """配置来源：app_settings > environment > unset（沿用历史 MODEL_CONFIG_SOURCE）。"""
+    if base:
+        return "app_settings"
+    return "environment" if env.get("NEW_API_KEY") else "unset"
+
+
+def resolve_profile_values(request=None, *, stored=None, environ=None,
+                           inherit_sensitive_headers: bool = True) -> dict:
+    """唯一 profile 解析入口：请求显式字段 > 指定/启用配置 > 环境变量 > 默认值。
+
+    返回 ``PROFILE_VALUE_FIELDS`` 的规范化字段集合，外加两个元数据键
+    ``name``（启用配置名）与 ``source``（app_settings / environment / unset）。
+    api.resolve_profile() 与 sql_engine.settings() 都只做这一份结果的投影，
+    不再各自拼装字段。
+
+    ``inherit_sensitive_headers``：请求提交了 ``headers`` 但没带已存配置里的敏感头
+    （Authorization / api-key / Cookie…）时，是否用 ``merge_sensitive_headers()``
+    从已存配置补回。默认补回：浏览器只看得到脱敏视图（``public_profile()`` 敏感头
+    只出键名），编辑非敏感头后重新「测试连接」时敏感头不会被整段丢掉（否则 401）。
+    请求显式提交的敏感头值始终优先；已存没有该敏感头时不会凭空造。
+
+    保守侧（两条实现原有的优先级差异）
+    ----------------------------------
+    旧实现并不一致：``api.resolve_profile()`` 会把**存储配置的端点 / 请求头 / 代理**
+    与**环境变量里的 ``NEW_API_KEY``** 拼在一起；``sql_engine.settings()`` 只要存储
+    配置没有密钥就整体忽略它、完全走环境变量（端点也回退到 env / 默认值）。
+    前者可能把环境里的真实密钥发往存储配置里写着的（第三方）端点，因此这里取**更不
+    外泄凭据**的一侧：**存储配置只有在自带 ``api_key`` 时才参与解析**。问数链路的
+    行为因此保持不变；探活侧失去的只是「无密钥存储配置 + env 密钥」这一种组合。
+    """
+    env = os.environ if environ is None else environ
+    raw_stored = stored if isinstance(stored, dict) else {}
+    base = raw_stored if _stored_is_active(raw_stored) else {}
+
+    def pick(field):
+        value = _request_value(request, field)
+        if field == "api_key" and value is not None:
+            value = str(value).strip() or None
+        if not _missing(value):
+            return value
+        value = base.get(field)
+        if not _missing(value):
+            return value
+        value = env.get(ENV_FIELD_NAMES[field])
+        return None if _missing(value) else value
+
+    protocol = str(pick("protocol") or "").strip().lower() or OPENAI
+    base_url = str(pick("base_url") or "").strip() or DEFAULT_BASE_URL
+    model = str(pick("model") or "").strip() or DEFAULT_MODEL
+    api_key = str(pick("api_key") or "").strip()
+    try:
+        max_tokens = max(0, int(pick("max_tokens") or 0))       # 0 = 不限制
+    except (TypeError, ValueError):
+        max_tokens = 0
+    try:
+        timeout_s = float(pick("timeout_s") or 0) or None
+    except (TypeError, ValueError):
+        timeout_s = None
+    auth_style = str(pick("auth_style") or "").strip().lower() or "both"
+
+    request_headers = _request_value(request, "headers")
+    if request_headers is not None:
+        headers = (merge_sensitive_headers(request_headers, base.get("headers"))
+                   if inherit_sensitive_headers else request_headers)
+    else:
+        headers = pick("headers")
+        headers = {} if headers is None else headers
+
+    proxy = pick("proxy")
+    proxy = "" if proxy is None else str(proxy).strip()
+
+    return {"protocol": protocol, "base_url": base_url, "model": model, "api_key": api_key,
+            "max_tokens": max_tokens, "timeout_s": timeout_s, "auth_style": auth_style,
+            "headers": headers, "proxy": proxy,
+            "name": str(base.get("name") or ""), "source": _config_source_value(base, env)}
+
+
 def _clean_profile(raw: dict, *, existing: dict | None = None) -> dict:
     merged = dict(existing or {})
     for field in PROFILE_FIELDS:

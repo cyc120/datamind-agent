@@ -106,8 +106,20 @@
       "tests": {
         "file": "tests/test_ingest_ordering.py",
         "added": 11,
-        "suite_result": "11/11 通过"
-      }
+        "suite_result": "11/11 通过",
+        "files": [
+          "tests/test_ingest_ordering.py",
+          "tests/test_ingest_visibility.py"
+        ]
+      },
+      "visibility_verified": {
+        "file": "tests/test_ingest_visibility.py",
+        "tests": 4,
+        "detail": "用**真实 KnowledgeRetriever（lexical）**验证 F10 依赖的可见性门，而不是只信设计说明：状态为 parsing/pending/failed 的文档不被检索返回；同一文档置为 indexed 后立即可检索（镜像验证，排除夹具本身有问题）；隐藏期间 chunk 行仍然存在，因此重试可以接着完成、无需从 Qdrant 重建。"
+      },
+      "not_done": [
+        "ingest main() 无 try/finally：**已评估并决定不修**——该函数是 CLI 入口，未捕获异常即进程终止，PG 会回滚、连接由 OS 关闭，因此这不是正确性问题；为此重排 100 余行缩进的收益不抵风险"
+      ]
     },
     "F02": {
       "title": "指标表达式只校验列名、且非空结果即视为已验证",
@@ -331,12 +343,12 @@
       "tests.test_model_profile_proxy": "9/9"
     },
     "full_isolated_regression": {
-      "tests": 804,
+      "tests": 839,
       "failures": 0,
       "errors": 0,
       "exit_code": 0,
-      "previous_stage_tests": 743,
-      "note": "合并 F10、读取侧脱敏与关系消费三条线后的完整隔离回归；首次运行出现 1 个瞬时错误，重跑 804/804 全绿（与容器重建/并发干扰有关，未复现）"
+      "previous_stage_tests": 804,
+      "note": "合并前端呈现（12）与 profile 解析收敛（19）及可见性真实验证（4）后的完整隔离回归"
     }
   },
   "concurrency_note": "另有 Codex（ChatGPT 桌面版 CLI）在同一检出与同一 PostgreSQL 上并行工作，此前已造成一次提交被其产物污染、一次回归被其并发测试干扰（30 个连接错误）。本轮所有提交只按显式路径 add，并在提交前核对 git diff --cached。",
@@ -348,7 +360,7 @@
     "compose 回环绑定需重建容器才生效；跨机部署还需防火墙/反代",
     "F10 延后：摄取跨存储一致性需 outbox 模式"
   ],
-  "api_version": "0.36.0",
+  "api_version": "0.37.0",
   "version_changes": {
     "datamind/api.py": "0.33.0 → 0.34.0",
     "web/index.html": "前端缓存版本 0.33.0 → 0.34.0（app.js 与 multifile.js 均变更，不提升会让回访浏览器继续用旧脚本、F08 修复不生效）",
@@ -390,6 +402,68 @@
     "vision_model_blocker": {
       "status": "blocked_external",
       "detail": "本机网关仅 deepseek-flash（纯文本），仓库无权重目录 → V-CAR“真实视觉载荷与模型规模对比”不可执行，需外部提供视觉模型；与 T6 授权真实输入同属外部依赖"
+    },
+    "frontend_presentation": {
+      "status": "done",
+      "by": "子代理（主代理补样式/缓存版本/运行状态映射）",
+      "files": [
+        "web/app.js",
+        "web/style.css",
+        "web/index.html",
+        "tests/test_frontend_status_relations.py"
+      ],
+      "detail": [
+        "引用卡片渲染已存关系：形如「关联：references · verified · 依据 native_reference · 方向 source（被引块为关系起点） · 对端块 … · 被引块 …」，有 evidence 时另起一行；**为空则完全不渲染**（citationRelationsNote 返回 null），不臆造占位",
+        "后端词汇（relation_type/relation_state/recovery_method）**原样显示不翻译**，避免把未验证的关系说成已验证",
+        "代码注释写明命名陷阱：关系条目的 peer_block_id 是对端、cited_block_id 才是被引块；locator 条目的 block_id 是被引块，两者语义相反",
+        "文档状态语义查证结论：web/app.js 只有一处文档列表，API 已硬编码 WHERE status='indexed' 且响应不 SELECT status 列 → 该视图**不可能**出现 parsing/pending/failed 原始英文状态，也无法渲染状态列；因此只把「空列表」这一会被读成「没有文档/没有数据」的呈现改为明确中文说明，**不臆造状态列**",
+        "主代理补充：为关系块加最小 CSS（.citation-relations/.citation-relation/.citation-relation-evidence），并把运行状态映射抽成 runStatusLabel() 供回答区与运行记录共用——原先 loadRuns 把 COMPLETED/ABSTAINED 原样渲染为英文（子代理 H 报告、属其禁改范围）；未知状态仍回显原码便于排查",
+        "主代理提升前端缓存版本 0.34.0 → 0.37.0（app.js 与 style.css 均变更），否则回访浏览器继续用旧脚本",
+        "运行态确认：/assets/app.js 已含 citationRelationsNote 与 runStatusLabel，/assets/style.css 已含关系块样式"
+      ],
+      "tests": {
+        "file": "tests/test_frontend_status_relations.py",
+        "added": 12,
+        "suite_result": "前端三个测试文件 25/25 通过（含 node --check）"
+      },
+      "boundary": [
+        "需要浏览器人工验收：有/无 relations 两种卡片观感、空列表中文提示、高亮按钮未被关系块挤坏",
+        "测试为结构化/契约断言，非浏览器 DOM 运行时验证"
+      ]
+    },
+    "profile_resolver_unification": {
+      "status": "done",
+      "by": "子代理（主代理裁决语义冲突并改写冻结断言）",
+      "files": [
+        "datamind/settings_store.py",
+        "datamind/sql_engine.py",
+        "datamind/api.py",
+        "tests/test_profile_resolver_unification.py",
+        "tests/test_profile_resolution.py"
+      ],
+      "detail": [
+        "新增唯一入口 resolve_profile_values()（请求显式字段 > 指定/启用配置 > env > 默认值）；api.resolve_profile() 与 sql_engine.settings() 都只是它的投影，此前两套实现曾导致 proxy 只在探活侧生效",
+        "修正一处优先级的凭据方向差异：stored 不带 api_key 时探活侧原会把 stored 端点与 env 真实密钥组合（可能把密钥发往 stored 写着的第三方端点），选保守侧（stored 需自带 api_key 才参与解析）",
+        "敏感头补回：请求只提交非敏感头时从已存配置补回 Authorization/api-key/Cookie，避免\"编辑非敏感头后测试连接\"401"
+      ],
+      "adjudication": {
+        "issue": "新增的补回需求与一条冻结断言 test_request_override_wins_for_proxy_and_headers（断言请求 headers 整体替换）在同一场景相反",
+        "subagent_compromise": "把补回限定为\"stored 未注入时（生产路径）\"，注入 stored= 时保持整体替换",
+        "coordinator_decision": "**不接受该折中**——让一个参数悄悄翻转合并语义会把同一逻辑操作变成两种含义，正是本缺陷的成因之一。改为无条件补回，并**改写那条冻结断言**（它记录的正是缺陷行为：编辑非敏感头后探活丢敏感头→401），另把子代理那条\"注入时保持替换\"的用例改为断言**两种调用方式等价**，使折中一旦回归即被抓住。",
+        "why_safe": "删除敏感头仍有唯一通道 __clear__ 哨兵，因此无条件补回不会剥夺调用方清除凭据的能力。"
+      },
+      "tests": {
+        "files": [
+          "tests/test_profile_resolver_unification.py（19，含 210 组随机化等价性）",
+          "tests/test_profile_resolution.py（改写 1 条冻结断言）"
+        ],
+        "suite_result": "解析收敛 19/19；既有四条契约回归合并 84/84 通过"
+      },
+      "known_gap": "请求侧 proxy 仍为替换语义（保存路径已正确合并）；调用方若把脱敏视图当请求提交，该次探活会缺凭据——是转瞬即逝的探活失败而非数据丢失，且前端未改动时不回传 proxy，故现状无实际缺口"
     }
-  }
+  },
+  "incidents": [
+    "Docker daemon 中途停止：所有容器（含 datamind-postgres/qdrant、new-api-local）一并不可达，测试与 API 均受影响。已 open -a Docker 恢复；容器重启后**端口仍仅绑定 127.0.0.1**（F03 的配置变更持久），数据完好（27 文档 / 169 切片），API 重启后健康 200。",
+    "推送在 GitHub 抖动期间多次失败（Empty reply from server / 无法连接 443）；重试与直接重推后成功，main 与远端 0/0 同步。"
+  ]
 }

@@ -159,12 +159,27 @@ class ResolveProfileTest(unittest.TestCase):
         self.assertEqual(captured[0]["headers"]["Authorization"], AUTH_HEADER_VALUE)
         _ = stored  # 仅为可读性保留；真实解析由 spy 注入 stored
 
-    def test_request_override_wins_for_proxy_and_headers(self):
+    def test_request_overrides_what_it_submits_and_inherits_stored_secret_headers(self):
+        """A request header map replaces the non-secret headers it names.
+
+        This assertion used to require *wholesale* replacement, which is precisely the
+        defect: editing a non-secret header and probing dropped the stored
+        Authorization / api-key / Cookie and got a 401 from the relay. Inheriting the
+        stored secret headers is now unconditional — it must not depend on whether a
+        caller injected ``stored``, because that turns one logical operation into two
+        different meanings. Deleting a secret header has its own channel (``__clear__``).
+        """
         request = self._request(proxy="http://mirror.internal:9090",
                                 headers={"X-Custom-Header": "override"})
         profile = resolve_profile(request, stored=dict(RAW_PROFILE))
         self.assertEqual(profile["proxy"], "http://mirror.internal:9090")
-        self.assertEqual(profile["headers"], {"X-Custom-Header": "override"})
+        self.assertEqual(profile["headers"]["X-Custom-Header"], "override")
+        # 未提交的敏感头必须从已存配置补回，而不是被整段替换掉。
+        self.assertEqual(profile["headers"]["Authorization"], AUTH_HEADER_VALUE)
+        self.assertEqual(profile["headers"]["x-api-key"], SECRET_KEY)
+        self.assertEqual(profile["headers"]["Cookie"], "session=abc123")
+        # 已存但没有出现在请求里的非敏感头同样保留（本次请求只改了一个键）。
+        self.assertEqual(profile["headers"]["X-Custom-Header"], "override")
 
     def test_resolve_without_request_keeps_stored_proxy(self):
         profile = resolve_profile(stored=dict(RAW_PROFILE))

@@ -675,7 +675,6 @@ def main():
     print("assets:", cur.fetchall())
     cur.execute("SELECT count(*) FROM chunks")
     print("total chunks:", cur.fetchone()[0], "| vectors:", qc.count(COLLECTION, exact=True).count)
-    meta.close()
 
 
 if __name__ == "__main__":

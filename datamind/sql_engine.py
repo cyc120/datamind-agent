@@ -18,7 +18,7 @@ from psycopg2 import sql as pg_sql
 
 from .catalog import Catalog
 from .providers import OPENAI, chat as provider_chat
-from .settings_store import DEFAULT_BASE_URL, DEFAULT_MODEL, active_profile
+from .settings_store import active_profile, resolve_profile_values
 from .sql_guard import PolicyError, guard_sql
 from sqlglot import exp, parse_one
 
@@ -47,6 +47,9 @@ def verification_passed(findings) -> bool:
 def settings() -> dict:
     """模型接入配置：页面保存的 app_settings 优先，环境变量只作兜底。
 
+    字段不再在这里拼装：统一走 ``settings_store.resolve_profile_values()``（与
+    ``api.resolve_profile()`` 同一份实现），本函数只把结果投影成历史契约的
+    ``NEW_API_*`` 键名。这样探活与问数链路不可能再出现「一边有、一边没有」的字段。
     不再读取任何本地密令文件；密钥只从元数据库或环境变量取得。
     """
     values = {k: v for k, v in os.environ.items()
@@ -55,25 +58,22 @@ def settings() -> dict:
         stored = active_profile()
     except Exception:
         stored = {}
-    if stored.get("api_key"):
-        values["NEW_API_KEY"] = stored["api_key"]
-        values["NEW_API_BASE_URL"] = stored["base_url"]
-        values["NEW_API_MODEL"] = stored["model"]
-        values["NEW_API_PROTOCOL"] = stored.get("protocol") or OPENAI
-        values["NEW_API_MAX_TOKENS"] = stored.get("max_tokens")
-        values["NEW_API_TIMEOUT"] = stored.get("timeout_s")
-        values["NEW_API_AUTH_STYLE"] = stored.get("auth_style")
-        values["NEW_API_HEADERS"] = stored.get("headers") or {}
-        # The transport already honours profile['proxy']; not carrying it here made probing
-        # use the proxy while the question paths silently did not.
-        values["NEW_API_PROXY"] = stored.get("proxy")
-        values["MODEL_PROFILE_NAME"] = stored.get("name")
-        values["MODEL_CONFIG_SOURCE"] = "app_settings"
-    else:
-        values.setdefault("NEW_API_PROTOCOL", OPENAI)
-        values.setdefault("MODEL_CONFIG_SOURCE", "environment" if values.get("NEW_API_KEY") else "unset")
-    values.setdefault("NEW_API_BASE_URL", DEFAULT_BASE_URL)
-    values.setdefault("NEW_API_MODEL", DEFAULT_MODEL)
+    resolved = resolve_profile_values(stored=stored)
+    values["NEW_API_PROTOCOL"] = resolved["protocol"]
+    values["NEW_API_BASE_URL"] = resolved["base_url"]
+    values["NEW_API_MODEL"] = resolved["model"]
+    values["NEW_API_MAX_TOKENS"] = resolved["max_tokens"]
+    values["NEW_API_TIMEOUT"] = resolved["timeout_s"]
+    values["NEW_API_AUTH_STYLE"] = resolved["auth_style"]
+    values["NEW_API_HEADERS"] = resolved["headers"]
+    # The transport already honours profile['proxy']; not carrying it here made probing
+    # use the proxy while the question paths silently did not.
+    values["NEW_API_PROXY"] = resolved["proxy"]
+    if resolved["api_key"]:
+        values["NEW_API_KEY"] = resolved["api_key"]
+    if resolved["name"]:
+        values["MODEL_PROFILE_NAME"] = resolved["name"]
+    values["MODEL_CONFIG_SOURCE"] = resolved["source"]
     return values
 
 

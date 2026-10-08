@@ -199,3 +199,8 @@ th{background:#f3f8f5;color:#3b5e50;position:sticky;top:0}tr:last-child td{borde
 @media(max-width:650px){ .dimension-selectors { grid-template-columns:1fr; } .dimension-evidence dl { grid-template-columns:1fr; gap:3px; } .dimension-evidence dd { margin-bottom:7px; } }
 
 .multifile-documents{display:grid;gap:8px;max-height:280px;overflow:auto;margin-top:12px}.multifile-document{display:flex;align-items:flex-start;gap:8px}.multifile-document input{width:auto;margin-top:4px}#fileBatchForm{display:grid;gap:12px}#fileJobs{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}details summary{cursor:pointer;margin:12px 0}
+
+/* 引用卡片里的已存关系块：与定位徽标同层级信息，弱化但不隐藏。 */
+.citation-relations { margin: 6px 0 2px; padding-left: 10px; border-left: 3px solid #94a3b8; }
+.citation-relation { margin: 2px 0; }
+.citation-relation-evidence { margin: 2px 0 0; opacity: 0.85; }

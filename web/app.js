@@ -558,10 +558,18 @@ function addEvent(evt) {
     showFinal(out);
   }
 }
+function runStatusLabel(status, keepRawCode) {
+  /* 运行状态的中文语义只在这里定义一处，回答区与运行记录共用，避免同一状态两处不一致。
+     未知状态返回原值（附原码），便于排查而不是显示成"执行失败"。 */
+  var labels = {COMPLETED: '已完成', ABSTAINED: '证据不足，已拒答',
+                NEEDS_CLARIFICATION: '需要澄清', FAILED_WITH_EVIDENCE: '执行失败（有证据）'};
+  if (labels[status]) { return labels[status]; }
+  return status ? (keepRawCode ? String(status) : '执行失败') : '';
+}
 function showFinal(out) {
   if (!out) { return; }
   var ok = out.status === 'COMPLETED';
-  status(ok ? '已完成' : (out.status === 'ABSTAINED' ? '证据不足，已拒答' : out.status === 'NEEDS_CLARIFICATION' ? '需要澄清' : '执行失败'), ok ? '' : 'fail');
+  status(runStatusLabel(out.status), ok ? '' : 'fail');
   $('answer').textContent = out.answer || '未返回答案';
   $('confidence').textContent = out.confidence_level ? '可信级别：' + out.confidence_level : '';
   var configIssues = ['MODEL_KEY_MISSING', 'MODEL_AUTH_FAILED', 'MODEL_BASE_URL_MISSING', 'MODEL_NAME_MISSING'];
@@ -608,6 +616,10 @@ function showDocumentResult(data) {
       pageLink.textContent = '查看第 ' + source.page_start + ' 页'; links.append(pageLink);
     }
     card.append(heading, meta, quote, links);
+    /* 已存关系先于定位徽标插入：关系讲的是被引块本身，定位讲的是它在原页上的位置。
+       没有 relations 时 citationRelationsNote 返回 null，卡片上不留任何占位。 */
+    var relationNote = citationRelationsNote(source, citationRelations(source));
+    if (relationNote) { card.insertBefore(relationNote, links); }
     var located = citationLocators(source);
     if (located.length) {
       var locatorNote = document.createElement('p'); locatorNote.className = 'field-hint';
@@ -838,6 +850,53 @@ function citationRegionFrame(source, entries) {
   frame.append(img, svg);
   return frame;
 }
+/* ---------------- 引用关联（stored relations） ----------------
+   命名陷阱：关系条目与 locator 条目对"块"的命名正好相反，不能混用。
+   - 关系条目里 `peer_block_id` 是这条已存关系的**对端**（被引块为 source 时它是目标块，
+     被引块为 target 时它是来源块）；`cited_block_id` 才是被引块。
+   - locator 条目里 `block_id` 是**被引块**本身。
+   把 peer_block_id 当成被引块（或反过来）会在 UI 上标错端点，因此两个字段名各自原样使用。 */
+function citationRelations(source) {
+  /* 只有后端确实为被引块带了已存关系时才渲染；relations 缺失、为空或条目全无内容都返回
+     空数组，由 citationRelationsNote 决定不渲染——前端不臆造任何关系或占位。 */
+  return (source.relations || []).filter(function (item) {
+    return item && (item.relation_type || item.relation_state || item.recovery_method ||
+      item.evidence || item.peer_block_id);
+  });
+}
+function citationRelationLabel(relation) {
+  /* relation_type / relation_state / recovery_method 原样显示：前端不翻译后端词汇，
+     否则可能把未验证的关系说成已验证。 */
+  return [relation.relation_type, relation.relation_state]
+    .concat(relation.recovery_method ? ['依据 ' + relation.recovery_method] : [])
+    .filter(Boolean).join(' · ');
+}
+function citationRelationEndpoint(relation) {
+  /* 方向以被引块为参照说明，并同时给出对端块，避免只写 source/target 时读不出指向。 */
+  var direction = relation.direction === 'source' ? 'source（被引块为关系起点）' :
+    relation.direction === 'target' ? 'target（被引块为关系终点）' : (relation.direction || '');
+  var parts = [];
+  if (direction) { parts.push('方向 ' + direction); }
+  if (relation.peer_block_id) { parts.push('对端块 ' + relation.peer_block_id); }
+  if (relation.cited_block_id) { parts.push('被引块 ' + relation.cited_block_id); }
+  return parts.join(' · ');
+}
+function citationRelationsNote(source, entries) {
+  /* 没有已存关系就不返回节点：空块会被读成"存在关系"。 */
+  if (!entries.length) { return null; }
+  var note = document.createElement('div'); note.className = 'citation-relations';
+  entries.forEach(function (relation) {
+    var label = citationRelationLabel(relation), endpoint = citationRelationEndpoint(relation);
+    var line = document.createElement('p'); line.className = 'field-hint citation-relation';
+    line.textContent = '关联：' + (label || '已存关系') + (endpoint ? ' · ' + endpoint : '');
+    note.append(line);
+    if (relation.evidence) {
+      var evidence = document.createElement('p'); evidence.className = 'field-hint citation-relation-evidence';
+      evidence.textContent = '关系依据：' + relation.evidence; note.append(evidence);
+    }
+  });
+  return note;
+}
 function showIndustrialResult(data) {
   $('industrialEvidence').classList.remove('hidden'); $('sqlEvidence').classList.add('hidden'); $('sqlResults').classList.add('hidden');
   $('industrialSummary').textContent = data.scope.part_id + ' · 工序 ' + data.scope.operation_no + ' · ' + data.scope.month + ' · ' + data.summary.batch_count + ' 批次 / ' + data.summary.measurement_count + ' 测量 · 规则 ' + data.rule_version + ' · 固定查询与规则计算';
@@ -995,7 +1054,7 @@ async function loadRuns() {
     var tbody = document.createElement('tbody');
     runs.forEach(function (item) {
       var tr = document.createElement('tr');
-      [item.run_id, item.status, item.question, String(item.started_at || '').slice(0, 19).replace('T', ' ')].forEach(function (v) {
+      [item.run_id, runStatusLabel(item.status, true), item.question, String(item.started_at || '').slice(0, 19).replace('T', ' ')].forEach(function (v) {
         var td = document.createElement('td'); td.textContent = v === null ? '' : v; tr.append(td);
       });
       tr.style.cursor = 'pointer';
@@ -1009,6 +1068,17 @@ async function loadRuns() {
   }
 }
 
+/* 文档状态语义（仅用于向用户解释，不用于渲染状态列）。
+   摄取期间文档状态可能是 parsing，随后才变为 indexed；但 /v1/documents 只返回 status='indexed'
+   的文档，本视图又不接受任何过滤参数，所以列表里永远不会出现非 indexed 文档，也不会出现
+   parsing/pending/failed 这类原始英文状态。这里保留中文语义只服务于下面的空列表说明，
+   不为不存在的状态臆造展示。 */
+var DOCUMENT_STATUS_LABELS = {
+  indexed: '可检索',
+  parsing: '处理中（暂不可检索）',
+  pending: '待处理（暂不可检索）',
+  failed: '处理失败（不可检索）'
+};
 async function loadDocuments() {
   var area = $('documentList'); area.textContent = '正在读取…';
   try {
@@ -1021,7 +1091,12 @@ async function loadDocuments() {
       var cell=document.createElement('td'), action=document.createElement('button');action.className='secondary';action.textContent='打开字段';
       action.addEventListener('click',function () { openDocumentFields({document_id:doc.document_id,title:doc.title,collection:doc.collection,document_version:doc.doc_version,document_sha256:doc.sha256,parser_version:doc.parser_version}); });
       var original=document.createElement('a');original.textContent='原文件';original.href='/v1/documents/'+encodeURIComponent(doc.document_id)+'/file';original.target='_blank';original.rel='noopener';cell.append(action,document.createTextNode(' '),original);row.append(cell);body.append(row);
-    }); table.append(body);area.replaceChildren(table);
+    }); table.append(body);
+    /* /v1/documents 只返回 status='indexed' 的文档（后端过滤，本视图不做任何过滤参数）。
+       因此列表里永远不会出现 parsing/pending/failed 等原始英文状态，这里也不额外造状态列；
+       但解析期间列表会整段为空，若只留表头会被读成"没有文档/没有数据"，所以给出明确中文语义。 */
+    if (documents.length) { area.replaceChildren(table); }
+    else { area.textContent = '当前没有' + DOCUMENT_STATUS_LABELS.indexed + '的文档。此列表只显示索引已完成（' + DOCUMENT_STATUS_LABELS.indexed + '）的文档；' + DOCUMENT_STATUS_LABELS.parsing + '或' + DOCUMENT_STATUS_LABELS.pending + '的文件在完成前不会出现在这里。'; }
   } catch (error) { area.textContent = '文档读取失败：' + error.message; }
 }
 $('refreshDocuments').addEventListener('click', loadDocuments);
