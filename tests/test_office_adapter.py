@@ -217,5 +217,110 @@ class OfficeCliTests(unittest.TestCase):
             self.assertIn('PARSE_ADAPTER_UNKNOWN', refused.stderr)
 
 
+@unittest.skipUnless(OFFICE_LIBRARIES, "可选 Office 库未安装（requirements-office.txt）")
+class OfficeFidelityTests(unittest.TestCase):
+    """F09 fidelity regressions: block identity, DOCX body order, uncached XLSX formulas."""
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.base = Path(self.directory.name)
+        office.register_office_adapters()
+
+    def test_block_ids_stay_unique_and_bounded_for_a_long_document_id(self):
+        # The old scheme truncated `off-{document_id}-{index}` at 64 chars, so a long
+        # document_id made every later block share one id and the contract rejected the
+        # duplicate. Ids must be distinct for any document_id and never exceed 64 chars.
+        long_id = 'doc-' + 'x' * 200
+        blocks = [office._block(long_id, 'v1', 'paragraph', f'第 {index} 段',
+                                {'locator_kind': 'office_object', 'paragraph': index}, index=index)
+                  for index in range(500)]
+        identifiers = [block['block_id'] for block in blocks]
+        self.assertEqual(len(set(identifiers)), len(identifiers))
+        for identifier in identifiers:
+            self.assertLessEqual(len(identifier), 64, identifier)
+        # Same index under a different document must not collide either.
+        self.assertNotEqual(office._block_identifier(long_id, 0),
+                            office._block_identifier('doc-' + 'y' * 200, 0))
+
+    def test_block_ids_are_unique_across_a_long_parsed_document(self):
+        path = self.base / 'long.docx'
+        import docx
+        document = docx.Document()
+        for index in range(120):
+            document.add_paragraph(f'第 {index} 段正文')
+        document.save(str(path))
+        result = office.parse(path, document_id='doc-' + 'z' * 128, source_version='v1')
+        identifiers = [block['block_id'] for block in result.payload['blocks']]
+        self.assertEqual(len(identifiers), 120)
+        self.assertEqual(len(set(identifiers)), len(identifiers))
+        for identifier in identifiers:
+            self.assertLessEqual(len(identifier), 64, identifier)
+        contract.validate_parse_result(result.payload)
+
+    def test_docx_blocks_follow_the_body_order_of_paragraphs_and_tables(self):
+        path = self.base / 'interleaved.docx'
+        import docx
+        document = docx.Document()
+        document.add_paragraph('第一段')
+        first = document.add_table(rows=1, cols=1)
+        first.cell(0, 0).text = '第一张表'
+        document.add_paragraph('第二段')
+        second = document.add_table(rows=1, cols=1)
+        second.cell(0, 0).text = '第二张表'
+        document.save(str(path))
+        result = office.parse(path, document_id='doc-order', source_version='v1')
+        blocks = result.payload['blocks']
+        # Without a body-order walk the tables would all come last; the real document
+        # interleaves paragraph/table/paragraph/table.
+        self.assertEqual([block['block_type'] for block in blocks],
+                         ['paragraph', 'table', 'paragraph', 'table'])
+        self.assertEqual([block['text'] for block in blocks],
+                         ['第一段', '第一张表', '第二段', '第二张表'])
+        self.assertEqual([block['locator'].get('paragraph') for block in blocks], [0, None, 1, None])
+        self.assertEqual([block['locator'].get('table') for block in blocks], [None, 0, None, 1])
+        self.assertEqual([block['reading_order'] for block in blocks], [0, 1, 2, 3])
+        # Implemented, so the boundary does not need to be declared; the fallback path in
+        # _docx_body_sequence is the one that declares `body_order_not_preserved`.
+        self.assertNotIn('body_order_not_preserved', result.payload['unsupported_features'])
+
+    def test_docx_order_fallback_declares_the_limitation_instead_of_guessing(self):
+        # If the XML body walk ever disagrees with python-docx's collections, the adapter
+        # must say the order is unproven rather than imply it preserved something it did not.
+        path = self.base / 'fallback.docx'
+        docx_fixture(path)
+        real_sequence = office._docx_body_sequence
+        with patch.object(office, '_docx_body_sequence',
+                          side_effect=lambda document: (real_sequence(document)[0], False)):
+            result = office.parse(path, document_id='doc-fallback', source_version='v1')
+        self.assertIn('body_order_not_preserved', result.payload['unsupported_features'])
+        self.assertEqual(result.payload['parse_status'], 'partial')
+        # The limitation is declared, but no block is dropped for it.
+        self.assertEqual(len(result.payload['blocks']), 3)
+
+    def test_xlsx_formula_without_a_cached_value_is_declared_partial(self):
+        path = self.base / 'formulas.xlsx'
+        import openpyxl
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
+        sheet.title = '公式表'
+        sheet.append(['批次', '温度', '温度×2'])
+        sheet.append(['B001', 850, '=B2*2'])
+        sheet.append(['B002', 870, '=B3*2'])
+        # openpyxl writes the formula without a cached result; only Excel would compute one.
+        workbook.save(str(path))
+        result = office.parse(path, document_id='doc-formula', source_version='v1')
+        self.assertEqual(result.payload['parse_status'], 'partial')
+        self.assertIn('formula_without_cached_value', result.payload['unsupported_features'])
+        contract.validate_parse_result(result.payload)
+
+    def test_xlsx_without_formulas_stays_parsed(self):
+        path = self.base / 'plain.xlsx'
+        xlsx_fixture(path)
+        result = office.parse(path, document_id='doc-plain', source_version='v1')
+        self.assertEqual(result.payload['parse_status'], 'parsed')
+        self.assertNotIn('formula_without_cached_value', result.payload['unsupported_features'])
+
+
 if __name__ == '__main__':
     unittest.main()

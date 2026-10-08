@@ -29,6 +29,20 @@ PROMPT_VERSION = "sql-v2"
 HARD_STOP_POLICY_REASONS = {"SELECT_ONLY", "MUTATION_OR_COMMAND", "DANGEROUS_FUNCTION",
                             "RECURSIVE_CTE_NOT_ALLOWED"}
 
+# 指标/口径类 finding 的前缀。结果非空（没有 EMPTY_RESULT）不代表口径正确，
+# 只要存在这类 finding，就不能把结果标为 verified。
+DEFINITION_FINDING_PREFIXES = ("METRIC_", "TIME_")
+# "已校验为错" blocks a draft; "无法独立校验" is recorded and lowers the verdict instead of
+# blocking, because refusing to answer a legitimate composite metric would be its own defect.
+ADVISORY_FINDINGS = frozenset({'METRIC_EXPRESSION_NOT_VERIFIABLE'})
+
+
+def verification_passed(findings) -> bool:
+    """结果可验证：既没有 EMPTY_RESULT，也没有任何指标/口径类 finding。"""
+    findings = [str(f) for f in (findings or [])]
+    return ("EMPTY_RESULT" not in findings
+            and not any(f.startswith(DEFINITION_FINDING_PREFIXES) for f in findings))
+
 
 def settings() -> dict:
     """模型接入配置：页面保存的 app_settings 优先，环境变量只作兜底。
@@ -237,24 +251,135 @@ def _execute(query, catalog: Catalog, cfg: dict) -> dict:
         conn.close()
 
 
-def _semantic_findings(question: str, sql: str, params: list, source: str) -> list[str]:
-    """Deterministic checks for the retail sales metric's critical definition."""
+# 问题里出现这些词时，必须按 business_metrics 的批准公式做结构比对。
+SALES_METRIC_QUESTION = re.compile(r"销售额|销售金额|营收|GMV|成交额", re.I)
+
+
+def _load_registered_metrics(source: str) -> list[dict]:
+    """读取 business_metrics 中该数据源 status='active' 的批准指标公式。"""
+    cfg = settings()
+    dsn = cfg.get("DATAMIND_META_DSN") or (
+        "host=127.0.0.1 port=5432 dbname=datamind_meta user=readonly_user password=readonly_dev")
+    with psycopg2.connect(dsn) as conn, conn.cursor() as cur:
+        cur.execute("SELECT metric_id, name, aliases, expression_sql FROM business_metrics "
+                    "WHERE source_id=%s AND status='active' ORDER BY metric_id", (source,))
+        return [{"metric_id": row[0], "name": row[1], "aliases": list(row[2] or []),
+                 "expression_sql": row[3]} for row in cur.fetchall()]
+
+
+def _registered_metric_for(question: str, metrics: list[dict]) -> dict | None:
+    """按最长名称/别名命中，选出问题所指的注册指标；长度相同则按 metric_id 稳定取先者。"""
+    normalized_question = question.lower().replace(" ", "")
+    best, best_length = None, 0
+    for metric in sorted(metrics, key=lambda item: str(item.get("metric_id") or "")):
+        terms = [str(metric.get("name") or "")] + [str(a) for a in metric.get("aliases") or []]
+        for term in terms:
+            normalized = term.lower().replace(" ", "")
+            if normalized and normalized in normalized_question and len(normalized) > best_length:
+                best, best_length = metric, len(normalized)
+    return best
+
+
+def _canonical_metric_expression(node) -> str:
+    """把指标公式规范化成可比较的字符串。
+
+    - 忽略表限定符：`oi.quantity` 与 `quantity` 等价。
+    - 乘法/加法链按因子排序，因此 `a*b` 与 `b*a` 等价（乘法交换律）；
+      减法/除法保持操作数顺序，不做交换。
+    - 未识别的节点退回完整 SQL 文本，宁可保守判为不一致，也不放宽口径。
+    """
+    if isinstance(node, exp.Paren):
+        return _canonical_metric_expression(node.this)
+    if isinstance(node, exp.Column):
+        return node.name.lower()
+    if isinstance(node, exp.Literal):
+        return str(node.this).strip().lower()
+    if isinstance(node, (exp.Mul, exp.Add)):
+        kind = type(node)
+        parts: list = []
+        stack = [node]
+        while stack:
+            current = stack.pop()
+            if isinstance(current, exp.Paren):
+                stack.append(current.this)
+            elif isinstance(current, kind):
+                stack.append(current.this)
+                stack.append(current.expression)
+            else:
+                parts.append(current)
+        operator = "*" if isinstance(node, exp.Mul) else "+"
+        return "(" + operator.join(sorted(_canonical_metric_expression(p) for p in parts)) + ")"
+    if isinstance(node, exp.Sub):
+        return ("(" + _canonical_metric_expression(node.this) + " - "
+                + _canonical_metric_expression(node.expression) + ")")
+    if isinstance(node, exp.Div):
+        return ("(" + _canonical_metric_expression(node.this) + " / "
+                + _canonical_metric_expression(node.expression) + ")")
+    if isinstance(node, exp.Neg):
+        return "-" + _canonical_metric_expression(node.this)
+    return node.sql(dialect="postgres").lower()
+
+
+def _metric_expression_is_structurally_verifiable(metric: dict, metrics: list[dict]) -> bool:
+    """注册表公式能否做结构比对。
+
+    形如 `sales_amount - refund_amount` 的复合指标引用了其他指标名，当前无法按列级
+    结构校验，返回 False 让调用方失败关闭（METRIC_EXPRESSION_NOT_VERIFIABLE），
+    而不是假装覆盖。只有单个聚合（SUM）且不引用其他指标时才可校验。
+    """
+    expression = str(metric.get("expression_sql") or "").strip()
+    if not expression:
+        return False
+    try:
+        tree = parse_one(expression, read="postgres")
+    except Exception:
+        return False
+    if not isinstance(tree, exp.Sum):
+        return False
+    identifiers = {column.name.lower() for column in tree.find_all(exp.Column)}
+    other_names: set[str] = set()
+    for other in metrics:
+        if other is metric:
+            continue
+        other_names.add(str(other.get("name") or "").lower())
+        other_names.add(str(other.get("metric_id") or "").split(".")[-1].lower())
+        other_names.update(str(alias).lower() for alias in other.get("aliases") or [])
+    other_names.discard("")
+    return not (identifiers & other_names)
+
+
+def _semantic_findings(question: str, sql: str, params: list, source: str, *,
+                       metric_registry=None) -> list[str]:
+    """Deterministic checks for the retail sales metric's critical definition.
+
+    指标校验按 business_metrics 的批准公式做结构比对（忽略表限定符，乘法/加法可交换），
+    不再只看列名是否出现。读不到注册表、问题所指指标不在注册表、或公式无法结构校验时
+    一律失败关闭。`metric_registry` 仅供测试注入，默认读元数据库。
+    """
     periods = time_periods(question)
     for period in periods:
         if period["from"] not in params or period["to"] not in params:
             if period["kind"] != "year" or period["year"] not in params:
                 return ["TIME_FILTER_MISMATCH"]
     if periods and source == "demo_retail":
-        if re.search(r"销售额|销售金额|营收|GMV|成交额", question, re.I) and "created_at" not in sql.lower():
+        if SALES_METRIC_QUESTION.search(question) and "created_at" not in sql.lower():
             return ["TIME_FIELD_MISMATCH"]
         if re.search(r"退款金额|退款额", question) and "refunded_at" not in sql.lower():
             return ["TIME_FIELD_MISMATCH"]
-    if source != "demo_retail" or not re.search(r"销售额|销售金额|营收|GMV|成交额", question, re.I):
+    if source != "demo_retail" or not SALES_METRIC_QUESTION.search(question):
         return []
     tree = parse_one(sql, read="postgres")
-    sums = [node for node in tree.find_all(exp.Sum)]
-    if not any({"quantity", "unit_price", "discount"}.issubset({c.name for c in node.find_all(exp.Column)})
-               for node in sums):
+    try:
+        metrics = list((_load_registered_metrics(source) if metric_registry is None
+                        else metric_registry(source)) or [])
+    except Exception:
+        # 注册表读不到时绝不静默通过。
+        return ["METRIC_EXPRESSION_NOT_VERIFIABLE"]
+    metric = _registered_metric_for(question, metrics)
+    if metric is None or not _metric_expression_is_structurally_verifiable(metric, metrics):
+        return ["METRIC_EXPRESSION_NOT_VERIFIABLE"]
+    approved = _canonical_metric_expression(parse_one(str(metric["expression_sql"]), read="postgres").this)
+    if not any(_canonical_metric_expression(node.this) == approved for node in tree.find_all(exp.Sum)):
         return ["METRIC_EXPRESSION_MISMATCH"]
     if "order_status" not in sql.lower() or not {"completed", "shipped", "refunded"}.issubset(set(map(str, params))):
         return ["METRIC_STATUS_FILTER_MISSING"]
@@ -303,14 +428,18 @@ def ask(question: str, source_id: str | None = None, *, generator=None, run_id: 
                 semantic = findings(draft['sql'], industrial_frame)
             else:
                 semantic = _semantic_findings(question, checked.sql, checked.params, source)
-            if semantic:
-                answer["attempts"].append({"attempt": attempt + 1, "error_code": semantic[0],
+            blocking = [code for code in semantic if code not in ADVISORY_FINDINGS]
+            advisory = [code for code in semantic if code in ADVISORY_FINDINGS]
+            if blocking:
+                answer["attempts"].append({"attempt": attempt + 1, "error_code": blocking[0],
                                            **({'sql':draft['sql']} if source=='demo_industrial' else {})})
-                feedback = f"Semantic validation failed: {semantic[0]}. Follow the source query contract, all frame filters and metric definitions exactly."
+                feedback = f"Semantic validation failed: {blocking[0]}. Follow the source query contract, all frame filters and metric definitions exactly."
                 continue
             execution = _execute(checked, catalog, cfg)
             sql_hash = hashlib.sha256(checked.sql.encode()).hexdigest()
-            findings = []
+            # An advisory finding is carried into validator_findings so the verdict is not
+            # "verified"; it just never blocks the answer.
+            findings = list(advisory)
             if not execution["rows"] or (len(execution["rows"]) == 1 and all(v is None for v in execution["rows"][0])):
                 findings.append("EMPTY_RESULT")
             if execution["row_count"] == 100:

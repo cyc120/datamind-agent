@@ -147,3 +147,33 @@ class LeaseTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class StdinDeadlineTests(unittest.TestCase):
+    """F04: the wall-clock deadline must also cover the standard-input write."""
+
+    def test_a_child_that_never_reads_stdin_cannot_bypass_the_deadline(self):
+        payload = 'x' * (8 * 1024 * 1024)  # far beyond any pipe buffer
+        started = time.monotonic()
+        result = task_budget.run_bounded_command(
+            [sys.executable, '-c', 'import time; time.sleep(300)'], payload,
+            deadline_s=1, grace_s=1)
+        elapsed = time.monotonic() - started
+        self.assertEqual(result['status'], 'timeout', result)
+        self.assertEqual(result['error_code'], 'TASK_DEADLINE_EXCEEDED')
+        self.assertLess(elapsed, 6.0, f'写入 stdin 绕过了 deadline：{elapsed:.1f}s')
+
+    def test_a_child_that_reads_stdin_normally_still_succeeds(self):
+        result = task_budget.run_bounded_command(
+            [sys.executable, '-c', 'import sys; print(len(sys.stdin.read()))'], 'abc',
+            deadline_s=15)
+        self.assertEqual(result['status'], 'ok', result)
+        self.assertEqual(result['stdout'].strip(), '3')
+
+    def test_a_large_payload_to_a_reading_child_is_delivered_completely(self):
+        size = 4 * 1024 * 1024
+        reader = 'import sys; data = sys.stdin.buffer.read(); print(len(data))'
+        result = task_budget.run_bounded_command([sys.executable, '-c', reader], 'y' * size,
+                                                 deadline_s=30)
+        self.assertEqual(result['status'], 'ok', result)
+        self.assertEqual(result['stdout'].strip(), str(size))

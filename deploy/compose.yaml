@@ -12,7 +12,9 @@ services:
       POSTGRES_DB: ${META_DB:-datamind_meta}
       TZ: Asia/Shanghai
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      # 仅绑定回环地址 127.0.0.1：默认拒绝局域网/公网访问（审计 F03）。
+      # 改动需下次 `docker compose up -d` 重建容器后生效；本次未重建运行中的栈。
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pg_meta_data:/var/lib/postgresql/data
       # 首次启动自动执行：角色 → 元数据 DDL → 演示库 DDL
@@ -28,8 +30,9 @@ services:
     container_name: datamind-qdrant
     restart: unless-stopped
     ports:
-      - "${QDRANT_PORT:-6333}:6333"   # REST
-      - "6334:6334"                   # gRPC
+      # 仅绑定回环地址 127.0.0.1（审计 F03），同样于下次 `up` 时生效。
+      - "127.0.0.1:${QDRANT_PORT:-6333}:6333"   # REST
+      - "127.0.0.1:6334:6334"                   # gRPC
     volumes:
       - qdrant_data:/qdrant/storage
     environment:
@@ -48,6 +51,18 @@ services:
   # minio:
   #   image: minio/minio:latest   # 需自备可用镜像源
   #   ...
+
+# ------------------------------------------------------------
+# 已知安全边界（审计 F03，本次仅收敛端口暴露面，未改动认证方案：
+# 认证方案会破坏本机正在运行的栈，故只记录、不在本次修改）
+#   1. Qdrant 无认证：容器未配置 api-key，任何能连到 6333/6334 的进程都可读写。
+#      现已通过 127.0.0.1 绑定限制为仅本机可达。
+#   2. deploy/init/01_roles.sql 中存在明文开发口令
+#      （datamind_app_dev / readonly_dev）；本文件 POSTGRES_PASSWORD 默认值
+#      datamind_dev 同为明文。生产部署应改为从 secret/环境变量注入。
+#   3. 若未来需要跨机访问，请显式配置防火墙或反向代理 + 认证，
+#      不要直接删除 127.0.0.1 前缀。
+# ------------------------------------------------------------
 
 volumes:
   pg_meta_data:

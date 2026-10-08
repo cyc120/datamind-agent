@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 import copy
+import hashlib
 import json
 import os
 import re
@@ -30,6 +31,8 @@ from fastapi import HTTPException
 
 from . import task_budget
 
+# Bumped when the plan schema changes, so a digest can never be confused across schemas.
+PLAN_SCHEMA = 'vcar-plan-v1'
 MAX_NODES = 64
 NODE_ID = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$')
 TOOLS = frozenset({'sql', 'rag', 'industrial_rules', 'fields', 'cad', 'ocr', 'source_authority'})
@@ -79,6 +82,12 @@ class Plan:
         for node in nodes:
             for parent in node.depends_on:
                 self.dependents[parent].append(node.node_id)
+        # A stable identity for this exact plan. Resume state is bound to it so persisted
+        # node results can never be replayed against a different plan that happens to
+        # reuse the same node ids.
+        self.digest = hashlib.sha256(json.dumps(
+            {'contract': PLAN_SCHEMA, 'nodes': [node.public() for node in self.nodes]},
+            ensure_ascii=False, sort_keys=True).encode('utf-8')).hexdigest()
 
     def subgraph(self, roots):
         """The given nodes plus everything that transitively depends on them."""
@@ -92,7 +101,7 @@ class Plan:
         return {node.node_id for node in self.nodes if node.node_id in seen}
 
     def public(self):
-        return {'nodes': [node.public() for node in self.nodes]}
+        return {'plan_digest': self.digest, 'nodes': [node.public() for node in self.nodes]}
 
 
 def _bounded_int(value, name, minimum, maximum):
@@ -167,14 +176,36 @@ def plan(nodes):
     return Plan(sorted(built, key=lambda item: item.index))
 
 
+def bound_state(plan_, records):
+    """Wrap node records into resume state bound to the plan that produced them."""
+    if not isinstance(plan_, Plan):
+        fail('PLAN_INVALID')
+    return {'plan_digest': plan_.digest, 'nodes': dict(records or {})}
+
+
 def validate_state(plan_, state):
-    """Accept only a previous run's node state for the same plan; never invent results."""
+    """Accept only a previous run's node state for the *same* plan; never invent results.
+
+    State must carry the plan digest it was produced under. A plain node mapping is
+    refused instead of being trusted, because identical node ids say nothing about
+    whether the persisted results describe the same work.
+    """
     if state is None:
         return {}
     if not isinstance(state, dict):
         fail('PLAN_STATE_INVALID')
+    if 'plan_digest' not in state and 'nodes' not in state:
+        fail('PLAN_STATE_UNBOUND')
+    digest = state.get('plan_digest')
+    if not isinstance(digest, str) or not digest:
+        fail('PLAN_STATE_UNBOUND')
+    if digest != plan_.digest:
+        fail('PLAN_STATE_PLAN_MISMATCH')
+    records = state.get('nodes')
+    if not isinstance(records, dict):
+        fail('PLAN_STATE_INVALID')
     restored = {}
-    for node_id, record in state.items():
+    for node_id, record in records.items():
         if node_id not in plan_.by_id or not isinstance(record, dict):
             fail('PLAN_STATE_INVALID')
         if record.get('status') not in STATUSES:
@@ -393,7 +424,8 @@ def _report(plan_, run, limits):
             gaps.append(gap)
     succeeded = any(node['status'] == 'succeeded' for node in nodes)
     status = 'completed' if not gaps else ('partial' if succeeded else 'failed')
-    return {'status': status, 'plan': plan_.public(), 'nodes': nodes, 'gaps': gaps,
+    return {'status': status, 'plan': plan_.public(), 'plan_digest': plan_.digest,
+            'nodes': nodes, 'gaps': gaps,
             'repairs': run.repairs, 'resumed': run.resumed,
             'budget': {'deadline_s': limits['deadline_s'], 'max_steps': limits['max_steps'],
                        'max_rows': limits['max_rows'], 'max_tokens': limits['max_tokens'],

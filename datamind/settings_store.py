@@ -7,8 +7,10 @@ HTTP 接口只回显掩码、readonly_user 对该表没有权限。
 from __future__ import annotations
 
 import os
+import re
 import uuid
 from datetime import datetime, timezone
+from urllib.parse import urlsplit, urlunsplit
 
 import psycopg2
 from psycopg2.extras import Json, RealDictCursor
@@ -77,6 +79,161 @@ def mask_key(api_key: str | None) -> str:
     if len(key) <= 10:
         return key[:2] + "…" + key[-2:]
     return key[:6] + "…" + key[-4:]
+
+
+# ---------- 无密钥导出的脱敏 ----------
+#
+# 「不含密钥」不等于「不含认证材料」：headers 里可能带 Authorization / x-api-key /
+# Cookie，proxy 的 URL 里可能内嵌 user:pass。导出路径必须先过 redact_profile()，
+# 由它统一剔除这些认证材料，返回的字典里不再出现任何明文密钥 / 口令。
+
+#: 显式列出的敏感头（大小写不敏感）
+SENSITIVE_HEADERS = frozenset({
+    "authorization", "proxy-authorization", "www-authenticate",
+    "api-key", "apikey", "x-api-key", "x-api-token", "x-goog-api-key",
+    "x-auth-token", "x-access-token", "authentication",
+    "cookie", "set-cookie",
+})
+
+#: 原始 headers 文本里命中这些词就不再信任（整条丢弃，避免漏网）
+_CREDENTIAL_HINT = re.compile(
+    r"(?i)(authorization|api[-_]?key|cookie|token|secret|bearer|password|passwd)")
+
+_REDACTED = "[REDACTED]"
+
+
+def is_sensitive_header(name) -> bool:
+    """判断一个请求头是否属于认证材料（authorization/api-key/cookie/token 等）。"""
+    key = str(name or "").strip().lower()
+    if not key:
+        return False
+    if key in SENSITIVE_HEADERS:
+        return True
+    if key.endswith(("-key", "-token", "-secret", "-password")):
+        return True
+    return "authorization" in key
+
+
+def redact_headers(headers) -> dict | str:
+    """剔除敏感头；非敏感头保留。兼容 {"__raw__": "<原始文本>"} 这种形态。"""
+    if not headers:
+        return headers if headers is not None else {}
+    if isinstance(headers, str):
+        # 原始文本：逐行过滤，仍有凭据迹象就整条丢弃
+        kept = []
+        for line in headers.splitlines():
+            name, sep, _ = line.partition(":")
+            if sep and is_sensitive_header(name):
+                continue
+            kept.append(line)
+        cleaned = "\n".join(kept)
+        return "" if _CREDENTIAL_HINT.search(cleaned) else cleaned
+    if isinstance(headers, dict):
+        cleaned = {}
+        for name, value in headers.items():
+            if name == "__raw__":
+                cleaned[name] = redact_headers(value)
+                continue
+            if is_sensitive_header(name):
+                continue
+            cleaned[str(name)] = value
+        return cleaned
+    return ""
+
+
+def redact_proxy(proxy: str | None) -> str:
+    """去掉代理 URL 里的 userinfo（user:pass@host:port → host:port）。"""
+    value = (proxy or "").strip()
+    if not value:
+        return ""
+    candidate = value if "://" in value else "//" + value
+    try:
+        parts = urlsplit(candidate)
+    except ValueError:
+        return ""
+    if parts.username is None and parts.password is None:
+        # 解析不出 userinfo，但文本里仍有 '@'：宁可整条去掉，不冒险导出
+        return "" if "@" in value else value
+    host = parts.hostname or ""
+    if not host:
+        return ""
+    try:
+        port = parts.port
+    except ValueError:
+        port = None
+    netloc = host if port is None else f"{host}:{port}"
+    if "://" in value:
+        return urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
+    return "//" + netloc + parts.path
+
+
+def _collect_secrets(source: dict) -> list[str]:
+    """收集 payload 内所有需要抹掉的明文密钥 / 口令，供兜底扫描使用。"""
+    secrets: list[str] = []
+
+    def add(value) -> None:
+        text = str(value or "").strip()
+        if len(text) >= 4 and text not in secrets:
+            secrets.append(text)
+
+    add(source.get("api_key"))
+    headers = source.get("headers")
+    if isinstance(headers, dict):
+        for name, value in headers.items():
+            if name == "__raw__":
+                continue
+            if is_sensitive_header(name):
+                add(value)
+    proxy = str(source.get("proxy") or "")
+    if proxy:
+        candidate = proxy if "://" in proxy else "//" + proxy
+        try:
+            parts = urlsplit(candidate)
+        except ValueError:
+            parts = None
+        if parts is not None:
+            add(parts.password)
+            add(parts.username)
+    return secrets
+
+
+def _scrub_secrets(value, secrets: list[str]):
+    """递归兜底：把字符串里残留的密钥 / 口令替换成 [REDACTED]。"""
+    if isinstance(value, str):
+        for secret in secrets:
+            if secret and secret in value:
+                value = value.replace(secret, _REDACTED)
+        return value
+    if isinstance(value, dict):
+        return {key: _scrub_secrets(item, secrets) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_scrub_secrets(item, secrets) for item in value]
+    return value
+
+
+def redact_profile(payload: dict) -> dict:
+    """返回不含任何认证材料的 profile 副本：无密钥导出 / 读取的唯一脱敏入口。
+
+    处理内容：
+      * ``api_key``：整体移除；
+      * ``headers``：剔除 authorization / api-key / x-api-key / cookie 等敏感头，
+        ``__raw__`` 原始文本按行过滤、仍有凭据迹象则整条丢弃；
+      * ``proxy``：去掉 URL 中的 userinfo（user:pass@），无法安全解析则整条丢弃；
+      * 兜底：任何字段里仍残留的密钥 / 口令值替换为 ``[REDACTED]``。
+    """
+    source = payload if isinstance(payload, dict) else {}
+    secrets = _collect_secrets(source)
+    redacted: dict = {}
+    for field, value in source.items():
+        if field == "api_key":
+            continue
+        if field == "headers":
+            redacted["headers"] = redact_headers(value)
+        elif field == "proxy":
+            redacted["proxy"] = redact_proxy(value)
+        else:
+            redacted[field] = value
+    return _scrub_secrets(redacted, secrets)
 
 
 def _clean_profile(raw: dict, *, existing: dict | None = None) -> dict:

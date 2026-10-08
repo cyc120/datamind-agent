@@ -13,7 +13,7 @@ from psycopg2.extras import Json
 
 from .catalog import Catalog
 from .rag_engine import PROMPT_VERSION as RAG_PROMPT_VERSION, ask_documents
-from .sql_engine import PROMPT_VERSION, ask, query_frame, settings, source_for
+from .sql_engine import PROMPT_VERSION, ask, query_frame, settings, source_for, verification_passed
 
 
 MODEL_ERROR_MESSAGES = {
@@ -306,7 +306,7 @@ class DataMindAgent:
             answer = _result_answer(result)
             if source=='demo_industrial':
                 answer += '\n' + result['semantic_contract']
-            verified = "EMPTY_RESULT" not in result["validator_findings"]
+            verified = verification_passed(result["validator_findings"])
             self._record_evidence(result, answer, verified)
             self._event("verification.passed" if verified else "verification.failed", "verification_agent",
                         "succeeded" if verified else "failed",

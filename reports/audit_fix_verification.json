@@ -1,0 +1,289 @@
+{
+  "stage": "audit_remediation",
+  "source_report": "reports/project_audit_20261008_2d9ab18_review.md",
+  "baseline": "2d9ab18（复审基线 API 0.30.0）",
+  "started_from": "68b8cf8（API 0.33.0）",
+  "date": "2026-10-08",
+  "scope": "按复审 §7 排期修复 F01–F11，并为每条加入可执行验收断言。本文件记录逐条状态、修复方式、验收证据与未修原因。",
+  "order_note": "复审给出的排期为：①F01 ②F02 ③F03+F11 ④F05+F06 ⑤F08+F09；F04/F07/F10 未进前五。",
+  "findings": {
+    "F01": {
+      "title": "SQL 列权限按全局别名表判定，两条越权路径",
+      "severity_after_review": "P1",
+      "status": "fixed",
+      "by": "主代理",
+      "files": [
+        "datamind/sql_guard.py",
+        "tests/test_sql_module.py"
+      ],
+      "mechanism": "aliases 全局收集且内层 CTE 别名覆盖外层表别名（原 sql_guard.py:96/106），投影别名全局豁免（原 111 行）",
+      "fix": "改用 sqlglot scope 逐查询作用域解析列来源：限定列按本作用域 sources 解析、未限定列按本作用域表解析；投影别名仅在 ORDER/GROUP/HAVING 中可引用；CTE 引用（Scope.is_cte）放行、派生表保持原有不可验证拒绝",
+      "acceptance": [
+        "SELECT c AS c FROM customers c LIMIT 1 → COLUMN_NOT_ALLOWED（实测）",
+        "SELECT c.phone FROM customers c WHERE EXISTS (WITH c AS (SELECT customer_id FROM customers) SELECT customer_id FROM c) → RESTRICTED_COLUMN（实测）",
+        "正常 ORDER BY 别名 / GROUP BY / CTE 引用不误伤（实测）"
+      ],
+      "tests": {
+        "file": "tests/test_sql_module.py",
+        "added": 6,
+        "suite_result": "21/21 通过"
+      }
+    },
+    "F04": {
+      "title": "stdin 写入绕过 deadline",
+      "severity_after_review": "P2+",
+      "status": "fixed",
+      "by": "主代理",
+      "files": [
+        "datamind/task_budget.py",
+        "tests/test_task_budget_resources.py"
+      ],
+      "mechanism": "preexec 之后同步 write 子进程 stdin，写满管道即无限阻塞；process.wait(timeout=deadline) 直到写返回才生效（原 task_budget.py:368-381）",
+      "fix": "deadline 起点提前到 spawn 之后、写入之前；stdin 由守护线程写入，主路径按剩余预算轮询并在超时/取消时终止进程组，随后只对剩余预算做 wait",
+      "acceptance": [
+        "8 MiB stdin + 永不读 stdin 的子进程在 deadline_s=1 下 status=timeout / TASK_DEADLINE_EXCEEDED，实测耗时 < 6s（不修复会永久阻塞）",
+        "正常读取 stdin 的子进程仍成功且数据完整（4 MiB 全量送达）"
+      ],
+      "tests": {
+        "file": "tests/test_task_budget_resources.py",
+        "added": 3,
+        "suite_result": "14/14 通过"
+      },
+      "regression": "tests/test_task_budget 23/23 通过"
+    },
+    "F07": {
+      "title": "V-CAR 恢复状态不绑定计划",
+      "severity_after_review": "P2",
+      "status": "fixed",
+      "by": "主代理",
+      "files": [
+        "datamind/vcar.py",
+        "tests/test_vcar.py"
+      ],
+      "mechanism": "validate_state 只校验节点 id 与状态，节点 id 相同的**另一个计划**的持久化结果可被直接复用",
+      "fix": "Plan 增加稳定摘要（PLAN_SCHEMA + 规范化节点内容 SHA-256）；恢复状态格式改为 {plan_digest, nodes}，裸映射 fail-closed 拒绝；摘要不符拒绝；结果与 plan.public() 均回报 plan_digest",
+      "acceptance": [
+        "裸节点映射 → PLAN_STATE_UNBOUND（实测）",
+        "来自不同计划的已绑定状态 → PLAN_STATE_PLAN_MISMATCH（实测）",
+        "同内容计划摘要一致、正确绑定可恢复（实测）"
+      ],
+      "tests": {
+        "file": "tests/test_vcar.py",
+        "added": 5,
+        "suite_result": "vcar 三个测试文件 49/49 通过"
+      }
+    },
+    "F10": {
+      "title": "公开摄取跨存储一致性（Qdrant 先写、PG 后提交）",
+      "severity_after_review": "P2（设计性缺口）",
+      "status": "deferred_with_reason",
+      "by": "主代理",
+      "mechanism": "ingestion/ingest.py 先对 Qdrant 执行 delete+upsert（非事务），随后才写 chunks 并 meta.commit()；PG 提交失败时 Qdrant 已是新向量而 PG 仍是旧 chunk，检索可能用旧文本配新向量",
+      "reason": "修复需要 outbox/状态机式的多存储协议并改动摄取主链路；该链路依赖 Qdrant 与嵌入模型，本轮预算内无法给出充分验证，故不改动，避免把未验证的改动放进生产摄取路径。",
+      "planned_fix": "按复审建议复用 outbox 模式：摄取前先把文档置为不可检索状态并提交 → 写 Qdrant → 写 PG chunks 并置 indexed 提交；任何失败都停在“不可检索”，并提供一个可由既有孤儿回收路径驱动的重试入口。"
+    },
+    "F02": {
+      "title": "指标表达式只校验列名、且非空结果即视为已验证",
+      "severity_after_review": "P1",
+      "status": "fixed",
+      "by": "子代理（主代理补充提示类语义）",
+      "files": [
+        "datamind/sql_engine.py",
+        "datamind/agent.py",
+        "tests/test_sql_module.py"
+      ],
+      "mechanism": "原 _semantic_findings 只做 {'quantity','unit_price','discount'}.issubset(SUM 内列名)，不校验运算符；agent 的 verified 仅排除 EMPTY_RESULT",
+      "fix": "按 business_metrics 注册表的 expression_sql 做**结构比对**（忽略表限定符、乘法链因子排序）；读不到注册表/无该指标/公式非单个 SUM → METRIC_EXPRESSION_NOT_VERIFIABLE（失败关闭）；SUM 参数与批准公式不一致 → METRIC_EXPRESSION_MISMATCH；新增 verification_passed(findings) 供 agent 与 sql_engine 共用，任一 METRIC_*/TIME_* finding 均不得判为 verified",
+      "advisory_design": "主代理补充：把“已校验为错（阻塞、触发重写）”与“无法独立校验（记录、不阻断）”分开。否则复合指标（净销售额 = 销售额 - 退款额，引用其他指标）会被失败关闭，导致合法问题永远失败——复审标准允许“标记为口径未通过”。ADVISORY_FINDINGS={'METRIC_EXPRESSION_NOT_VERIFIABLE'} 进入 validator_findings 使 verdict 非 verified，但不触发重写。",
+      "acceptance": [
+        "SUM(quantity + unit_price + discount) → METRIC_EXPRESSION_MISMATCH（含 ask 端到端）",
+        "批准公式 sum(oi.quantity*oi.unit_price*(1-oi.discount)) 及乘法交换序 → 无 finding",
+        "表限定符差异等价",
+        "注册表异常/缺失 → 失败关闭 NOT_VERIFIABLE",
+        "净销售额复合指标 → NOT_VERIFIABLE 且**不阻断**，validator_findings 可见且 verification_passed 为假",
+        "口径错误仍触发全部 3 次重写后失败"
+      ],
+      "tests": {
+        "file": "tests/test_sql_module.py",
+        "added": 17,
+        "suite_result": "38/38 通过"
+      },
+      "known_gaps": [
+        "触发面仍窄：仅销售额别名族走注册表结构校验；业绩/销量/退款额/订单量/客户总量未强制",
+        "复合指标未做递归展开比对（改为提示类，不阻断）",
+        "粒度：只要求存在匹配的 SUM，不要求整个投影等于该公式",
+        "每次校验新建元数据库连接（刻意不加缓存以保失败关闭）"
+      ]
+    },
+    "F03": {
+      "title": "存储服务绑定全部网卡",
+      "severity_after_review": "P1'（部署前置）",
+      "status": "fixed_config_not_yet_effective",
+      "by": "子代理",
+      "files": [
+        "deploy/compose.yaml"
+      ],
+      "fix": "三处发布端口改为仅回环：127.0.0.1:${POSTGRES_PORT:-5432}:5432、127.0.0.1:${QDRANT_PORT:-6333}:6333、127.0.0.1:6334:6334；文末新增已知安全边界注释（Qdrant 无认证、明文口令）",
+      "acceptance": [
+        "docker compose config（只读）显示 postgres/qdrant 发布项 host_ip=127.0.0.1（改动前无 host_ip 字段）",
+        "测试解析 YAML 逐条断言绑定回环"
+      ],
+      "not_effective_yet": "容器未重建：docker ps 仍显示 0.0.0.0 与 [::] 监听；需下一次 docker compose up -d 重建这两个容器后才收敛。认证与口令方案未动（会破坏本机运行中的栈）。",
+      "tests": {
+        "file": "tests/test_verify_isolation.py",
+        "added": 12,
+        "suite_result": "12/12 通过（含用旧版文件反证 8 failures + 1 error）"
+      }
+    },
+    "F05": {
+      "title": "无密钥导出残留认证材料",
+      "severity_after_review": "P2",
+      "status": "fixed",
+      "by": "子代理",
+      "files": [
+        "datamind/settings_store.py",
+        "datamind/api.py",
+        "tests/test_profile_resolution.py"
+      ],
+      "fix": "新增唯一脱敏入口 redact_profile()：移除 api_key、剔除敏感头（authorization/api-key/x-api-key/cookie 及 *-key/-token/-secret/-password 规则）、去掉 proxy userinfo（无法解析则整条丢弃）、并以 _scrub_secrets 兜底替换残留密钥；/v1/model/profiles/export 在 include_keys=False 时改走它",
+      "acceptance": [
+        "脱敏后 JSON 文本中不出现原始密钥/口令/Authorization 头值；非敏感头保留；入参不被修改"
+      ],
+      "tests": {
+        "file": "tests/test_profile_resolution.py",
+        "added": 13,
+        "suite_result": "13/13 通过；既有 test_model_config_api 16/16 通过"
+      },
+      "known_gaps": [
+        "settings_store.public_profile()（GET /v1/model/profiles，admin-only）仍原样回传 headers/proxy；前端表单会回填并回传这两个字段，直接脱敏会写回脱敏值，需同步改 UI 与保存语义（建议：敏感头只回显键名 + 空值表示保持不变）"
+      ]
+    },
+    "F06": {
+      "title": "探活与问答链路 profile 解析不一致",
+      "severity_after_review": "P2",
+      "status": "partial",
+      "by": "子代理",
+      "files": [
+        "datamind/api.py",
+        "tests/test_profile_resolution.py"
+      ],
+      "fix": "api.py 内统一为 resolve_profile(request, *, stored=None)：探活、模型列表与 _stored_config() 均走它，headers/proxy 与 api_key 同一套合并规则，同一输入必得同一结果",
+      "partial_reason": "问答真实链路仍是独立解析且完全不含 proxy：sql_engine.settings()/model_profile()（调用方 sql_engine._call_model、rag_engine._draft、pdf_answer._draft）。**本轮未改**（超出子代理写入范围）。",
+      "planned_fix": "settings() 增补 NEW_API_PROXY（stored.get('proxy')）、model_profile() 输出 proxy 键，并进一步把 sql_engine.model_profile() 与 api.resolve_profile() 统一到 settings_store 的共享函数"
+    },
+    "F11": {
+      "title": "验证脚本污染真实库并硬编码期望规模",
+      "severity_after_review": "P1'（上调）",
+      "status": "fixed",
+      "by": "子代理",
+      "files": [
+        "scripts/verify.py",
+        "scripts/reset_demo.sh",
+        "tests/test_verify_isolation.py"
+      ],
+      "fix": "删除 conn.autocommit=True（污染根因），越权探针改为 SAVEPOINT 内执行且必回滚；新增 verify_readonly_isolation 在 try/finally 中统一 rollback+close（可注入假连接）；新增 derive_expectations 动态推导期望，删掉 2 源/26 文档/==30/>=90 等全部硬编码，改为与规模无关的自洽不变量；reset_demo.sh 的 py -3.13 改 .venv/bin/python",
+      "acceptance": [
+        "新测试 12/12 通过",
+        "用 git show HEAD: 的旧版三个文件反证 → 8 failures + 1 error（证明测试非空转）",
+        "只读抽验：readonly_user 无 orders DELETE 权限、无 demo_retail CREATE 权限；ABORT 后 ROLLBACK TO SAVEPOINT 可恢复",
+        "当前真实库为 3 源/27 文档，旧脚本的 2/26 现在就会误报，佐证该缺陷"
+      ],
+      "known_gaps": [
+        "verify.py 自身仍硬编码 PG_A/PG_R 口令；01_roles.sql 与 compose 默认口令为明文（按指示未动）"
+      ]
+    },
+    "F08": {
+      "title": "前端运行/回放共用状态导致串屏",
+      "severity_after_review": "P2",
+      "status": "fixed",
+      "by": "子代理",
+      "files": [
+        "web/app.js",
+        "web/multifile.js",
+        "tests/test_frontend_generation.py"
+      ],
+      "fix": "引入请求代次：run()/replay()/loadRuns() 各取代次并在**渲染前**比对，过期响应丢弃；过期的流执行 reader.cancel()；#send 的禁用状态只由拥有该代次的流恢复；multifile.js 的 submitFileBatch 只在 detailToken 未变时重绘任务详情",
+      "acceptance": [
+        "渲染前代次比对、过期流取消、旧请求不解除新请求的禁用状态（结构化断言）",
+        "node --check web/app.js 与 web/multifile.js rc=0（node v24.16.0）",
+        "用只读基线 tmp/audit-baseline/web/app.js 反证：8 项前端测试中 7 项失败（仅 node --check 通过）"
+      ],
+      "tests": {
+        "file": "tests/test_frontend_generation.py",
+        "added": 8,
+        "suite_result": "前端+Office 24/24 通过"
+      },
+      "known_gaps": [
+        "app.js 中 loadDocuments / loadAuthority* / loadProfiles，以及部分 loadDimensions 仍无代次守卫（本轮未授权范围）"
+      ]
+    },
+    "F09": {
+      "title": "Office 保真：block_id 截断、DOCX 正文顺序、XLSX 无缓存公式静默通过",
+      "severity_after_review": "P2（XLSX 部分 P2+）",
+      "status": "fixed",
+      "by": "子代理",
+      "files": [
+        "ingestion/office.py",
+        "tests/test_office_adapter.py"
+      ],
+      "fix": [
+        "(a) block_id 改为 'off-' + sha256(f'{document_id}\\x1f{index}')[:32]（定长 36 字符），不再截断长字符串；原先长 document_id 会让不同块塌缩到同一前缀",
+        "(b) DOCX 改为按真实正文顺序遍历 w:p/w:tbl 交错序列（walk document.element.body 的子元素，按位置对应 paragraphs/tables）；XML 与 python-docx 集合不一致时追加漏掉的元素（不静默丢弃）并声明 body_order_not_preserved + partial",
+        "(c) XLSX 载入两次（data_only=True 取缓存值、data_only=False 取公式），data_type=='f' 且缓存为 None → 声明 formula_without_cached_value 且 parse_status=partial；普通工作簿仍为 parsed"
+      ],
+      "acceptance": [
+        "旧实现 block id 在 500 块中只有 1 个唯一值，新实现全唯一（反证）",
+        "旧实现 DOCX 顺序为 段落,段落,表格,表格，新实现为真实交错",
+        "旧实现无缓存公式报 parsed 且无 feature，新实现报 partial + formula_without_cached_value",
+        "前端/Office/契约相关 71 项测试合并通过"
+      ],
+      "parser_version": "CONTRACT_PARSER_VERSION 'office-adapter-v1' → 'v2'（block id 方案、顺序与状态语义均变化，诚实升版以触发重新解析）",
+      "tests": {
+        "file": "tests/test_office_adapter.py",
+        "added": 6,
+        "suite_result": "前端+Office 24/24 通过"
+      },
+      "known_gaps": [
+        "formula_without_cached_value 按文件粒度声明（非按单元格/工作表）；无缓存单元格的块文本仍为空",
+        "PPTX 的 slide.shapes 顺序未必是视觉 z-order，且未声明（与 (b) 同类，本轮未处理）"
+      ]
+    }
+  },
+  "verification": {
+    "focused_suites": {
+      "tests.test_sql_module": "38/38",
+      "tests.test_task_budget": "23/23",
+      "tests.test_task_budget_resources": "14/14",
+      "tests.test_vcar + test_vcar_bounded + test_vcar_ablation": "49/49",
+      "tests.test_agent_api + test_multifile_rag + test_rag": "30/30",
+      "tests.test_profile_resolution": "13/13",
+      "tests.test_model_config_api": "16/16",
+      "tests.test_verify_isolation": "12/12",
+      "tests.test_office_adapter + test_frontend_generation": "24/24",
+      "tests.test_parse_contract 等相邻模块 71 项": "71/71"
+    },
+    "full_isolated_regression": {
+      "tests": 734,
+      "failures": 0,
+      "errors": 0,
+      "exit_code": 0,
+      "previous_stage_tests": 664,
+      "note": "合并四条子代理线与主代理三处修复后的完整隔离回归"
+    }
+  },
+  "concurrency_note": "另有 Codex（ChatGPT 桌面版 CLI）在同一检出与同一 PostgreSQL 上并行工作，此前已造成一次提交被其产物污染、一次回归被其并发测试干扰（30 个连接错误）。本轮所有提交只按显式路径 add，并在提交前核对 git diff --cached。",
+  "follow_ups": [
+    "public_profile() 读取侧仍回传 headers/proxy，需与前端保存语义一起改（F05 同类暴露）",
+    "问答链路（sql_engine/rag_engine/pdf_answer）仍不含 proxy，需统一到共享解析函数（F06 剩余）",
+    "复合指标（净销售额等引用其他指标的公式）未做递归展开比对，目前按提示类处理",
+    "指标口径强制面仍窄（业绩/销量/退款额/订单量/客户总量未走注册表结构校验）",
+    "compose 回环绑定需重建容器才生效；跨机部署还需防火墙/反代",
+    "F10 延后：摄取跨存储一致性需 outbox 模式"
+  ],
+  "api_version": "0.34.0",
+  "version_changes": {
+    "datamind/api.py": "0.33.0 → 0.34.0",
+    "web/index.html": "前端缓存版本 0.33.0 → 0.34.0（app.js 与 multifile.js 均变更，不提升会让回访浏览器继续用旧脚本、F08 修复不生效）",
+    "ingestion/office.py": "CONTRACT_PARSER_VERSION 'office-adapter-v1' → 'v2'（block id 方案、DOCX 顺序与 XLSX 状态语义变化，诚实升版以触发重新解析）"
+  }
+}

@@ -31,7 +31,8 @@
 - **局部修复**：修复只重跑**受影响子图**（失败节点 + 其后继）；独立分支不重跑。每次尝试写入 `history`，事件保留 `started` / `failed` / `failed_detail` / `repair_scheduled`——**原始失败不删除**。
 - **重新验证**：修复后后继节点重新执行，而不是复用旧结论。
 - **未消解冲突**：节点返回 `{"unresolved": true, "evidence": [...]}` 时**终止自动消解**、不进入修复，双方向证据写入该 gap 的 `evidence`，后继标记 `PLAN_DEPENDENCY_UNRESOLVED`（对应「真实来源矛盾无规则时返回双方证据」）。
-- **断点恢复**：`state` 中 `succeeded` 复用且不重跑，`unresolved` 不自动消解，`pending/failed/skipped/budget_exhausted` 重新调度；非法 state 一律 `PLAN_STATE_INVALID`。
+- **断点恢复**：`state` 中 `succeeded` 复用且不重跑，`unresolved` 不自动消解，`pending/failed/skipped/budget_exhausted` 重新调度。
+- **状态必须绑定计划（API 0.34.0）**：恢复状态格式为 `{'plan_digest': …, 'nodes': {…}}`，`plan_digest` 来自 `Plan.digest`（`PLAN_SCHEMA` + 规范化节点内容的 SHA-256）。裸节点映射一律 `PLAN_STATE_UNBOUND`（失败关闭），摘要不符一律 `PLAN_STATE_PLAN_MISMATCH`——因为节点 id 相同并不能说明持久化结果描述的是同一份工作。可用 `bound_state(plan, records)` 构造，`execute` 结果与 `plan.public()` 都会回报 `plan_digest`；其余非法 state 仍为 `PLAN_STATE_INVALID`。
 
 ## 验证
 

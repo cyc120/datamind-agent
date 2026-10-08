@@ -521,6 +521,13 @@ $('dimensionHistoryPrevious').addEventListener('click',function(){loadDimensionH
 $('dimensionHistoryNext').addEventListener('click',function(){if(DIM.historyNext!==null){loadDimensionHistory(DIM.historyNext);}});
 
 /* ---------------- 问数 ---------------- */
+/* 运行与回放共用同一块输出区，所以每次请求都取一个代次号；异步响应渲染前先比对，
+   代次已被更新的响应一律丢弃，避免先发出的旧响应覆盖后发出的新响应。 */
+var RUN_GENERATION = 0;
+var RUN_STREAMING = null;
+var RUNS_GENERATION = 0;
+function beginRunGeneration() { RUN_GENERATION += 1; return RUN_GENERATION; }
+function staleRunGeneration(generation) { return generation !== RUN_GENERATION; }
 function status(text, kind) {
   var el = $('status'); el.textContent = text; el.className = 'status ' + (kind || '');
 }
@@ -882,6 +889,8 @@ function showResult(data) {
 async function run() {
   var question = $('question').value.trim();
   if (!question) { return; }
+  var generation = beginRunGeneration();
+  RUN_STREAMING = generation;
   clearRun(); $('send').disabled = true;
   try {
     var selected = $('source').value;
@@ -900,10 +909,12 @@ async function run() {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(request)
     });
+    if (staleRunGeneration(generation)) { return; }
     if (!response.ok) { throw new Error('HTTP ' + response.status); }
     var reader = response.body.getReader(), decoder = new TextDecoder(), buffer = '';
     while (true) {
       var chunk = await reader.read();
+      if (staleRunGeneration(generation)) { try { reader.cancel(); } catch (cancelError) {} return; }
       if (chunk.done) { break; }
       buffer += decoder.decode(chunk.value, { stream: true });
       var boundary;
@@ -914,12 +925,16 @@ async function run() {
       }
     }
   } catch (err) {
+    if (staleRunGeneration(generation)) { return; }
     status('连接失败', 'fail'); $('answer').textContent = '无法连接 Agent API：' + err.message;
-  } finally { $('send').disabled = false; }
+  } finally {
+    if (RUN_STREAMING === generation) { RUN_STREAMING = null; $('send').disabled = false; }
+  }
 }
 async function replay() {
   var id = $('replayId').value.trim();
   if (!id) { return; }
+  var generation = beginRunGeneration();
   view('chat'); clearRun();
   try {
     var responses = await Promise.all([
@@ -927,8 +942,10 @@ async function replay() {
       apiFetch('/v1/runs/' + encodeURIComponent(id) + '/events'),
       apiFetch('/v1/runs/' + encodeURIComponent(id) + '/evidence')
     ]);
+    if (staleRunGeneration(generation)) { return; }
     if (!responses[0].ok) { throw new Error('找不到运行 ID'); }
     var run = await responses[0].json(), events = await responses[1].json(), evidence = await responses[2].json();
+    if (staleRunGeneration(generation)) { return; }
     $('question').value = run.question || '';
     events.events.forEach(addEvent);
     var finalEvent = events.events.slice().reverse().find(function (evt) {
@@ -943,7 +960,10 @@ async function replay() {
     if (sqlNode && rowNode) {
       var merged = {}; Object.assign(merged, sqlNode.payload, rowNode.payload); showResult(merged);
     }
-  } catch (err) { status('读取失败', 'fail'); $('answer').textContent = err.message; }
+  } catch (err) {
+    if (staleRunGeneration(generation)) { return; }
+    status('读取失败', 'fail'); $('answer').textContent = err.message;
+  }
 }
 async function diagnostic() {
   clearRun(); $('diagnostic').disabled = true;
@@ -957,10 +977,13 @@ async function diagnostic() {
 }
 async function loadRuns() {
   var area = $('runList');
+  var generation = ++RUNS_GENERATION;
   try {
     var response = await apiFetch('/v1/runs?limit=20');
+    if (generation !== RUNS_GENERATION) { return; }
     if (!response.ok) { throw new Error('HTTP ' + response.status); }
     var data = await response.json(), runs = data.runs || [];
+    if (generation !== RUNS_GENERATION) { return; }
     area.replaceChildren();
     if (!runs.length) { area.textContent = '暂无运行记录'; return; }
     var table = document.createElement('table'), thead = document.createElement('thead'), hr = document.createElement('tr');
@@ -979,7 +1002,10 @@ async function loadRuns() {
       tbody.append(tr);
     });
     table.append(tbody); area.append(table);
-  } catch (err) { area.textContent = '运行记录读取失败：' + err.message; }
+  } catch (err) {
+    if (generation !== RUNS_GENERATION) { return; }
+    area.textContent = '运行记录读取失败：' + err.message;
+  }
 }
 
 async function loadDocuments() {

@@ -223,7 +223,9 @@ async function submitFileBatch(event) {
   var actor = AUTH.user.user_id;
   var csrf = AUTH.csrf;
   var token = MULTIFILE.token;
-  MULTIFILE.detailToken++;
+  // Invalidate any detail read already in flight and remember this submit's generation, so
+  // its response cannot repaint a job detail a newer selection now owns.
+  var read = ++MULTIFILE.detailToken;
   clearTimeout(MULTIFILE.timer);
   MULTIFILE.submitting = true;
   renderMultifileAuth();
@@ -275,8 +277,10 @@ async function submitFileBatch(event) {
     // Keep the confirmed request too: another click for unchanged inputs must
     // reopen this job rather than create a second measurement version.
     pending.job_id = job.job_id;
-    MULTIFILE.job = job.job_id;
-    renderFileJob(job);
+    if (read === MULTIFILE.detailToken) {
+      MULTIFILE.job = job.job_id;
+      renderFileJob(job);
+    }
     $('fileMessage').textContent = '任务已登记；每份文件独立提交，失败项可单独重试。';
     await loadMultifile();
   } catch (error) {

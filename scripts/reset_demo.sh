@@ -27,19 +27,19 @@ GRANT USAGE ON SCHEMA public TO readonly_user, datamind_app;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO readonly_user, datamind_app;"
 
 echo "=== [4/7] 生成零售演示数据 ==="
-py -3.13 db/seed_demo_retail.py
+.venv/bin/python db/seed_demo_retail.py
 
 echo "=== [5/7] 元数据登记（SchemaSnapshot/业务词表/指标/别名） ==="
-py -3.13 db/build_catalog.py
+.venv/bin/python db/build_catalog.py
 
 echo "=== [6/7] 评测集种子 ==="
-py -3.13 db/seed_eval_cases.py
+.venv/bin/python db/seed_eval_cases.py
 
 echo "=== [7/7] 知识库摄取（解析→切片→BGE→Qdrant） ==="
-py -3.13 db/migrate.py
+.venv/bin/python db/migrate.py
 export HF_ENDPOINT=https://hf-mirror.com
-py -3.13 ingestion/ingest.py --reset
-py -3.13 db/seed_industrial.py
-py -3.13 db/build_industrial_catalog.py
+.venv/bin/python ingestion/ingest.py --reset
+.venv/bin/python db/seed_industrial.py
+.venv/bin/python db/build_industrial_catalog.py
 
-echo "=== 完成。运行 bash scripts/verify.py 做端到端验证 ==="
+echo "=== 完成。运行 .venv/bin/python scripts/verify.py 做端到端验证（只读，不写真实库）==="

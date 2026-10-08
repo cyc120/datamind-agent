@@ -365,35 +365,68 @@ def _run_child(argv, stdin_text, deadline, limit, grace, interval, child_env, cw
                threading.Thread(target=_pump, args=(process.stderr, err), daemon=True)]
     for reader in readers:
         reader.start()
-    try:
-        if stdin_text:
-            process.stdin.write(stdin_text.encode('utf-8'))
-    except (BrokenPipeError, OSError, ValueError):
-        pass
-    finally:
+    # The deadline covers the standard-input write as well: a child that never reads its
+    # stdin would otherwise fill the pipe buffer and block this write, so the wall clock
+    # budget only started after it returned.
+    end = time.monotonic() + deadline
+    timed_out = cancelled = False
+    writer = None
+    if stdin_text:
+        payload = stdin_text.encode('utf-8')
+
+        def _feed_stdin():
+            try:
+                process.stdin.write(payload)
+            except (BrokenPipeError, OSError, ValueError):
+                pass
+            finally:
+                try:
+                    process.stdin.close()
+                except (OSError, ValueError):
+                    pass
+
+        writer = threading.Thread(target=_feed_stdin, daemon=True)
+        writer.start()
+        while writer.is_alive():
+            if cancel_event is not None and cancel_event.is_set():
+                cancelled = True
+                _terminate_group(process, grace)
+                break
+            if time.monotonic() >= end:
+                timed_out = True
+                _terminate_group(process, grace)
+                break
+            writer.join(timeout=min(0.05, max(0.0, end - time.monotonic())))
+        if cancelled or timed_out:
+            # Let the writer unwind now that the group is gone; it is a daemon, so a
+            # lingering thread can never hold the call open.
+            writer.join(timeout=min(1.0, grace + 0.5))
+    else:
         try:
             process.stdin.close()
-        except OSError:
+        except (OSError, ValueError):
             pass
-    timed_out = cancelled = False
-    try:
-        if cancel_event is None:
-            process.wait(timeout=deadline)
-        else:
-            end = time.monotonic() + deadline
-            while True:
+    if not (cancelled or timed_out):
+        try:
+            if cancel_event is None:
                 remaining = end - time.monotonic()
                 if remaining <= 0:
                     raise subprocess.TimeoutExpired(process.args, deadline)
-                if cancel_event.wait(min(interval, remaining)):
-                    cancelled = True
-                    _terminate_group(process, grace)
-                    break
-                if process.poll() is not None:
-                    break
-    except subprocess.TimeoutExpired:
-        timed_out = True
-        _terminate_group(process, grace)
+                process.wait(timeout=remaining)
+            else:
+                while True:
+                    remaining = end - time.monotonic()
+                    if remaining <= 0:
+                        raise subprocess.TimeoutExpired(process.args, deadline)
+                    if cancel_event.wait(min(interval, remaining)):
+                        cancelled = True
+                        _terminate_group(process, grace)
+                        break
+                    if process.poll() is not None:
+                        break
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            _terminate_group(process, grace)
     for reader in readers:
         reader.join(timeout=grace + 1)
     exit_code = process.returncode

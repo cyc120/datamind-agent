@@ -29,7 +29,8 @@ from .providers import (OPENAI, PROTOCOLS, list_models as provider_list_models,
 from .settings_store import (DEFAULT_BASE_URL, DEFAULT_MODEL, PROFILE_FIELDS, activate_profile,
                              active_profile, clear_model_config, delete_profile, list_profiles,
                              load_model_config, normalize_base_url, public_model_config,
-                             public_profile, public_profiles, save_model_config, save_profile)
+                             public_profile, public_profiles, redact_profile, save_model_config,
+                             save_profile)
 
 
 class DocumentReference(BaseModel):
@@ -162,7 +163,7 @@ class ProfileImportRequest(BaseModel):
     activate_first: bool = False
 
 
-app = FastAPI(title="DataMind Agent", version="0.33.0")
+app = FastAPI(title="DataMind Agent", version="0.34.0")
 
 
 @app.middleware('http')
@@ -678,7 +679,7 @@ def health():
 
 def _stored_config() -> dict:
     try:
-        return load_model_config()
+        return _select_stored_profile()
     except psycopg2.Error:
         raise HTTPException(503, detail={"error_code": "DATABASE_UNAVAILABLE"})
 
@@ -698,22 +699,38 @@ def _profiles_safe() -> dict:
     return jsonable_encoder(data)
 
 
-def _profile_from_request(request: ProfileRequest) -> dict:
-    """探活用的完整配置：指定配置 > 当前启用配置 > 环境变量 > 默认值，请求字段优先。"""
-    try:
+def _select_stored_profile(profile_id: str | None = None) -> dict:
+    """从元数据库选出目标配置：指定 id 优先，未命中则回退当前启用配置。"""
+    if profile_id:
         state = list_profiles()
-        stored = next((item for item in state["items"] if item.get("id") == request.profile_id), {})
-        if not stored:
-            stored = load_model_config()
-    except psycopg2.Error:
-        stored = {}
-    profile = dict(stored)
-    for field in ("protocol", "base_url", "model", "auth_style", "headers", "proxy",
-                  "max_tokens", "timeout_s"):
-        value = getattr(request, field, None)
-        if value is not None:
-            profile[field] = value
-    profile["api_key"] = (request.api_key or "").strip() or stored.get("api_key", "")
+        found = next((item for item in state["items"] if item.get("id") == profile_id), None)
+        if found:
+            return dict(found)
+    return dict(load_model_config())
+
+
+def resolve_profile(request: ProfileRequest | None = None, *, stored: dict | None = None) -> dict:
+    """api.py 内唯一的 profile 解析入口（探活、模型列表等共用）。
+
+    优先级：请求显式字段 > 指定/启用配置 > 环境变量 > 默认值。
+    ``headers`` / ``proxy`` 与 ``api_key`` 走同一套合并规则，因此同一份输入
+    在任何入口都会解析出同一结果（含代理）。``stored`` 可显式注入已保存配置，
+    便于测试与无数据库场景。
+    """
+    if stored is None:
+        try:
+            stored = _select_stored_profile(getattr(request, "profile_id", None))
+        except psycopg2.Error:
+            stored = {}
+    base = dict(stored or {})
+    profile = dict(base)
+    if request is not None:
+        for field in ("protocol", "base_url", "model", "auth_style", "headers", "proxy",
+                      "max_tokens", "timeout_s"):
+            value = getattr(request, field, None)
+            if value is not None:
+                profile[field] = value
+        profile["api_key"] = (request.api_key or "").strip() or base.get("api_key", "")
     profile["base_url"] = profile.get("base_url") or os.environ.get("NEW_API_BASE_URL") or DEFAULT_BASE_URL
     profile["model"] = profile.get("model") or os.environ.get("NEW_API_MODEL") or DEFAULT_MODEL
     profile["api_key"] = profile.get("api_key") or os.environ.get("NEW_API_KEY") or ""
@@ -728,13 +745,19 @@ def get_profiles():
 
 @app.get("/v1/model/profiles/export")
 def export_profiles(include_keys: bool = Query(default=False)):
+    """导出接入配置；默认（include_keys=False）经过 redact_profile() 脱敏。
+
+    脱敏会移除 api_key，并剔除 headers 中的 authorization/api-key/x-api-key/cookie
+    等敏感头、去掉 proxy URL 里的 userinfo，保证「无密钥导出」不含任何认证材料。
+    include_keys=True 是显式要求带密钥的搬迁导出，原样返回。
+    """
     state = list_profiles()
     items = []
     for item in state["items"]:
         payload = {field: item.get(field) for field in PROFILE_FIELDS}
         payload["id"] = item.get("id")
         if not include_keys:
-            payload.pop("api_key", None)
+            payload = redact_profile(payload)
         items.append(payload)
     return jsonable_encoder({"exported_at": datetime.now(timezone.utc).isoformat(),
                              "include_keys": include_keys, "active": state.get("active"),
@@ -832,7 +855,7 @@ def delete_model_config():
 
 @app.post("/v1/model/config/models")
 def probe_models(request: ProfileRequest):
-    profile = _profile_from_request(request)
+    profile = resolve_profile(request)
     result = provider_list_models(profile)
     result["base_url"] = profile.get("base_url")
     result["protocol"] = profile.get("protocol") or OPENAI
@@ -841,7 +864,7 @@ def probe_models(request: ProfileRequest):
 
 @app.post("/v1/model/config/test")
 def probe_chat(request: ProfileRequest):
-    profile = _profile_from_request(request)
+    profile = resolve_profile(request)
     result = provider_test_chat(profile)
     result["base_url"] = profile.get("base_url")
     result["configured_model"] = profile.get("model")

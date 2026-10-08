@@ -2,6 +2,9 @@
 import unittest
 from datetime import date
 
+from unittest.mock import patch
+
+from datamind import sql_engine
 from datamind.catalog import Catalog
 from datamind.sql_engine import ask, time_periods
 from datamind.sql_guard import PolicyError, guard_sql
@@ -201,3 +204,157 @@ class ColumnScopeTest(unittest.TestCase):
     def test_a_projection_alias_is_not_a_licence_to_select_the_alias_name(self):
         # `name` exists only as an output alias, never as a base column.
         self.blocked("SELECT name FROM customers LIMIT 1", "COLUMN_NOT_ALLOWED")
+
+
+SALES_QUESTION = "2024年销售额是多少？"
+SALES_WHERE = ("FROM order_items oi JOIN orders o ON oi.order_id=o.order_id "
+               "WHERE o.order_status IN ('completed','shipped','refunded') "
+               "AND o.created_at >= '2024-01-01' AND o.created_at < '2025-01-01'")
+# business_metrics 中 demo_retail.sales_amount 的批准公式。
+APPROVED_SALES_SQL = "SELECT sum(oi.quantity * oi.unit_price * (1 - oi.discount)) " + SALES_WHERE
+
+
+class MetricExpressionRegistryTest(unittest.TestCase):
+    """F02: 指标校验必须按 business_metrics 的批准公式做结构比对，且失败关闭。
+
+    旧实现只检查 SUM 里是否出现 quantity/unit_price/discount 三个列名，
+    因此 `SUM(quantity + unit_price + discount)` 这种运算符错误的表达式会被放行。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.catalog = Catalog(META, "demo_retail")
+
+    def findings(self, sql, question=SALES_QUESTION, **kwargs):
+        from datamind.sql_engine import _semantic_findings
+        checked = guard_sql(sql, self.catalog)
+        return _semantic_findings(question, checked.sql, checked.params, "demo_retail", **kwargs)
+
+    def test_wrong_operator_is_rejected(self):
+        findings = self.findings("SELECT sum(oi.quantity + oi.unit_price + oi.discount) " + SALES_WHERE)
+        self.assertIn("METRIC_EXPRESSION_MISMATCH", findings)
+
+    def test_ask_rejects_wrong_operator_expression(self):
+        bad = "SELECT sum(oi.quantity + oi.unit_price + oi.discount) " + SALES_WHERE
+        result = ask(SALES_QUESTION, generator=lambda *_: {"sql": bad})
+        self.assertEqual(result["error_code"], "REPAIR_BUDGET_EXHAUSTED")
+        self.assertEqual(result["attempts"][0]["error_code"], "METRIC_EXPRESSION_MISMATCH")
+
+    def test_approved_formula_passes_metric_check(self):
+        findings = self.findings(APPROVED_SALES_SQL)
+        self.assertNotIn("METRIC_EXPRESSION_MISMATCH", findings)
+        self.assertNotIn("METRIC_EXPRESSION_NOT_VERIFIABLE", findings)
+        self.assertEqual(findings, [])
+
+    def test_table_qualifiers_are_ignored(self):
+        qualified = self.findings(APPROVED_SALES_SQL)
+        unqualified = self.findings("SELECT sum(quantity * unit_price * (1 - discount)) " + SALES_WHERE)
+        self.assertEqual(unqualified, [])
+        self.assertEqual(unqualified, qualified, "oi.quantity 与 quantity 必须等价")
+
+    def test_commutative_multiplication_is_accepted(self):
+        reordered = self.findings(
+            "SELECT sum(oi.unit_price * (1 - oi.discount) * oi.quantity) " + SALES_WHERE)
+        self.assertEqual(reordered, [], "乘法交换律应被低成本地接受")
+
+    def test_missing_discount_is_still_rejected(self):
+        findings = self.findings("SELECT sum(oi.quantity * oi.unit_price) " + SALES_WHERE)
+        self.assertIn("METRIC_EXPRESSION_MISMATCH", findings)
+
+    def test_registry_unavailable_fails_closed(self):
+        def broken(_source):
+            raise RuntimeError("registry down")
+
+        findings = self.findings(APPROVED_SALES_SQL, metric_registry=broken)
+        self.assertIn("METRIC_EXPRESSION_NOT_VERIFIABLE", findings)
+
+    def test_registry_without_the_metric_fails_closed(self):
+        findings = self.findings(APPROVED_SALES_SQL, metric_registry=lambda _source: [])
+        self.assertIn("METRIC_EXPRESSION_NOT_VERIFIABLE", findings)
+
+    def test_compound_metric_that_references_other_metrics_is_not_silently_passed(self):
+        # 净销售额公式 `sales_amount - refund_amount` 引用其他指标，无法按列级结构比对，
+        # 必须失败关闭，而不是假装已强制。
+        findings = self.findings(APPROVED_SALES_SQL, question="2024年净销售额是多少？")
+        self.assertIn("METRIC_EXPRESSION_NOT_VERIFIABLE", findings)
+
+    def test_status_filter_behavior_is_preserved(self):
+        without_status = ("SELECT sum(oi.quantity * oi.unit_price * (1 - oi.discount)) "
+                          "FROM order_items oi JOIN orders o ON oi.order_id=o.order_id "
+                          "WHERE o.created_at >= '2024-01-01' AND o.created_at < '2025-01-01'")
+        self.assertIn("METRIC_STATUS_FILTER_MISSING", self.findings(without_status))
+
+    def test_time_findings_are_preserved(self):
+        from datamind.sql_engine import _semantic_findings
+        status = ["completed", "shipped", "refunded"]
+        wrong_year = ("SELECT SUM(oi.quantity * oi.unit_price * (1 - oi.discount)) FROM order_items oi "
+                      "WHERE oi.order_id IN (SELECT order_id FROM orders WHERE created_at >= %s AND created_at < %s)")
+        self.assertEqual(
+            _semantic_findings(SALES_QUESTION, wrong_year,
+                               status + ["2025-01-01", "2026-01-01"], "demo_retail"),
+            ["TIME_FILTER_MISMATCH"])
+        self.assertEqual(
+            _semantic_findings(SALES_QUESTION, wrong_year, status, "demo_retail"),
+            ["TIME_FILTER_MISMATCH"])
+        # 销售额必须按 created_at 过滤；同样的时间参数落在别的字段上时必须报 TIME_FIELD_MISMATCH。
+        self.assertEqual(
+            _semantic_findings(SALES_QUESTION, "SELECT SUM(oi.quantity * oi.unit_price * (1 - oi.discount)) "
+                               "FROM order_items oi", status + ["2024-01-01", "2025-01-01"], "demo_retail"),
+            ["TIME_FIELD_MISMATCH"])
+
+
+class VerifiedJudgmentTest(unittest.TestCase):
+    """F02: 「结果非空」不等于 verified，任何指标/口径类 finding 都必须让它为假。"""
+
+    def test_definition_findings_block_verification(self):
+        from datamind.sql_engine import verification_passed
+        for findings in (["METRIC_EXPRESSION_MISMATCH"], ["METRIC_EXPRESSION_NOT_VERIFIABLE"],
+                         ["METRIC_STATUS_FILTER_MISSING"], ["TIME_FILTER_MISMATCH"],
+                         ["EMPTY_RESULT"], ["EMPTY_RESULT", "METRIC_EXPRESSION_MISMATCH"]):
+            self.assertFalse(verification_passed(findings), findings)
+
+    def test_clean_and_row_limit_results_stay_verified(self):
+        from datamind.sql_engine import verification_passed
+        self.assertTrue(verification_passed([]))
+        self.assertTrue(verification_passed(["ROW_LIMIT_REACHED"]))
+
+    def test_agent_uses_the_shared_verdict(self):
+        import datamind.agent as agent_module
+        from datamind.sql_engine import verification_passed
+        self.assertIs(agent_module.verification_passed, verification_passed)
+
+
+class AdvisoryMetricFindingTests(unittest.TestCase):
+    """F02: 'we verified it is wrong' blocks; 'we could not verify it' only lowers the verdict.
+
+    Refusing to answer a legitimate composite metric (net sales references two other
+    metrics) would replace one defect with another, so it is surfaced instead of blocked.
+    """
+
+    def generator(self, calls):
+        def generate(question, catalog, feedback):
+            calls.append(feedback)
+            return {'sql': 'SELECT count(*) FROM customers LIMIT 5', 'interpretation': 'count'}
+        return generate
+
+    def test_an_unverifiable_expression_is_recorded_and_not_blocking(self):
+        calls = []
+        with patch.object(sql_engine, '_semantic_findings',
+                          return_value=['METRIC_EXPRESSION_NOT_VERIFIABLE']):
+            result = ask('销售额是多少', 'demo_retail', generator=self.generator(calls))
+        self.assertEqual(result['status'], 'completed', result)
+        self.assertEqual(len(calls), 1, '提示类 finding 不应触发重写')
+        self.assertIn('METRIC_EXPRESSION_NOT_VERIFIABLE', result['validator_findings'])
+        self.assertFalse(sql_engine.verification_passed(result['validator_findings']))
+
+    def test_a_verified_mismatch_still_blocks_after_the_rewrite_budget(self):
+        calls = []
+        with patch.object(sql_engine, '_semantic_findings',
+                          return_value=['METRIC_EXPRESSION_MISMATCH']):
+            result = ask('销售额是多少', 'demo_retail', generator=self.generator(calls))
+        self.assertNotEqual(result['status'], 'completed')
+        self.assertEqual(len(calls), 3, '口径错误应触发全部重写机会')
+
+    def test_advisory_and_blocking_findings_are_declared_explicitly(self):
+        self.assertIn('METRIC_EXPRESSION_NOT_VERIFIABLE', sql_engine.ADVISORY_FINDINGS)
+        self.assertNotIn('METRIC_EXPRESSION_MISMATCH', sql_engine.ADVISORY_FINDINGS)

@@ -821,3 +821,11 @@ Office/DXF 的块按 `part`/`paragraph`/`slide`/`sheet`/`handle` 定位，**没�
 同时修正一处交付隐患：`web/index.html` 的前端缓存版本仍是 `0.14.0`，回访浏览器可能继续使用旧脚本而看不到新功能，已更新为 `0.33.0`。
 
 新增 5 项前端接缝守护测试（`tests/test_frontend_locators.py`）：前端读取的字段必须与后端实际产出的定位字段一致、必须存在旋转页拒绝绘制的判断、非页面定位走标签分支、`node --check` 语法校验。完整隔离回归 **664/664**、失败/错误 0。边界：界面为静态资源，需浏览器刷新；`BlockRelation` 尚未进入检索排序或冲突消解。
+
+### 18.20 独立审计缺陷修复（API 0.34.0，2026 年 10 月 8 日）
+
+依据独立审计与复审（`reports/project_audit_20261008_2d9ab18_review.md`）按其 §7 排期修复 F01–F09 与 F11：**F01** 列权限改按 sqlglot AST scope 逐作用域解析（堵住 `SELECT c AS c FROM customers c` 与内层 CTE 别名覆盖外层表别名两条越权路径，同时不误伤 ORDER/GROUP 别名与 CTE 引用）；**F02** 指标口径改为与 `business_metrics.expression_sql` 注册表做结构比对，`verification_passed()` 使"非空结果"不再等于已验证，并把"已校验为错"（阻塞）与"无法独立校验"（记录、不阻断，避免误伤净销售额等复合指标）分开；**F03** 存储端口默认仅回环（需重建容器生效）；**F04** deadline 覆盖 stdin 写入（子进程不读 stdin 不再能绕过）；**F05** 无密钥导出经 `redact_profile()` 彻底脱敏；**F06** `api.py` 内 profile 解析统一为 `resolve_profile()`（问答链路仍待统一）；**F07** 恢复状态绑定 `Plan.digest`（裸映射失败关闭、摘要不符拒绝）；**F08** 前端引入请求代次防串屏；**F09** Office 保真（block id 摘要化、DOCX 真实正文顺序、XLSX 无缓存公式显式声明 `formula_without_cached_value`）；**F11** 验证脚本不再污染真实库且去掉硬编码规模。
+
+**F10（摄取跨存储一致性）明确延后**：需要 outbox/状态机式多存储协议并改动依赖 Qdrant 与嵌入模型的摄取主链路，本轮无法充分验证，故不改动，方案已记录。
+
+执行方式：F01/F04/F07 由主代理实现，F02、F03+F11、F05+F06、F08+F09 由四个子代理并行实现，每个子代理限定写入文件集合并禁止仓库级格式化与 git 写操作，改动全部由主代理独立复核。新增 70 项测试，完整隔离回归 **734/734**、失败/错误 0。诚实边界见 `docs/AUDIT_FIXES.md`「未完成与后续建议」。

@@ -210,7 +210,8 @@ class VcarExecuteTests(unittest.TestCase):
             return {'ok': True}
 
         resumed = vcar.execute(vcar.plan([node('a'), node('b')]), {'sql': fixed},
-                               budget={'max_repair': 0}, state=state)
+                               budget={'max_repair': 0},
+                               state=vcar.bound_state(vcar.plan([node('a'), node('b')]), state))
         self.assertTrue(resumed['resumed'])
         self.assertEqual(seen, ['b'])
         self.assertEqual(resumed['status'], 'completed')
@@ -219,11 +220,14 @@ class VcarExecuteTests(unittest.TestCase):
 
     def test_invalid_resume_state_is_refused(self):
         built = vcar.plan([node('a')])
-        for state in ([], {'missing': {'status': 'succeeded'}},
-                      {'a': {'status': 'unknown'}}, {'a': 'succeeded'},
-                      {'a': {'status': 'succeeded', 'result': object()}}):
+        for records in ({'missing': {'status': 'succeeded'}},
+                        {'a': {'status': 'unknown'}}, {'a': 'succeeded'},
+                        {'a': {'status': 'succeeded', 'result': object()}}):
             with self.assertRaises(HTTPException) as caught:
-                vcar.execute(built, {'sql': lambda n, i: {}}, state=state)
+                vcar.execute(built, {'sql': lambda n, i: {}}, state=vcar.bound_state(built, records))
+            self.assertEqual(caught.exception.detail['error_code'], 'PLAN_STATE_INVALID')
+        with self.assertRaises(HTTPException) as caught:
+            vcar.execute(built, {'sql': lambda n, i: {}}, state=[])
             self.assertEqual(caught.exception.detail['error_code'], 'PLAN_STATE_INVALID')
 
     def test_invalid_budget_arguments_are_refused(self):
@@ -238,3 +242,47 @@ class VcarExecuteTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class ResumePlanBindingTests(unittest.TestCase):
+    """F07: persisted node state is bound to the plan that produced it."""
+
+    def build(self, broken=True):
+        return vcar.plan([node('a'), node('b')])
+
+    def test_resume_state_must_carry_a_plan_digest(self):
+        built = self.build()
+        with self.assertRaises(HTTPException) as caught:
+            vcar.execute(built, {'sql': lambda n, i: {}}, state={'a': {'status': 'succeeded'}})
+        self.assertEqual(caught.exception.detail['error_code'], 'PLAN_STATE_UNBOUND')
+
+    def test_state_from_a_different_plan_is_refused(self):
+        built = vcar.plan([node('a'), node('b')])
+        other = vcar.plan([node('a'), node('b', depends_on=('a',))])
+        self.assertNotEqual(built.digest, other.digest)
+        with self.assertRaises(HTTPException) as caught:
+            vcar.execute(built, {'sql': lambda n, i: {}},
+                         state=vcar.bound_state(other, {'a': {'status': 'succeeded'}}))
+        self.assertEqual(caught.exception.detail['error_code'], 'PLAN_STATE_PLAN_MISMATCH')
+
+    def test_same_plan_content_produces_the_same_digest(self):
+        first = vcar.plan([node('a'), node('b', depends_on=('a',))])
+        second = vcar.plan([node('a'), node('b', depends_on=('a',))])
+        self.assertEqual(first.digest, second.digest)
+        result = vcar.execute(second, {'sql': lambda n, i: {'ok': True}},
+                              state=vcar.bound_state(first, {'a': {'status': 'succeeded'}}))
+        self.assertTrue(result['resumed'])
+        self.assertEqual(result['plan_digest'], first.digest)
+
+    def test_the_result_reports_the_digest_to_persist(self):
+        built = self.build()
+        result = vcar.execute(built, {'sql': lambda n, i: {'ok': True}})
+        self.assertEqual(result['plan_digest'], built.digest)
+        self.assertEqual(result['plan']['plan_digest'], built.digest)
+
+    def test_a_record_for_an_unknown_node_is_still_refused_when_bound(self):
+        built = vcar.plan([node('a')])
+        with self.assertRaises(HTTPException) as caught:
+            vcar.execute(built, {'sql': lambda n, i: {}},
+                         state=vcar.bound_state(built, {'ghost': {'status': 'succeeded'}}))
+        self.assertEqual(caught.exception.detail['error_code'], 'PLAN_STATE_INVALID')

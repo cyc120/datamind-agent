@@ -76,6 +76,8 @@
 | `memory_bytes`（16 MiB–64 GiB） | 子进程 `RLIMIT_AS`（**地址空间**，不是 RSS） | `TASK_MEMORY_LIMIT_EXCEEDED` |
 | 限额在 preexec 阶段设置失败 | 不执行任务 | `TASK_BUDGET_SPAWN_FAILED` |
 
+**deadline 覆盖 stdin 写入（API 0.34.0）**：子进程的 stdin 由守护线程写入，主路径按**同一**挂钟预算轮询并在超时或取消时终止整个进程组，因此"子进程从不读 stdin、管道写满即阻塞"不再能绕过 deadline。不修复时 8 MiB 的 stdin 会让 `run_bounded_command` 在 `deadline_s=1` 下永久阻塞；修复后实测 < 6 秒返回 `TASK_DEADLINE_EXCEEDED`。正常读取 stdin 的子进程与大载荷（4 MiB）仍完整送达。
+
 **平台事实与失败关闭**：macOS 拒绝设置 `RLIMIT_AS`/`RLIMIT_DATA`（`setrlimit` 返回 EINVAL），只有 `RLIMIT_CPU`/`NOFILE`/`FSIZE` 可用。`rlimit_supported(kind)` 在一次性子进程中探测并缓存结果；**请求了内存上限而平台不支持时直接拒绝**并返回 `TASK_BUDGET_RLIMIT_UNSUPPORTED`，绝不静默当作已生效。真正的内存隔离仍需 Linux cgroup，本模块不主张提供。
 
 ## 跨主机租约
