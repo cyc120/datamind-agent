@@ -15,6 +15,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import re
+import zipfile
 from pathlib import Path
 
 from fastapi import HTTPException
@@ -73,6 +74,7 @@ SOURCE_BLOCK_CONTRACT_FIELDS = ('block_id', 'page_no', 'block_type', 'text', 'he
 _SHA256 = re.compile(r'^[a-f0-9]{64}$')
 _HANDLE = re.compile(r'^[1-9A-F][0-9A-F]{0,31}$')
 _CELL = re.compile(r'^[A-Z]{1,3}[1-9][0-9]{0,6}$')
+_SHEET_RANGE = re.compile(r'^[A-Z]{1,3}[1-9][0-9]{0,6}(:[A-Z]{1,3}[1-9][0-9]{0,6})?$')
 _TIME_UNITS = ('s', 'ms', 'us', 'ns', 'iso8601', 'frame')
 _BBOX_EPSILON = 0.5
 
@@ -81,6 +83,13 @@ _ADAPTERS: dict = {}
 _MAGIC = ((b'%PDF-', 'application/pdf'), (b'\x89PNG\r\n\x1a\n', 'image/png'),
           (b'\xff\xd8\xff', 'image/jpeg'), (b'PK\x03\x04', 'application/zip'))
 OCTET_STREAM = 'application/octet-stream'
+# OOXML packages are all ZIP containers, so the subtype needs the archive index, not the
+# leading bytes. Anything unrecognised stays a plain ZIP instead of being guessed.
+OOXML_MEDIA_TYPES = {
+    'word/document.xml': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'ppt/presentation.xml': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'xl/workbook.xml': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+}
 
 
 def fail(code, **context):
@@ -230,6 +239,8 @@ def _validate_sheet(payload):
         fail('PARSE_LOCATOR_INVALID', subject=subject, reason='cell_or_range')
     if cell is not None and (not _text(cell) or not _CELL.fullmatch(cell.strip().upper())):
         fail('PARSE_LOCATOR_INVALID', subject=subject, reason='cell')
+    if cell_range is not None and (not _text(cell_range) or not _SHEET_RANGE.fullmatch(cell_range.strip().upper())):
+        fail('PARSE_LOCATOR_INVALID', subject=subject, reason='range')
 
 
 def _validate_temporal(payload):
@@ -448,6 +459,19 @@ def register_adapter(name, *, media_types, capabilities, handler=None):
     return record
 
 
+def _ooxml_subtype(path):
+    """Distinguish an OOXML subtype from a plain ZIP by its package index."""
+    try:
+        with zipfile.ZipFile(path) as archive:
+            names = set(archive.namelist())
+    except (zipfile.BadZipFile, OSError):
+        return None
+    for marker, media_type in OOXML_MEDIA_TYPES.items():
+        if marker in names:
+            return media_type
+    return None
+
+
 def detect_media_type(path):
     """Sniff a file signature; unknown content is reported, never guessed from a name."""
     try:
@@ -457,6 +481,8 @@ def detect_media_type(path):
         fail('PARSE_MEDIA_UNREADABLE', path=str(path))
     for magic, media_type in _MAGIC:
         if head.startswith(magic):
+            if media_type == 'application/zip':
+                return _ooxml_subtype(path) or media_type
             return media_type
     return OCTET_STREAM
 

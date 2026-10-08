@@ -71,7 +71,21 @@
 - **已接入解析出口**：`parse_pdf` 在返回前把真实块映射进契约并校验，结果记录为 `detail['parse_contract']`（`parsed`/`failed`/`skipped` + 稳定错误码）。契约违反**不会中断摄取**，而是带错误码写入质量明细保持可见。
 - **定位写入独立表**：契约 locator 落在 `document_block_locators(block_id, document_id, contract_version, locator)`，与 `document_blocks` 分列存放。原因是基表 `document_blocks` 属主为 `postgres`，而迁移以应用角色运行——项目既有迁移从不 ALTER 基表，因此遵循既有模式另建应用所有的表，而不是变更表属主。
 - **只有校验过的块才有定位行**：契约出现之前解析的块不写任何行，**不编造 locator**；块与定位行在同一文档重建时一起删除后重插。
-- **只注册了 PDF 一个适配器**：ZIP 类（DOCX/XLSX/PPTX）只被识别为 `application/zip`，没有更深的内容判定与适配器。
+- **已注册 PDF 与三种 Office 适配器**：DOCX/PPTX/XLSX 通过**包内索引**（`word/document.xml`、`ppt/presentation.xml`、`xl/workbook.xml`）区分；不含已知部件的 ZIP 仍报 `application/zip` 并被拒绝，不猜类型。
+
+## Office 适配器（API 0.29.0）
+
+可选依赖见 `requirements-office.txt`（python-docx / python-pptx / openpyxl）；未安装时 `office._require` 以 `PARSE_ADAPTER_UNSUPPORTED`（`library_missing`）明确拒绝，而不是返回空解析。入口：`ingestion/office.py`（`parse_docx`/`parse_pptx`/`parse_xlsx`/`parse`）与 `scripts/parse_office.py`。
+
+| 格式 | 产出块 | locator | 刻意不做 |
+|---|---|---|---|
+| DOCX | 标题（`title` + `heading_level`）、段落、表格（整表为一块，保留 `table_cells` 二维结构） | `office_object`，`part=word/document.xml` + `paragraph=N` 或 `table=N` | 不做单元格级 locator、不解析样式/批注/修订 |
+| PPTX | 每个文本框一块；标题占位符标为 `title` | `office_object`，`part=ppt/slides/slideN.xml` + `slide=N`、`shape=M` | 不解析图片、图表、SmartArt、备注 |
+| XLSX | **按行**一块，`table_cells` 为当行值 | `sheet_range`，`sheet=<名>` + `range=A1:B1` | 不解析公式（只取缓存值）、合并单元格语义、隐藏表、多表区 |
+
+行号保留**真实电子表格行号**（跳过空行但不重编号），因此引用指向操作员看到的同一行。
+
+**有界而非静默截断**：超过 `MAX_BLOCKS`（默认 2000）或单表 `max_rows_per_sheet`（默认 500）时，`parse_status` 置 `partial` 并在 `unsupported_features` 写入 `block_limit_reached` / `sheet_row_limit_reached`。
 - **未实现 Office/CAD 新解析器**：`office_object`/`sheet_range`/`cad_entity` 只是可校验的定位器契约，尚无产出它们的解析器。
 - **`Chunk`、`DocumentFact`、`DrawingFeature` 未纳入本契约**：现有存储与检索尚未统一，留待后续阶段。
 - 契约版本为 `parse-contract-v1`；变更契约需同时更新测试与本文件。

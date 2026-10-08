@@ -1,6 +1,6 @@
 {
   "stage": "parse_contract_and_resource_limits",
-  "api_version": "0.28.0",
+  "api_version": "0.29.0",
   "date": "2026-10-07",
   "scope": "并行推进两条技术实现线：(A) T3 统一解析契约（ParseResult/SourceLocator/Block/Relation/Adapter，§5.2/§5.4）；(B) T5 统一 CPU/内存配额与跨主机租约（§13）。",
   "lines": {
@@ -24,6 +24,22 @@
       ],
       "tests": {"file": "tests/test_parse_contract.py", "tests": 42, "failures": 0, "errors": 0}
     },
+    "C_office_adapters": {
+      "components": {
+        "ingestion/office.py": "parse_docx / parse_pptx / parse_xlsx 映射进契约并注册三个适配器；parse() 探测后经 dispatch 路由",
+        "scripts/parse_office.py": "CLI：探测→路由→校验，打印契约汇总；未知 ZIP 以 PARSE_ADAPTER_UNKNOWN 拒绝",
+        "requirements-office.txt": "可选依赖 python-docx / python-pptx / openpyxl；未安装时以 PARSE_ADAPTER_UNSUPPORTED(library_missing) 拒绝"
+      },
+      "implemented": [
+        "OOXML 子类型由包内索引判定（word/document.xml、ppt/presentation.xml、xl/workbook.xml）；其它 ZIP 仍报 application/zip 并被拒绝",
+        "DOCX：标题（heading_level）、段落、整表（保留 table_cells 二维结构），locator=office_object(part, paragraph/table)",
+        "PPTX：每个文本框一块，标题占位符标 title，locator=office_object(part, slide, shape)",
+        "XLSX：按行一块，locator=sheet_range(sheet, range)，保留真实电子表格行号（跳过空行但不重编号）",
+        "有界而非静默截断：超 MAX_BLOCKS 或单表行数上限时 parse_status=partial 并记录 block_limit_reached / sheet_row_limit_reached"
+      ],
+      "tests": {"file": "tests/test_office_adapter.py", "tests": 10, "failures": 0, "errors": 0,
+                "skips_without_optional_libraries": True}
+    },
     "B_resource_limits_and_leases": {
       "components": {
         "datamind/task_budget.py": "cpu_seconds（RLIMIT_CPU）与 memory_bytes（RLIMIT_AS）限额、平台能力探测、稳定错误码、PostgreSQL 租约 API",
@@ -41,7 +57,7 @@
     }
   },
   "verification": {
-    "full_isolated_regression": {"tests": 620, "failures": 0, "errors": 0, "exit_code": 0, "previous_stage_tests": 614},
+    "full_isolated_regression": {"tests": 630, "failures": 0, "errors": 0, "exit_code": 0, "previous_stage_tests": 620},
     "platform_facts": {
       "rlimit_cpu": "受支持并实测生效（1 秒 CPU 上限下 300 秒自旋被终止）",
       "rlimit_as": "本机 macOS 不支持（setrlimit 返回 EINVAL），因此内存上限按失败关闭处理",

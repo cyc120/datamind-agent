@@ -1,0 +1,5 @@
+# 可选：Office 解析适配器（DOCX/PPTX/XLSX -> 统一解析契约）
+# 仅在使用 Office 适配器时需要；不安装时路由会明确拒绝这些类型。
+python-docx>=1.1
+python-pptx>=1.0
+openpyxl>=3.1
