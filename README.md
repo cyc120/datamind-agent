@@ -4,7 +4,7 @@
 
 本仓库包含三大部分：
 
-1. **`gateway/` — 大模型接入基座（可选）**：基于 New API 的模型网关，可继续用于渠道池、令牌配额与调用审计。应用默认直连上游 OpenAI 兼容接口——在 8000 页面登录管理员后于左侧「模型接入」填入接口地址、模型名和 API 密钥即可，无需启动该网关；若要经过网关，把接口地址填成 `http://localhost:4000/v1` 即可。详见 [gateway/README.md](gateway/README.md)。
+1. **模型接入：直连上游**。应用直接调用 OpenAI 兼容（或 Anthropic Messages）接口，不依赖任何本地网关：登录管理员后在左侧「模型接入」填入接口地址、模型名与 API 密钥即可（默认地址 `https://api.deepseek.com/v1`）。需要渠道池、令牌配额或调用审计时，可自行在前面加一层网关并把接口地址指向它——本仓库不再内置网关。
 2. **`deploy/` `db/` `ingestion/` `scripts/` `data/` — 基础数据库底座**（本 README 主体）：结构化业务库 + 非结构化知识库 + 元数据基础设施 + 评测集，全部可重置、可复现。
 3. **`datamind/` `web/` — 应用层**：结构化问数与文档问答 Agent、HTTP/SSE 接口、引用定位和运行回放。
 
@@ -98,7 +98,6 @@ Schema Linking 的独立验收入口是 `.venv/bin/python scripts/eval_schema.py
 ## 二、目录结构
 
 ```
-├── gateway/                    # 大模型接入基座（New API，可选，见 gateway/README.md）
 ├── deploy/
 │   ├── compose.yaml            # PostgreSQL + Qdrant（MinIO 注释保留）
 │   ├── .env / .env.example

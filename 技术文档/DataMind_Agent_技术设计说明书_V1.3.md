@@ -861,3 +861,15 @@ Office/DXF 的块按 `part`/`paragraph`/`slide`/`sheet`/`handle` 定位，**没�
 **敏感头补回（无条件）**：请求只提交非敏感头时会从已存配置补回 `Authorization`/`api-key`/`Cookie` 等，避免"编辑非敏感头后测试连接"401；请求显式值优先，已存没有的不凭空造，删除仅 `__clear__` 一条通道。子代理一度把该行为限定为"注入 `stored=` 时保持整体替换"以兼容一条**记录缺陷行为**的冻结断言；协调者判定让参数翻转合并语义正是本缺陷成因之一，改为**无条件补回**并改写该断言，另加"两种调用方式等价"断言防止折中回归。请求侧 `proxy` 仍为替换语义（保存路径已正确合并，探活路径无实际缺口）。
 
 新增 31 项测试，完整隔离回归见 `reports/audit_fix_verification.json`。边界：需浏览器人工验收；关系未进入排序/消解。
+
+### 18.24 移除本地模型网关，统一为直连上游（API 0.37.0，2026 年 10 月 8 日）
+
+应用**本就不依赖网关**：`DEFAULT_BASE_URL` 为 `https://api.deepseek.com/v1`，`providers.py` 只构造标准端点（`/chat/completions`、`/messages`）并支持 openai/anthropic 协议、自定义头与代理，全程未使用任何网关专有 API；README 原文本已写明网关可选、应用默认直连上游。本地 4000 端口的 New API 网关（`gateway/`，vendored，997 个跟踪文件）只是**纯透传**（渠道指向 `https://api.deepseek.com`）。
+
+经确认后执行移除：把网关库中的上游渠道密钥（只读取出，未打印明文）经 `settings_store.save_model_config()` 迁移到 `app_settings`（`base_url=https://api.deepseek.com/v1`、`model=deepseek-flash`），**先实测直连可用**（httpx 对上游返回 200；`deepseek-flash`/`deepseek-v4-pro`/`deepseek-chat`/`deepseek-reasoner` 四个模型名均可用），再 `git rm -r gateway/`（历史保留）、删除被 gitignore 的残留、`docker rm -f new-api-local` 释放 4000 端口、清理 `.gitignore` 的网关条目，并把 README 改为直连说明。
+
+**删除前后各做一次真实端到端验证**：`sql_engine.ask('2025年销售额最高的前三个产品是什么？', 'demo_retail')` 均返回 `status=completed`、3 行、无 finding（且使用注册表批准的公式，顺带印证 F02）。完整隔离回归 **844/844**。
+
+**一处值得记录的假警报**：用 `urllib` 直连时曾报 `CERTIFICATE_VERIFY_FAILED`（自签证书链），一度怀疑环境存在 TLS 拦截；改用 **httpx（应用真正使用的客户端）** 后返回 200 —— 这是该环境下 `urllib` 的 CA 路径差异导致的假警报，应用不受影响。**未据此做任何"降低证书校验"的改动。**
+
+边界：移除后失去渠道池、令牌配额与调用审计（可自行在前置一层网关恢复，仓库不再内置）；`tests/` 中的 `localhost:4000` 仅作为"本机地址"样例验证代理绕过逻辑，与网关无关，刻意未改。

@@ -34,14 +34,6 @@ spec_text.txt
 /data/object_store/cad_sources/
 /tmp/
 
-# ===== gateway（New API 接入基座）本地私有文件 =====
-/gateway/.env
-/gateway/secrets/
-/gateway/backups/
-/gateway/logs/
-/gateway/source/AGENTS.md
-/gateway/source/.agents/
-
 # 本地验证脚本、临时凭据和预览中间文件
 /work/
 

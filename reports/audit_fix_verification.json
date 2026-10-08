@@ -490,6 +490,39 @@
         "审计 §5 指出 PROGRESS.md 分母互相矛盾（同一文件既写 549/549 又写 643/650）。已建立**唯一的权威当前状态块**（API 版本、当前回归分母、审计缺陷状态、未决外部依赖、设计入口），把陈旧值显式标注为\"历史值，当前值见文首\"",
         "并在块内写明\"新增测试会改变这个分母，每次都要同步本表\"——本轮随即因新增 5 项测试把分母从 839 更新为 844，避免再次制造同类不一致"
       ]
+    },
+    "gateway_removal": {
+      "status": "done",
+      "by": "主代理（经用户确认后执行）",
+      "decision": "移除对本地 4000 端口 New API 网关的依赖与相关文件",
+      "evidence_direct_link_capable": [
+        "DEFAULT_BASE_URL 本就是 https://api.deepseek.com/v1（默认直连上游，不是网关）",
+        "providers.py 只构造标准端点（/chat/completions、/messages），支持 openai/anthropic 协议 + 自定义头 + 代理，全程未用任何网关专有 API",
+        "README 原文本已写明网关可选、应用默认直连上游、无需启动该网关",
+        "网关自身渠道配置是纯透传（https://api.deepseek.com，模型 deepseek-flash/deepseek-v4-pro）"
+      ],
+      "migration": [
+        "从网关 one-api.db 只读取出上游渠道密钥（未打印明文），经 settings_store.save_model_config() 写入 app_settings：base_url=https://api.deepseek.com/v1、model=deepseek-flash",
+        "迁移前实测直连：httpx（应用实际使用的客户端）对 https://api.deepseek.com/v1 返回 200；deepseek-flash/deepseek-v4-pro/deepseek-chat/deepseek-reasoner 四个模型名上游均可用"
+      ],
+      "false_alarm_recorded": "用 urllib 直连时曾报 CERTIFICATE_VERIFY_FAILED（自签证书链），一度怀疑环境有 TLS 拦截。改用 httpx（应用真正的客户端）后返回 200——是该环境下 urllib 的 CA 路径差异导致的假警报，应用不受影响。未据此做任何\"降级信任\"的改动。",
+      "removal": [
+        "gateway/ 997 个跟踪文件经 git rm -r 移除（历史保留可恢复）",
+        "gateway/ 下 27 个被 gitignore 的残留（第三方 agent 文档、.DS_Store、空目录）按核验过的绝对路径删除",
+        "new-api-local 容器已 docker rm -f，4000 端口释放",
+        ".gitignore 中 7 条网关专属条目已清理",
+        "README 改为直连说明并移除目录树中的 gateway/ 条目"
+      ],
+      "verification": [
+        "删除前：真实 NL2SQL 端到端 status=completed、3 行、无 finding",
+        "删除容器后：再次同样的端到端验证仍 completed、3 行、无 finding",
+        "完整隔离回归 844/844（网关移除未影响任何测试）"
+      ],
+      "not_changed": [
+        "tests/ 中 localhost:4000 仅作为\"本机地址\"样例用于验证代理绕过逻辑（只看 host，与网关无关），刻意不改动以免无谓改测试",
+        "技术文档 V1.2 属冻结历史记录，未改"
+      ],
+      "user_decision": "用户选择\"迁移密钥到应用配置 + 停用并移除容器 + 删除 gateway/\""
     }
   }
 }
