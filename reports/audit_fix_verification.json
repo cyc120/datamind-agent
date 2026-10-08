@@ -536,7 +536,7 @@
         "数据：30 文档 / 184 切片（curated 14、ohrbench 14、scan 2）；document_block_locators 33 行",
         "真实模型调用（经 8000，直连上游、网关已移除）：NL2SQL status=COMPLETED、3 行、validator_findings=[]"
       ],
-      "observation": "切片数由 169 升至 184、文档由 27 升至 30：这是 R1 修复后的**真实世界确认**——OHR-Bench JSON 分支此前会因缺少 block_id 在 build_chunks 处 KeyError 而中断整轮摄取，现已正常完成。",
+      "observation": "**一处我自己先写错、已更正的归因**：我曾把「切片 169→184、文档 27→30」写成 R1 修复的实际效果。**这是错的**——独立交付审查核对时间戳与算术后发现，那 3 份增量恰是另一个 agent（Codex）写入 `data/knowledge_base/` 的 `field-test-*.pdf`（各 5 切片/6 事实，`27+3=30`、`169+15=184` 精确吻合），被 `ingest.py` 的 `KB_DIR.glob(\"*.pdf\")` **按目录遍历**摄入了被服务的知识库——并非 OHR 分支。已修根因（摄取改为**按 `manifest.json` 白名单**，未声明文件**报告但不摄取**，见 `knowledge_base_jobs()` 与 `tests/test_ingest_manifest_whitelist.py`），并清理污染（删 3 文档 / 15 切片 / 18 事实 / 15 向量 / 3 页图目录 / 3 个 PDF / 1 份未跟踪机器产物），计数已回到 **27 文档 / 169 切片 / 23 事实 / 169 向量**。R1 本身仍是真实修复（有单元测试与「摄取不再在该段中断」为证），但**计数增加不能作为它的证据**，此前那样写属于错误归因。",
       "reviewed_not_a_defect": "doc-industrial-0ac6c55838c3 状态 indexed 但无 chunks：由 db/seed_industrial.py 有意注册，持有 17 条 document_facts（工业路径查 document_facts 而非 chunks），非缺陷。",
       "defect_found_and_fixed": {
         "title": "契约读接口只读一套存储，对 PDF 谎报「未存定位」",
@@ -548,7 +548,17 @@
       },
       "not_done": [
         "两套存储仍未合并为单一契约表（本次只让读接口如实覆盖两者）"
-      ]
+      ],
+      "contamination_incident": {
+        "what": "另一个 agent（Codex）写入 data/knowledge_base/ 的 3 份 field-test-*.pdf 被摄取进被服务的知识库（3 文档 / 15 切片 / 18 事实 / 15 向量 / 3 页图目录）",
+        "root_cause": "ingestion/ingest.py 用 KB_DIR.glob(\"*.pdf\") 按目录遍历，manifest.json 只用于取元数据、不是白名单——任何落入该目录的 PDF 都会被摄取",
+        "how_found": "交付就绪审查通过时间戳（OHR 文档 uploaded_at 未变）与算术（27+3=30、169+15=184）指出，我据此逐项核实确认",
+        "my_earlier_claim_was_wrong": "我曾把该增量写成 R1 修复的实际效果，属错误归因，已在 V1.3 §18.25 与本文件更正",
+        "root_cause_fix": "新增 knowledge_base_jobs()：按 manifest 白名单枚举，未声明文件报告但不摄取；main() 改用之；守护测试 tests/test_ingest_manifest_whitelist.py（6 项）",
+        "cleanup": "删除 3 份文档及其 chunks/facts/blocks/locators、3 个页图目录、Qdrant 中 15 个点、磁盘上 3 个 PDF、1 份未跟踪机器产物；清理安全审查取证留下的 2 次 run 及其证据边/节点/claims",
+        "restored_counts": "27 文档 / 169 切片 / 23 事实 / 169 向量（Qdrant green）",
+        "residual_risk": "若其他工具再次向该目录写入 PDF，现在会被跳过并**打印告警**，不再污染语料"
+      }
     }
   }
 }

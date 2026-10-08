@@ -496,6 +496,30 @@ def publish_document(cur, qc, doc_id, collection, points, write_metadata, *, com
 # ============================================================
 # 主流程
 # ============================================================
+def knowledge_base_jobs(kb_dir=None):
+    """Enumerate knowledge-base PDFs from the manifest — never by globbing the directory.
+
+    The manifest *is* the knowledge base definition. Globbing meant any PDF dropped into
+    the directory (by another tool, for example) was ingested into the served corpus
+    without review; that is a contamination vector, not a convenience. Undeclared files and
+    declared-but-missing files are both returned so the caller can report them.
+    """
+    kb_dir = Path(kb_dir) if kb_dir is not None else KB_DIR
+    manifest = json.loads((kb_dir / "manifest.json").read_text(encoding="utf-8"))
+    declared = [entry["file"] for entry in manifest["documents"]]
+    jobs, missing = [], []
+    for entry in manifest["documents"]:
+        pdf = kb_dir / entry["file"]
+        if not pdf.is_file():
+            missing.append(entry["file"])
+            continue
+        jobs.append({"path": pdf, "origin": "scan" if "扫描版" in entry["file"] else "curated",
+                     "file_type": "pdf", "title": pdf.stem, "info": entry,
+                     "collection": "demo_kb"})
+    undeclared = sorted(path.name for path in kb_dir.glob("*.pdf") if path.name not in set(declared))
+    return jobs, missing, undeclared
+
+
 def main():
     global FORMULA_SLOTS
     ap = argparse.ArgumentParser()
@@ -555,14 +579,11 @@ def main():
         print(f"created collection {COLLECTION}")
 
     # ---------- 收集待摄取文档 ----------
-    jobs = []
-    for pdf in sorted(KB_DIR.glob("*.pdf")):
-        manifest = json.loads((KB_DIR / "manifest.json").read_text(encoding="utf-8"))
-        info = next((m for m in manifest["documents"] if m["file"] == pdf.name), {})
-        origin = "scan" if "扫描版" in pdf.name else "curated"
-        jobs.append({"path": pdf, "origin": origin, "file_type": "pdf",
-                     "title": pdf.stem, "info": info,
-                     "collection": "demo_kb"})
+    jobs, missing, undeclared = knowledge_base_jobs()
+    if missing:
+        print(f"  [missing] manifest 声明但文件不存在（跳过）：{missing}")
+    if undeclared:
+        print(f"  [skipped] 目录中未在 manifest 声明的 PDF（**不摄取**）：{undeclared}")
     for js in sorted(OHR_DIR.glob("ohr-*.json")):
         rec = json.loads(js.read_text(encoding="utf-8"))
         jobs.append({"path": js, "origin": "ohrbench", "file_type": "json",
