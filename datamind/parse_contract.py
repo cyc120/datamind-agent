@@ -20,6 +20,10 @@ Relationship to other contracts:
   Because a projection may not silently lose evidence, every source field is either
   required or optional here (`CAD_SOURCE_LOCATOR_FIELDS`), and any field the projection
   deliberately discards is declared in `CAD_SOURCE_LOCATOR_DROPPED_FIELDS` (empty today).
+* ``cad-contract-v2`` (`ingestion/cad_contract_v2.py`, reader `ingestion/cad_dxf_v2.py`) is
+  the wide engineering profile: the same locator plus ``block_path``, the INSERT chain that
+  makes a block-internal handle unique (`CAD_SOURCE_LOCATOR_V2_FIELDS`). It is carried in
+  the same optional field set, so one locator validation covers both profiles.
 * A validated block is also a *storeable* block. Its keys are closed
   (`BLOCK_REQUIRED_FIELDS` + `BLOCK_OPTIONAL_FIELDS`), every key has a column
   (`db/migrations/015_contract_store.sql` and `017_contract_block_shape.sql`), and every
@@ -74,7 +78,10 @@ LOCATOR_OPTIONAL_FIELDS = {
     # `source_sha256` is part of the CAD source contract's Locator; it is optional here so
     # projecting a source locator keeps the evidence that ties the block to one drawing
     # revision instead of dropping it (see CAD_SOURCE_LOCATOR_FIELDS).
-    'cad_entity': ('view', 'view_id', 'render_ref', 'model_z', 'coordinate_system', 'source_sha256'),
+    # `block_path` is the v2 source locator's INSERT chain (see CAD_SOURCE_LOCATOR_V2_FIELDS):
+    # a block-internal handle is only unique together with the references that reach it.
+    'cad_entity': ('view', 'view_id', 'render_ref', 'model_z', 'coordinate_system',
+                   'source_sha256', 'block_path'),
     'temporal_segment': ('speaker', 'frame_ref'),
     'model_spatial_object': ('transform', 'view'),
 }
@@ -86,6 +93,13 @@ LOCATOR_OPTIONAL_FIELDS = {
 # such fields. tests/test_parse_contract.py asserts this set is fully covered above.
 CAD_SOURCE_LOCATOR_FIELDS = ('locator_kind', 'source_sha256', 'handle', 'layer', 'view_id',
                              'coordinate_system', 'layout')
+# The `cad-contract-v2` source locator (`ingestion/cad_contract_v2.py`) is the v1 locator
+# plus the INSERT chain of an expanded block entity: `handle` alone is not unique once a
+# block is inserted twice, so `(handle, block_path)` is the v2 identity. `block_path` is
+# optional here (a Model-space entity has an empty chain) but when it is present it must
+# be a bounded list of well-formed handles, validated in `_validate_cad`.
+CAD_SOURCE_LOCATOR_V2_FIELDS = CAD_SOURCE_LOCATOR_FIELDS + ('block_path',)
+MAX_CAD_BLOCK_PATH = 32
 # Source fields the projection deliberately discards, with the reason. Empty on purpose:
 # nothing in the frozen source locator is dropped today. A new entry here is a contract
 # change, not an implementation detail.
@@ -287,6 +301,17 @@ def _validate_cad(payload):
     if source_sha256 is not None and (not isinstance(source_sha256, str)
                                       or not _SHA256.fullmatch(source_sha256)):
         fail('PARSE_LOCATOR_INVALID', subject=subject, reason='source_sha256')
+    block_path = payload.get('block_path')
+    if block_path is not None:
+        if not _sequence(block_path) or len(block_path) > MAX_CAD_BLOCK_PATH:
+            fail('PARSE_LOCATOR_INVALID', subject=subject, reason='block_path')
+        for item in block_path:
+            if not isinstance(item, str) or not _HANDLE.fullmatch(item):
+                fail('PARSE_LOCATOR_INVALID', subject=subject, reason='block_path_handle', value=repr(item))
+        if len(set(block_path)) != len(block_path):
+            # A repeated reference would mean the entity is inside the same INSERT twice,
+            # which cannot happen in a real INSERT chain and would make the key ambiguous.
+            fail('PARSE_LOCATOR_INVALID', subject=subject, reason='block_path_cycle')
 
 
 def _validate_office(payload):

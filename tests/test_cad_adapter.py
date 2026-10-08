@@ -37,6 +37,53 @@ def fake_bundle(*, target_handle='38', entities=3):
                          'entities': built, 'features': [feature], 'identity': {}, 'views': []}}
 
 
+def fake_bundle_v2(*, target_handle='38', block_path=None):
+    """A v2 bundle whose labelled diameter points at a circle inside a block."""
+    source = {'document_id': 'doc-x', 'document_version': 1, 'source_sha256': 'b' * 64,
+              'format': 'dxf', 'parser_version': 'dxf-native-v2', 'provenance': 'synthetic_demo',
+              'insunits': 4, 'insunits_modelled': True, 'unit': 'mm', 'encoding': 'utf-8',
+              'coordinate_system': 'WCS_XY', 'layout': 'Model'}
+    chain = list(block_path or [])
+    entities = [
+        {'handle': '38', 'layer': 'GEOMETRY', 'view_id': 'model', 'block_path': chain,
+         'anchor': {'x': 1.0, 'y': 2.0}, 'entity_type': 'CIRCLE',
+         'center': {'x': 1.0, 'y': 2.0}, 'radius': 0.5},
+        {'handle': '3B', 'layer': 'DM_DIAMETER', 'view_id': 'model', 'block_path': [],
+         'anchor': {'x': 25.0, 'y': 25.0}, 'entity_type': 'TEXT', 'text': '%%c20 +/-0.1',
+         'insertion': {'x': 25.0, 'y': 25.0}, 'height': 2.0, 'rotation': 0.0,
+         'bbox': {'xmin': 25.0, 'ymin': 25.0, 'xmax': 35.0, 'ymax': 27.0}},
+        {'handle': '4A', 'layer': 'GEOMETRY', 'view_id': 'model', 'block_path': [],
+         'anchor': {'x': 0.0, 'y': -5.0}, 'entity_type': 'DIMENSION',
+         'dimension_type': 'linear', 'geometry_measurement': 10.0, 'declared_text': None,
+         'defpoints': [{'x': 0.0, 'y': -5.0}, {'x': 0.0, 'y': 0.0}], 'dimstyle': 'Standard'},
+    ]
+    diameter = {'feature_id': 'diameter-3B', 'feature_type': 'diameter',
+                'annotation_raw': '%%c20 +/-0.1',
+                'locator': {'locator_kind': 'cad_entity', 'handle': '3B', 'layer': 'DM_DIAMETER',
+                            'view_id': 'model', 'block_path': []},
+                'nominal_value': '20', 'tolerance_lower': '-0.1', 'tolerance_upper': '0.1',
+                'unit': 'mm', 'association_status': 'confirmed', 'selected_target': target_handle,
+                'association_evidence': {'method': 'native_reference', 'rationale': 'XDATA'}}
+    native = {'feature_id': 'dimension-4A', 'feature_type': 'native_dimension',
+              'locator': {'locator_kind': 'cad_entity', 'handle': '4A', 'layer': 'GEOMETRY',
+                          'view_id': 'model', 'block_path': []},
+              'dimension_type': 'linear', 'unit': 'mm', 'declared_text': None,
+              'declared_value': None, 'geometry_measurement': '10.0',
+              'value_authority': 'dimension_measurement'}
+    return {'metadata': {'profile': 'datamind-2d-engineering-dxf-v2',
+                         'parser_version': 'dxf-native-v2', 'ezdxf_version': '1.4.4',
+                         'dxf_version': 'AC1024', 'encoding': 'utf-8',
+                         'warnings': ['CAD_SINGLE_MODEL_VIEW_ONLY'],
+                         'unsupported_features': ['CAD_ENTITY_TYPE_UNSUPPORTED:ELLIPSE:99'],
+                         'unsupported': [{'code': 'CAD_ENTITY_TYPE_UNSUPPORTED',
+                                          'entity_type': 'ELLIPSE', 'handle': '99',
+                                          'block_path': [], 'detail': None}],
+                         'limits': {'max_bytes': 1}, 'counts': {}},
+            'snapshot': {'contract_version': 'cad-contract-v2', 'source': source,
+                         'entities': entities, 'features': [diameter, native],
+                         'identity': {}, 'views': []}}
+
+
 class CadDetectionTests(unittest.TestCase):
     def test_a_real_dxf_is_detected(self):
         self.assertEqual(contract.detect_media_type(DXF), contract.DXF_MEDIA_TYPE)
@@ -119,6 +166,14 @@ class DxfAdapterTests(unittest.TestCase):
 
     def test_a_missing_reference_target_is_declared_not_invented(self):
         with patch.object(cad_adapter.cad_dxf, 'parse_file', return_value=fake_bundle(target_handle='FF')):
+            result = cad_adapter.parse(DXF, document_id='doc-x', profile='v1')
+        self.assertIn('dimension_target_not_included', result.payload['unsupported_features'])
+        self.assertEqual(result.payload['relations'], [])
+        self.assertEqual(result.payload['parse_status'], 'partial')
+
+    def test_a_v2_target_outside_the_bounded_read_is_declared_too(self):
+        with patch.object(cad_adapter.cad_dxf_v2, 'parse_file',
+                          return_value=fake_bundle_v2(target_handle='FF')):
             result = cad_adapter.parse(DXF, document_id='doc-x')
         self.assertIn('dimension_target_not_included', result.payload['unsupported_features'])
         self.assertEqual(result.payload['relations'], [])
@@ -236,6 +291,64 @@ class SourceLocatorProjectionTests(unittest.TestCase):
             for field in contract.CAD_SOURCE_LOCATOR_FIELDS:
                 self.assertIn(field, locator, field)
 
+
+
+class V2AdapterTests(unittest.TestCase):
+    """The wide engineering profile projected into the unified contract."""
+
+    def setUp(self):
+        contract._ADAPTERS.clear()
+        cad_adapter.register_cad_adapters()
+
+    def tearDown(self):
+        contract._ADAPTERS.clear()
+
+    def bundle(self, **options):
+        with patch.object(cad_adapter.cad_dxf_v2, 'parse_file',
+                          return_value=fake_bundle_v2(**options)):
+            return cad_adapter.parse(DXF, document_id='doc-v2')
+
+    def test_the_default_profile_reads_through_the_v2_reader(self):
+        self.assertEqual(cad_adapter.DEFAULT_PROFILE, 'v2')
+        self.assertEqual(cad_adapter.PROFILES, ('v1', 'v2'))
+        self.assertEqual(cad_adapter.PARSER_VERSIONS['v1'], 'cad-contract-adapter-v1')
+        self.assertEqual(cad_adapter.PARSER_VERSIONS['v2'], 'cad-contract-adapter-v2')
+
+    def test_the_block_path_reaches_the_unified_locator(self):
+        result = self.bundle(block_path=['A6'])
+        circle = next(block for block in result.payload['blocks']
+                      if block['locator']['handle'] == '38')
+        self.assertEqual(circle['locator']['block_path'], ['A6'])
+        # Both source locator field sets are carried without loss.
+        for field in contract.CAD_SOURCE_LOCATOR_V2_FIELDS:
+            self.assertIn(field, circle['locator'], field)
+
+    def test_a_native_dimension_keeps_measurement_and_declared_text_apart(self):
+        result = self.bundle()
+        dimension = next(block for block in result.payload['blocks']
+                         if block['native_attributes'].get('feature_type') == 'native_dimension')
+        native = dimension['native_attributes']
+        self.assertEqual(native['geometry_measurement'], '10.0')
+        self.assertEqual(native['value_authority'], 'dimension_measurement')
+        self.assertIsNone(native['declared_value'])
+        self.assertEqual(dimension['block_type'], 'dimension')
+        self.assertEqual(dimension['text'], '')
+
+    def test_reader_declarations_become_unsupported_features_and_failed_scope(self):
+        result = self.bundle()
+        self.assertIn('CAD_ENTITY_TYPE_UNSUPPORTED:ELLIPSE:99',
+                      result.payload['unsupported_features'])
+        self.assertEqual(result.payload['parse_status'], 'partial')
+        self.assertEqual([item['detail'] for item in result.payload['failed_scope']],
+                         ['CAD_ENTITY_TYPE_UNSUPPORTED'])
+
+    def test_the_manifest_carries_the_profile_contract_and_bounds(self):
+        manifest = self.bundle().payload['manifest']
+        self.assertEqual(manifest['parser_version'], 'dxf-native-v2')
+        self.assertEqual(manifest['profile'], 'datamind-2d-engineering-dxf-v2')
+        self.assertEqual(manifest['cad_contract_version'], 'cad-contract-v2')
+        self.assertEqual(manifest['encoding'], 'utf-8')
+        self.assertEqual(manifest['limits'], {'max_bytes': 1})
 
 
 class DrawingCliTests(unittest.TestCase):

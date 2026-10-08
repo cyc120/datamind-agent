@@ -829,3 +829,26 @@ class CadLocatorProjectionTests(unittest.TestCase):
         self.assertEqual(caught.exception.detail['error_code'], 'PARSE_LOCATOR_INVALID')
         self.assertEqual(caught.exception.detail['details']['reason'], 'source_sha256')
 
+    def test_the_v2_source_fields_are_the_v1_fields_plus_the_block_path(self):
+        from ingestion import cad_contract_v2
+        self.assertEqual(set(contract.CAD_SOURCE_LOCATOR_V2_FIELDS),
+                         set(contract.CAD_SOURCE_LOCATOR_FIELDS) | {'block_path'})
+        self.assertEqual(set(contract.CAD_SOURCE_LOCATOR_V2_FIELDS),
+                         set(cad_contract_v2.Locator.model_fields))
+        covered = set(contract.LOCATOR_REQUIRED_FIELDS['cad_entity']) \
+            | set(contract.LOCATOR_OPTIONAL_FIELDS['cad_entity'])
+        self.assertEqual(sorted(set(contract.CAD_SOURCE_LOCATOR_V2_FIELDS) - covered), [])
+
+    def test_the_v2_block_path_is_validated_when_it_is_carried(self):
+        carried = contract.validate_locator(locator('cad_entity', block_path=['2AF', '3B']))
+        self.assertEqual(carried.payload['block_path'], ['2AF', '3B'])
+        # An absent chain stays valid: a Model-space entity has no INSERT above it.
+        self.assertNotIn('block_path', contract.validate_locator(locator('cad_entity')).payload)
+
+    def test_an_unusable_block_path_is_refused(self):
+        for value in ('2AF', ['not-a-handle'], ['2AF', '2AF'], ['2AF'] * 33, [2]):
+            with self.subTest(value=value), self.assertRaises(HTTPException) as caught:
+                contract.validate_locator(locator('cad_entity', block_path=value))
+            self.assertEqual(caught.exception.detail['error_code'], 'PARSE_LOCATOR_INVALID')
+            self.assertEqual(caught.exception.detail['details']['subject'], 'locator.cad_entity')
+

@@ -211,8 +211,17 @@ def read_result(document_id, dsn, *, limit=2000):
             relation_state, recovery_method, evidence FROM document_block_relations
             WHERE document_id=%s ORDER BY relation_id''', (document_id,))
         relations = [dict(row) for row in cur.fetchall()]
+    # Two stores hold locators in different shapes, and a single count would mislead: a DXF
+    # has every locator *inside* its contract blocks (`blocks[].locator`) with zero rows in
+    # the page-shaped table, so reporting only `locator_count` showed "8 blocks, 0 locators"
+    # for a fully located drawing. All three counts are returned so a caller never has to
+    # guess which store a number came from.
+    block_locator_count = sum(1 for block in blocks if block.get('locator'))
     return {'document_id': document_id, 'blocks': blocks, 'relations': relations,
-            'locators': locators, 'block_count': len(blocks), 'locator_count': len(locators),
+            'locators': locators, 'block_count': len(blocks),
+            'locator_count': len(locators),                    # 分页型：document_block_locators
+            'block_locator_count': block_locator_count,        # 契约块内嵌：blocks[].locator
+            'locator_total': len(locators) + block_locator_count,
             'relation_count': len(relations)}
 
 

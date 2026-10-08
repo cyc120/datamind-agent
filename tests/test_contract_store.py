@@ -196,6 +196,48 @@ class ContentHashSemanticsTests(unittest.TestCase):
         self.assertIn('sha256(text)', source.replace('`', ''))
 
 
+class LocatorCountSemanticsTests(unittest.TestCase):
+    """A DXF keeps every locator inside its contract blocks; the counts must say so.
+
+    Regression: `/contract` reported `block_count: 8, locator_count: 0` for a fully located
+    drawing, because `locator_count` only counted the page-shaped store. A caller (or a
+    reviewer) reads that as "the drawing has no locators".
+    """
+
+    def test_the_three_counts_distinguish_the_two_stores(self):
+        with tempfile.TemporaryDirectory() as directory:
+            dsn = _write_dsn()
+            document_id = f'doc-loc-{uuid.uuid4().hex[:12]}'
+            block = {'block_id': 'blk-loc-src', 'page_no': 1, 'bbox': [1.0, 2.0, 3.0, 4.0]}
+            payload = {
+                'classification': {'detected_media_type': 'image/vnd.dxf', 'source_name': 'd.dxf'},
+                'adapter_capabilities': ['entities'], 'relations': [],
+                'parsed_scope': [], 'failed_scope': [], 'quality_findings': [],
+                'unsupported_features': [], 'artifact_refs': [],
+                'manifest': {'parser_version': 'dxf-native-v1'}, 'parse_status': 'parsed',
+                'blocks': [{**block, 'document_id': document_id, 'source_version': 'v1',
+                            'parser_version': 'dxf-adapter-v1', 'block_type': 'figure',
+                            'text': '', 'reading_order': 0, 'content_hash': 'b' * 64,
+                            'native_attributes': {}, 'quality': {},
+                            'locator': {'locator_kind': 'cad_entity', 'document_id': document_id,
+                                        'source_version': 'v1', 'layout': 'Model', 'handle': '38',
+                                        'layer': 'GEOMETRY', 'model_xy': [1.0, 2.0], 'unit': 'mm'}}],
+            }
+            with psycopg2.connect(dsn) as conn, conn.cursor() as cur:
+                contract_store.persist_result(cur, document_id=document_id, payload=payload)
+            self.addCleanup(self.cleanup, document_id)
+            read = contract_store.read_result(document_id, dsn)
+            self.assertEqual(read['block_count'], 1)
+            self.assertEqual(read['locator_count'], 0, '分页型 store 应为 0')
+            self.assertEqual(read['block_locator_count'], 1, '块内嵌 locator 必须被数到')
+            self.assertEqual(read['locator_total'], 1)
+
+    def cleanup(self, document_id):
+        with psycopg2.connect(_write_dsn()) as conn, conn.cursor() as cur:
+            for table in ('document_contract_blocks', 'document_block_relations'):
+                cur.execute(f'DELETE FROM {table} WHERE document_id=%s', (document_id,))
+
+
 class ContractEndpointTests(unittest.TestCase):
     def setUp(self):
         self.dsn = _write_dsn()

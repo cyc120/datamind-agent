@@ -163,7 +163,7 @@ class ProfileImportRequest(BaseModel):
     activate_first: bool = False
 
 
-app = FastAPI(title="DataMind Agent", version="0.38.0")
+app = FastAPI(title="DataMind Agent", version="0.39.0")
 
 
 # ---------- request authorisation surface (default deny) ----------
@@ -182,7 +182,7 @@ PUBLIC_READ_PREFIXES = ('/v1/documents', '/v1/runs', '/assets/')
 #: not be able to read them, so they carry the same origin check as mutations do.
 SENSITIVE_READ_PREFIXES = ('/v1/model/profiles', '/v1/model/config')
 _NO_STORE_PREFIXES = ('/v1/pdf-snapshots', '/v1/pdf-knowledge', '/v1/drawings',
-                      '/v1/dimensions', '/v1/files', '/v1/plans',
+                      '/v1/dimensions', '/v1/files', '/v1/uploads', '/v1/plans',
                       '/v1/model/profiles', '/v1/model/config')
 
 
@@ -203,10 +203,11 @@ def _required_permission(request) -> str | None:
     cad_path=path=='/v1/drawings' or path.startswith('/v1/drawings/')
     dimension_path=path.startswith('/v1/dimensions/')
     files_path=path.startswith('/v1/files/')
+    upload_path=path=='/v1/uploads' or path.startswith('/v1/uploads/')
     pdf_snapshot_path=path=='/v1/pdf-snapshots' or path.startswith('/v1/pdf-snapshots/')
     pdf_knowledge_path=path=='/v1/pdf-knowledge' or path.startswith('/v1/pdf-knowledge/')
     plan_path=path.startswith('/v1/plans')
-    return ('admin' if plan_path or files_path or pdf_snapshot_path or pdf_knowledge_path else
+    return ('admin' if plan_path or files_path or upload_path or pdf_snapshot_path or pdf_knowledge_path else
             'approver' if dimension_path and request.method=='POST' and path.endswith('/approvals') else
             'admin' if dimension_path and (request.method=='POST' or path.endswith('/sources')) else
             'reviewer' if cad_path and request.method=='POST' and path.endswith('/reviews') else
@@ -636,6 +637,48 @@ def file_job_retry(job_id: str,request: Request):
     return retry(job_id,_write_dsn(),request.state.identity)
 
 
+# ---------- upload pipeline: stage -> queue -> contract store -> review gate ----------
+# All three surfaces are admin-only (see `_required_permission`); the POSTs additionally
+# carry CSRF and a same-origin check from the shared middleware. Parsing is asynchronous:
+# `GET /v1/uploads/{upload_id}` drives the bounded worker for that one upload, so a
+# polling client is what advances a queued job. A parsed upload stays unretrievable
+# (`needs_review`, non-`indexed`) until `POST /v1/uploads/{upload_id}/approve`.
+
+@app.post('/v1/uploads', status_code=201)
+async def upload_create(request: Request,filename: str=Query(min_length=1,max_length=200),
+                        provenance: Literal['synthetic_demo','authorized_external']=Query()):
+    from ingestion import upload_pipeline
+    return await upload_pipeline.create(request,filename,provenance,_write_dsn(),request.state.identity)
+
+
+@app.get('/v1/uploads')
+def upload_list(status: str | None=Query(default=None,max_length=32),
+                media_type: str | None=Query(default=None,max_length=120),
+                since: str | None=Query(default=None,max_length=40),
+                limit: int=Query(default=50,ge=1,le=200)):
+    from ingestion import upload_pipeline
+    return jsonable_encoder(upload_pipeline.listing(_write_dsn(),status=status,
+                                                    media_type=media_type,since=since,limit=limit))
+
+
+@app.get('/v1/uploads/{upload_id}')
+def upload_detail(upload_id: str,request: Request):
+    from ingestion import upload_pipeline
+    dsn=_write_dsn()
+    # Polling is the worker's clock: one *bounded* wave for this upload, then report the
+    # truth. `work_once` defaults to a child process under
+    # `upload_pipeline.wave_deadline()`, so this GET cannot block indefinitely; an
+    # unfinished parse is reported as `running` and stays claimable.
+    upload_pipeline.work_once(dsn,upload_id)
+    return jsonable_encoder(upload_pipeline.detail(upload_id,dsn))
+
+
+@app.post('/v1/uploads/{upload_id}/approve')
+def upload_approve(upload_id: str,request: Request):
+    from ingestion import upload_pipeline
+    return jsonable_encoder(upload_pipeline.approve(upload_id,_write_dsn(),request.state.identity))
+
+
 @app.get('/v1/auth/me')
 def auth_me(request: Request,response: Response):
     from .auth import current
@@ -1043,7 +1086,7 @@ def get_document(document_id: str):
 
 def _source_path(document: dict) -> Path:
     path = Path(document.get("object_uri") or "").resolve()
-    if not any(path.is_relative_to(ROOT / name) for name in ("data/knowledge_base", "data/ohr_bench_samples", "data/industrial_demo")) or not path.is_file():
+    if not any(path.is_relative_to(ROOT / name) for name in ("data/knowledge_base", "data/ohr_bench_samples", "data/industrial_demo", "data/uploads", "data/cad_demo", "data/dimension_demo")) or not path.is_file():
         raise HTTPException(404, detail={"error_code": "SOURCE_FILE_UNAVAILABLE"})
     if hashlib.sha256(path.read_bytes()).hexdigest() != document["sha256"]:
         raise HTTPException(409, detail={"error_code": "SOURCE_VERSION_MISMATCH"})
@@ -1058,14 +1101,39 @@ def _expected_document(document,version,sha):
             raise HTTPException(409,detail={'error_code':'DOCUMENT_SELECTION_CHANGED'})
 
 
+FILE_MEDIA_TYPES = {"pdf": "application/pdf", "json": "application/json",
+                    "dxf": "application/dxf",
+                    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
+
+
 @app.get("/v1/documents/{document_id}/file")
 def document_file(document_id: str,expected_version: int | None=Query(default=None,ge=1),
                   expected_sha256: str | None=Query(default=None,pattern=r'^[a-f0-9]{64}$')):
     document = _public_document(document_id)
     _expected_document(document,expected_version,expected_sha256)
     path = _source_path(document)
-    return FileResponse(path, media_type="application/pdf" if document["file_type"] == "pdf" else "application/json",
+    return FileResponse(path, media_type=FILE_MEDIA_TYPES.get(document["file_type"], "application/octet-stream"),
                         filename=path.name, content_disposition_type="inline")
+
+
+def _upload_document(document_id: str):
+    """An upload's contract is readable before review.
+
+    Uploads keep `needs_review` and a non-`indexed` status until an explicit approve, and
+    `_public_document` refuses exactly those rows — that is the retrieval gate. The
+    contract endpoint is evidence browsing rather than retrieval, and the upload detail
+    links to it as `contract_url`, so an `origin='upload'` row is readable here (and only
+    here) before approval. `/v1/documents`, RAG and every other document route keep the
+    gate unchanged.
+    """
+    with psycopg2.connect(_read_dsn()) as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute("""SELECT * FROM document_assets WHERE document_id=%s AND origin='upload'
+                       AND 'public'=ANY(acl) AND collection=ANY(%s)""",
+                    (document_id, sorted(COLLECTIONS)))
+        row = cur.fetchone()
+    return dict(row) if row else None
 
 
 @app.get("/v1/documents/{document_id}/contract")
@@ -1084,13 +1152,20 @@ def document_contract(document_id: str):
     "nothing was parsed" from "a gap was declared".
     """
     from ingestion.contract_store import read_result
-    document = _public_document(document_id)
+    try:
+        document = _public_document(document_id)
+    except HTTPException:
+        document = _upload_document(document_id)
+        if document is None:
+            raise
     stored = read_result(document_id, _read_dsn())
     summary = (document.get("quality_detail") or {}).get("parse_contract") or {}
     return {"document_id": document_id, "document_version": document["doc_version"],
             "source_sha256": document["sha256"], "parser_version": document["parser_version"],
             "contract_version": document.get("contract_version"),
             "block_count": stored["block_count"], "locator_count": stored["locator_count"],
+            "block_locator_count": stored.get("block_locator_count"),
+            "locator_total": stored.get("locator_total"),
             "relation_count": stored["relation_count"],
             "parse_contract": jsonable_encoder(summary),
             "unsupported_features": list(summary.get("unsupported_features") or []),

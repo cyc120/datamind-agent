@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>DataMind Agent · 问数与文档问答</title>
-  <link rel="stylesheet" href="/assets/style.css?v=0.38.0">
-  <script src="/assets/app.js?v=0.38.0" defer></script>
-  <script src="/assets/multifile.js?v=0.38.0" defer></script>
+  <link rel="stylesheet" href="/assets/style.css?v=0.39.0">
+  <script src="/assets/app.js?v=0.39.0" defer></script>
+  <script src="/assets/multifile.js?v=0.39.0" defer></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -22,7 +22,7 @@
       <button class="nav-item" data-view="authority"><span class="ico">◇</span>来源权威规则</button>
       <button class="nav-item" data-view="cad"><span class="ico">⌖</span>图纸与实体</button>
       <button class="nav-item" data-view="dimensions"><span class="ico">↔</span>尺寸核验</button>
-      <button class="nav-item" data-view="files"><span class="ico">⇈</span>多文件任务</button>
+      <button class="nav-item" data-view="files"><span class="ico">⇈</span>我的文件</button>
     </nav>
     <div class="account-panel">
       <div id="accountStatus">未登录 · 只读浏览</div>
@@ -203,9 +203,30 @@
     </section>
 
     <section class="view" data-view="files">
-      <div class="page-head"><div class="eyebrow">File Tasks</div><h1>多文件任务</h1><p>同时上传限定 DXF 图纸和单条尺寸 JSON，逐文件登记、查看结果和重试。图纸与尺寸仍需显式关联及独立批准。</p></div>
-      <section class="card"><form id="fileBatchForm"><label for="uploadProvenance">文件来源</label><select id="uploadProvenance" required><option value="">请选择来源</option><option value="synthetic_demo">合成演示材料</option><option value="authorized_external">已获授权的外部材料</option></select><label for="uploadFiles">选择多份文件（最多20份）</label><input id="uploadFiles" type="file" multiple accept=".dxf,.json"><p class="field-hint">DXF≤2 MiB，JSON≤1 MiB且每份只有一条测量。通用 PDF/OCR 并发导入尚未接入。</p><div id="fileRows"></div><button id="submitFileBatch" type="submit">提交本批登记任务</button></form><p id="fileMessage" role="status"></p></section>
-      <section class="card"><button id="refreshFiles" class="secondary">刷新任务</button><div id="fileJobs"></div><div id="fileJobDetail"></div></section>
+      <div class="page-head"><div class="eyebrow">My Files</div><h1>我的文件</h1><p>一个按钮完成上传并入库：逐份上传、轮询解析到终态，在同一张卡片内显示块数、定位数、缺口与失败原因。<strong>未复核前不会出现在可检索文档中。</strong></p></div>
+      <section class="card">
+        <h2>上传并入库</h2>
+        <form id="fileBatchForm">
+          <label for="uploadProvenance">文件来源</label>
+          <select id="uploadProvenance" required><option value="">请选择来源</option><option value="synthetic_demo">合成演示材料</option><option value="authorized_external">已获授权的外部材料</option></select>
+          <label for="uploadFiles">选择文件（可多选，最多20份）</label>
+          <input id="uploadFiles" type="file" multiple accept=".dxf,.json,.docx,.pptx,.xlsx,.pdf">
+          <p class="field-hint">上限：DXF≤8 MiB · JSON≤1 MiB · DOCX/PPTX/XLSX≤16 MiB · PDF≤32 MiB；DWG 需要外部转换器，暂不支持。选中后点一次「上传并入库」即可，无需再单独提交批次登记。</p>
+          <button id="submitFileBatch" type="submit">上传并入库</button>
+        </form>
+        <p id="fileMessage" role="status"></p>
+        <div id="fileRows" class="upload-results"></div>
+      </section>
+      <section class="card">
+        <div class="actions"><h2>我的文件</h2><button id="refreshFiles" class="secondary" type="button">刷新文件列表</button></div>
+        <div class="upload-filters">
+          <div><label for="uploadStatusFilter">状态筛选</label><select id="uploadStatusFilter"><option value="">全部状态</option><option value="queued">排队中</option><option value="running">解析中</option><option value="succeeded">已入库</option><option value="failed">失败</option><option value="partial_failure">部分失败</option><option value="cancelled">已取消</option></select></div>
+          <div><label for="uploadTypeFilter">类型筛选</label><select id="uploadTypeFilter"><option value="">全部类型</option><option value=".dxf">DXF 图纸</option><option value=".json">测量 JSON</option><option value=".docx">Word 文档</option><option value=".pptx">演示文稿</option><option value=".xlsx">表格</option><option value=".pdf">PDF</option></select></div>
+        </div>
+        <p id="fileListMessage" class="field-hint" role="status"></p>
+        <div id="fileList" class="upload-list"></div>
+        <div id="fileDetail" class="upload-detail-area"></div>
+      </section>
     </section>
 
     <!-- ============ 模型接入 ============ -->
