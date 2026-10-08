@@ -14,12 +14,13 @@
 | F03 | 存储服务绑定全部网卡 | P1' | **配置已改，待重建容器生效** |
 | F04 | stdin 写入绕过 deadline | P2+ | **已修复** |
 | F05 | 无密钥导出残留认证材料 | P2 | **已修复** |
-| F06 | 探活与问答链路 profile 解析不一致 | P2 | **部分修复**（api.py 内统一；问答链路未改） |
+| F06 | 探活与问答链路 profile 解析不一致 | P2 | **已修复** |
 | F07 | V-CAR 恢复状态不绑定计划 | P2 | **已修复** |
 | F08 | 前端运行/回放串屏 | P2 | **已修复** |
 | F09 | Office 保真（block_id 截断、正文顺序、公式无缓存静默通过） | P2（XLSX 部分 P2+） | **已修复** |
 | F10 | 摄取跨存储一致性（Qdrant 先写、PG 后提交） | P2（设计性） | **明确延后**，见下 |
 | F11 | 验证脚本污染真实库并硬编码规模 | P1' | **已修复** |
+| F12 | 本机地址在配置显式 proxy 时仍走代理（修复 F06 时自查发现） | P2（同族可用性） | **已修复** |
 
 ## 逐条说明
 
@@ -50,9 +51,14 @@
 ### F05 无密钥导出脱敏（P2）
 新增唯一脱敏入口 `redact_profile()`：移除 `api_key`、剔除敏感头（`authorization`/`api-key`/`x-api-key`/`cookie` 及 `*-key/-token/-secret/-password` 规则）、去掉 `proxy` 的 userinfo（无法安全解析则整条丢弃），并以 `_scrub_secrets()` 兜底替换任何字段中残留的密钥值。`/v1/model/profiles/export` 在 `include_keys=False` 时走它。
 
-### F06 profile 解析统一（P2，部分）
-`api.py` 内已统一为唯一入口 `resolve_profile(request, *, stored=None)`，探活、模型列表与 `_stored_config()` 共用，`headers`/`proxy` 与 `api_key` 同一套合并规则。
-**未完成**：问答真实链路仍是独立解析且**完全不含 proxy**——`sql_engine.settings()`/`model_profile()` 及其调用方 `sql_engine._call_model`、`rag_engine._draft`、`pdf_answer._draft`。建议让 `settings()` 增补 `NEW_API_PROXY`、`model_profile()` 输出 `proxy`，并把两处解析统一到共享函数。
+### F06 profile 解析统一（P2）
+`api.py` 内统一为唯一入口 `resolve_profile(request, *, stored=None)`，探活、模型列表与 `_stored_config()` 共用，`headers`/`proxy` 与 `api_key` 同一套合并规则。
+**问答链路的 proxy 传递已补齐**：`sql_engine.settings()` 把存储配置的 `proxy` 映射为 `NEW_API_PROXY`，`model_profile()` 输出 `proxy` 键。传输层 `providers.make_client()` **本就**支持 `profile['proxy']`——缺的只是这条传递链，所以修复很小。此前"探活走代理、问答不走代理"会让配了中继的部署出现"探活通过但问答不通"。
+**仍未统一的是解析实现本身**：`sql_engine.settings()` 与 `api.resolve_profile()` 仍是两套逻辑（前者产出 `NEW_API_*` 环境风格字典，后者产出 profile 结构）。是否合并为一个共享解析器留作后续，本轮只保证**行为一致**（proxy 已一致）。
+
+### F12 本机地址在配置显式 proxy 时仍走代理（P2，修复 F06 时自查发现）
+补 F06 时写传输层测试才发现：`providers.make_client()` 先判断显式 `proxy`、再判断 `is_local`，因此 profile 里只要配了 proxy，连 `http://localhost` 网关也会被塞进代理——正是该函数注释里写明要避免的**挂起或 502**。而 F06 把 proxy 带进问答链路后，这条路径的**暴露面反而变大**，所以必须一并修。
+现改为：`is_local(url)` 优先，本机地址一律直连（`trust_env=False`）且不使用任何来源的代理（含显式 profile proxy）；远端 URL 才使用显式 proxy，无 proxy 时维持尊重系统/环境代理的原行为。
 
 ### F07 恢复状态绑定计划（P2）
 `Plan` 增加稳定摘要（`PLAN_SCHEMA` + 规范化节点内容 SHA-256）。恢复状态改为 `{'plan_digest': …, 'nodes': {…}}`：裸节点映射一律 `PLAN_STATE_UNBOUND`（失败关闭），摘要不符一律 `PLAN_STATE_PLAN_MISMATCH`——节点 id 相同并不能说明持久化结果描述的是同一份工作。`execute` 结果与 `plan.public()` 均回报 `plan_digest`。
@@ -84,5 +90,6 @@
 2. **F10 延后**：按上述 outbox 方案单独任务实施。
 3. **读取侧同类暴露**：`settings_store.public_profile()`（`GET /v1/model/profiles`，admin-only）仍原样回传 `headers`/`proxy`；前端表单会回填并回传，直接脱敏会让保存写回脱敏值，需同步改 UI 与保存语义（建议：敏感头只回显键名，空值表示保持不变）。
 4. **F03 生效窗口**：需重建 Postgres/Qdrant 容器；认证与明文口令方案待统一走 secret 注入。
-5. **F02 覆盖仍窄**：仅销售额别名族走注册表结构校验；业绩、销量、退款额、订单量、客户总量未强制；复合指标未做递归展开比对。
+5. **F06 解析实现未合并**：`sql_engine.settings()` 与 `api.resolve_profile()` 仍是两套代码（行为已一致，实现未统一）。
+6. **F02 覆盖仍窄**：仅销售额别名族走注册表结构校验；业绩、销量、退款额、订单量、客户总量未强制；复合指标未做递归展开比对。
 6. **Codex 并发**：另有 agent 在同一检出与同一 PostgreSQL 上工作，曾造成一次提交被其产物污染、一次回归被其并发测试干扰。本轮所有提交只按显式路径 `add`，并在提交前核对 `git diff --cached`。

@@ -829,3 +829,11 @@ Office/DXF 的块按 `part`/`paragraph`/`slide`/`sheet`/`handle` 定位，**没�
 **F10（摄取跨存储一致性）明确延后**：需要 outbox/状态机式多存储协议并改动依赖 Qdrant 与嵌入模型的摄取主链路，本轮无法充分验证，故不改动，方案已记录。
 
 执行方式：F01/F04/F07 由主代理实现，F02、F03+F11、F05+F06、F08+F09 由四个子代理并行实现，每个子代理限定写入文件集合并禁止仓库级格式化与 git 写操作，改动全部由主代理独立复核。新增 70 项测试，完整隔离回归 **734/734**、失败/错误 0。诚实边界见 `docs/AUDIT_FIXES.md`「未完成与后续建议」。
+
+### 18.21 F06 剩余部分与自查发现的 F12（API 0.35.0，2026 年 10 月 8 日）
+
+**F06 补齐**：`sql_engine.settings()` 把存储配置的 `proxy` 映射为 `NEW_API_PROXY`，`model_profile()` 输出 `proxy` 键；传输层 `providers.make_client()` 本就支持 `profile['proxy']`，缺的只是这条传递链。修复前"探活走代理、问答不走代理"，配了中继的部署会出现探活通过但问答不通。注意 `sql_engine.settings()` 与 `api.resolve_profile()` 仍是**两套解析实现**（行为已一致，实现未合并），这一点如实保留。
+
+**F12（自查发现）**：补 F06 时写传输层测试才发现 `providers.make_client()` 先判断显式 `proxy`、再判断 `is_local`，因此 profile 里一旦配置 proxy，连 `http://localhost` 网关也会被塞进代理——正是该函数注释要避免的挂起或 502；而 F06 把 proxy 带进问答链路后该**暴露面反而变大**。现改为 `is_local(url)` 优先：本机地址一律直连且不使用任何来源的代理（含显式 profile proxy），远端 URL 才使用显式 proxy，无 proxy 时维持尊重系统/环境代理的原行为。
+
+新增 11 项测试，完整隔离回归见 `reports/audit_fix_verification.json`。见 `docs/AUDIT_FIXES.md`。

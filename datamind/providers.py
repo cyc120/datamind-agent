@@ -166,11 +166,14 @@ def make_client(url: str, profile: dict, timeout: float) -> httpx.Client:
     远端地址仍尊重系统/环境代理，也可以用 profile 里的 proxy 显式指定。
     """
     limits = httpx.Timeout(timeout, connect=min(CONNECT_TIMEOUT, timeout))
+    # The direct-to-local rule wins over every proxy source, including one configured
+    # explicitly in the profile: routing the localhost gateway through a relay is exactly
+    # the hang/502 this function exists to prevent.
+    if is_local(url):
+        return httpx.Client(timeout=limits, follow_redirects=True, trust_env=False)
     proxy = (profile.get("proxy") or "").strip()
     if proxy:
         return httpx.Client(timeout=limits, follow_redirects=True, proxy=proxy, trust_env=False)
-    if is_local(url):
-        return httpx.Client(timeout=limits, follow_redirects=True, trust_env=False)
     return httpx.Client(timeout=limits, follow_redirects=True)
 
 

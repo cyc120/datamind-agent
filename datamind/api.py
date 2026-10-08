@@ -163,7 +163,7 @@ class ProfileImportRequest(BaseModel):
     activate_first: bool = False
 
 
-app = FastAPI(title="DataMind Agent", version="0.34.0")
+app = FastAPI(title="DataMind Agent", version="0.35.0")
 
 
 @app.middleware('http')

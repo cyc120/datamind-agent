@@ -64,6 +64,9 @@ def settings() -> dict:
         values["NEW_API_TIMEOUT"] = stored.get("timeout_s")
         values["NEW_API_AUTH_STYLE"] = stored.get("auth_style")
         values["NEW_API_HEADERS"] = stored.get("headers") or {}
+        # The transport already honours profile['proxy']; not carrying it here made probing
+        # use the proxy while the question paths silently did not.
+        values["NEW_API_PROXY"] = stored.get("proxy")
         values["MODEL_PROFILE_NAME"] = stored.get("name")
         values["MODEL_CONFIG_SOURCE"] = "app_settings"
     else:
@@ -84,7 +87,8 @@ def model_profile(cfg: dict | None = None) -> dict:
             "max_tokens": cfg.get("NEW_API_MAX_TOKENS") or 0,
             "timeout_s": cfg.get("NEW_API_TIMEOUT"),
             "auth_style": cfg.get("NEW_API_AUTH_STYLE") or "both",
-            "headers": cfg.get("NEW_API_HEADERS") or {}}
+            "headers": cfg.get("NEW_API_HEADERS") or {},
+            "proxy": cfg.get("NEW_API_PROXY") or ""}
 
 
 def _json_default(value):

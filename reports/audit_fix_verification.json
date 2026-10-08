@@ -159,17 +159,34 @@
       ]
     },
     "F06": {
-      "title": "探活与问答链路 profile 解析不一致",
+      "title": "探活与问答链路 profile 解析不一致（proxy 未传递）",
       "severity_after_review": "P2",
-      "status": "partial",
-      "by": "子代理",
+      "status": "fixed",
+      "by": "子代理（api.py）+ 主代理（问答链路）",
       "files": [
         "datamind/api.py",
-        "tests/test_profile_resolution.py"
+        "datamind/sql_engine.py",
+        "tests/test_profile_resolution.py",
+        "tests/test_model_profile_proxy.py"
       ],
-      "fix": "api.py 内统一为 resolve_profile(request, *, stored=None)：探活、模型列表与 _stored_config() 均走它，headers/proxy 与 api_key 同一套合并规则，同一输入必得同一结果",
-      "partial_reason": "问答真实链路仍是独立解析且完全不含 proxy：sql_engine.settings()/model_profile()（调用方 sql_engine._call_model、rag_engine._draft、pdf_answer._draft）。**本轮未改**（超出子代理写入范围）。",
-      "planned_fix": "settings() 增补 NEW_API_PROXY（stored.get('proxy')）、model_profile() 输出 proxy 键，并进一步把 sql_engine.model_profile() 与 api.resolve_profile() 统一到 settings_store 的共享函数"
+      "fix": [
+        "api.py 内统一为 resolve_profile(request, *, stored=None)：探活、模型列表与 _stored_config() 共用，headers/proxy 与 api_key 同一套合并规则",
+        "主代理补齐问答链路：sql_engine.settings() 把 stored['proxy'] 映射为 NEW_API_PROXY；model_profile() 输出 proxy 键。传输层 providers.make_client() 本就支持 profile['proxy']，缺的只是这条传递链"
+      ],
+      "acceptance": [
+        "settings() 携带存储的 proxy；model_profile()['proxy'] 等于该值；无配置时为 '' 而非 None",
+        "环境变量 NEW_API_PROXY 在无存储配置时仍生效",
+        "rag_engine._draft 实际把含 proxy 的 profile 交给 provider_chat（打桩捕获断言）",
+        "传输层：远端 URL 用显式 proxy 且 trust_env=False；本机 URL 直连；未指定 proxy 时仍尊重系统/环境代理"
+      ],
+      "tests": {
+        "files": [
+          "tests/test_profile_resolution.py",
+          "tests/test_model_profile_proxy.py"
+        ],
+        "added": 21,
+        "suite_result": "test_model_profile_proxy 8/8 与 test_model_config_api 16/16 合并 25/25；test_profile_resolution 13/13"
+      }
     },
     "F11": {
       "title": "验证脚本污染真实库并硬编码期望规模",
@@ -247,6 +264,28 @@
         "formula_without_cached_value 按文件粒度声明（非按单元格/工作表）；无缓存单元格的块文本仍为空",
         "PPTX 的 slide.shapes 顺序未必是视觉 z-order，且未声明（与 (b) 同类，本轮未处理）"
       ]
+    },
+    "F12": {
+      "title": "本机地址在配置了显式 profile proxy 时仍走代理（主代理在修复 F06 时自查发现）",
+      "severity": "P2（与 F03/F06 同族的可用性缺陷）",
+      "status": "fixed",
+      "by": "主代理",
+      "discovered": "补 F06 时写测试才发现：providers.make_client() 先判显式 proxy 再判 is_local，因此 profile 里一旦配置 proxy，连 http://localhost 网关也会被塞进代理——正是该函数注释里要避免的挂起/502。且 F06 修复把 proxy 带进问答链路后，这条路径的暴露面变大。",
+      "files": [
+        "datamind/providers.py",
+        "tests/test_model_profile_proxy.py"
+      ],
+      "fix": "调整判定顺序：is_local(url) 优先，本机地址一律直连（trust_env=False）且不使用任何来源的代理（含显式 profile proxy）；远端 URL 才使用显式 proxy，无 proxy 时维持尊重系统/环境代理的原行为",
+      "acceptance": [
+        "http://localhost:4000 + {'proxy': X} → 传给 httpx.Client 的参数不含 proxy 且 trust_env=False",
+        "https://… + {'proxy': X} → proxy=X 且 trust_env=False",
+        "https://… 且无 proxy → 不传 proxy/trust_env（继续尊重系统代理）"
+      ],
+      "tests": {
+        "file": "tests/test_model_profile_proxy.py",
+        "added": 3,
+        "suite_result": "合并 25/25 通过"
+      }
     }
   },
   "verification": {
@@ -260,15 +299,17 @@
       "tests.test_model_config_api": "16/16",
       "tests.test_verify_isolation": "12/12",
       "tests.test_office_adapter + test_frontend_generation": "24/24",
-      "tests.test_parse_contract 等相邻模块 71 项": "71/71"
+      "tests.test_parse_contract 等相邻模块 71 项": "71/71",
+      "tests.test_model_profile_proxy + test_model_config_api": "25/25",
+      "tests.test_model_profile_proxy": "9/9"
     },
     "full_isolated_regression": {
-      "tests": 734,
+      "tests": 743,
       "failures": 0,
       "errors": 0,
       "exit_code": 0,
-      "previous_stage_tests": 664,
-      "note": "合并四条子代理线与主代理三处修复后的完整隔离回归"
+      "previous_stage_tests": 734,
+      "note": "补齐 F06 剩余部分并修复自查发现的 F12 后的完整隔离回归"
     }
   },
   "concurrency_note": "另有 Codex（ChatGPT 桌面版 CLI）在同一检出与同一 PostgreSQL 上并行工作，此前已造成一次提交被其产物污染、一次回归被其并发测试干扰（30 个连接错误）。本轮所有提交只按显式路径 add，并在提交前核对 git diff --cached。",
@@ -280,7 +321,7 @@
     "compose 回环绑定需重建容器才生效；跨机部署还需防火墙/反代",
     "F10 延后：摄取跨存储一致性需 outbox 模式"
   ],
-  "api_version": "0.34.0",
+  "api_version": "0.35.0",
   "version_changes": {
     "datamind/api.py": "0.33.0 → 0.34.0",
     "web/index.html": "前端缓存版本 0.33.0 → 0.34.0（app.js 与 multifile.js 均变更，不提升会让回访浏览器继续用旧脚本、F08 修复不生效）",
