@@ -65,3 +65,33 @@
 - 子进程不继承父进程的 monkeypatch 状态。真实登记在子进程运行要求目标模块的存储配置可显式解析；测试以接线与 DSN 交接验证该路径，未把测试夹具的临时根目录伪装成生产配置。
 - 对已经进入原生推理的线程不做物理取消，只终止其进程组。
 - OCR/公式阶段接入同一预算、跨主机租约与授权真实输入验收仍待完成。
+
+## CPU/内存限额（API 0.25.0）
+
+`run_bounded` / `run_bounded_command` 新增两个限额参数，并在结果里回报实际生效的限额：
+
+| 参数 | 机制 | 稳定错误码 |
+|---|---|---|
+| `cpu_seconds`（1–3600） | 子进程 `RLIMIT_CPU`；超限内核发 `SIGXCPU` | `TASK_CPU_LIMIT_EXCEEDED` |
+| `memory_bytes`（16 MiB–64 GiB） | 子进程 `RLIMIT_AS`（**地址空间**，不是 RSS） | `TASK_MEMORY_LIMIT_EXCEEDED` |
+| 限额在 preexec 阶段设置失败 | 不执行任务 | `TASK_BUDGET_SPAWN_FAILED` |
+
+**平台事实与失败关闭**：macOS 拒绝设置 `RLIMIT_AS`/`RLIMIT_DATA`（`setrlimit` 返回 EINVAL），只有 `RLIMIT_CPU`/`NOFILE`/`FSIZE` 可用。`rlimit_supported(kind)` 在一次性子进程中探测并缓存结果；**请求了内存上限而平台不支持时直接拒绝**并返回 `TASK_BUDGET_RLIMIT_UNSUPPORTED`，绝不静默当作已生效。真正的内存隔离仍需 Linux cgroup，本模块不主张提供。
+
+## 跨主机租约
+
+`db/migrations/013_task_leases.sql` 建 `task_leases(name, token, holder, fence, acquired_at, renewed_at, expires_at)`。
+
+| 接口 | 语义 |
+|---|---|
+| `acquire_lease(dsn, name, ttl, holder=…)` | 空闲或已过期时取得；**接管会递增 `fence`**；仍被占用时返回 `None` |
+| `renew_lease(dsn, name, token, ttl)` | 仅持有者可续期；已被接管则返回 `None` |
+| `release_lease(dsn, name, token)` | 仅持有者可释放；已失去则 `False` |
+| `lease_holder(dsn, name)` | 当前持有者，含 `expired` 标记 |
+| `sweep_leases(dsn)` | 删除过期行并返回其名称（清理用） |
+
+**这是协作式协调，不是分布式共识**：它假设数据库健康可达，并要求**每个写入方在提交前比较自己取得的 `fence`**，否则失去租约的持有者仍可能覆盖新结果。租约尚未接入 V-CAR 或文件登记的执行路径，当前只提供原语。
+
+## 验证（0.25.0 增量）
+
+`tests/test_task_budget_resources.py` **11/11**，完整隔离回归 **603/603**，见 `reports/parse_contract_verification.json`。覆盖：CPU 上限真实终止自旋子进程并给出 `TASK_CPU_LIMIT_EXCEEDED`；内存上限按平台能力要么执行要么**失败关闭且任务未运行**；无限制运行回报空限额；参数边界校验；租约互斥、`fence` 递增、过期接管后旧 token 无法续期/释放、过期标记与清理、参数校验，以及**独立进程无法取得已被占用的租约**（子进程使用 `effective_dsn` 指向同一数据库）。

@@ -1,6 +1,6 @@
 # DataMind Agent 项目进度
 
-更新日期：2026-10-07。当前代码 API：**0.24.0**；本轮按技术文档 §6.4/§9.2 新增 **V-CAR 机制消融与修复/冲突指标**（`datamind/ablation.py`：四条机制臂在 16 例冻结合成集上对照，按 §9.2 报告修复成功率、误修复率、冲突 Precision/Recall、正确/错误/未消解与触发比例，零分母报告 N/A；实测 `local` 臂 2 例误修复、`full` 臂 0 误修复并保留 2 例未消解）；上一轮把 **V-CAR 节点接入统一任务预算与 HTTP**（`bounded_runners` 在独立进程组内执行节点、按工具占跨进程资源槽、取消可传播、节点时限取自全局剩余预算；`POST /v1/plans/execute` 目标由服务端白名单决定，未配置即 fail closed）；上一轮按技术文档 §6.1/§6.4/§15-P3 新增**通用 V-CAR 依赖计划**（`datamind/vcar.py`：节点契约与拓扑校验、独立节点并发、失败只重跑受影响子图并保留原始失败、统一全局预算 `deadline/max_steps/max_rows/max_tokens/max_repair`、无权威规则的冲突终止自动消解并返回双方证据、断点恢复）；上一轮为已发布私有 PDF 向量点的受控修复与孤立点回收（`/v1/pdf-knowledge/publications/{id}/repair`、`/v1/pdf-knowledge/orphans`、`/orphans/reclaim`；只按冻结计划补点、默认 dry-run、仅限 `pdf_private_*`、不改计划/发布行/当前头）；上一轮把扫描页 OCR 与公式会话接入统一任务预算（运行器泛化为可执行任意命令/独立解释器；`ocr.page_blocks_bounded` 与 `formula.recognize(dsn=…)` 在进程组内受 deadline/槽/取消约束，ingest 可选启用）；上一轮为统一任务预算原语（`datamind/task_budget.py`），再上一轮为受控私有模型回答。完整回归在隔离数据库副本验收；原检出和原 8000 服务未升级。设计主入口：[V1.3 技术设计说明书](技术文档/DataMind_Agent_技术设计说明书_V1.3.md)（0.24.0 基线），历史阶段记录保留在 [V1.2 说明书](技术文档/DataMind_Agent_技术设计说明书_V1.2.md) §18.12–18.33。私有知识发布提交 [`6913ccc`](https://github.com/cyc120/datamind-agent/commit/6913ccc9a459b7bd91a72f72ec642d56e92d8a24) 已随 PR #1/#2 并入 `main`。仓库：[cyc120/datamind-agent](https://github.com/cyc120/datamind-agent)，当前只保留 `main` 分支。
+更新日期：2026-10-07。当前代码 API：**0.25.0**；本轮**并行推进两条线**：按 §5.2/§5.4 新增**统一解析契约**（`datamind/parse_contract.py`：parse_status 与摄取状态机、七类 SourceLocator 校验、Block/Relation 约束、Adapter 能力登记、真实 PDF 块映射；`docs/PARSE_CONTRACT.md`），并按 §13 新增**CPU/内存限额与跨主机租约**（`cpu_seconds` 经 RLIMIT_CPU 生效；`memory_bytes` 在平台不支持时失败关闭；migration 013 的 `task_leases` 提供接管递增 fence 的协作式租约）；上一轮按 §6.4/§9.2 新增 **V-CAR 机制消融与修复/冲突指标**（`datamind/ablation.py`：四条机制臂在 16 例冻结合成集上对照，按 §9.2 报告修复成功率、误修复率、冲突 Precision/Recall、正确/错误/未消解与触发比例，零分母报告 N/A；实测 `local` 臂 2 例误修复、`full` 臂 0 误修复并保留 2 例未消解）；上一轮把 **V-CAR 节点接入统一任务预算与 HTTP**（`bounded_runners` 在独立进程组内执行节点、按工具占跨进程资源槽、取消可传播、节点时限取自全局剩余预算；`POST /v1/plans/execute` 目标由服务端白名单决定，未配置即 fail closed）；上一轮按技术文档 §6.1/§6.4/§15-P3 新增**通用 V-CAR 依赖计划**（`datamind/vcar.py`：节点契约与拓扑校验、独立节点并发、失败只重跑受影响子图并保留原始失败、统一全局预算 `deadline/max_steps/max_rows/max_tokens/max_repair`、无权威规则的冲突终止自动消解并返回双方证据、断点恢复）；上一轮为已发布私有 PDF 向量点的受控修复与孤立点回收（`/v1/pdf-knowledge/publications/{id}/repair`、`/v1/pdf-knowledge/orphans`、`/orphans/reclaim`；只按冻结计划补点、默认 dry-run、仅限 `pdf_private_*`、不改计划/发布行/当前头）；上一轮把扫描页 OCR 与公式会话接入统一任务预算（运行器泛化为可执行任意命令/独立解释器；`ocr.page_blocks_bounded` 与 `formula.recognize(dsn=…)` 在进程组内受 deadline/槽/取消约束，ingest 可选启用）；上一轮为统一任务预算原语（`datamind/task_budget.py`），再上一轮为受控私有模型回答。完整回归在隔离数据库副本验收；原检出和原 8000 服务未升级。设计主入口：[V1.3 技术设计说明书](技术文档/DataMind_Agent_技术设计说明书_V1.3.md)（0.25.0 基线），历史阶段记录保留在 [V1.2 说明书](技术文档/DataMind_Agent_技术设计说明书_V1.2.md) §18.12–18.33。私有知识发布提交 [`6913ccc`](https://github.com/cyc120/datamind-agent/commit/6913ccc9a459b7bd91a72f72ec642d56e92d8a24) 已随 PR #1/#2 并入 `main`。仓库：[cyc120/datamind-agent](https://github.com/cyc120/datamind-agent)，当前只保留 `main` 分支。
 
 本次推进：把 V-CAR 节点接入统一任务预算与 HTTP（`datamind/vcar.py` 的 `bounded_runners` / `ExecutionContext` / `run_request`：节点在独立进程组内执行、节点时限取自全局剩余预算、按工具占跨进程资源槽、取消传播杀进程组；新增 `POST /v1/plans/execute`，目标由服务端白名单决定）。这一轮之前依次完成：通用 V-CAR 依赖计划原语、私有向量修复与孤立回收、统一任务预算与进程时限、扫描页 OCR/公式接入同一预算、受控私有模型回答。当前完整隔离回归 **549/549**。历史分母（465/465、480/480、502/502、513/513、523/523、539/539）与原始失败全部保留，不跨轮拼接为模型成绩。
 
@@ -26,6 +26,8 @@
 | V-CAR 通用依赖计划 | 节点契约与拓扑校验；独立节点并发；失败只重跑受影响子图且保留原始失败；统一预算与两次修复上限；冲突终止自动消解；断点恢复 | 16 项单元测试；视觉载荷/局部重识别与机制消融待做 |
 | V-CAR 受控节点执行 | 节点在独立进程组内执行；节点时限取自全局剩余预算；按工具占跨进程资源槽；取消传播杀进程组；目标由服务端白名单决定 | 10 项组件/契约测试；HTTP 需运维显式配置注册表；同主机执行，非同主机租约 |
 | V-CAR 机制消融 | 四条机制臂在同一冻结集对照；修复成功率、误修复率（含占原正确输入份额）、冲突 P/R、正确/错误/未消解、触发比例；零分母 N/A | 18 项测试；合成 16 例、机制替身，非模型精度；真实视觉载荷与模型规模对比未做 |
+| 统一解析契约 | parse_status 五态与摄取状态机；七类 SourceLocator 必需字段与取值校验；Block/Relation 约束与不足依据黑名单；Adapter 能力登记（未登记明确拒绝）；真实 PDF 块映射不补造 | 25 项测试；仅契约与映射，未接入生产摄取；Office/CAD 无解析器；Chunk/DocumentFact/DrawingFeature 未纳入 |
+| CPU/内存限额与跨主机租约 | cpu_seconds 经 RLIMIT_CPU 生效；memory_bytes 平台不支持时失败关闭；task_leases 协作式租约与接管递增 fence | 11 项测试；本机 macOS 不支持 RLIMIT_AS；非 cgroup 硬隔离、非分布式共识；租约未接入执行路径 |
 | 统一任务预算与进程时限 | 跨进程资源槽、挂钟 deadline、进程组终止（含孙进程）、取消传播、输出上限与稳定超时码；登记 worker、PDF 准备 CLI、扫描页 OCR 与公式会话可选接入 | 34 项组件/契约测试；非 CPU/内存 cgroup 硬隔离；跨主机租约待接入 |
 | 结构化单源问数 | Catalog、Schema Linking、SQL Guard、参数化只读执行、修复、Trace/SSE/回放 | 历史零售 14/14，鲁棒性 4/4；未在本次重跑模型评分 |
 | 文档问答 | Hybrid/RRF 检索、真实模型生成、原文引用/定位与拒答 | 最近完整 RAG 10/12，单题上游错误复测 1/1 单列；语义蕴含未独立验证 |
@@ -48,6 +50,8 @@
 本阶段没有修改原库的数据、模型配置或复核记录。完整回归在临时元数据库中把原 17 页工业文档重新提取为 v2，验证新版读取/复核和旧模块兼容；模板仅在离线评测中使用。测试库不复制模型设置、账户、会话、登录限流、权威规则、CAD 资产、关联复核、私有 PDF 快照或知识发布行，运行后删除。
 
 ## 本阶段验收与历史证据
+
+本轮统一解析契约与资源限额完整隔离回归 **603/603**（上一阶段 567 + 新增 36）、失败/错误 0、退出 0，见 `reports/parse_contract_verification.json`。新增 36 项为 25 项解析契约测试与 11 项资源/租约测试。平台事实：`RLIMIT_CPU` 受支持并实测生效（1 秒上限下 300 秒自旋被终止），`RLIMIT_AS` 在本机 macOS 被拒（`setrlimit` EINVAL），因此内存上限**失败关闭**而不是假装生效；独立进程无法取得已被占用的租约。过程记录：并行的子代理在实现期间对仓库做了越界自动改写（删除 `web/app.js` 一行行为代码、删除 `style.css` 的 `.step/.num` 规则、批量移除 import 与 requirements 条目），已中断该子代理并**逐项回退全部 33 个受影响文件**，只保留受控改动；其产出的 1234 行契约模块因与规范偏差较大且无测试而弃用，改为受控实现。租约跨进程测试首轮误用父进程原始 DSN，子进程在隔离回归中连到真实库并成功取租约；改用 `effective_dsn` 后通过，同时验证了该原语的必要性。
 
 本轮 V-CAR 机制消融与修复指标完整隔离回归 **567/567**（上一阶段 549 + 新增 18）、失败/错误 0、退出 0，见 `reports/vcar_ablation_verification.json`；实测报告 `reports/vcar_ablation.json`。18 项覆盖：冻结数据集摘要固定与变化拒绝、畸形数据集拒绝、逐例失败保留、零分母报告 N/A、修复成功率/误修复率/误修复占原正确输入份额/冲突 P-R 与假阳性算术、冲突检测与标签解耦（同一来源相反标签得到相同检出）、臂行为（本地臂产生误修复、full 臂零误修复并把无规则冲突留作未消解并返回双方证据、ocr_text 在冻结集漏检全部真实冲突）、两次运行指标一致、脚本拒绝覆盖与数据集变化时拒绝运行。实测对比：`ocr_text` 0.1875／`structured` 0.6875／`local` 0.6875（**2 例误修复，14.29%**）／`full` **1.0（0 误修复，2 例正确未消解）**。开发中修正两处度量缺陷：机制臂原依据 defect 标签判定冲突（标签泄漏使 Precision 恒为 1），改为纯来源比对；「未察觉冲突」原被记为正确消解，现要求先检出才计分。
 
@@ -119,9 +123,9 @@
 |---|---|---|---|
 | T1 | V-CAR 接入 HTTP 与 `task_budget`（§6.1/§6.4） | **已完成**（10 项新测试；见 `reports/vcar_bounded_verification.json`） | 节点在独立进程组内执行、占用跨进程资源槽、取消可传播；HTTP 目标由服务端白名单决定 |
 | T2 | V-CAR 机制消融与误修复/错误消解统计（§6.4） | **已完成**（机制层；18 项测试，见 `reports/vcar_ablation_verification.json`） | 四条机制臂已对照并报告误修复率/错误消解/未消解；**真实模型与视觉载荷、模型规模对比仍待做** |
-| T3 | 通用 Parser Adapter 与统一 Locator/Relation 契约（§5.2/§5.4） | 未实现 | 分类与能力登记、稳定产物契约、跨格式统一定位与关系存储 |
+| T3 | 通用 Parser Adapter 与统一 Locator/Relation 契约（§5.2/§5.4） | **契约与映射已完成**（25 项测试）；**未接入生产路由** | 分类与能力登记、稳定产物契约、跨格式统一定位与关系存储 |
 | T4 | Office（DOCX/PPTX/复杂 XLSX）与图纸 PDF/DWG 适配（§5.1.1/§5.8） | 未实现 | 逐格式原生对象解析、定位与关系；每格式各有样本与独立分母 |
-| T5 | 统一 CPU/内存配额与跨主机租约（§13） | 仅有挂钟 deadline 与进程组终止 | 资源硬隔离、跨主机租约与统一配额 |
+| T5 | 统一 CPU/内存配额与跨主机租约（§13） | **CPU 限额与租约已完成**；内存限额在本机 macOS 不可执行（失败关闭） | 资源硬隔离（需 Linux cgroup）、租约接入执行路径 |
 | T6 | 授权真实输入验收（§9.1） | 缺外部材料 | 真实模板/图纸/扫描件独立样本，标签先冻结，分列原生/扫描分母 |
 | D1 | 赛题交付包、答辩材料与官方专项核对 | **延后**（见「现阶段优先级」） | 前置技术任务完成后启动；不复用合成材料成绩宣称验收 |
 

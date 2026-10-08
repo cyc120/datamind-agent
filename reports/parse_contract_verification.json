@@ -1,0 +1,64 @@
+{
+  "stage": "parse_contract_and_resource_limits",
+  "api_version": "0.25.0",
+  "date": "2026-10-07",
+  "scope": "并行推进两条技术实现线：(A) T3 统一解析契约（ParseResult/SourceLocator/Block/Relation/Adapter，§5.2/§5.4）；(B) T5 统一 CPU/内存配额与跨主机租约（§13）。",
+  "lines": {
+    "A_parse_contract": {
+      "components": {
+        "datamind/parse_contract.py": "契约常量（解析状态、摄取状态机、关系类型/状态、七类定位器）与校验；SourceLocator/DocumentBlock/BlockRelation/ParseResult；适配器能力登记；from_pdf_blocks 映射",
+        "docs/PARSE_CONTRACT.md": "契约、各定位器必需字段、关系与恢复方法约束、映射范围与边界"
+      },
+      "implemented": [
+        "parse_status 五态与摄取状态机 queued→classifying→parsing→validating→indexing→ready（任一步可转 failed），跳步拒绝",
+        "七类 SourceLocator 的必需字段与取值校验：页号≥1、bbox 在页内且不倒置、unit/coordinate_system、CAD 句柄十六进制、sheet A1 单元格、时间区间与 time_base",
+        "未知定位器键与未知结果字段一律拒绝，缺失字段不补造",
+        "Block 必需字段与 content_hash(SHA-256)、locator 与 document_id 一致性",
+        "Relation 端点存在于同一结果、类型/状态白名单、evidence 非空、name_similarity/proximity/adjacency/guess 作为恢复方法被拒",
+        "适配器登记：同名 media type 不得重复；未登记类型 PARSE_ADAPTER_UNKNOWN（不返回空解析成功）；能力查询与 UNKNOWN/UNSUPPORTED 区分",
+        "from_pdf_blocks 用真实 ingest/OCR 块形状映射：只搬运解析器实际产出的键，页尺寸缺失/页号非法/bbox 越界即拒绝"
+      ],
+      "tests": {"file": "tests/test_parse_contract.py", "tests": 25, "failures": 0, "errors": 0}
+    },
+    "B_resource_limits_and_leases": {
+      "components": {
+        "datamind/task_budget.py": "cpu_seconds（RLIMIT_CPU）与 memory_bytes（RLIMIT_AS）限额、平台能力探测、稳定错误码、PostgreSQL 租约 API",
+        "db/migrations/013_task_leases.sql": "task_leases(name, token, holder, fence, acquired_at, renewed_at, expires_at)，fence 随接管递增",
+        "tests/budget_targets.py": "子进程目标夹具（echo/spin/allocate）"
+      },
+      "implemented": [
+        "run_bounded / run_bounded_command 新增 cpu_seconds 与 memory_bytes，并在结果中回报实际限额",
+        "SIGXCPU → TASK_CPU_LIMIT_EXCEEDED；地址空间耗尽 → TASK_MEMORY_LIMIT_EXCEEDED；preexec 失败 → TASK_BUDGET_SPAWN_FAILED",
+        "平台能力探测并缓存：macOS 拒绝 RLIMIT_AS/RLIMIT_DATA，请求内存上限时**失败关闭**返回 TASK_BUDGET_RLIMIT_UNSUPPORTED，绝不静默忽略",
+        "租约：acquire（占用或接管，接管递增 fence）、renew、release、holder（含 expired）、sweep；过期接管后旧 token 无法续期或释放"
+      ],
+      "tests": {"file": "tests/test_task_budget_resources.py", "tests": 11, "failures": 0, "errors": 0}
+    }
+  },
+  "verification": {
+    "full_isolated_regression": {"tests": 603, "failures": 0, "errors": 0, "exit_code": 0, "previous_stage_tests": 567},
+    "platform_facts": {
+      "rlimit_cpu": "受支持并实测生效（1 秒 CPU 上限下 300 秒自旋被终止）",
+      "rlimit_as": "本机 macOS 不支持（setrlimit 返回 EINVAL），因此内存上限按失败关闭处理",
+      "lease_cross_process": "独立进程无法取得已被占用的租约（在其自己的解释器中验证）"
+    },
+    "source_database_modified": false
+  },
+  "incidents": [
+    "并行子代理在实现期间对仓库执行了越界的自动改写（删除 web/app.js 中一行行为代码、删除 style.css 的 .step/.num 规则、批量移除 import 与 requirements 条目）。已中断该子代理、逐项回退全部 33 个受影响文件，并只保留受控改动；回退后完整回归通过。",
+    "该子代理产出的 1234 行 parse_contract.py 因与本规范偏差较大且无任何测试，已弃用并改为受控实现（本文件的 A 线）。",
+    "租约跨进程测试首轮误用父进程的原始 DSN，子进程因此在隔离回归中连到真实库并成功取租约；改为使用 effective_dsn 后通过——这同时验证了 effective_dsn 存在的必要性。"
+  ],
+  "boundaries": [
+    "解析契约仅描述与校验，未接入统一 Adapter 路由，未改造 ingestion/ingest.py 的生产链路。",
+    "未实现 Office/CAD 新解析器；office_object/sheet_range/cad_entity 只是可校验的定位器契约。",
+    "Chunk、DocumentFact、DrawingFeature 未纳入本契约，现有存储与检索尚未统一。",
+    "内存上限在本机 macOS 不可执行，按失败关闭；CPU 上限与租约为挂钟/协作式机制，不是 cgroup 级硬隔离，也不是分布式共识。",
+    "租约要求所有写入方比较 fence，属协作式约束；未接入 V-CAR 或文件登记的执行路径。"
+  ],
+  "not_measured": [
+    "真实 Office/CAD 文件在契约下的解析结果",
+    "Linux 环境下 RLIMIT_AS 的实际行为与 cgroup 方案对比",
+    "租约在高并发与网络分区下的表现"
+  ]
+}
