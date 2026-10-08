@@ -4,11 +4,14 @@ These tests are the review of the contract: they pin the documented constants, t
 per-kind locator requirements, relation integrity, the ingest state machine, the adapter
 registry (including explicit refusal) and the mapping of real ingest block shapes.
 """
+import tempfile
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 from fastapi import HTTPException
 
+from ingestion import ingest
 from datamind import parse_contract as contract
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -322,3 +325,57 @@ class PdfMappingTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class IngestIntegrationTests(unittest.TestCase):
+    """The production parse path must actually emit a contract-validated result."""
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.patch = patch.object(ingest, 'PAGE_IMG_DIR', Path(self.directory.name))
+        self.patch.start()
+        self.addCleanup(self.patch.stop)
+
+    def native_pdf(self):
+        return ROOT / 'data/knowledge_base/04_售后服务与退款管理制度.pdf'
+
+    def scanned_pdf(self):
+        return ROOT / 'data/knowledge_base/07_门店巡检记录_2025年12月_扫描版.pdf'
+
+    def test_native_pdf_is_validated_against_the_contract(self):
+        blocks, _, detail = ingest.parse_pdf(self.native_pdf(), 'contract-native', include_quality=True)
+        summary = detail['parse_contract']
+        self.assertEqual(summary['validation'], 'parsed', summary)
+        self.assertEqual(summary['contract_version'], contract.CONTRACT_VERSION)
+        self.assertEqual(summary['blocks'], len(blocks))
+        self.assertEqual(summary['locator_kinds'], ['pdf_region'])
+        self.assertEqual(summary['parse_status'], detail['parse_status'])
+
+    def test_scanned_pdf_ocr_blocks_are_validated_too(self):
+        blocks, _, detail = ingest.parse_pdf(self.scanned_pdf(), 'contract-scan', include_quality=True)
+        summary = detail['parse_contract']
+        self.assertEqual(summary['validation'], 'parsed', summary)
+        self.assertEqual(summary['blocks'], len(blocks))
+        self.assertTrue(blocks)
+
+    def test_a_contract_violation_is_recorded_not_raised(self):
+        import pymupdf
+        path = self.native_pdf()
+        with pymupdf.open(path) as document:
+            page = document[0]
+            oversized = {'page_no': 1, 'bbox': [0.0, 0.0, page.rect.width + 500.0, page.rect.height],
+                         'block_type': 'paragraph', 'text': '越界块'}
+            detail = {'source_sha256': 'a' * 64, 'parse_status': 'parsed', 'pages': []}
+            summary = ingest._contract_summary(document, path, 'contract-bad', [oversized], detail)
+        self.assertEqual(summary['validation'], 'failed', summary)
+        self.assertEqual(summary['error_code'], 'PARSE_LOCATOR_INVALID')
+
+    def test_no_blocks_skips_validation_instead_of_inventing_one(self):
+        import pymupdf
+        path = self.native_pdf()
+        with pymupdf.open(path) as document:
+            detail = {'source_sha256': 'b' * 64, 'parse_status': 'failed', 'pages': []}
+            summary = ingest._contract_summary(document, path, 'contract-empty', [], detail)
+        self.assertEqual(summary['validation'], 'skipped', summary)
+        self.assertEqual(summary['reason'], 'no_blocks')

@@ -72,6 +72,48 @@ def detect_heading(span_size):
     return 0
 
 
+def _contract_summary(document, pdf_path, doc_id, blocks, detail):
+    """Map the parsed blocks into the unified parse contract and record the outcome.
+
+    Ingestion is never aborted by a contract violation: the stable error code is written
+    into the quality detail so the gap stays visible instead of being hidden, and the
+    existing block output is left untouched.
+    """
+    from fastapi import HTTPException
+
+    from datamind import parse_contract
+
+    version = parse_contract.CONTRACT_VERSION
+    if not blocks:
+        return {"contract_version": version, "validation": "skipped", "reason": "no_blocks"}
+    page_sizes = {index + 1: (float(page.rect.width), float(page.rect.height))
+                  for index, page in enumerate(document)}
+    try:
+        mapped = parse_contract.from_pdf_blocks(
+            blocks, page_sizes=page_sizes, parser_version=PARSER_VERSION, document_id=doc_id,
+            source_version=detail["source_sha256"])
+        result = parse_contract.validate_parse_result({
+            "classification": {"detected_media_type": "application/pdf", "source_name": pdf_path.name},
+            "adapter_capabilities": sorted({block["block_type"] for block in blocks if block.get("block_type")}) or ["text"],
+            "blocks": mapped, "relations": [],
+            "parsed_scope": [{"kind": "page", "ref": page, "status": "parsed"} for page in sorted(page_sizes)],
+            "failed_scope": [{"kind": "page", "ref": page["page_no"], "status": "failed",
+                              "detail": page.get("error_code")}
+                             for page in detail["pages"] if page.get("error_code")],
+            "quality_findings": [], "unsupported_features": [], "artifact_refs": [],
+            "manifest": {"parser_version": PARSER_VERSION, "source_sha256": detail["source_sha256"]},
+            "parse_status": detail["parse_status"],
+        })
+    except HTTPException as error:
+        code = error.detail.get("error_code") if isinstance(error.detail, dict) else None
+        return {"contract_version": version, "validation": "failed",
+                "error_code": code or "PARSE_CONTRACT_FAILED", "blocks": len(blocks)}
+    payload = result.payload
+    return {"contract_version": payload["contract_version"], "validation": "parsed",
+            "parse_status": payload["parse_status"], "blocks": len(payload["blocks"]),
+            "locator_kinds": sorted({block["locator"]["locator_kind"] for block in payload["blocks"]})}
+
+
 def parse_pdf(pdf_path: Path, doc_id: str, ocr_proxy: Path | None = None, *, include_quality=False,
               ocr_engine=None, formula_engine=None, formula_dsn=None, formula_slots=None,
               formula_deadline=None, ocr_dsn=None, ocr_deadline=None, ocr_slots=None):
@@ -201,6 +243,7 @@ def parse_pdf(pdf_path: Path, doc_id: str, ocr_proxy: Path | None = None, *, inc
     blocks.sort(key=lambda b: (b["page_no"], b["bbox"][1], b["bbox"][0]))
     for i, b in enumerate(blocks):
         b["reading_order"] = i
+    detail["parse_contract"] = _contract_summary(doc, pdf_path, doc_id, blocks, detail)
     doc.close()
     return (blocks, page_count, detail) if include_quality else (blocks, page_count)
 

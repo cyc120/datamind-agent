@@ -1,10 +1,11 @@
 {
   "stage": "parse_contract_and_resource_limits",
-  "api_version": "0.25.0",
+  "api_version": "0.26.0",
   "date": "2026-10-07",
   "scope": "并行推进两条技术实现线：(A) T3 统一解析契约（ParseResult/SourceLocator/Block/Relation/Adapter，§5.2/§5.4）；(B) T5 统一 CPU/内存配额与跨主机租约（§13）。",
   "lines": {
     "A_parse_contract": {
+      "integration": "ingestion/ingest.py::parse_pdf 与 _contract_summary",
       "components": {
         "datamind/parse_contract.py": "契约常量（解析状态、摄取状态机、关系类型/状态、七类定位器）与校验；SourceLocator/DocumentBlock/BlockRelation/ParseResult；适配器能力登记；from_pdf_blocks 映射",
         "docs/PARSE_CONTRACT.md": "契约、各定位器必需字段、关系与恢复方法约束、映射范围与边界"
@@ -16,9 +17,10 @@
         "Block 必需字段与 content_hash(SHA-256)、locator 与 document_id 一致性",
         "Relation 端点存在于同一结果、类型/状态白名单、evidence 非空、name_similarity/proximity/adjacency/guess 作为恢复方法被拒",
         "适配器登记：同名 media type 不得重复；未登记类型 PARSE_ADAPTER_UNKNOWN（不返回空解析成功）；能力查询与 UNKNOWN/UNSUPPORTED 区分",
-        "from_pdf_blocks 用真实 ingest/OCR 块形状映射：只搬运解析器实际产出的键，页尺寸缺失/页号非法/bbox 越界即拒绝"
+        "from_pdf_blocks 用真实 ingest/OCR 块形状映射：只搬运解析器实际产出的键，页尺寸缺失/页号非法/bbox 越界即拒绝",
+        "API 0.26.0：parse_pdf 在返回前实际产出并校验契约，写入质量明细 parse_contract（parsed/failed/skipped + 稳定错误码）；契约违反不中断摄取但保持可见；真实原生/扫描/公式 PDF 均验证为 parsed"
       ],
-      "tests": {"file": "tests/test_parse_contract.py", "tests": 25, "failures": 0, "errors": 0}
+      "tests": {"file": "tests/test_parse_contract.py", "tests": 29, "failures": 0, "errors": 0}
     },
     "B_resource_limits_and_leases": {
       "components": {
@@ -36,7 +38,7 @@
     }
   },
   "verification": {
-    "full_isolated_regression": {"tests": 603, "failures": 0, "errors": 0, "exit_code": 0, "previous_stage_tests": 567},
+    "full_isolated_regression": {"tests": 607, "failures": 0, "errors": 0, "exit_code": 0, "previous_stage_tests": 603},
     "platform_facts": {
       "rlimit_cpu": "受支持并实测生效（1 秒 CPU 上限下 300 秒自旋被终止）",
       "rlimit_as": "本机 macOS 不支持（setrlimit 返回 EINVAL），因此内存上限按失败关闭处理",

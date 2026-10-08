@@ -2,7 +2,7 @@
 
 2026-10-07，API **0.25.0**。本阶段实现技术设计说明书 **§5.2**（Parser Adapter 与解析状态）与 **§5.4**（Block、Relation、Chunk 与来源定位）记载的目标契约。
 
-契约位于 `datamind/parse_contract.py`。它**只描述并校验契约**：不读文件、不调用模型、不接管真实摄取路由；调用方把自己的解析结果映射进来。缺失信息一律报错，**不用默认值或猜测补造**。
+契约位于 `datamind/parse_contract.py`；API 0.26.0 起 `ingestion/ingest.py` 的 `parse_pdf` **实际产出并校验**该契约（结果写入质量明细的 `parse_contract` 字段）。模块本身**只描述并校验契约**：不读文件、不调用模型、不接管摄取路由；缺失信息一律报错，**不用默认值或猜测补造**。
 
 两个目标字段在本版**未纳入契约**：`Chunk` 与 `DocumentFact`/`DrawingFeature`。原因见「边界」——现有 `chunks`/`document_facts` 表尚未统一到本契约，先冻结 Block/Relation/Locator 三个边界，避免一次改动同时触碰存储与检索。
 
@@ -56,7 +56,8 @@
 
 ## 边界
 
-- **仅契约与映射**：未接入统一 Adapter 路由，未改造 `ingestion/ingest.py` 的生产链路，真实摄取仍走既有代码。
+- **已接入解析出口**：`parse_pdf` 在返回前把真实块映射进契约并校验，结果记录为 `detail['parse_contract']`（`parsed`/`failed`/`skipped` + 稳定错误码）。契约违反**不会中断摄取**，而是带错误码写入质量明细保持可见。
+- **尚未接入路由与存储**：Adapter 登记仍是进程内契约，没有按 media type 路由 Adapter 的分发器；契约结果也未写入 `document_blocks`（现有存储列仍是原格式）。
 - **未实现 Office/CAD 新解析器**：`office_object`/`sheet_range`/`cad_entity` 只是可校验的定位器契约，尚无产出它们的解析器。
 - **`Chunk`、`DocumentFact`、`DrawingFeature` 未纳入本契约**：现有存储与检索尚未统一，留待后续阶段。
 - 契约版本为 `parse-contract-v1`；变更契约需同时更新测试与本文件。
