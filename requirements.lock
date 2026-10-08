@@ -63,3 +63,16 @@ typing_extensions==4.16.0
 urllib3==2.8.0
 uvicorn==0.54.0
 xlsxwriter==3.2.9
+
+# ---------------------------------------------------------------------------
+# 本文件前 65 行为固定版本（每行「包名 + 双等号 + 版本」）；以下是说明注释（解析器跳过注释）。
+# 可选：材料生成/取样工具。它们被 requirements.txt 声明，但**未安装（可选）**在
+# 本机 .venv 中，且不被 datamind/ 或 ingestion/ 的运行时模块导入（只用于离线生成
+# 演示/工业 PDF 语料或抽样 OHR-Bench parquet）。因此这里不写固定版本——写死一个
+# 未实测的版本号就是编造。
+#   reportlab  – ingestion/generate_demo_docs.py、scripts/build_industrial_*.py
+#   matplotlib – ingestion/generate_demo_docs.py（渲染公式图片）
+#   img2pdf    – ingestion/generate_demo_docs.py（图片合成 PDF）
+#   pyarrow    – ingestion/sample_ohrbench.py（读取 OHR-Bench parquet 样本）
+# 状态：未安装（可选）。需要时按 requirements.txt 安装。
+# ---------------------------------------------------------------------------

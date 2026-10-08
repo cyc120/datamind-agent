@@ -62,6 +62,27 @@ NON_SEARCHABLE_STATUS = "parsing"
 SEARCHABLE_STATUS = "indexed"
 FAILED_STATUS = "failed"
 
+# ---------- F08：`document_assets.status` 的唯一取值来源与写入点 ----------
+# 复核方法：只读 SQL 统计库内真实分布 + 通读本文件。非测试代码里写
+# `document_assets.status` 的只有本文件与 db/seed_industrial.py；真实写入的取值恰好
+# 三个：
+#   'parsing' → 登记资产、发布第 1 步（不可检索）
+#   'indexed' → 发布终态且至少落了一条切片（检索可见；读取侧的门就是它）
+#   'failed'  → 发布终态但零切片（needs_review=TRUE）
+# 本文件所有写 status 的语句都集中在下面 REGISTER_ASSET_SQL 与 mark_asset_status()
+# 两处定义，取值只从 ASSET_STATUS_WRITES 取，改状态不必再翻遍全文。
+ASSET_STATUS_WRITES = (NON_SEARCHABLE_STATUS, SEARCHABLE_STATUS, FAILED_STATUS)
+#
+# 契约侧缺口（**不由本文件修复**，供协调者转交 datamind/parse_contract.py 负责人）：
+# 该模块的 INGEST_STATES/INGEST_TRANSITIONS 描述的是另一套生命周期
+# ('queued'→'classifying'→'parsing'→'validating'→'indexing'→'ready')，其中
+# **没有 'indexed'**，而 'indexed' 恰是真实可见性门（datamind/knowledge.py 等）
+# 与摄取真正写入的终态。也就是说 validate_ingest_state('indexed') 会抛
+# PARSE_STATUS_INVALID，契约状态机无法表达摄取的真实终态；另外 ingest_step()
+# 在本仓库没有任何调用者。datamind/parse_contract.py 属其他子代理的文件，本文件
+# 不越权修改，只在此显式记录缺口，并由 tests/test_ingest_contract_coverage.py 锁住。
+INGEST_STATE_CONTRACT_GAPS = ("indexed",)
+
 
 def sha256_file(p: Path) -> str:
     h = hashlib.sha256()
@@ -87,6 +108,11 @@ def detect_heading(span_size):
 
 
 _PDF_ADAPTER = 'pdf-native'
+# F01: OHR-Bench 记录的适配器与"无定位"缺口码。JSON 没有文件签名可嗅探，所以由
+# 摄取侧显式按这个 media type 派发，而不是让 detect_media_type 去猜。
+OHR_ADAPTER = 'ohr-bench-json'
+OHR_MEDIA_TYPE = 'application/vnd.ohr-bench+json'
+OHR_LOCATOR_GAP = 'locator_unavailable'
 
 
 def _pdf_contract_payload(*, pdf_path, doc_id, blocks, page_sizes, detail, parser_version):
@@ -124,6 +150,64 @@ def _ensure_pdf_adapter():
             handler=_pdf_contract_payload)
 
 
+# ---------- F01：OHR-Bench JSON 分支（诚实缺口，不伪造坐标） ----------
+def ohr_block(record):
+    """One OHR-Bench record as an ingest block, carrying **no invented geometry**.
+
+    OHR-Bench 记录只有 `page_idx` 与人工校准的 `gt_text`；记录本身与
+    `data/ohr_bench_samples/manifest.json` 都没有 bbox、也没有页面尺寸（已逐条核对）。
+    `document_blocks.bbox` 是 nullable 的，所以这里保留 `bbox=None`，而不是这条分支
+    以前写的 `[0, 0, 0, 0]`：那个值不是"未知"，在契约看来是**倒置**的非法框
+    （`bbox_inverted`），写进去只会谎报一个并不存在的定位。
+    """
+    return {"page_no": record["page_idx"] + 1, "block_type": "paragraph", "bbox": None,
+            "text": record["gt_text"], "heading_level": None, "table_cells": None,
+            "reading_order": 0, "ocr_confidence": 1.0}
+
+
+def _ohr_contract_payload(*, record, doc_id, source_name, parser_version, source_version):
+    """Contract mapping for the OHR-Bench JSON branch — the explicit-gap choice (F01).
+
+    为什么不是"诚实的 pdf_region 定位"：契约的 `pdf_region` 需要
+    `page_width`/`page_height` 与一个真实 bbox，而 OHR 样本两者都没有，任何坐标都只能
+    是编的；契约也没有"只有页码、没有区域"的 locator 种类。为什么 `blocks=[]`：
+    `validate_block` 要求每个 block 都带 locator，而 locator 没有"未知"取值，因此这条
+    记录**无法**被表示成一个合法的 contract block —— 与其伪造一块，不如如实声明
+    "该记录没有块级定位"。
+    缺口通过 `unsupported_features=[OHR_LOCATOR_GAP]` 与
+    `failed_scope(status='unsupported')` 显式声明；文本仍落在 `document_blocks`（无定位），
+    切片/向量照常，不会被静默丢弃。
+    `parse_status` 取 'unsupported' 而不是 'partial'：契约对空 blocks 只接受
+    'unsupported'/'failed'（'partial' 会被判 PARSE_RESULT_INVALID: empty_for_status），
+    而且语义上"不具备定位能力"比"部分解析"更准确——并没有任何内容解析失败。
+    """
+    page_no = record["page_idx"] + 1
+    return {
+        "classification": {"detected_media_type": OHR_MEDIA_TYPE, "source_name": source_name},
+        "adapter_capabilities": ["native_text"],
+        "blocks": [],
+        "relations": [],
+        "parsed_scope": [],
+        "failed_scope": [{"kind": "page", "ref": page_no, "status": "unsupported",
+                          "detail": OHR_LOCATOR_GAP}],
+        "quality_findings": [],
+        "unsupported_features": [OHR_LOCATOR_GAP],
+        "artifact_refs": [],
+        "manifest": {"parser_version": parser_version, "source_sha256": source_version},
+        "parse_status": "unsupported",
+    }
+
+
+def _ensure_ohr_adapter():
+    """Register the OHR-Bench JSON adapter once (explicit dispatch: JSON has no signature)."""
+    from datamind import parse_contract
+
+    if OHR_ADAPTER not in parse_contract.registered_adapters():
+        parse_contract.register_adapter(
+            OHR_ADAPTER, media_types=[OHR_MEDIA_TYPE], capabilities=["native_text"],
+            handler=_ohr_contract_payload)
+
+
 BLOCK_INSERT_SQL = """
     INSERT INTO document_blocks(block_id, document_id, page_no, bbox, block_type,
         text, table_cells, formula_latex, reading_order, heading_level,
@@ -134,11 +218,52 @@ LOCATOR_INSERT_SQL = """
     INSERT INTO document_block_locators(block_id, document_id, contract_version, locator)
     VALUES (%s,%s,%s,%s)"""
 
+# ---------- F08：写 `document_assets.status` 的两条语句（唯一的 SQL 定义处） ----------
+REGISTER_ASSET_SQL = """
+    INSERT INTO document_assets(document_id, title, collection, file_type, origin,
+        sha256, object_uri, page_count, language, acl, quality_score, quality_detail,
+        parser_version, status, uploaded_at)
+    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,now())
+    ON CONFLICT (document_id) DO UPDATE SET status=EXCLUDED.status"""
+MARK_NON_SEARCHABLE_SQL = "UPDATE document_assets SET status=%s, parser_version=%s WHERE document_id=%s"
+MARK_TERMINAL_SQL = """UPDATE document_assets SET status=%s, needs_review=%s, page_count=%s,
+       quality_score=%s, quality_detail=%s, doc_version=1, parser_version=%s
+    WHERE document_id=%s"""
+
+
+def register_asset(cur, *, doc_id, title, collection, file_type, origin, sha256, object_uri):
+    """F08: 登记/开新版本，状态只从 ASSET_STATUS_WRITES 取（这里恒为不可检索）。"""
+    cur.execute(REGISTER_ASSET_SQL, (doc_id, title, collection, file_type, origin, sha256,
+                                     object_uri, 0, "zh", ["public"], None, None, PARSER_VERSION,
+                                     NON_SEARCHABLE_STATUS))
+
+
+def mark_asset_status(cur, doc_id, status, *, parser_version=PARSER_VERSION, terminal=None):
+    """F08: 本文件**唯一**写 `document_assets.status` 的函数。
+
+    `status` 只能取 ASSET_STATUS_WRITES 中的值。`terminal=None` 用于登记资产与发布第 1
+    步（只改 status + parser_version）；`terminal` 给出 needs_review/page_count/
+    quality_score/quality_detail 时用于发布终态。
+    """
+    if status not in ASSET_STATUS_WRITES:
+        raise ValueError(f"UNKNOWN_ASSET_STATUS:{status!r}")
+    if terminal is None:
+        cur.execute(MARK_NON_SEARCHABLE_SQL, (status, parser_version, doc_id))
+        return
+    cur.execute(MARK_TERMINAL_SQL, (status, terminal["needs_review"], terminal["page_count"],
+                                    terminal["quality_score"], terminal["quality_detail"],
+                                    parser_version, doc_id))
+
 
 def _block_row(block, doc_id):
-    """Row for `document_blocks`; unchanged historical shape (no contract columns)."""
+    """Row for `document_blocks`; unchanged historical shape (no contract columns).
+
+    `bbox` is written as SQL NULL when the producer has no geometry (the OHR-Bench JSON
+    branch), instead of fabricating a zero box; the column is nullable for exactly this.
+    """
+    bbox = block.get("bbox")
     return (block["block_id"], doc_id, block["page_no"],
-            json.dumps(block["bbox"]), block["block_type"], block["text"],
+            json.dumps(bbox) if bbox is not None else None, block["block_type"], block["text"],
             json.dumps(block["table_cells"], ensure_ascii=False) if block.get("table_cells") else None,
             block.get("formula_latex"), block["reading_order"], block.get("heading_level"),
             block.get("ocr_confidence"), PARSER_VERSION,
@@ -156,6 +281,38 @@ def _locator_row(block, doc_id):
         return None
     return (block["block_id"], doc_id, block["contract_version"],
             json.dumps(locator, ensure_ascii=False))
+
+
+def _contract_error_summary(version, error, blocks):
+    """A contract violation is recorded, never raised: the gap stays visible in quality_detail."""
+    code = error.detail.get("error_code") if isinstance(error.detail, dict) else None
+    return {"contract_version": version, "validation": "failed",
+            "error_code": code or "PARSE_CONTRACT_FAILED", "blocks": len(blocks)}
+
+
+def _carry_and_summarize(result, blocks, adapter):
+    """Shared contract tail: carry each validated locator onto its block, then summarize.
+
+    Both producers (PDF and OHR-Bench JSON) end here, so "走同一契约路径" is one code path
+    and not two look-alike copies.
+    """
+    payload = result.payload
+    locators = {block["block_id"]: block["locator"] for block in payload["blocks"]}
+    for block in blocks:
+        # Carry the validated locator with the block so persistence writes the same object
+        # that was validated, instead of a re-derived copy. A block the contract did not
+        # return (no representable locator) gets None and therefore writes no locator row.
+        block["contract_locator"] = locators.get(block.get("block_id"))
+        block["contract_version"] = payload["contract_version"]
+    summary = {"contract_version": payload["contract_version"], "validation": "parsed",
+               "adapter": adapter, "parse_status": payload["parse_status"],
+               "blocks": len(payload["blocks"]), "source_blocks": len(blocks),
+               "locators_written": sum(1 for block in blocks if block.get("contract_locator")),
+               "locator_kinds": sorted({block["locator"]["locator_kind"] for block in payload["blocks"]})}
+    if payload["unsupported_features"]:
+        # F01: an explicit gap declaration travels with the summary instead of being hidden.
+        summary["unsupported_features"] = list(payload["unsupported_features"])
+    return summary
 
 
 def _contract_summary(document, pdf_path, doc_id, blocks, detail):
@@ -181,21 +338,31 @@ def _contract_summary(document, pdf_path, doc_id, blocks, detail):
                                         page_sizes=page_sizes, detail=detail,
                                         parser_version=PARSER_VERSION)
     except HTTPException as error:
-        code = error.detail.get("error_code") if isinstance(error.detail, dict) else None
-        return {"contract_version": version, "validation": "failed",
-                "error_code": code or "PARSE_CONTRACT_FAILED", "blocks": len(blocks)}
-    payload = result.payload
-    locators = {block["block_id"]: block["locator"] for block in payload["blocks"]}
-    for block in blocks:
-        # Carry the validated locator with the block so persistence writes the same object
-        # that was validated, instead of a re-derived copy.
-        block["contract_locator"] = locators.get(block.get("block_id"))
-        block["contract_version"] = payload["contract_version"]
-    return {"contract_version": payload["contract_version"], "validation": "parsed",
-            "adapter": _PDF_ADAPTER, "parse_status": payload["parse_status"],
-            "blocks": len(payload["blocks"]),
-            "locators_written": sum(1 for block in blocks if block.get("contract_locator")),
-            "locator_kinds": sorted({block["locator"]["locator_kind"] for block in payload["blocks"]})}
+        return _contract_error_summary(version, error, blocks)
+    return _carry_and_summarize(result, blocks, _PDF_ADAPTER)
+
+
+def _ohr_contract_summary(record, json_path, doc_id, blocks, source_version):
+    """F01: route the OHR-Bench JSON branch through the same contract validation.
+
+    Same `parse_contract.dispatch` + same `_carry_and_summarize` tail as the PDF path; the
+    difference is only the adapter, because an OHR record has no bbox/page size and so
+    yields an explicit `unsupported_features` gap rather than a fabricated locator.
+    """
+    from fastapi import HTTPException
+
+    from datamind import parse_contract
+
+    version = parse_contract.CONTRACT_VERSION
+    _ensure_ohr_adapter()
+    try:
+        result = parse_contract.dispatch(OHR_MEDIA_TYPE, record=record, doc_id=doc_id,
+                                         source_name=Path(json_path).name,
+                                         parser_version=PARSER_VERSION,
+                                         source_version=source_version)
+    except HTTPException as error:
+        return _contract_error_summary(version, error, blocks)
+    return _carry_and_summarize(result, blocks, OHR_ADAPTER)
 
 
 def parse_pdf(pdf_path: Path, doc_id: str, ocr_proxy: Path | None = None, *, include_quality=False,
@@ -470,8 +637,7 @@ def publish_document(cur, qc, doc_id, collection, points, write_metadata, *, com
     （HTTP /v1/pdf-knowledge/orphans 与 /v1/pdf-knowledge/orphans/reclaim）兜底。
     """
     # 1) 先落"不可检索"状态并提交（提交后 Qdrant 才可能被改动）
-    cur.execute("UPDATE document_assets SET status=%s, parser_version=%s WHERE document_id=%s",
-                (NON_SEARCHABLE_STATUS, parser_version, doc_id))
+    mark_asset_status(cur, doc_id, NON_SEARCHABLE_STATUS, parser_version=parser_version)
     commit()
 
     # 2) Qdrant 覆盖式重建该文档的向量
@@ -483,12 +649,12 @@ def publish_document(cur, qc, doc_id, collection, points, write_metadata, *, com
 
     # 3) PG 元数据 + 终态提交（只有走到这里才可能变成 'indexed'）
     chunk_count = write_metadata() or 0
-    cur.execute("""
-        UPDATE document_assets SET status=%s, needs_review=%s, page_count=%s,
-               quality_score=%s, quality_detail=%s, doc_version=1, parser_version=%s
-        WHERE document_id=%s""",
-        (SEARCHABLE_STATUS if chunk_count else FAILED_STATUS, not chunk_count, page_count,
-         quality_score, json.dumps(quality_detail, ensure_ascii=False), parser_version, doc_id))
+    # F08: 终态取值同样只从 ASSET_STATUS_WRITES 取；'indexed' 才是检索可见态。
+    mark_asset_status(cur, doc_id, SEARCHABLE_STATUS if chunk_count else FAILED_STATUS,
+                      parser_version=parser_version,
+                      terminal={"needs_review": not chunk_count, "page_count": page_count,
+                                "quality_score": quality_score,
+                                "quality_detail": json.dumps(quality_detail, ensure_ascii=False)})
     commit()
     return chunk_count
 
@@ -518,6 +684,27 @@ def knowledge_base_jobs(kb_dir=None):
                      "collection": "demo_kb"})
     undeclared = sorted(path.name for path in kb_dir.glob("*.pdf") if path.name not in set(declared))
     return jobs, missing, undeclared
+
+
+# ---------- F12：`--reset` 的清理范围 ----------
+# reset 会重建 document_blocks/document_assets，若不清契约三表，就会留下指不到任何
+# 块的孤儿定位（document_block_locators）与孤儿关系/契约块
+# （document_block_relations / document_contract_blocks）。子表在前、父表在后
+# （当前没有外键，顺序只为语义清晰；这些表名是模块常量，不是外部输入）。
+RESET_DELETE_TABLES = ("document_block_relations", "document_contract_blocks",
+                       "document_block_locators", "chunks", "document_blocks",
+                       "ingest_jobs",
+                       # 事实行同样是"按文档"的：只删 assets/facts 会留下指向已不存在事实的
+                       # 复核与审批（它们对 document_facts 无外键，因此不会被级联清掉）。
+                       # 审批引用复核，故 approvals 先删。
+                       "document_fact_approvals", "document_fact_reviews", "document_facts",
+                       "document_assets")
+
+
+def reset_metadata(cur):
+    """F12: 清空重建所需的所有元数据行，契约三表包含在内。"""
+    for table in RESET_DELETE_TABLES:
+        cur.execute(f"DELETE FROM {table}")
 
 
 def main():
@@ -555,10 +742,7 @@ def main():
 
     if args.reset:
         print("resetting knowledge index ...")
-        cur.execute("DELETE FROM chunks")
-        cur.execute("DELETE FROM document_blocks")
-        cur.execute("DELETE FROM ingest_jobs")
-        cur.execute("DELETE FROM document_assets")
+        reset_metadata(cur)
         meta.commit()
         qc = QdrantClient(url=QDRANT, trust_env=False)
         if qc.collection_exists(COLLECTION):
@@ -603,14 +787,9 @@ def main():
             print(f"  skip (indexed): {job['title']}")
             continue
 
-        cur.execute("""
-            INSERT INTO document_assets(document_id, title, collection, file_type, origin,
-                sha256, object_uri, page_count, language, acl, quality_score, quality_detail,
-                parser_version, status, uploaded_at)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'parsing',now())
-            ON CONFLICT (document_id) DO UPDATE SET status='parsing'""",
-            (doc_id, job["title"], job["collection"], job["file_type"], job["origin"],
-             digest, str(path), 0, "zh", ["public"], None, None, PARSER_VERSION))
+        register_asset(cur, doc_id=doc_id, title=job["title"], collection=job["collection"],
+                       file_type=job["file_type"], origin=job["origin"], sha256=digest,
+                       object_uri=str(path))
         # F10 第 1 步（提前）：登记为非检索状态后**立即提交**，让解析/嵌入这段
         # 长事务期间该文档也选不中；失败时不会退回旧的已提交状态。
         meta.commit()
@@ -626,15 +805,20 @@ def main():
         else:
             rec = job["record"]
             page_count = 1
-            blocks = [{"page_no": rec['page_idx'] + 1, "block_type": "paragraph",
-                       "bbox": [0, 0, 0, 0], "text": rec["gt_text"],
-                       "heading_level": None, "table_cells": None,
-                       "reading_order": 0, "ocr_confidence": 1.0}]
+            # F01: 不再写死 bbox=[0,0,0,0]（契约会判 bbox_inverted，且那是个编造的定位）。
+            blocks = [ohr_block(rec)]
             q_detail = {"text_coverage": 1.0, "source_page_no": rec['page_idx'] + 1,
                         "note": "OHR-Bench 人工校准 gt_text（原始样本转录，不是本项目 OCR）"}
             q_score = 1.0
 
         ensure_block_ids(blocks, doc_id)
+        if job["file_type"] != "pdf":
+            # F01：JSON/OHR 分支与 PDF 分支走同一套契约校验（parse_contract.dispatch +
+            # 同一个 _carry_and_summarize 收尾），只是适配器不同。该分支的记录没有 bbox
+            # 与页面尺寸，因此产出的是**显式缺口声明**，而不是编造坐标；文本仍照常落
+            # document_blocks / 切片 / 向量，不会被丢。
+            q_detail["parse_contract"] = _ohr_contract_summary(
+                job["record"], path, doc_id, blocks, digest)
         extracted, field_detail = facts.extract(blocks, document_id=doc_id, source_sha256=digest,
                                                parser_version=PARSER_VERSION)
         q_detail["fact_extraction"] = field_detail

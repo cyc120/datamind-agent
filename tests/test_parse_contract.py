@@ -5,7 +5,9 @@ per-kind locator requirements, relation integrity, the ingest state machine, the
 registry (including explicit refusal) and the mapping of real ingest block shapes.
 """
 import json
+import re
 import tempfile
+import uuid
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -16,6 +18,36 @@ from ingestion import ingest
 from datamind import parse_contract as contract
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def contract_block_columns():
+    """The `document_contract_blocks` columns the checked-in migrations declare.
+
+    Read from the migration files rather than the live database so the closure of the block
+    shape can be checked without a database and before `db/migrate.py` has run.
+    """
+    columns = set()
+    for path in sorted((ROOT / 'db/migrations').glob('*.sql')):
+        text = path.read_text(encoding='utf-8')
+        for body in re.findall(r'CREATE TABLE IF NOT EXISTS document_contract_blocks\s*\((.*?)\);',
+                               text, re.S):
+            for line in body.splitlines():
+                token = line.strip().split(None, 1)
+                if token and re.fullmatch(r'[a-z_]+', token[0]):
+                    columns.add(token[0])
+        columns.update(re.findall(
+            r'ALTER TABLE document_contract_blocks\s+ADD COLUMN IF NOT EXISTS ([a-z_]+)', text))
+    return columns
+
+
+def live_contract_block_columns():
+    """The columns the running database actually has (empty when it is unreachable)."""
+    import psycopg2
+    from datamind.agent import _write_dsn
+    with psycopg2.connect(_write_dsn()) as conn, conn.cursor() as cur:
+        cur.execute("""SELECT column_name FROM information_schema.columns
+            WHERE table_name='document_contract_blocks'""")
+        return {row[0] for row in cur.fetchall()}
 
 
 def locator(kind='pdf_region', **overrides):
@@ -551,3 +583,249 @@ class StorageColumnTests(unittest.TestCase):
         self.assertEqual(found.get('locator'), 'jsonb')
         self.assertEqual(found.get('block_id'), 'character varying')
         self.assertIsNotNone(owner)
+
+
+class BlockWidthTests(unittest.TestCase):
+    """F06: a value longer than its storage column is refused by the contract.
+
+    The defect: `from_pdf_blocks` accepted a 66-character `block_id` and validation accepted
+    a 132-character `document_id`, while every contract table declares VARCHAR(64) for both.
+    A result could therefore pass validation and then fail at INSERT time.
+    """
+
+    def error(self, code, reason, action):
+        with self.assertRaises(HTTPException) as caught:
+            action()
+        self.assertEqual(caught.exception.detail['error_code'], code)
+        self.assertEqual(caught.exception.detail['details'].get('reason'), reason)
+
+    def block(self, document_id='doc-1', **overrides):
+        payload = {'block_id': 'b1', 'document_id': document_id, 'source_version': 'v1',
+                   'parser_version': 'pdf-ocr-0.4', 'block_type': 'paragraph', 'text': '正文',
+                   'native_attributes': {}, 'reading_order': 0,
+                   'locator': locator('office_object', document_id=document_id),
+                   'quality': {}, 'content_hash': 'a' * 64}
+        payload.update(overrides)
+        return payload
+
+    def test_the_widths_are_the_storage_widths(self):
+        self.assertEqual(contract.BLOCK_COLUMN_WIDTHS,
+                         {'block_id': 64, 'document_id': 64, 'parser_version': 64,
+                          'source_version': 128})
+        self.assertEqual(contract.DOCUMENT_ID_MAX_LENGTH, 64)
+
+    def test_every_identifier_is_checked_against_its_column(self):
+        for field, limit in contract.BLOCK_COLUMN_WIDTHS.items():
+            if field == 'document_id':
+                accepted = self.block(document_id='x' * limit)
+
+                def refused(limit=limit):
+                    return contract.validate_block(self.block(document_id='x' * (limit + 1)))
+            else:
+                accepted = self.block(**{field: 'x' * limit})
+
+                def refused(field=field, limit=limit):
+                    return contract.validate_block(self.block(**{field: 'x' * (limit + 1)}))
+            self.assertEqual(len(contract.validate_block(accepted).payload[field]), limit)
+            self.error('PARSE_BLOCK_INVALID', f'{field}_too_long', refused)
+
+    def test_a_locator_document_id_is_bounded_too(self):
+        self.error('PARSE_LOCATOR_INVALID', 'document_id_too_long',
+                   lambda: contract.validate_locator(
+                       locator('office_object', document_id='d' * 65)))
+        self.assertEqual(contract.validate_locator(
+            locator('office_object', document_id='d' * 64)).document_id, 'd' * 64)
+    def test_require_document_id_is_the_rule_the_adapters_share(self):
+        self.assertEqual(contract.require_document_id('d' * 64), 'd' * 64)
+        self.error('PARSE_RESULT_INVALID', 'document_id_too_long',
+                   lambda: contract.require_document_id('d' * 65, code='PARSE_RESULT_INVALID',
+                                                        subject='cad'))
+
+    def generated_pdf_blocks(self, document_id, count=30, **overrides):
+        source = {'page_no': 1, 'bbox': [1.0, 2.0, 3.0, 4.0], 'block_type': 'paragraph',
+                  'text': '正文'}
+        source.update(overrides)
+        return contract.from_pdf_blocks([dict(source) for _ in range(count)],
+                                        page_sizes={1: (595.0, 842.0)},
+                                        parser_version='pdf-ocr-0.4',
+                                        document_id=document_id, source_version='v1')
+
+    def test_generated_pdf_block_ids_fit_the_column_for_a_long_document(self):
+        mapped = self.generated_pdf_blocks('d' * 64)
+        identifiers = [item['block_id'] for item in mapped]
+        self.assertEqual(len(set(identifiers)), len(identifiers))
+        for identifier in identifiers:
+            self.assertLessEqual(len(identifier), 64, identifier)
+        self.assertEqual(len(contract.validate_parse_result(
+            parse_result(blocks=mapped, relations=[])).blocks), len(mapped))
+
+    def test_an_explicit_over_long_id_is_refused_not_truncated(self):
+        # The defect's reproduction: 66 characters used to be accepted here.
+        self.error('PARSE_BLOCK_INVALID', 'block_id_too_long',
+                   lambda: self.generated_pdf_blocks('doc-1', count=1, block_id='x' * 66))
+
+    def test_a_document_id_the_stores_cannot_hold_is_refused(self):
+        for length in (65, 132, 200):
+            self.error('PARSE_BLOCK_INVALID', 'document_id_too_long',
+                       lambda length=length: self.generated_pdf_blocks('d' * length, count=1))
+
+
+class BlockShapeClosureTests(unittest.TestCase):
+    """F07: every key a validated block may carry has a column to live in.
+
+    Reproducing the defect: validation accepted `heading_level`/`table_cells` while
+    `document_contract_blocks` had no column for them, so an Office table lost its cells on
+    write even though the contract had said the block was valid.
+    """
+
+    def block(self, **overrides):
+        payload = {'block_id': 'b1', 'document_id': 'doc-1', 'source_version': 'v1',
+                   'parser_version': 'office-native-v1', 'block_type': 'paragraph',
+                   'text': '正文', 'native_attributes': {}, 'reading_order': 0,
+                   'locator': locator('office_object'), 'quality': {},
+                   'content_hash': 'a' * 64}
+        payload.update(overrides)
+        return payload
+
+    def test_the_block_shape_is_closed(self):
+        for key in contract.BLOCK_OPTIONAL_FIELDS:
+            self.assertEqual(contract.validate_block(self.block(**{key: None})).payload[key], None)
+        with self.assertRaises(HTTPException) as caught:
+            contract.validate_block(self.block(invented_field=1))
+        self.assertEqual(caught.exception.detail['error_code'], 'PARSE_BLOCK_INVALID')
+        self.assertEqual(caught.exception.detail['details']['reason'], 'unknown_field')
+
+    def test_the_migrations_declare_a_column_for_every_block_key(self):
+        columns = contract_block_columns()
+        allowed = set(contract.BLOCK_REQUIRED_FIELDS) | set(contract.BLOCK_OPTIONAL_FIELDS)
+        self.assertTrue(allowed <= columns, sorted(allowed - columns))
+        # The table may carry its own bookkeeping columns; nothing else is expected.
+        self.assertTrue(columns - allowed <= {'contract_version', 'created_at'},
+                        sorted(columns - allowed - {'contract_version', 'created_at'}))
+
+    def test_an_empty_key_value_is_still_storable(self):
+        """Optional keys that are present but empty must not become "unknown"."""
+        block = contract.validate_block(self.block(heading_level=None, table_cells=None)).payload
+        self.assertIn('table_cells', block)
+        self.assertEqual(block['table_cells'], None)
+
+
+class OfficeContractBlockStorageTests(unittest.TestCase):
+    """F07 acceptance: an Office block round-trips with heading level and table cells."""
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.path = Path(self.directory.name) / 'shape.docx'
+        import docx
+        document = docx.Document()
+        document.add_heading('标题一', level=1)
+        document.add_paragraph('正文段落')
+        table = document.add_table(rows=2, cols=2)
+        table.cell(0, 0).text = '项目'
+        table.cell(0, 1).text = '数值'
+        table.cell(1, 0).text = '不良率'
+        table.cell(1, 1).text = '0.8%'
+        document.save(str(self.path))
+        self.document_id = f'doc-shape-{uuid.uuid4().hex[:12]}'
+        from datamind.agent import _write_dsn
+        self.dsn = _write_dsn()
+        self.addCleanup(self.cleanup)
+
+    def cleanup(self):
+        import psycopg2
+        with psycopg2.connect(self.dsn) as conn, conn.cursor() as cur:
+            cur.execute('DELETE FROM document_contract_blocks WHERE document_id=%s',
+                        (self.document_id,))
+
+    def parse(self):
+        from ingestion import office
+        return office.parse(self.path, document_id=self.document_id, source_version='v1')
+
+    def missing_columns(self):
+        allowed = set(contract.BLOCK_REQUIRED_FIELDS) | set(contract.BLOCK_OPTIONAL_FIELDS)
+        return sorted(allowed - live_contract_block_columns())
+
+    def test_office_blocks_with_headings_and_cells_survive_the_store(self):
+        missing = self.missing_columns()
+        if missing:
+            self.skipTest('db/migrations/017_contract_block_shape.sql not applied: %s' % missing)
+        import psycopg2
+        from ingestion import contract_store
+        payload = self.parse().payload
+        title = next(block for block in payload['blocks'] if block['block_type'] == 'title')
+        table = next(block for block in payload['blocks'] if block['block_type'] == 'table')
+        self.assertEqual(title['heading_level'], 1)
+        self.assertEqual(table['table_cells'], [['项目', '数值'], ['不良率', '0.8%']])
+        with psycopg2.connect(self.dsn) as conn, conn.cursor() as cur:
+            stored = contract_store.persist_result(cur, document_id=self.document_id,
+                                                   payload=payload, dsn=self.dsn)
+        self.assertEqual(stored['omitted_columns'], [])
+        self.assertEqual(stored['blocks'], len(payload['blocks']))
+        read = contract_store.read_result(self.document_id, self.dsn)
+        by_type = {block['block_type']: block for block in read['blocks']}
+        self.assertEqual(by_type['title']['heading_level'], 1)
+        self.assertEqual(by_type['table']['table_cells'], [['项目', '数值'], ['不良率', '0.8%']])
+        for block in read['blocks']:
+            for name in contract.BLOCK_REQUIRED_FIELDS + contract.BLOCK_OPTIONAL_FIELDS:
+                self.assertIn(name, block, name)
+
+    def test_the_live_table_accepts_every_block_key(self):
+        missing = self.missing_columns()
+        if missing:
+            self.skipTest('db/migrations/017_contract_block_shape.sql not applied: %s' % missing)
+        import psycopg2
+        from psycopg2.extras import Json
+        columns = live_contract_block_columns()
+        blocks = self.parse().payload['blocks']
+        jsonish = ('locator', 'native_attributes', 'quality', 'table_cells', 'bbox')
+        with psycopg2.connect(self.dsn) as conn, conn.cursor() as cur:
+            for block in blocks:
+                # Every key this particular block carries must have a column; a
+                # page-independent Office block simply has no page_no/bbox to store.
+                storable = [name for name in (contract.BLOCK_REQUIRED_FIELDS
+                                              + contract.BLOCK_OPTIONAL_FIELDS)
+                            if name in columns and name in block]
+                cur.execute(
+                    'INSERT INTO document_contract_blocks(%s) VALUES (%s)' % (
+                        ', '.join(['contract_version'] + storable),
+                        ', '.join(['%s'] * (1 + len(storable)))),
+                    [contract.CONTRACT_VERSION] + [
+                        Json(block[name]) if name in jsonish else block[name]
+                        for name in storable])
+                cur.execute(
+                    'SELECT %s FROM document_contract_blocks WHERE block_id=%%s' % ', '.join(storable),
+                    (block['block_id'],))
+                row = cur.fetchone()
+                for name, value in zip(storable, row):
+                    self.assertEqual(value, block[name], name)
+            conn.rollback()
+
+
+class CadLocatorProjectionTests(unittest.TestCase):
+    """F10: the unified `cad_entity` locator is the projection of the frozen CAD locator."""
+
+    def test_the_declared_source_fields_are_the_frozen_locators_fields(self):
+        from ingestion import cad_contract
+        self.assertEqual(set(contract.CAD_SOURCE_LOCATOR_FIELDS),
+                         set(cad_contract.Locator.model_fields))
+
+    def test_no_source_field_is_declared_dropped(self):
+        self.assertEqual(contract.CAD_SOURCE_LOCATOR_DROPPED_FIELDS, {})
+        self.assertTrue(set(contract.CAD_SOURCE_LOCATOR_DROPPED_FIELDS)
+                        <= set(contract.CAD_SOURCE_LOCATOR_FIELDS))
+
+    def test_every_source_field_is_required_or_optional_for_cad_entity(self):
+        covered = set(contract.LOCATOR_REQUIRED_FIELDS['cad_entity']) \
+            | set(contract.LOCATOR_OPTIONAL_FIELDS['cad_entity'])
+        uncovered = sorted(set(contract.CAD_SOURCE_LOCATOR_FIELDS) - covered)
+        self.assertEqual(uncovered, [])
+
+    def test_the_source_digest_is_validated_when_it_is_carried(self):
+        carried = contract.validate_locator(locator('cad_entity', source_sha256='a' * 64))
+        self.assertEqual(carried.payload['source_sha256'], 'a' * 64)
+        with self.assertRaises(HTTPException) as caught:
+            contract.validate_locator(locator('cad_entity', source_sha256='not-a-digest'))
+        self.assertEqual(caught.exception.detail['error_code'], 'PARSE_LOCATOR_INVALID')
+        self.assertEqual(caught.exception.detail['details']['reason'], 'source_sha256')
+

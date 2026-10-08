@@ -25,12 +25,48 @@ DEMO_DISPLAY = '本机管理员'
 DEMO_CSRF = secrets.token_urlsafe(32)
 _LOOPBACK = {'127.0.0.1','::1','localhost'}
 
+#: Fixed browser-origin allow-list. It must never be derived from a request header:
+#: ``Host`` / ``Origin`` / ``X-Forwarded-*`` are all caller-controlled, so a request
+#: whose ``Host`` matches its own ``Origin`` would otherwise authorize itself. A
+#: non-default front-end can be added with a comma separated ``DATAMIND_ALLOWED_ORIGINS``.
+DEFAULT_ALLOWED_ORIGINS = ('http://127.0.0.1:8000','http://localhost:8000',
+                           'http://127.0.0.1:3000','http://localhost:3000')
+
+
+def allowed_origins() -> frozenset:
+    values=list(DEFAULT_ALLOWED_ORIGINS)
+    for item in (os.environ.get('DATAMIND_ALLOWED_ORIGINS') or '').split(','):
+        item=item.strip().rstrip('/')
+        if item:values.append(item)
+    return frozenset(values)
+
+
+def socket_host(request) -> str:
+    """Transport peer address only; forwarding headers are never trusted.
+
+    ``X-Forwarded-For`` / ``X-Real-IP`` / ``Forwarded`` are caller-controlled. With
+    uvicorn's proxy-headers middleware enabled a loopback peer could claim any address
+    and a remote peer could claim loopback; the start scripts therefore pass
+    ``--no-proxy-headers`` and this helper reads ``scope['client']`` directly.
+    """
+    client=getattr(request,'client',None)
+    host=getattr(client,'host','') if client is not None else ''
+    if host:return host
+    peer=(getattr(request,'scope',None) or {}).get('client')
+    return peer[0] if peer else ''
+
 
 def demo_allowed(request):
     flag=os.environ.get('DATAMIND_LOCAL_NO_LOGIN')
     if flag is not None:
         return flag.strip().lower() not in {'','0','false','no','off'}
-    return (request.client.host if request.client else '') in _LOOPBACK
+    return socket_host(request) in _LOOPBACK
+
+
+def demo_identity() -> dict:
+    """Static no-login administrator view; touches no database."""
+    return {'user_id':DEMO_USER_ID,'username':DEMO_USERNAME,'display_name':DEMO_DISPLAY,
+            'roles':['admin'],'csrf_token':DEMO_CSRF,'_demo':True}
 
 
 def ensure_demo_user(dsn):
@@ -39,12 +75,12 @@ def ensure_demo_user(dsn):
         cur.execute('''INSERT INTO auth_users(user_id,username,display_name,password_hash,roles)
             VALUES (%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING''',
             (DEMO_USER_ID,DEMO_USERNAME,DEMO_DISPLAY,password_hash(secrets.token_urlsafe(24)),['admin']))
-    return {'user_id':DEMO_USER_ID,'username':DEMO_USERNAME,'display_name':DEMO_DISPLAY,
-            'roles':['admin'],'csrf_token':DEMO_CSRF,'_demo':True}
+    return demo_identity()
 
 
-def _demo_identity(request,dsn,mutation):
-    user=ensure_demo_user(dsn)
+def _demo_identity(request,dsn,mutation,*,provision=True):
+    # Read paths pass provision=False so a GET never writes an audit/identity row.
+    user=ensure_demo_user(dsn) if provision else demo_identity()
     if mutation:
         origin_check(request)
         if not hmac.compare_digest(request.headers.get('x-csrf-token','').encode(),user['csrf_token'].encode()):
@@ -90,9 +126,19 @@ def provision(username,display_name,password,roles,dsn):
 
 
 def origin_check(request):
+    """Reject cross-site / non-allow-listed browser origins.
+
+    Expected origins come from a fixed allow-list (defaults + ``DATAMIND_ALLOWED_ORIGINS``),
+    never from the request's own ``Host`` header: ``Host: evil.example`` with a matching
+    ``Origin`` must not be able to authorize itself. Requests without an ``Origin`` header
+    (curl, server-to-server, same-origin navigation) stay allowed; ``Sec-Fetch-Site:
+    cross-site`` is rejected even without ``Origin``.
+    """
+    if (request.headers.get('sec-fetch-site') or '').strip().lower()=='cross-site':
+        fail('ORIGIN_NOT_ALLOWED',403)
     origin=request.headers.get('origin')
-    expected=str(request.base_url).rstrip('/')
-    if (origin is not None and origin!=expected) or request.headers.get('sec-fetch-site')=='cross-site':
+    if origin is None:return
+    if origin.strip().rstrip('/') not in allowed_origins():
         fail('ORIGIN_NOT_ALLOWED',403)
 
 
@@ -128,11 +174,11 @@ def login(request,username,password,dsn):
     return token,dict(user_id=user['user_id'],username=user['username'],display_name=user['display_name'],roles=user['roles']),csrf
 
 
-def current(request,dsn,*,required=False,permission=None,mutation=False):
+def current(request,dsn,*,required=False,permission=None,mutation=False,provision_demo=True):
     token=request.cookies.get(COOKIE)
     demo=demo_allowed(request)
     if not token:
-        if demo:return _demo_identity(request,dsn,mutation)
+        if demo:return _demo_identity(request,dsn,mutation,provision=provision_demo)
         if required:fail('LOGIN_REQUIRED')
         return None
     with psycopg2.connect(dsn) as conn,conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -141,7 +187,7 @@ def current(request,dsn,*,required=False,permission=None,mutation=False):
             AND s.expires_at>now() AND u.active''',(hashlib.sha256(token.encode()).hexdigest(),))
         user=cur.fetchone()
     if not user:
-        if demo:return _demo_identity(request,dsn,mutation)
+        if demo:return _demo_identity(request,dsn,mutation,provision=provision_demo)
         if required:fail('SESSION_INVALID')
         return None
     user=dict(user)

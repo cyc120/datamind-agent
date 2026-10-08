@@ -10,11 +10,11 @@
 
 `赛题/` 和 `技术文档/` 为项目资料，不参与网关运行。
 
-技术设计主入口已整理为 **[V1.3 整合版说明书](技术文档/DataMind_Agent_技术设计说明书_V1.3.md)**（0.37.0 基线）：依据[复杂文件分类与解析参考 MD](<技术文档/复杂非结构化文件分类与解析技术文档.md>)统一文件分类、解析/结构/定位契约、工业跨源核验、真实接口与分层验收。当前 SQL 问数、文档问答、真实扫描 OCR、公式图片解析和字段候选/定位已接入；限定工业温度规则核验、受控二维 DXF、认证关联复核与单条尺寸核验服务可运行。尺寸页面、受控文件队列与最多 8 份文件的显式 RAG 已完成；原生 PDF 已有离线准备和认证快照登记，已有私有知识发布与冻结计划恢复。私有 PDF 可显式多文件检索，并能在本次检索证据上做受控模型回答（原文连续片段/数字支持校验、生成后重查身份与证据）。私有 PDF 已可按冻结计划受控修复丢失点并回收孤立点；通用 V-CAR 依赖计划（并发、受影响子图局部修复、统一预算、断点恢复）已实现，节点可在独立进程组内按统一预算执行并经 `POST /v1/plans/execute` 受控调用（目标由服务端白名单决定）。PDF/OCR 解析队列、视觉载荷与机制消融、完整表格结构、通用 CAD/工业查询与广泛来源裁决仍待扩展。能力与历史分母见 [V1.3 §18](技术文档/DataMind_Agent_技术设计说明书_V1.3.md#18-实施状态历史成绩与修订记录)；历史文档/OCR/工业评测与各阶段边界见 [V1.2 历史说明书](技术文档/DataMind_Agent_技术设计说明书_V1.2.md#18-实施进度与下一步验收2026-年-10-月-2-日) §18.12–18.33。
+技术设计主入口已整理为 **[V1.3 整合版说明书](技术文档/DataMind_Agent_技术设计说明书_V1.3.md)**（0.37.0 基线）：依据[复杂文件分类与解析参考 MD](<技术文档/复杂非结构化文件分类与解析技术文档.md>)统一文件分类、解析/结构/定位契约、工业跨源核验、真实接口与分层验收。当前 SQL 问数、文档问答、真实扫描 OCR、公式图片解析和字段候选/定位已接入；限定工业温度规则核验、受控二维 DXF、认证关联复核与单条尺寸核验服务可运行。尺寸页面、受控文件队列与最多 8 份文件的显式 RAG 已完成；原生 PDF 已有离线准备和认证快照登记，已有私有知识发布与冻结计划恢复。私有 PDF 可显式多文件检索，并能在本次检索证据上做受控模型回答（原文连续片段/数字支持校验、生成后重查身份与证据）。私有 PDF 已可按冻结计划受控修复丢失点并回收孤立点；通用 V-CAR 依赖计划（并发、受影响子图局部修复、统一预算、断点恢复）已实现，节点可在独立进程组内按统一预算执行并经 `POST /v1/plans/execute` 受控调用（目标由服务端白名单决定）。PDF/OCR 解析队列、**真实视觉载荷**、完整表格结构、通用 CAD/工业查询与广泛来源裁决仍待扩展（V-CAR 机制消融已于 API 0.24.0 完成，见 [V1.3 §18.10](技术文档/DataMind_Agent_技术设计说明书_V1.3.md#1810-v-car-机制消融与修复指标api-02402026-年-10-月-7-日)）。能力与历史分母见 [V1.3 §18](技术文档/DataMind_Agent_技术设计说明书_V1.3.md#18-实施状态历史成绩与修订记录)；历史文档/OCR/工业评测与各阶段边界见 [V1.2 历史说明书](技术文档/DataMind_Agent_技术设计说明书_V1.2.md#18-实施进度与下一步验收2026-年-10-月-2-日) §18.12–18.33。
 
 ## 当前进度（2026-10-08，代码 API 0.37.0）
 
-[进度总览与下一阶段验收](PROGRESS.md) 汇总当前状态；详细实现、历史错误与分母保留在 [V1.2 历史说明书](技术文档/DataMind_Agent_技术设计说明书_V1.2.md#18-实施进度与下一步验收2026-年-10-月-2-日) §18.12–18.33 与 [V1.3 §18](技术文档/DataMind_Agent_技术设计说明书_V1.3.md#18-实施状态历史成绩与修订记录)。本轮私有 PDF 检索的 profile/并发专项 14/14、联合向量 capture 8/8、HTTP 32/32（历史）；**当前完整隔离回归 845/845**（权威值见 PROGRESS.md「当前状态」），上一阶段完整隔离回归为 **465/465**；独立认证 Qdrant 与本地真实 BGE 的两文件/历史版本场景通过，原库计数与旧模块未改。上一知识发布 411/411、认证登记 338/338、准备 292/292 保留；私有知识发布提交 [`6913ccc`](https://github.com/cyc120/datamind-agent/commit/6913ccc9a459b7bd91a72f72ec642d56e92d8a24) 已随 PR #1/#2 并入 `main`。受控私有模型回答新增 15 项组件/契约测试（**480/480**），本轮统一任务预算与进程时限新增 22 项、完整隔离回归 **502/502**：挂钟 deadline 终止进程组（含孙进程）、跨进程资源槽、取消传播、输出上限与稳定超时码。扫描页 OCR 与公式会话已接入同一预算：受控路径与进程内路径的 OCR 结果一致，真实 1 秒时限对约 1.8 秒的扫描页返回 `OCR_TIMEOUT`。
+[进度总览与下一阶段验收](PROGRESS.md) 汇总当前状态；详细实现、历史错误与分母保留在 [V1.2 历史说明书](技术文档/DataMind_Agent_技术设计说明书_V1.2.md#18-实施进度与下一步验收2026-年-10-月-2-日) §18.12–18.33 与 [V1.3 §18](技术文档/DataMind_Agent_技术设计说明书_V1.3.md#18-实施状态历史成绩与修订记录)。本轮私有 PDF 检索的 profile/并发专项 14/14、联合向量 capture 8/8、HTTP 32/32（历史）；**当前完整隔离回归 959/959**（唯一权威值见 PROGRESS.md「当前状态」），更早阶段为 **465/465**；独立认证 Qdrant 与本地真实 BGE 的两文件/历史版本场景通过，原库计数与旧模块未改。上一知识发布 411/411、认证登记 338/338、准备 292/292 保留；私有知识发布提交 [`6913ccc`](https://github.com/cyc120/datamind-agent/commit/6913ccc9a459b7bd91a72f72ec642d56e92d8a24) 已随 PR #1/#2 并入 `main`。受控私有模型回答新增 15 项组件/契约测试（**480/480**），本轮统一任务预算与进程时限新增 22 项、完整隔离回归 **502/502**：挂钟 deadline 终止进程组（含孙进程）、跨进程资源槽、取消传播、输出上限与稳定超时码。扫描页 OCR 与公式会话已接入同一预算：受控路径与进程内路径的 OCR 结果一致，真实 1 秒时限对约 1.8 秒的扫描页返回 `OCR_TIMEOUT`。
 
 | 阶段 | 已验证结果 | 当前缺口 |
 |---|---|---|
@@ -35,7 +35,7 @@
 | PDF 私有模型回答 | 只用本次选定私有片段生成；原文连续片段与数字支持校验、最多一次修复、文件未覆盖即拒答、生成后重查身份与证据；[说明](docs/PDF_PRIVATE_SEARCH.md) | 15 项组件/契约测试；真实模型忠实度未评测 |
 | 统一任务预算与进程时限 | 跨进程资源槽、挂钟 deadline、进程组终止（含孙进程）、取消传播、输出上限与稳定超时码；登记 worker / PDF 准备 CLI / 扫描页 OCR / 公式会话可选接入；[说明](docs/TASK_BUDGET.md) | 34 项组件/契约测试；非 CPU/内存 cgroup 硬隔离；跨主机租约待接入 |
 | PDF 私有多文件检索 | 1–4 份显式发布/完整计划 SHA、匹配本地 embedding profile、完整点核对、逐文件覆盖、两个跨进程检索槽；[使用说明](docs/PDF_PRIVATE_SEARCH.md) | 返回证据；未生成答案；实验阈值未标定，槽不等于统一 CPU/内存硬隔离 |
-| 组件/集成回归 | **当前隔离回归 845/845**（API 0.37.0）；历史：465/465（411 + 14 + 8 + 32） | 不代表模型或真实工厂识别准确率 |
+| 组件/集成回归 | **当前隔离回归 959/959**（API 0.38.0）；历史：465/465（411 + 14 + 8 + 32） | 不代表模型或真实工厂识别准确率 |
 
 尺寸认证服务已经接入操作页面；受控文件登记已有持久任务队列，多文档问答可显式选择与校验。不同文件独立成功或失败，同一资产仍按预期前版提交，队列不会自动配对测量/图纸或代为批准。原生 PDF 可准备、认证登记并发布独立私有知识版本；向量确认前不推进头，重试复用冻结计划。已发布 PDF 可以显式多文件检索和受控模型回答，查询期间源/计划/实际点变化拒绝返回，历史选择保持固定。统一任务预算已提供挂钟 deadline、进程组终止与跨进程资源槽，登记 worker、PDF 准备 CLI、扫描页 OCR 与公式会话均已接入；通用 V-CAR 依赖计划（并发、受影响子图局部修复、统一预算、断点恢复）已实现，节点可在独立进程组内按统一预算执行并经 `POST /v1/plans/execute` 受控调用（目标由服务端白名单决定）。**现阶段以技术实现为主**，按 [V1.3 §15](技术文档/DataMind_Agent_技术设计说明书_V1.3.md) 顺序推进：统一解析契约（§5.2/§5.4）已接入生产解析出口、具备媒体类型探测与 Adapter 路由，并把校验过的 locator 写入 `document_block_locators`（`parse_pdf` 经 `dispatch` 产出并校验契约），CPU 限额/跨主机租约（§13）已完成原语层；Office、原生 DXF 的契约适配与存储（块/定位/关系）已完成，DWG 明确拒绝；已按独立审计修复 F01–F12（含摄取跨存储一致性与 profile 读取侧脱敏），契约关系已可被引用消费，存储端口默认仅回环；先做关系进入检索排序/冲突消解、以及需要外部输入的 V-CAR 真实视觉对比（本机无视觉模型），再做真实视觉载荷与模型规模对比、统一 CPU/内存配额与跨主机租约；**赛题交付包等前置技术任务完成后再做**。历史扫描字段 3/15、RAG 10/12 及单题复测 1/1 保持各自分母。
 
@@ -69,7 +69,7 @@ bash scripts/start_local.sh --background
 # 浏览器打开 http://127.0.0.1:8000
 ```
 
-登录管理员后，模型接入在页面左侧「模型接入」中配置并即时生效，支持**多套接入配置**（ccswitch 风格）：每套配置可独立选择协议、地址、模型、密钥、鉴权方式，一键切换当前启用，支持导出/导入（默认不含密钥）。**协议支持 OpenAI 兼容（`/chat/completions`）与 Anthropic Messages（`/v1/messages`）**两套；Base URL 会自动补版本段（`/v1`、`/api/paas/v4`、`/api/v3` 都能直接填）。预设 DeepSeek / Anthropic 官方 / Claude 中转 / 阿里云百炼 / 智谱 / 月之暗面 / 硅基流动 / 火山方舟 / 本地网关 / 自定义，填入 API 密钥后可「拉取模型列表」验证密钥、选模型、「测试连接」验证可对话。密钥存放于 `datamind_meta.app_settings`，接口只回显掩码，`readonly_user` 对该表无任何权限；不再读取任何本地密令文件。同名环境变量 `NEW_API_BASE_URL`、`NEW_API_MODEL`、`NEW_API_KEY` 仍可作为兜底（优先级低于页面配置）。**本机地址（localhost/127.0.0.1）始终直连**——httpx 会经 urllib 读取 macOS 系统代理，若不绕开会把本地网关请求塞进代理导致挂起或 502；远端地址继续尊重系统/环境代理，也可在配置里用「代理」字段显式指定。问数数据库只用 `readonly_user`；可通过 `DATAMIND_META_DSN`、`DATAMIND_META_WRITE_DSN`、`DATAMIND_DB_HOST`、`DATAMIND_DB_PORT`、`DATAMIND_QUERY_USER`、`DATAMIND_QUERY_PASSWORD`、`DATAMIND_SQL_TIMEOUT` 配置。失败时返回可读错误码：`MODEL_KEY_MISSING`（未配置密钥）、`MODEL_AUTH_FAILED`（密钥被拒）、`MODEL_BALANCE_EMPTY`（上游额度不足）、`MODEL_UNREACHABLE`、`MODEL_TIMEOUT` 等；评测脚本逐例记录结果，不把失败计为正确。
+登录管理员后，模型接入在页面左侧「模型接入」中配置并即时生效，支持**多套接入配置**（ccswitch 风格）：每套配置可独立选择协议、地址、模型、密钥、鉴权方式，一键切换当前启用，支持导出/导入（默认不含密钥）。**协议支持 OpenAI 兼容（`/chat/completions`）与 Anthropic Messages（`/v1/messages`）**两套；Base URL 会自动补版本段（`/v1`、`/api/paas/v4`、`/api/v3` 都能直接填）。预设 DeepSeek / Anthropic 官方 / Claude 中转 / 阿里云百炼 / 智谱 / 月之暗面 / 硅基流动 / 火山方舟 / 自建网关 / 自定义（与页面预设一致；直连上游为默认，如需经自建网关请在「接口地址」填写其地址，本仓库不再内置网关），填入 API 密钥后可「拉取模型列表」验证密钥、选模型、「测试连接」验证可对话。密钥存放于 `datamind_meta.app_settings`，接口只回显掩码，`readonly_user` 对该表无任何权限；不再读取任何本地密令文件。同名环境变量 `NEW_API_BASE_URL`、`NEW_API_MODEL`、`NEW_API_KEY` 仍可作为兜底（优先级低于页面配置）。**本机地址（localhost/127.0.0.1）始终直连**——httpx 会经 urllib 读取 macOS 系统代理，若不绕开会把发往本机地址的请求塞进代理导致挂起或 502；远端地址继续尊重系统/环境代理，也可在配置里用「代理」字段显式指定。问数数据库只用 `readonly_user`；可通过 `DATAMIND_META_DSN`、`DATAMIND_META_WRITE_DSN`、`DATAMIND_DB_HOST`、`DATAMIND_DB_PORT`、`DATAMIND_QUERY_USER`、`DATAMIND_QUERY_PASSWORD`、`DATAMIND_SQL_TIMEOUT` 配置。失败时返回可读错误码：`MODEL_KEY_MISSING`（未配置密钥）、`MODEL_AUTH_FAILED`（密钥被拒）、`MODEL_BALANCE_EMPTY`（上游额度不足）、`MODEL_UNREACHABLE`、`MODEL_TIMEOUT` 等；评测脚本逐例记录结果，不把失败计为正确。
 
 本地 Agent 提供 `POST /v1/chat`、`POST /v1/chat/stream`（SSE）、`GET /v1/runs`、`GET /v1/runs/{id}`、`GET /v1/runs/{id}/events?after=...`、`GET /v1/runs/{id}/evidence`、`GET|PUT|DELETE /v1/model/config`（兼容单配置）、`GET|POST /v1/model/profiles`、`PUT|DELETE /v1/model/profiles/{id}`、`POST /v1/model/profiles/{id}/activate`、`GET /v1/model/profiles/export`、`POST /v1/model/profiles/import`、`POST /v1/model/config/models`、`POST /v1/model/config/test` 和 `/health`。页面入口包括问数与问答、模型接入、运行记录、字段复核、来源权威规则、图纸与实体、尺寸核验和多文件任务，可直接深链 `/#model`、`/#runs`、`/#fields`、`/#authority`、`/#cad`、`/#dimensions`、`/#files`。运行、事件、SQL/文档证据和 Claim 写入 `datamind_meta`，可按 run ID 回放。服务面向本机演示，默认绑定 `127.0.0.1`；复核、审批与模型管理已接入本地账户权限，公共问数/文档读取仍面向本机演示。工业温度问题可进入限定跨源规则工具；零售等通用数据库与文档联合推理仍返回 `ROUTE_UNSUPPORTED`。
 
@@ -79,7 +79,7 @@ bash scripts/start_local.sh --background
 
 Schema Linking 的独立验收入口是 `.venv/bin/python scripts/eval_schema.py`。`data/evaluation/schema_linking_v1.json` 固定了 12 条 NL2SQL 问题及 6 条扩展问题的人工核对 gold 表、语义锚点列、指标和连接路径。脚本使用 SQL Agent 实际的 8 候选预算，分别计算表/列/指标的 Top-5 微平均召回与 Join Graph 路径准确率；报告记录逐题漏召回、Catalog 快照及检索代码哈希。当前结果见 `reports/schema_linking.json`：表 **31/31**、列 **28/28**、指标 **4/4**、路径 **6/6**。这是小规模自建样本上的元数据召回成绩，不等同于复杂问题的端到端 SQL 准确率；向量召回尚未接入。
 
-**当前实测基线（2026-09-30，模型 `deepseek-flash` 经本地网关，快照 `snap-demo_retail-e9495c660cd1`，评测集 `retail-v2` + 提示词 `sql-v2`）**：NL2SQL 执行一致率 **14/14，连续三轮**；鲁棒性用例 **4/4**（错别字、口语简称、越权拒答、空结果）。逐例报告含生成 SQL、gold SQL、修复尝试与结果预览，见 `reports/nl2sql.json`、`reports/robustness.json`。样本量小，不能外推为通用准确率；技术说明书 §4.6 的 Recall@5 仍需在扩样后的固定评测集上实测。
+**历史实测基线（2026-09-30，当时模型 `deepseek-flash` 经本地 4000 网关；该网关与 `gateway/` 已于 0.37.0 移除、现为直连上游，快照 `snap-demo_retail-e9495c660cd1`，评测集 `retail-v2` + 提示词 `sql-v2`）**：NL2SQL 执行一致率 **14/14，连续三轮**；鲁棒性用例 **4/4**（错别字、口语简称、越权拒答、空结果）。逐例报告含生成 SQL、gold SQL、修复尝试与结果预览，见 `reports/nl2sql.json`、`reports/robustness.json`。样本量小，不能外推为通用准确率；技术说明书 §4.6 的 Recall@5 仍需在扩样后的固定评测集上实测。
 
 ## 一、数据库总体架构
 
@@ -155,6 +155,8 @@ Schema Linking 的独立验收入口是 `.venv/bin/python scripts/eval_schema.py
 
 ## 五、非结构化知识库（26 份文档 / 169 切片）
 
+下表 26 份 = `demo_kb` 12 份本地文档 + `ohrbench_kb` 14 份 OHR-Bench 语料；全库 `document_assets` 共 27 份，另有 1 份 `industrial_demo` 工业文档走事实路径、不建切片。计数为 2026-10-08 实测（`/health` 与只读 SQL 一致）。
+
 | 类型 | 文档 |
 |---|---|
 | 原生文本（多级目录/跨页表） | 01 重点产品分析报告（销量冠军与 DB 联动）、02 渠道白皮书 |
@@ -175,7 +177,7 @@ Schema Linking 的独立验收入口是 `.venv/bin/python scripts/eval_schema.py
 
 请求支持 `mode: auto|sql|rag|industrial`；文档范围通过 `scope.document_collections` 指定。API 0.14.0 增加 `scope.document_refs`，每份引用必须包含 `document_id/document_version/source_sha256/parser_version`，最多 8 份无重复公开文档。所选版本或访问状态不符、任一文件缺相关证据均阻断；生成完成前再次检查文件头与有效切片集合，不回退全库。`retrieval.coverage` 与 `answer_coverage` 分别报告检索片段覆盖、实际引用/未引用文件。文档接口为 `GET /v1/documents`、`GET /v1/documents/{id}`、`GET /v1/documents/{id}/file`、`GET /v1/documents/{id}/pages/{page_no}` 和 `GET /v1/documents/{id}/facts`。引用带文件哈希、版本、页码、块 ID/坐标和原文；源文件发生改变时，文件、页面预览与字段返回 `SOURCE_VERSION_MISMATCH`。前端显示引用卡片、原文件/原页链接及候选字段定位，并支持 SSE 和运行回放。
 
-**2026-10-01 实测**：26 文档、169 切片/向量；12 条固定题、模型 `deepseek-flash`、提示词 `rag-v1`、检索器 `hybrid-rrf-v2`，两轮严格端到端验收均为 **10/12**，可回答题 Recall@5 **11/11**、MRR@10 **0.955**。`rag-002` 数值/条件正确且引用可打开，但引用客服手册而非 gold 指定制度；`rag-006` 公式仍是图片，因缺少公式文本而拒答，计为失败。`rag-012` 缺少 2026 年预算证据，按 gold 正确拒答。报告见 `reports/rag.json`、`reports/rag_second.json`；首轮上游模型错误及检索失败保留于 `reports/rag_initial.json`，不从历史统计中删除。46 项 SQL/API/引用完整性回归通过；这些小样本成绩不代表复杂文档的通用准确率。
+**历史（2026-10-01 实测）**：26 文档、169 切片/向量；12 条固定题、模型 `deepseek-flash`、提示词 `rag-v1`、检索器 `hybrid-rrf-v2`，两轮严格端到端验收均为 **10/12**，可回答题 Recall@5 **11/11**、MRR@10 **0.955**。`rag-002` 数值/条件正确且引用可打开，但引用客服手册而非 gold 指定制度；`rag-006` 公式仍是图片，因缺少公式文本而拒答，计为失败。`rag-012` 缺少 2026 年预算证据，按 gold 正确拒答。报告见 `reports/rag.json`、`reports/rag_second.json`；首轮上游模型错误及检索失败保留于 `reports/rag_initial.json`，不从历史统计中删除。46 项 SQL/API/引用完整性回归通过；这些小样本成绩不代表复杂文档的通用准确率。
 
 ```bash
 bash scripts/start_local.sh --background   # SQL + RAG + 工业演示，后台 API，保留现有数据
@@ -238,7 +240,7 @@ bash scripts/start_local.sh --sql-only     # 只初始化 SQL 所需服务
 - 规则：`industrial-rules-v1`，Decimal 摄氏/K 换算、审批与半开有效期、逐测量键/方法/时间核对。多版本重叠、未知单位、缺报告留待复核；真实值差异保留双方原值，没有权威规则时不选定来源。
 - 入口：打开本机页面，点击「工业温度核验」，或选择「工业合成演示核验」并输入 **2026年9月A102工序30哪些批次温度超限？生产记录和质检报告是否一致？**。得到 9 批次/10 测量，B001、B006 超限，B001 报告数值冲突，5 条测量有复核/证据缺口。支持原页定位、双方重叠工艺版本和 Trace 回放。
 - 实测：冻结规则开发集 **13/13**、完整回归 **74/74**，见 `reports/industrial_rules.json`、`reports/industrial_regression.txt`、`reports/industrial_verification.json`。工业查询及答案使用固定参数化 SQL/规则，不调用大模型，这些成绩不能记作 NL2SQL、OCR 或独立泛化准确率。
-- 当前共 27 文档资产、23 条候选字段；原知识库仍为 169 切片/向量。工业 PDF 使用 `typed_facts_only`，没有新增向量/RAG 切片；旧扫描字段 3/15、表头 5/9 的失败边界保持不变。
+- 当前共 27 文档资产（26 份知识库文档 + 1 份工业文档）、23 条候选字段；原知识库仍为 169 切片/向量。工业 PDF 使用 `typed_facts_only`，没有新增向量/RAG 切片；旧扫描字段 3/15、表头 5/9 的失败边界保持不变。
 
 ```bash
 bash scripts/start_local.sh --background
@@ -285,7 +287,7 @@ API 使用 `mode: sql`、`scope.database_sources: ["demo_industrial"]`；符合�
 - 当前为本机未认证演示，复核人是自行填写的标签，不代表核实身份或正式审批。写接口仅由本地应用使用；查询角色只有复核表 SELECT 权限。正式使用仍需身份认证、审批与权威规则。
 - 完整回归 **89/89**，覆盖追加历史、原始字段/审批不变、重复/并发、旧版本隔离、退回后证据不足及既有功能。浏览器用隔离副本验证提交/历史/定位，随后移除副本；正式文档没有被代为复核。见 `reports/field_review_verification.json`、`reports/field_review_regression.txt`、`reports/field_review_browser.png`。
 
-测试材料未进入运行知识库；当前仍为 27 文档、23 候选事实、169 切片/向量。工业模型 8/8 与模型前澄清 2/2 保留为上轮成绩；本轮没有新增真实模型评测或修改令牌额度。
+测试材料未进入运行知识库；当前仍为 27 文档（26 份知识库文档 + 1 份工业文档）、23 候选事实、169 切片/向量。工业模型 8/8 与模型前澄清 2/2 保留为上轮成绩；本轮没有新增真实模型评测或修改令牌额度。
 
 ```bash
 # 初始报告禁止覆盖；后续复测必须指定新的路径

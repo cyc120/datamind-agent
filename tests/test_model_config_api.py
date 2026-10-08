@@ -183,12 +183,31 @@ class ProfileAPITest(unittest.TestCase):
         self.assertEqual(profile["protocol"], "anthropic")
         self.assertEqual(profile["api_key"], "sk-ant-secret-987654321")
         self.assertEqual(profile["base_url"], "https://api.anthropic.com")
+        # 同一来源（host 相同）不提交 api_key：允许继承已存密钥（便利性保留）。
         with patch("datamind.api.provider_list_models",
                    return_value={"ok": True, "models": ["claude-sonnet-4-5"]}) as fake:
-            result = self.client.post("/v1/model/config/models", json={
-                "profile_id": created["id"], "base_url": "https://relay.example.com"}).json()
-        self.assertEqual(result["models"], ["claude-sonnet-4-5"])
-        self.assertEqual(fake.call_args[0][0]["base_url"], "https://relay.example.com")
+            same_origin = self.client.post("/v1/model/config/models", json={
+                "profile_id": created["id"], "base_url": "https://api.anthropic.com/v1"}).json()
+        self.assertEqual(same_origin["models"], ["claude-sonnet-4-5"])
+        self.assertEqual(fake.call_args[0][0]["api_key"], "sk-ant-secret-987654321")
+
+        # 换到**另一来源**又不提交 api_key：绝不继承已存密钥，否则等于把密钥送到调用方
+        # 指定的任意地址（F01）。本条曾断言"200 且继承"，那正是被修掉的缺陷行为。
+        with patch("datamind.api.provider_list_models") as leak:
+            refused = self.client.post("/v1/model/config/models", json={
+                "profile_id": created["id"], "base_url": "https://relay.example.com"})
+        self.assertEqual(refused.status_code, 400, refused.text)
+        self.assertEqual(refused.json()["detail"]["error_code"], "MODEL_KEY_NOT_INHERITED")
+        leak.assert_not_called()
+
+        # 换来源但**显式提交**自己的 key：这是合法的自带密钥用法，必须可用。
+        with patch("datamind.api.provider_list_models",
+                   return_value={"ok": True, "models": ["claude-sonnet-4-5"]}) as fake:
+            relayed = self.client.post("/v1/model/config/models", json={
+                "profile_id": created["id"], "base_url": "https://relay.example.com",
+                "api_key": "sk-relay-own-000"}).json()
+        self.assertEqual(relayed["models"], ["claude-sonnet-4-5"])
+        self.assertEqual(fake.call_args[0][0]["api_key"], "sk-relay-own-000")
 
     def test_missing_key_paths(self):
         clear_model_config()

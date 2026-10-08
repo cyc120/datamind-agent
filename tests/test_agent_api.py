@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from datamind.agent import SQLAgent
 from datamind.api import app
 from datamind.sql_engine import ask as real_ask
+import auth_fixtures
 
 
 GOLD = "SELECT count(*) FROM orders WHERE created_at >= '2024-01-01' AND created_at < '2025-01-01'"
@@ -21,18 +22,27 @@ def seeded_ask(question, source_id, *, generator=None, run_id=None):
 class AgentAPITest(unittest.TestCase):
     def setUp(self):
         self.runs = []
+        # /v1/chat, /v1/chat/stream and /v1/diagnostics/sql are mutating routes now covered by
+        # the default-deny identity middleware (identity + CSRF + origin), so this client can no
+        # longer rely on TestClient's host ("testclient", not loopback) being granted demo admin.
+        # A disposable session carries the CSRF token every mutation must present.
         self.client = TestClient(app)
+        auth_fixtures.login(self.client)
 
     def tearDown(self):
-        if not self.runs:
-            return
-        with psycopg2.connect("host=127.0.0.1 port=5432 dbname=datamind_meta user=datamind_app password=datamind_app_dev") as conn, conn.cursor() as cur:
-            for run_id in self.runs:
-                cur.execute("DELETE FROM evidence_edges WHERE run_id=%s", (run_id,))
-                cur.execute("DELETE FROM evidence_nodes WHERE run_id=%s", (run_id,))
-                cur.execute("DELETE FROM claims WHERE run_id=%s", (run_id,))
-                cur.execute("DELETE FROM runs WHERE run_id=%s", (run_id,))
-        self.client.close()
+        try:
+            if not self.runs:
+                return
+            with psycopg2.connect("host=127.0.0.1 port=5432 dbname=datamind_meta user=datamind_app password=datamind_app_dev") as conn, conn.cursor() as cur:
+                for run_id in self.runs:
+                    cur.execute("DELETE FROM evidence_edges WHERE run_id=%s", (run_id,))
+                    cur.execute("DELETE FROM evidence_nodes WHERE run_id=%s", (run_id,))
+                    cur.execute("DELETE FROM claims WHERE run_id=%s", (run_id,))
+                    cur.execute("DELETE FROM runs WHERE run_id=%s", (run_id,))
+        finally:
+            # Remove the fixture account even when a test failed before registering a run.
+            auth_fixtures.cleanup(self.client)
+            self.client.close()
 
     def test_agent_persists_verified_sql_evidence(self):
         agent = SQLAgent()

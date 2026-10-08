@@ -12,6 +12,7 @@ from datamind.api import app
 from datamind.agent import route_for
 from datamind.industrial import run,parse_question,SQL
 from datamind.industrial_rules import evaluate,temperature,timestamp
+import auth_fixtures
 
 READ='host=127.0.0.1 port=5432 dbname=datamind_meta user=readonly_user password=readonly_dev'
 WRITE='host=127.0.0.1 port=5432 dbname=datamind_meta user=datamind_app password=datamind_app_dev'
@@ -88,12 +89,18 @@ class IndustrialRuleTest(unittest.TestCase):
 
 
 class IndustrialAPIIntegrationTest(unittest.TestCase):
-    def setUp(self):self.client=TestClient(app);self.runs=[]
+    def setUp(self):
+        # /v1/chat and /v1/chat/stream are mutating routes now covered by the default-deny
+        # identity middleware (identity + CSRF + same-origin); TestClient's "testclient" host
+        # is not loopback, so sign in with a disposable fixture account before any POST.
+        self.client=TestClient(app);self.runs=[]
+        auth_fixtures.login(self.client)
     def tearDown(self):
         with psycopg2.connect(WRITE) as conn,conn.cursor() as cur:
             for rid in self.runs:
                 cur.execute('DELETE FROM evidence_edges WHERE run_id=%s',(rid,));cur.execute('DELETE FROM evidence_nodes WHERE run_id=%s',(rid,))
                 cur.execute('DELETE FROM claims WHERE run_id=%s',(rid,));cur.execute('DELETE FROM runs WHERE run_id=%s',(rid,))
+        auth_fixtures.cleanup(self.client)
         self.client.close()
     def ask(self,body):
         response=self.client.post('/v1/chat',json=body);self.assertEqual(response.status_code,200)

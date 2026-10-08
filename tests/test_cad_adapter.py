@@ -148,6 +148,96 @@ class DxfAdapterTests(unittest.TestCase):
         self.assertIn('CAD_TEXT_BOUNDS_APPROXIMATE', result.payload['quality_findings'])
 
 
+class BlockIdentityTests(unittest.TestCase):
+    """F03: a block id is a fixed-length digest, never a truncated long string.
+
+    The defect: `f'dxf-{document_id}-{index}'[:64]` collapsed a drawing's blocks onto one
+    id once the document_id reached 59 characters, and the whole drawing then failed as
+    `duplicate_block_id`.
+    """
+
+    def test_the_identifier_is_unique_and_bounded_for_any_document_id(self):
+        for document_id in ('d', 'd' * 58, 'd' * 59, 'd' * 64, 'd' * 128, 'd' * 200):
+            identifiers = {cad_adapter._block_identifier(document_id, index)
+                           for index in range(500)}
+            self.assertEqual(len(identifiers), 500, document_id[:16])
+            for identifier in identifiers:
+                self.assertLessEqual(len(identifier), 64, identifier)
+        # The same index under a different document must not collide either.
+        self.assertNotEqual(cad_adapter._block_identifier('d' * 59, 0),
+                            cad_adapter._block_identifier('d' * 59 + 'x', 0))
+
+    def test_a_drawing_parses_for_every_document_id_the_store_accepts(self):
+        for length in (1, 59, 64):
+            result = cad_adapter.parse(DXF, document_id='d' * length)
+            identifiers = [block['block_id'] for block in result.payload['blocks']]
+            self.assertEqual(len(set(identifiers)), len(identifiers))
+            for identifier in identifiers:
+                self.assertLessEqual(len(identifier), 64, identifier)
+            self.assertEqual(result.payload['parse_status'], 'parsed')
+
+    def test_an_id_the_contract_stores_cannot_hold_is_refused_up_front(self):
+        # Every contract store declares document_id VARCHAR(64); accepting more here would
+        # hand the caller a "parsed" result that only fails at INSERT time.
+        for length in (65, 132, 200):
+            with self.assertRaises(HTTPException) as caught:
+                cad_adapter.parse(DXF, document_id='d' * length)
+            self.assertEqual(caught.exception.detail['error_code'], 'PARSE_RESULT_INVALID')
+            self.assertEqual(caught.exception.detail['details']['reason'], 'document_id_too_long')
+
+    def test_the_frozen_source_profile_bound_admits_every_contract_legal_id(self):
+        # The unified contract is the stricter of the two (64 vs the frozen profile's 128),
+        # so the adapter never has to rewrite the caller's identity to satisfy the profile.
+        self.assertLessEqual(contract.DOCUMENT_ID_MAX_LENGTH, cad_adapter.PROFILE_DOCUMENT_ID_MAX)
+
+
+class SourceLocatorProjectionTests(unittest.TestCase):
+    """F10: the `cad_entity` locator carries every field of the frozen source locator."""
+
+    def setUp(self):
+        contract._ADAPTERS.clear()
+        cad_adapter.register_cad_adapters()
+
+    def tearDown(self):
+        contract._ADAPTERS.clear()
+
+    def test_the_frozen_source_locator_projects_without_loss(self):
+        from ingestion import cad_contract
+        source_locator = {'locator_kind': 'cad_entity', 'source_sha256': 'a' * 64,
+                          'handle': '2AF', 'layer': 'GEOMETRY', 'view_id': 'model',
+                          'coordinate_system': 'WCS_XY', 'layout': 'Model'}
+        # The frozen contract is the source of truth for what a source locator carries.
+        cad_contract.Locator.model_validate(source_locator)
+        projected = cad_adapter._locator('doc-1', 'v1',
+                                         {'handle': '2AF', 'layer': 'GEOMETRY',
+                                          'insertion': {'x': 1.0, 'y': 2.0}},
+                                         unit='mm', layout='Model', coordinate_system='WCS_XY',
+                                         view_id='model', source_sha256='a' * 64)
+        for field in cad_contract.Locator.model_fields:
+            self.assertIn(field, projected, field)
+            self.assertEqual(projected[field], source_locator[field], field)
+        # The two fields the source locator has no equivalent for are added, not invented:
+        # the drawing supplies them (insertion point / INSUNITS).
+        self.assertEqual(projected['model_xy'], [1.0, 2.0])
+        self.assertEqual(projected['unit'], 'mm')
+        self.assertEqual(contract.CAD_SOURCE_LOCATOR_DROPPED_FIELDS, {})
+
+    def test_a_real_drawing_keeps_view_and_source_digest_on_every_block(self):
+        result = cad_adapter.parse(DXF, document_id='doc-dev-mm')
+        source_sha256 = result.payload['manifest']['source_sha256']
+        self.assertEqual(len(source_sha256), 64)
+        for block in result.payload['blocks']:
+            locator = block['locator']
+            self.assertEqual(locator['locator_kind'], 'cad_entity')
+            self.assertEqual(locator['view_id'], 'model')
+            self.assertEqual(locator['coordinate_system'], 'WCS_XY')
+            self.assertEqual(locator['source_sha256'], source_sha256)
+            self.assertEqual(locator['layout'], 'Model')
+            for field in contract.CAD_SOURCE_LOCATOR_FIELDS:
+                self.assertIn(field, locator, field)
+
+
+
 class DrawingCliTests(unittest.TestCase):
     def test_cli_prints_the_summary_and_refuses_a_dwg(self):
         completed = subprocess.run(

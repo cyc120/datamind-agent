@@ -80,4 +80,4 @@ echo '启动 DataMind Agent：http://127.0.0.1:8000/'
 if [[ "$background" == 1 ]]; then
   exec .venv/bin/python scripts/start_api_background.py
 fi
-exec .venv/bin/uvicorn datamind.api:app --host 127.0.0.1 --port 8000
+exec .venv/bin/uvicorn datamind.api:app --host 127.0.0.1 --port 8000 --no-proxy-headers

@@ -15,6 +15,38 @@ DIRECTORY=ROOT/'data/industrial_demo'
 DSN='host=127.0.0.1 port=5432 dbname=datamind_meta user=datamind_app password=datamind_app_dev'
 
 
+def locator_plan(blocks,doc_id,quality):
+    """F02: rows to write into `document_block_locators` + the **honest** count.
+
+    选择"真的写入 locator"（而不是删掉计数）：`ingest.parse_pdf` 已经为每个块做过契约
+    校验，并把校验过的 locator 原样挂在 `contract_locator` 上；下面重写块 id 只改
+    `document_blocks.block_id`，而 pdf_region locator 载荷里**没有** block_id 字段，
+    所以同一个已校验对象可以按新 id 落库，两边 id 保持一致。
+    以前这条路径只写 `document_blocks` 却沿用了 parse_pdf 的
+    `locators_written=296`，于是 quality_detail 声称 296 条而表里 0 行——这里改成只报
+    实际要写出的行数，缺定位的块显式记录为 gap，不再谎报。
+    """
+    rows=[]
+    for block in blocks:
+        row=ingest._locator_row(block,doc_id)
+        if row is not None:rows.append(row)
+    contract=quality.get('parse_contract')
+    if not isinstance(contract,dict):
+        contract={};quality['parse_contract']=contract
+    contract['locators_written']=len(rows)
+    contract['locators_unavailable']=len(blocks)-len(rows)
+    if len(rows)<len(blocks):contract['locator_gap']='locator_unavailable'
+    else:contract.pop('locator_gap',None)
+    return rows
+
+
+def write_locators(cur,doc_id,rows):
+    """F02: 覆盖式写入该文档的定位行，返回实际执行的行数（供与 quality_detail 对账）。"""
+    cur.execute('DELETE FROM document_block_locators WHERE document_id=%s',(doc_id,))
+    for row in rows:cur.execute(ingest.LOCATOR_INSERT_SQL,row)
+    return len(rows)
+
+
 def main():
     migrate()
     seed_path=DIRECTORY/'seed_v1.json';manifest=json.loads((DIRECTORY/'manifest.json').read_text())
@@ -32,6 +64,7 @@ def main():
         raise ValueError('INDUSTRIAL_DOCUMENT_FIELDS_INCOMPLETE')
     quality.update(parser_version=industrial_facts.PARSER_VERSION,provenance=seed['provenance'],
                    index_mode='typed_facts_only',fact_extraction=field_quality)
+    locators=locator_plan(blocks,doc_id,quality)
     with psycopg2.connect(DSN) as conn,conn.cursor() as cur:
         for p in seed['parts']:
             cur.execute('INSERT INTO demo_industrial.parts VALUES (%s,%s,%s) ON CONFLICT(part_id) DO UPDATE SET name=EXCLUDED.name,material=EXCLUDED.material',tuple(p[k] for k in ('part_id','name','material')))
@@ -46,15 +79,16 @@ def main():
             cur.execute('INSERT INTO demo_industrial.quality_records VALUES (%s,%s,%s,%s) ON CONFLICT(quality_id) DO UPDATE SET report_id=EXCLUDED.report_id,method=EXCLUDED.method',tuple(q[k] for k in ('quality_id','measurement_id','report_id','method')))
         cur.execute('INSERT INTO demo_industrial.dataset_manifest(dataset_version,seed_sha256,pdf_sha256,provenance) VALUES (%s,%s,%s,%s) ON CONFLICT(dataset_version) DO UPDATE SET seed_sha256=EXCLUDED.seed_sha256,pdf_sha256=EXCLUDED.pdf_sha256', (seed['dataset_version'],seed_sha,digest,seed['provenance']))
         cur.execute("""INSERT INTO document_assets(document_id,title,collection,file_type,origin,sha256,object_uri,page_count,
-                       parser_version,status,quality_detail) VALUES (%s,'工业合成演示：工艺与质检原文','industrial_demo','pdf','curated',%s,%s,%s,%s,'indexed',%s)
-                       ON CONFLICT(document_id) DO UPDATE SET status='indexed',parser_version=EXCLUDED.parser_version,quality_detail=EXCLUDED.quality_detail""",
-                    (doc_id,digest,str(source),count,industrial_facts.PARSER_VERSION,json.dumps(quality,ensure_ascii=False)))
+                       parser_version,status,quality_detail) VALUES (%s,'工业合成演示：工艺与质检原文','industrial_demo','pdf','curated',%s,%s,%s,%s,%s,%s)
+                       ON CONFLICT(document_id) DO UPDATE SET status=EXCLUDED.status,parser_version=EXCLUDED.parser_version,quality_detail=EXCLUDED.quality_detail""",
+                    (doc_id,digest,str(source),count,industrial_facts.PARSER_VERSION,ingest.SEARCHABLE_STATUS,json.dumps(quality,ensure_ascii=False)))
         cur.execute('DELETE FROM document_blocks WHERE document_id=%s',(doc_id,))
         for b in blocks:
             cur.execute('INSERT INTO document_blocks(block_id,document_id,page_no,bbox,block_type,text,reading_order,parser_version,content_hash) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)',
                         (b['block_id'],doc_id,b['page_no'],json.dumps(b['bbox']),b['block_type'],b['text'],b['reading_order'],industrial_facts.PARSER_VERSION,hashlib.sha256(b['text'].encode()).hexdigest()))
+        write_locators(cur,doc_id,locators)
         facts.persist(cur,doc_id,extracted)
-    print(f'industrial-demo-v1: 3 parts, {len(seed["batches"])} batches, {len(seed["measurements"])} measurements; {len(extracted)} native PDF facts; {doc_id}')
+    print(f'industrial-demo-v1: 3 parts, {len(seed["batches"])} batches, {len(seed["measurements"])} measurements; {len(extracted)} native PDF facts; {len(locators)} locators; {doc_id}')
 
 
 if __name__=='__main__':main()

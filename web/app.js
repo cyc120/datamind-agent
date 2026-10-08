@@ -19,7 +19,7 @@ var PRESETS = [
   { name: '月之暗面', protocol: 'openai', base: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k' },
   { name: '硅基流动', protocol: 'openai', base: 'https://api.siliconflow.cn/v1', model: 'deepseek-ai/DeepSeek-V3' },
   { name: '火山方舟', protocol: 'openai', base: 'https://ark.cn-beijing.volces.com/api/v3', model: '' },
-  { name: '本地网关 4000', protocol: 'openai', base: 'http://localhost:4000/v1', model: 'deepseek-flash' },
+  { name: '自建网关', protocol: 'openai', base: '', model: '' },
   { name: '自定义', protocol: 'openai', base: '', model: '' }
 ];
 var STATE = { profiles: [], active: null, editingId: null, secretHeaders: [],
@@ -1192,7 +1192,7 @@ function syncProtocolHint() {
   var anthropic = $('protocol').value === 'anthropic';
   $('baseHint').innerHTML = anthropic
     ? 'Anthropic Messages 协议：填 <code>https://api.anthropic.com</code> 即可，会自动请求 <code>/v1/messages</code>；中转站按其文档填写。'
-    : 'OpenAI 兼容地址；填到 <code>/v1</code> 即可，粘贴完整端点也会自动截断。';
+    : 'OpenAI 兼容地址；填到 <code>/v1</code> 即可，粘贴完整端点也会自动截断。如需经自建网关，填写其地址。';
   $('authStyle').parentElement.style.opacity = anthropic ? '1' : '.45';
   $('authStyle').disabled = !anthropic;
 }

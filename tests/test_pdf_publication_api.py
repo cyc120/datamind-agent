@@ -134,12 +134,15 @@ class PdfSnapshotAPITest(unittest.TestCase):
         csrf = self.admin.headers.pop("X-CSRF-Token")
         self.assert_error(self.admin.post("/v1/pdf-snapshots", json=self.payload), 403, "CSRF_REQUIRED")
         self.admin.headers["X-CSRF-Token"] = csrf
-        for headers in ({"Origin": "https://untrusted.invalid"}, {"Sec-Fetch-Site": "cross-site"}):
+        # 同源判定已改为固定白名单，不再从 Host 推导：`http://testserver`（TestClient 的 Host）
+        # 正是"自证同源"的攻击面，必须被拒；正例改用白名单内的来源。
+        for headers in ({"Origin": "https://untrusted.invalid"}, {"Sec-Fetch-Site": "cross-site"},
+                        {"Origin": "http://testserver"}):
             with self.subTest(headers=headers):
                 self.assert_error(self.admin.post("/v1/pdf-snapshots", json=self.payload, headers=headers),
                                   403, "ORIGIN_NOT_ALLOWED")
         response = self.admin.post("/v1/pdf-snapshots", json=self.payload,
-                                   headers={"Origin": "http://testserver"})
+                                   headers={"Origin": "http://127.0.0.1:8000"})
         self.assertEqual(response.status_code, 200, response.text)
         self.assert_private_response(response)
 

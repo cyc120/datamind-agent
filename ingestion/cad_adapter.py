@@ -6,6 +6,18 @@ emits one contract block per entity plus one per extracted dimension, located by
 entity handle their source XDATA names, so the relation carries real evidence instead of
 an inferred association.
 
+Relationship between the two CAD contracts: `cad-contract-v1` (`ingestion/cad_contract.py`,
+hash-frozen in `data/evaluation/frozen/cad_dxf_v1`) is the **source** contract; the unified
+`cad_entity` locator (`datamind/parse_contract.py`) is a **projection** of it and this
+module is the only place that projects. The source locator's fields are
+`('locator_kind', 'source_sha256', 'handle', 'layer', 'view_id', 'coordinate_system',
+'layout')`; `handle`/`layer`/`layout` map to the required fields, `source_sha256`/`view_id`/
+`coordinate_system` are carried through as optional fields, and the two fields the unified
+locator requires that the source has no equivalent for -- `model_xy` and `unit` -- are added
+from the entity's insertion point/bounding box and the drawing's INSUNITS. Nothing is
+dropped (`parse_contract.CAD_SOURCE_LOCATOR_DROPPED_FIELDS` is empty), which
+`tests/test_cad_adapter.py` asserts field by field.
+
 Scope is deliberately narrow: LINE/CIRCLE/TEXT and explicit XDATA references only. DWG is
 proprietary and needs an external converter, so it is refused explicitly rather than
 being guessed at.
@@ -22,9 +34,28 @@ from . import cad_dxf
 ADAPTER = 'dxf-native'
 CONTRACT_PARSER_VERSION = 'cad-contract-adapter-v1'
 MAX_BLOCKS = 2000
+# `ingestion/cad_contract.py` bounds its Identifier to 128 characters and that module is
+# hash-pinned in the frozen profile's manifest. The unified contract is stricter (64, the
+# width of every contract store column), so a contract-legal document id is always valid
+# for the source profile too; this constant records that relation and is asserted in
+# tests/test_cad_adapter.py instead of being handled by rewriting the caller's identity.
+PROFILE_DOCUMENT_ID_MAX = 128
 _GEOMETRY_TYPES = ('LINE', 'CIRCLE')
 _TITLE_LAYERS = set(cad_dxf.TITLE_LAYERS)
 _DWG_REFUSAL = 'CAD_DWG_CONVERTER_UNAVAILABLE'
+
+
+def _block_identifier(document_id, index):
+    """Return a stable block id that no other (document_id, index) can share.
+
+    `dxf-{document_id}-{index}` truncated at 64 characters collapsed every block of a
+    drawing whose document_id reached 59 characters onto one id, which the contract then
+    refused as a duplicate. A fixed-length digest of the pair is collision-free for any
+    document_id and always fits the 64-character column, exactly as
+    `ingestion/office.py:_block_identifier` does for Office blocks.
+    """
+    material = f'{document_id}\x1f{index}'.encode('utf-8')
+    return 'dxf-' + hashlib.sha256(material).hexdigest()[:32]
 
 
 def _content_hash(document_id, source_version, kind, identity, text):
@@ -43,7 +74,16 @@ def _model_xy(entity):
     return [0.0, 0.0]
 
 
-def _locator(document_id, source_version, entity, *, unit, layout, coordinate_system, view_id):
+def _locator(document_id, source_version, entity, *, unit, layout, coordinate_system, view_id,
+             source_sha256=None):
+    """Project a frozen source locator into the unified `cad_entity` locator.
+
+    Every field of the source locator (`parse_contract.CAD_SOURCE_LOCATOR_FIELDS`) is
+    accounted for: `handle`/`layer`/`layout` are the required ones, `view_id`/
+    `coordinate_system`/`source_sha256` are carried through, and `model_xy`/`unit` are added
+    because the source locator has no equivalent for them (its coordinates live in the
+    drawing's WCS and its unit in the source's INSUNITS). Nothing is discarded.
+    """
     payload = {'locator_kind': 'cad_entity', 'document_id': document_id,
                'source_version': source_version, 'layout': layout or 'Model',
                'handle': entity['handle'], 'layer': entity['layer'],
@@ -52,12 +92,14 @@ def _locator(document_id, source_version, entity, *, unit, layout, coordinate_sy
         payload['view_id'] = view_id
     if coordinate_system:
         payload['coordinate_system'] = coordinate_system
+    if source_sha256:
+        payload['source_sha256'] = source_sha256
     return parse_contract.validate_locator(payload).payload
 
 
 def _block(document_id, source_version, index, block_type, text, locator, *, native=None,
            heading_level=None):
-    payload = {'block_id': f'dxf-{document_id}-{index}'.replace(' ', '_')[:64],
+    payload = {'block_id': _block_identifier(document_id, index),
                'document_id': document_id, 'source_version': source_version,
                'parser_version': CONTRACT_PARSER_VERSION, 'block_type': block_type,
                'text': text or '', 'native_attributes': native or {}, 'reading_order': index,
@@ -78,15 +120,24 @@ def _entity_block_type(entity):
 
 
 def parse_dxf(path, *, document_id, source_version=None, provenance='synthetic_demo'):
-    """Map one bounded native DXF into a contract payload (validated by `dispatch`)."""
+    """Map one bounded native DXF into a contract payload (validated by `dispatch`).
+
+    The id is checked against the contract store's column width before anything is parsed:
+    an over-long id can never be stored, so refusing it here keeps the caller from getting
+    a "parsed" result that only fails later at INSERT time. A contract-legal id is also
+    within the frozen source profile's bound (`PROFILE_DOCUMENT_ID_MAX`), so it is handed
+    to the profile unchanged -- the caller's identity is never rewritten.
+    """
+    parse_contract.require_document_id(document_id, code='PARSE_RESULT_INVALID', subject='cad')
     bundle = cad_dxf.parse_file(path, document_id=document_id, document_version=1,
                                 provenance=provenance)
     snapshot = bundle['snapshot']
     source = snapshot['source']
+    source_sha256 = source.get('source_sha256')
     unit = source.get('unit') or 'mm'
     layout = source.get('layout')
     coordinate_system = source.get('coordinate_system')
-    version = source_version or source.get('source_sha256')
+    version = source_version or source_sha256
     if not version:
         parse_contract.fail('PARSE_BLOCK_INVALID', subject='cad', reason='source_version')
     blocks, by_handle, unsupported, index = [], {}, [], 0
@@ -96,7 +147,8 @@ def parse_dxf(path, *, document_id, source_version=None, provenance='synthetic_d
                 unsupported.append('block_limit_reached')
             break
         locator = _locator(document_id, version, entity, unit=unit, layout=layout,
-                           coordinate_system=coordinate_system, view_id=entity.get('view_id'))
+                           coordinate_system=coordinate_system, view_id=entity.get('view_id'),
+                           source_sha256=source_sha256)
         block = _block(document_id, version, index, _entity_block_type(entity),
                        entity.get('text') or '', locator,
                        native={'entity_type': entity.get('entity_type'),
@@ -116,7 +168,8 @@ def parse_dxf(path, *, document_id, source_version=None, provenance='synthetic_d
                                                  'insertion': feature.get('insertion') or {}},
                            unit=feature.get('unit') or unit, layout=layout,
                            coordinate_system=coordinate_system,
-                           view_id=feature['locator'].get('view_id'))
+                           view_id=feature['locator'].get('view_id'),
+                           source_sha256=source_sha256)
         block = _block(document_id, version, index, 'dimension',
                        feature.get('annotation_raw') or '', locator,
                        native={'feature_id': feature.get('feature_id'),
@@ -156,7 +209,7 @@ def parse_dxf(path, *, document_id, source_version=None, provenance='synthetic_d
                'manifest': {'parser_version': cad_dxf.PARSER_VERSION,
                             'profile': bundle['metadata'].get('profile'),
                             'cad_contract_version': snapshot.get('contract_version'),
-                            'source_sha256': source.get('source_sha256')},
+                            'source_sha256': source_sha256},
                'parse_status': 'partial' if unsupported else 'parsed'}
     return payload
 

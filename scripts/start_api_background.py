@@ -21,7 +21,7 @@ def main():
         print('DataMind Agent 已运行：http://127.0.0.1:8000/');return
     directory=ROOT/'.cache/api';directory.mkdir(parents=True,exist_ok=True)
     with (directory/'server.log').open('ab') as log:
-        process=subprocess.Popen([sys.executable,'-m','uvicorn','datamind.api:app','--host','127.0.0.1','--port','8000'],
+        process=subprocess.Popen([sys.executable,'-m','uvicorn','datamind.api:app','--host','127.0.0.1','--port','8000','--no-proxy-headers'],
             cwd=ROOT,stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
     (directory/'server.pid').write_text(str(process.pid)+'\n')
     for _ in range(20):

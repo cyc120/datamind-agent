@@ -10,13 +10,23 @@ from ingestion import ingest
 
 
 def ohr_block(text='gt 文本'):
-    """A block shaped exactly like the OHR-Bench branch builds it (no block_id)."""
-    return {'page_no': 1, 'block_type': 'paragraph', 'bbox': [0, 0, 0, 0], 'text': text,
+    """A block shaped exactly like the OHR-Bench branch builds it (no block_id, no bbox).
+
+    OHR-Bench records carry only `page_idx` and `gt_text`; there is no geometry to record,
+    so the honest shape is `bbox=None` (F01). The branch used to write `bbox=[0, 0, 0, 0]`,
+    which the parse contract rejects as `bbox_inverted` — a fabricated locator, not a
+    missing one. `ingest.ohr_block` is the single producer, and the test below keeps this
+    fixture from drifting away from it.
+    """
+    return {'page_no': 1, 'block_type': 'paragraph', 'bbox': None, 'text': text,
             'heading_level': None, 'table_cells': None, 'reading_order': 0,
             'ocr_confidence': 1.0}
 
 
 class BlockIdentityTests(unittest.TestCase):
+    def test_the_fixture_matches_the_real_branch_builder(self):
+        self.assertEqual(ingest.ohr_block({'page_idx': 0, 'gt_text': 'gt 文本'}), ohr_block())
+
     def test_a_block_without_an_id_gets_one(self):
         blocks = [ohr_block()]
         ingest.ensure_block_ids(blocks, 'doc-ohr')

@@ -45,3 +45,25 @@ spec_text.txt
 
 # Native PDF preparation sources and private attempt products are runtime data.
 /data/object_store/pdf_prepared/
+
+# ===== 知识库样本 PDF 白名单 =====
+# 只忽略知识库目录下新落入/被外部工具写入的 PDF（曾发生 field-test-*.pdf 被误摄取）；
+# 下面 12 份演示 PDF 由 data/knowledge_base/manifest.json 声明，逐条放行。
+/data/knowledge_base/*.pdf
+!/data/knowledge_base/01_重点产品市场分析报告_2025.pdf
+!/data/knowledge_base/02_渠道运营策略白皮书.pdf
+!/data/knowledge_base/03_2025年分区域经营数据简报.pdf
+!/data/knowledge_base/04_售后服务与退款管理制度.pdf
+!/data/knowledge_base/05_经营指标核算与计算公式说明.pdf
+!/data/knowledge_base/06_2025年度经营分析报告.pdf
+!/data/knowledge_base/07_门店巡检记录_2025年12月_扫描版.pdf
+!/data/knowledge_base/08_产品质检报告_数码品类_扫描版.pdf
+!/data/knowledge_base/09_无线降噪耳机Pro产品手册.pdf
+!/data/knowledge_base/10_零售演示库数据字典.pdf
+!/data/knowledge_base/11_客户服务话术手册.pdf
+!/data/knowledge_base/12_财务指标核算办法.pdf
+
+# ===== 运行时产物与日志 =====
+/output/
+*.log
+/reports/project_audit_*

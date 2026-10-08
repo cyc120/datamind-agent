@@ -15,6 +15,7 @@ from datamind.api import app
 from datamind.knowledge import KnowledgeRetriever, select_documents
 from datamind.rag_engine import ask_documents, verify_claims, PROMPT_VERSION
 from ingestion.ingest import build_chunks
+import auth_fixtures
 
 
 WRITE_DSN = "host=127.0.0.1 port=5432 dbname=datamind_meta user=datamind_app password=datamind_app_dev"
@@ -72,7 +73,11 @@ class RAGIntegrationTest(unittest.TestCase):
     def setUp(self):
         self.tag = uuid.uuid4().hex[:12]
         self.docs, self.runs = [], []
+        # /v1/chat and /v1/chat/stream are mutating routes now gated by the default-deny
+        # identity middleware (identity + CSRF + same-origin), so TestClient's non-loopback
+        # "testclient" host is no longer auto-admin: sign in with a disposable fixture account.
         self.client = TestClient(app)
+        auth_fixtures.login(self.client)
         with psycopg2.connect(WRITE_DSN) as conn, conn.cursor() as cur:
             for kind in ("public", "private", "stale", "tampered", "review"):
                 doc = f"test-doc-{self.tag}-{kind}"
@@ -96,6 +101,7 @@ class RAGIntegrationTest(unittest.TestCase):
                 cur.execute("DELETE FROM claims WHERE run_id=%s", (run_id,))
                 cur.execute("DELETE FROM runs WHERE run_id=%s", (run_id,))
             cur.execute("DELETE FROM document_assets WHERE document_id=ANY(%s)", (self.docs,))
+        auth_fixtures.cleanup(self.client)
         self.client.close()
 
     def retrieve(self):

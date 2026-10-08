@@ -230,7 +230,8 @@ class OfficeFidelityTests(unittest.TestCase):
     def test_block_ids_stay_unique_and_bounded_for_a_long_document_id(self):
         # The old scheme truncated `off-{document_id}-{index}` at 64 chars, so a long
         # document_id made every later block share one id and the contract rejected the
-        # duplicate. Ids must be distinct for any document_id and never exceed 64 chars.
+        # duplicate. The contract now bounds document_id at 64 chars, but the identifier
+        # helper stays injective and bounded for any input it is handed.
         long_id = 'doc-' + 'x' * 200
         blocks = [office._block(long_id, 'v1', 'paragraph', f'第 {index} 段',
                                 {'locator_kind': 'office_object', 'paragraph': index}, index=index)
@@ -250,13 +251,31 @@ class OfficeFidelityTests(unittest.TestCase):
         for index in range(120):
             document.add_paragraph(f'第 {index} 段正文')
         document.save(str(path))
-        result = office.parse(path, document_id='doc-' + 'z' * 128, source_version='v1')
+        # Every contract store holds document_id in a VARCHAR(64), so 64 characters is the
+        # longest contract-legal id; the block ids must stay distinct and bounded there.
+        result = office.parse(path, document_id='d' * 64, source_version='v1')
         identifiers = [block['block_id'] for block in result.payload['blocks']]
         self.assertEqual(len(identifiers), 120)
         self.assertEqual(len(set(identifiers)), len(identifiers))
         for identifier in identifiers:
             self.assertLessEqual(len(identifier), 64, identifier)
         contract.validate_parse_result(result.payload)
+
+    def test_a_document_id_the_stores_cannot_hold_is_refused_not_accepted(self):
+        # The old assertion let a 132-character id through here even though no contract
+        # table can store it, so a "successful" parse failed later at INSERT time. The
+        # contract now refuses it with a stable reason instead.
+        path = self.base / 'short.docx'
+        import docx
+        document = docx.Document()
+        document.add_paragraph('短文档也必须有 ≤64 的 document_id')
+        document.save(str(path))
+        for length in (65, 132, 200):
+            with self.assertRaises(HTTPException) as caught:
+                office.parse(path, document_id='d' * length, source_version='v1')
+            self.assertEqual(caught.exception.detail['error_code'], 'PARSE_BLOCK_INVALID')
+            self.assertEqual(caught.exception.detail['details']['reason'], 'document_id_too_long')
+            self.assertEqual(caught.exception.detail['details']['limit'], 64)
 
     def test_docx_blocks_follow_the_body_order_of_paragraphs_and_tables(self):
         path = self.base / 'interleaved.docx'

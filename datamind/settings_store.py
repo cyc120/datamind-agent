@@ -72,6 +72,48 @@ def normalize_base_url(base_url: str | None) -> str:
     return _normalize_base_url(base_url)
 
 
+# ---------- 目标是否与已存配置同源 ----------
+#
+# 探活请求会带上「用户填的 base_url」。如果它与已存配置不是同一个 host/端口，而请求
+# 又没有提交自己的 api_key，就绝不能把已存密钥（或已存敏感头）发过去：那等于让任何
+# 能调用探活接口的人把真实密钥外送到自己指定的地址。比较只看 host + 归一化端口
+# （http→80 / https→443），无 scheme 的裸主机名端口视为未知、按同 host 处理。
+
+_DEFAULT_PORTS = {"http": 80, "https": 443}
+
+
+def target_host_port(base_url) -> tuple | None:
+    """base_url 的 (host, port)；port 为 None 表示裸主机名没有可推导的端口。"""
+    text = str(base_url or "").strip()
+    if not text:
+        return None
+    candidate = text if "://" in text else "//" + text
+    try:
+        parts = urlsplit(candidate)
+    except ValueError:
+        return None
+    host = (parts.hostname or "").strip().lower()
+    if not host:
+        return None
+    try:
+        port = parts.port
+    except ValueError:
+        return None
+    if port is None:
+        port = _DEFAULT_PORTS.get((parts.scheme or "").strip().lower())
+    return host, port
+
+
+def same_target_source(left, right) -> bool:
+    """两个地址是否指向同一 host（端口归一化后相同）。无法解析时按「不同源」处理。"""
+    first, second = target_host_port(left), target_host_port(right)
+    if first is None or second is None or first[0] != second[0]:
+        return False
+    if first[1] is None or second[1] is None:
+        return True                     # 裸主机名：端口未知，同 host 即可
+    return first[1] == second[1]
+
+
 def mask_key(api_key: str | None) -> str:
     key = api_key or ""
     if not key:
@@ -411,19 +453,26 @@ def _config_source_value(base: dict, env) -> str:
 
 
 def resolve_profile_values(request=None, *, stored=None, environ=None,
-                           inherit_sensitive_headers: bool = True) -> dict:
+                           inherit_sensitive_headers: bool = True,
+                           allow_cross_origin_key: bool = False) -> dict:
     """唯一 profile 解析入口：请求显式字段 > 指定/启用配置 > 环境变量 > 默认值。
 
-    返回 ``PROFILE_VALUE_FIELDS`` 的规范化字段集合，外加两个元数据键
-    ``name``（启用配置名）与 ``source``（app_settings / environment / unset）。
-    api.resolve_profile() 与 sql_engine.settings() 都只做这一份结果的投影，
-    不再各自拼装字段。
+    返回 ``PROFILE_VALUE_FIELDS`` 的规范化字段集合，外加元数据键
+    ``name``（启用配置名）、``source``（app_settings / environment / unset）与
+    ``key_inheritance_blocked`` / ``stored_credentials_restricted``。
 
     ``inherit_sensitive_headers``：请求提交了 ``headers`` 但没带已存配置里的敏感头
     （Authorization / api-key / Cookie…）时，是否用 ``merge_sensitive_headers()``
     从已存配置补回。默认补回：浏览器只看得到脱敏视图（``public_profile()`` 敏感头
     只出键名），编辑非敏感头后重新「测试连接」时敏感头不会被整段丢掉（否则 401）。
     请求显式提交的敏感头值始终优先；已存没有该敏感头时不会凭空造。
+
+    ``allow_cross_origin_key``（**默认安全**）：请求显式指定了一个与已存配置
+    不同源（host/端口不同）的 ``base_url`` 时，是否仍允许回落到已存密钥。默认
+    ``False``：既不用已存 ``api_key``，也不补回已存敏感头，更不回落到
+    ``NEW_API_KEY`` 环境变量，并在 ``key_inheritance_blocked`` 上标记出来，由
+    调用方（探活路由）返回 400 ``MODEL_KEY_NOT_INHERITED``。请求显式提交的
+    ``api_key`` 不受影响；同源（或请求未指定 ``base_url``）时行为与从前一致。
 
     保守侧（两条实现原有的优先级差异）
     ----------------------------------
@@ -438,12 +487,23 @@ def resolve_profile_values(request=None, *, stored=None, environ=None,
     raw_stored = stored if isinstance(stored, dict) else {}
     base = raw_stored if _stored_is_active(raw_stored) else {}
 
+    request_target = _request_value(request, "base_url")
+    request_key = _request_value(request, "api_key")
+    target_mismatch = bool(
+        base and not _missing(request_target) and not _missing(base.get("base_url"))
+        and not same_target_source(request_target, base.get("base_url")))
+    restricted = target_mismatch and not allow_cross_origin_key
+    blocked = restricted and _missing(request_key)
+    inherit_headers = inherit_sensitive_headers and not restricted
+
     def pick(field):
         value = _request_value(request, field)
         if field == "api_key" and value is not None:
             value = str(value).strip() or None
         if not _missing(value):
             return value
+        if blocked and field == "api_key":
+            return None                 # 已存/环境密钥都不得外送到另一个来源
         value = base.get(field)
         if not _missing(value):
             return value
@@ -466,8 +526,13 @@ def resolve_profile_values(request=None, *, stored=None, environ=None,
 
     request_headers = _request_value(request, "headers")
     if request_headers is not None:
+        # 显式提交的头始终以提交内容为准；跨源时不补回任何已存敏感头。
         headers = (merge_sensitive_headers(request_headers, base.get("headers"))
-                   if inherit_sensitive_headers else request_headers)
+                   if inherit_headers else request_headers)
+    elif restricted:
+        # 请求没提交 headers：也不要回落到已存敏感头。保留非敏感头，剔除凭据。
+        headers = redact_headers(pick("headers"))
+        headers = {} if headers is None else headers
     else:
         headers = pick("headers")
         headers = {} if headers is None else headers
@@ -478,7 +543,9 @@ def resolve_profile_values(request=None, *, stored=None, environ=None,
     return {"protocol": protocol, "base_url": base_url, "model": model, "api_key": api_key,
             "max_tokens": max_tokens, "timeout_s": timeout_s, "auth_style": auth_style,
             "headers": headers, "proxy": proxy,
-            "name": str(base.get("name") or ""), "source": _config_source_value(base, env)}
+            "name": str(base.get("name") or ""), "source": _config_source_value(base, env),
+            "key_inheritance_blocked": blocked,
+            "stored_credentials_restricted": restricted}
 
 
 def _clean_profile(raw: dict, *, existing: dict | None = None) -> dict:

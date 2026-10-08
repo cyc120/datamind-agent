@@ -27,12 +27,12 @@
 | `office_object` | `part` 加 `paragraph`/`table`/`slide`/`shape` 之一 |
 | `sheet_range` | `sheet` 加 `cell`（A1 形式）或 `range` |
 | `cad_entity` | `layout`、`handle`（十六进制）、`layer`、`model_xy`、`unit` |
+| `temporal_segment` | `start < end`、`time_unit`、`time_base` |
+| `model_spatial_object` | `object_id`、`coordinate_reference`、`unit` |
 
 ## 写入存储
 
 `ingestion/ingest.py` 在重建某文档的块时：先删除该文档的 `document_blocks` 与 `document_block_locators`，再按 `BLOCK_INSERT_SQL`（13 列，历史形状不变）写入块，最后对**有校验定位的块**执行 `LOCATOR_INSERT_SQL` 写入 `(block_id, document_id, contract_version, locator)`。缺少定位的块不写行。
-| `temporal_segment` | `start < end`、`time_unit`、`time_base` |
-| `model_spatial_object` | `object_id`、`coordinate_reference`、`unit` |
 
 ## Block 与 Relation
 
@@ -66,6 +66,10 @@
 
 `tests/test_parse_contract.py` **25/25**，完整隔离回归见 `reports/parse_contract_verification.json`。覆盖：常量与文档一致、摄取状态机放行/拒绝、七类定位器逐一校验与必需字段缺失、页号/bbox 越界与倒置、CAD 句柄、关系端点/类型/状态/证据/恢复方法、结果必需字段与未知字段拒绝、适配器登记/查询/未知与不支持区分，以及用真实 ingest/OCR 块形状做映射往返（字段不丢、缺失保持缺失、页尺寸缺失拒绝）。
 
+## 版本追加记录
+
+以下小节按**新→旧**追加，记录各 API 版本对契约的增补；正文（上文）描述的是当前契约。
+
 ## 关系被检索侧消费（API 0.36.0）
 
 `document_block_relations` 里的契约关系（例如原生 DXF 的尺寸标注 → 目标圆）现在随引用一并提供，纪律与定位**完全一致**：
@@ -75,7 +79,7 @@
 - `citation_from_hit(..., relations=…)` 只附上存储中确实存在的关系；`ask_documents(..., relation_lookup=…)` 一次性查询全部命中块，失败**不阻断回答**并写入独立的 `relation_lookup_error`（与 locator 的错误互不影响）；未注入时行为与之前完全一致。
 - 索引：迁移 016 为 `target_block_id` 补索引，按对端查询不再是顺序扫描（实测执行计划为 `Index Scan using document_block_relations_target_idx`）。
 
-**关系目前只是可追溯元数据**：它**不参与**检索排序、打分、重排或冲突消解，前端也尚未展示该字段。
+**关系已随引用在前端渲染**（`web/app.js` 的引用卡片，API 0.37.0：`citationRelations` / `citationRelationsNote`，后端词汇原样显示、无关系则完全不渲染）。**但它仍只是可追溯元数据**：**不参与**检索排序、打分、重排或冲突消解。
 
 ## 前端消费定位（API 0.33.0）
 
@@ -146,6 +150,6 @@ Office/DXF 的块按 `part`/`paragraph`/`slide`/`sheet`/`handle` 定位，**没�
 行号保留**真实电子表格行号**（跳过空行但不重编号），因此引用指向操作员看到的同一行。
 
 **有界而非静默截断**：超过 `MAX_BLOCKS`（默认 2000）或单表 `max_rows_per_sheet`（默认 500）时，`parse_status` 置 `partial` 并在 `unsupported_features` 写入 `block_limit_reached` / `sheet_row_limit_reached`。
-- **未实现 Office/CAD 新解析器**：`office_object`/`sheet_range`/`cad_entity` 只是可校验的定位器契约，尚无产出它们的解析器。
+- **Office/CAD 解析器已实现（API 0.29.0/0.30.0）**：`office_object`/`sheet_range` 由 `ingestion/office.py` 产出（DOCX/PPTX/XLSX，注册适配器并在包内索引判定子类型），`cad_entity` 由 `ingestion/cad_adapter.py` 产出（原生 DXF，注册 `dxf-native`）；三者都映射进统一契约并写库。仍缺的是**图纸 PDF/DWG 转换**与 **Office 合并单元格/公式语义**（见上文两节）。
 - **`Chunk`、`DocumentFact`、`DrawingFeature` 未纳入本契约**：现有存储与检索尚未统一，留待后续阶段。
 - 契约版本为 `parse-contract-v1`；变更契约需同时更新测试与本文件。

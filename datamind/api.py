@@ -163,11 +163,41 @@ class ProfileImportRequest(BaseModel):
     activate_first: bool = False
 
 
-app = FastAPI(title="DataMind Agent", version="0.37.0")
+app = FastAPI(title="DataMind Agent", version="0.38.0")
 
 
-@app.middleware('http')
-async def identity_permissions(request: Request, call_next):
+# ---------- request authorisation surface (default deny) ----------
+#
+# The middleware below no longer enumerates "protected prefixes" and lets everything else
+# through: that is how POST /v1/chat, POST /v1/chat/stream and POST /v1/diagnostics/sql
+# ended up with no identity, CSRF or origin check at all. Now only the routes listed here
+# are reachable anonymously; every other route needs an identity, and every mutation also
+# needs CSRF + a same-origin request.
+
+PUBLIC_PATHS = frozenset({'/', '/health', '/v1/auth/login', '/v1/auth/me'})
+#: Public reads: the document/run viewers stay usable without a session (their payloads are
+#: ACL-filtered to public documents); static assets are the page itself.
+PUBLIC_READ_PREFIXES = ('/v1/documents', '/v1/runs', '/assets/')
+#: Reads that expose credentials or connection targets; a browser on another origin must
+#: not be able to read them, so they carry the same origin check as mutations do.
+SENSITIVE_READ_PREFIXES = ('/v1/model/profiles', '/v1/model/config')
+_NO_STORE_PREFIXES = ('/v1/pdf-snapshots', '/v1/pdf-knowledge', '/v1/drawings',
+                      '/v1/dimensions', '/v1/files', '/v1/plans',
+                      '/v1/model/profiles', '/v1/model/config')
+
+
+def _is_public_request(request) -> bool:
+    path = request.url.path
+    if path in PUBLIC_PATHS:
+        return True
+    return request.method in {'GET','HEAD','OPTIONS'} and path.startswith(PUBLIC_READ_PREFIXES)
+
+
+def _no_store_path(path: str) -> bool:
+    return any(path == prefix or path.startswith(prefix + '/') for prefix in _NO_STORE_PREFIXES)
+
+
+def _required_permission(request) -> str | None:
     path=request.url.path
     authority_path=path.startswith('/v1/authority/')
     cad_path=path=='/v1/drawings' or path.startswith('/v1/drawings/')
@@ -176,39 +206,50 @@ async def identity_permissions(request: Request, call_next):
     pdf_snapshot_path=path=='/v1/pdf-snapshots' or path.startswith('/v1/pdf-snapshots/')
     pdf_knowledge_path=path=='/v1/pdf-knowledge' or path.startswith('/v1/pdf-knowledge/')
     plan_path=path.startswith('/v1/plans')
-    permission=('admin' if plan_path or files_path or pdf_snapshot_path or pdf_knowledge_path else
-                'approver' if dimension_path and request.method=='POST' and path.endswith('/approvals') else
-                'admin' if dimension_path and (request.method=='POST' or path.endswith('/sources')) else
-                'reviewer' if cad_path and request.method=='POST' and path.endswith('/reviews') else
-                'admin' if path=='/v1/drawings/sources' or (cad_path and request.method=='POST') else
-                'admin' if path.startswith('/v1/model/') or path=='/v1/authority/candidates' or
-                (authority_path and request.method=='POST' and path.endswith('/rules')) else
-                'approver' if authority_path and request.method=='POST' and path.endswith('/events') else
-                'reviewer' if request.method=='POST' and path.endswith('/reviews') else
-                'approver' if request.method=='POST' and path.endswith('/approvals') else None)
-    if permission or authority_path or cad_path or dimension_path or pdf_snapshot_path or pdf_knowledge_path or plan_path:
-        from .auth import current
+    return ('admin' if plan_path or files_path or pdf_snapshot_path or pdf_knowledge_path else
+            'approver' if dimension_path and request.method=='POST' and path.endswith('/approvals') else
+            'admin' if dimension_path and (request.method=='POST' or path.endswith('/sources')) else
+            'reviewer' if cad_path and request.method=='POST' and path.endswith('/reviews') else
+            'admin' if path=='/v1/drawings/sources' or (cad_path and request.method=='POST') else
+            'admin' if path.startswith('/v1/model/') or path=='/v1/authority/candidates' or
+            (authority_path and request.method=='POST' and path.endswith('/rules')) else
+            'approver' if authority_path and request.method=='POST' and path.endswith('/events') else
+            'reviewer' if request.method=='POST' and path.endswith('/reviews') else
+            'approver' if request.method=='POST' and path.endswith('/approvals') else None)
+
+
+@app.middleware('http')
+async def identity_permissions(request: Request, call_next):
+    from .auth import current,origin_check
+    path=request.url.path
+    read_only=request.method in {'GET','HEAD','OPTIONS'}
+    no_store=_no_store_path(path)
+    if not _is_public_request(request):
         try:
+            if read_only and path.startswith(SENSITIVE_READ_PREFIXES):
+                origin_check(request)
             request.state.identity=await run_in_threadpool(current,request,_write_dsn(),required=True,
-                permission=permission,mutation=request.method not in {'GET','HEAD','OPTIONS'})
+                permission=_required_permission(request),mutation=not read_only,
+                # A GET must never provision the demo user: reads do not write identity rows.
+                provision_demo=not read_only)
         except HTTPException as exc:
             return JSONResponse(status_code=exc.status_code,content={'detail':exc.detail},
-                                headers={'Cache-Control':'no-store'} if pdf_snapshot_path or pdf_knowledge_path else None)
+                                headers={'Cache-Control':'no-store'} if no_store else None)
     response=await call_next(request)
-    if cad_path or dimension_path or files_path or pdf_snapshot_path or pdf_knowledge_path or plan_path:response.headers['Cache-Control']='no-store'
+    if no_store:response.headers['Cache-Control']='no-store'
     return response
 
 
 def _pdf_snapshot_recheck(request):
     # File verification can outlive the middleware's initial identity check.
     from .auth import current
-    current(request,_write_dsn(),required=True,permission='admin')
+    current(request,_write_dsn(),required=True,permission='admin',provision_demo=False)
 
 
 def _admin_recheck(request):
     # Long-running work can outlive the middleware's initial identity check.
     from .auth import current
-    current(request,_write_dsn(),required=True,permission='admin')
+    current(request,_write_dsn(),required=True,permission='admin',provision_demo=False)
 
 
 @app.post('/v1/pdf-snapshots')
@@ -598,7 +639,10 @@ def file_job_retry(job_id: str,request: Request):
 @app.get('/v1/auth/me')
 def auth_me(request: Request,response: Response):
     from .auth import current
-    identity=current(request,_write_dsn())
+    # F07: this is a GET, so it must not INSERT the demo user row; the demo identity is
+    # a static view and session lookups stay on the write DSN because readonly_user is
+    # deliberately granted no access to auth_users/auth_sessions.
+    identity=current(request,_write_dsn(),provision_demo=False)
     response.headers['Cache-Control']='no-store'
     return {'user':{k:v for k,v in identity.items() if k not in {'csrf_token','_session_hash','_demo'}} if identity else None,
             'csrf_token':identity['csrf_token'] if identity else None}
@@ -662,6 +706,24 @@ def index():
     return FileResponse(WEB)
 
 
+def _vector_store_status() -> str:
+    """Probe Qdrant's readiness endpoint; any failure degrades, never raises.
+
+    /health is the liveness/readiness signal the start scripts poll, so a vector-store
+    outage must surface as a field value, not as a 500.
+    """
+    import urllib.request
+    base = (os.environ.get('DATAMIND_QDRANT_URL') or 'http://127.0.0.1:6333').strip().rstrip('/')
+    if '://' not in base:
+        base = 'http://' + base
+    try:
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(base + '/readyz', timeout=1.0) as response:
+            return 'ready' if 200 <= response.status < 300 else 'unavailable'
+    except Exception:
+        return 'unavailable'
+
+
 @app.get("/health")
 def health():
     try:
@@ -670,9 +732,14 @@ def health():
             cur.fetchone()
             cur.execute("SELECT count(*) FROM document_assets WHERE status='indexed' AND 'public'=ANY(acl) AND NOT needs_review")
             document_count = cur.fetchone()[0]
+        knowledge = "ready" if document_count else "empty"
+        vector_store = _vector_store_status()
+        if knowledge == "ready" and vector_store != "ready":
+            knowledge = "degraded"
         return {"status": "ok", "database": "ready", "agent": "sql+rag",
                 "capabilities": ["sql", "rag", "multifile_rag", "industrial_rules", "industrial_nl2sql", "fact_reviews", "local_identity", "fact_approvals", "source_authority", "cad_assets", "cad_dimensions", "file_jobs", "private_pdf_answer"],
-                "knowledge": "ready" if document_count else "empty", "document_count": document_count}
+                "knowledge": knowledge, "document_count": document_count,
+                "vector_store": vector_store}
     except psycopg2.Error:
         raise HTTPException(503, detail={"error_code": "DATABASE_UNAVAILABLE"})
 
@@ -735,6 +802,16 @@ def resolve_profile(request: ProfileRequest | None = None, *, stored: dict | Non
     profile = dict(stored or {})
     for field in PROFILE_VALUE_FIELDS:
         profile[field] = resolved[field]
+    # Cross-source probes must be rejectable: the key was neither inherited nor invented.
+    profile["key_inheritance_blocked"] = bool(resolved.get("key_inheritance_blocked"))
+    profile["stored_credentials_restricted"] = bool(resolved.get("stored_credentials_restricted"))
+    return profile
+
+
+def _reject_cross_origin_inheritance(profile: dict) -> dict:
+    """F01: a probe aimed at a different host must not reuse the stored key."""
+    if profile.get("key_inheritance_blocked"):
+        raise HTTPException(400, detail={"error_code": "MODEL_KEY_NOT_INHERITED"})
     return profile
 
 
@@ -861,7 +938,7 @@ def delete_model_config():
 
 @app.post("/v1/model/config/models")
 def probe_models(request: ProfileRequest):
-    profile = resolve_profile(request)
+    profile = _reject_cross_origin_inheritance(resolve_profile(request))
     result = provider_list_models(profile)
     result["base_url"] = profile.get("base_url")
     result["protocol"] = profile.get("protocol") or OPENAI
@@ -870,7 +947,7 @@ def probe_models(request: ProfileRequest):
 
 @app.post("/v1/model/config/test")
 def probe_chat(request: ProfileRequest):
-    profile = resolve_profile(request)
+    profile = _reject_cross_origin_inheritance(resolve_profile(request))
     result = provider_test_chat(profile)
     result["base_url"] = profile.get("base_url")
     result["configured_model"] = profile.get("model")
@@ -999,15 +1076,24 @@ def document_contract(document_id: str):
     `locators` holds the validated locators of page-shaped PDF parses, which live beside
     `document_blocks`. A document may have either or both; returning only one would report
     "nothing stored" for a document that does have validated locators.
+
+    `parse_contract` repeats the summary the ingest path recorded, including
+    `unsupported_features`. Without it a document whose format cannot carry a locator (an
+    OHR-Bench JSON record has a page index but no page geometry, so no honest `pdf_region`
+    exists) reads as "indexed but nothing stored" — the counts alone cannot distinguish
+    "nothing was parsed" from "a gap was declared".
     """
     from ingestion.contract_store import read_result
     document = _public_document(document_id)
     stored = read_result(document_id, _read_dsn())
+    summary = (document.get("quality_detail") or {}).get("parse_contract") or {}
     return {"document_id": document_id, "document_version": document["doc_version"],
             "source_sha256": document["sha256"], "parser_version": document["parser_version"],
             "contract_version": document.get("contract_version"),
             "block_count": stored["block_count"], "locator_count": stored["locator_count"],
             "relation_count": stored["relation_count"],
+            "parse_contract": jsonable_encoder(summary),
+            "unsupported_features": list(summary.get("unsupported_features") or []),
             "blocks": jsonable_encoder(stored["blocks"]),
             "locators": jsonable_encoder(stored["locators"]),
             "relations": jsonable_encoder(stored["relations"])}

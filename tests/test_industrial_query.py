@@ -10,6 +10,7 @@ from datamind.catalog import Catalog
 from datamind.industrial_query import findings, frame_for
 from datamind.sql_engine import ask
 from datamind.sql_guard import guard_sql, PolicyError
+import auth_fixtures
 
 META='host=127.0.0.1 port=5432 dbname=datamind_meta user=readonly_user password=readonly_dev'
 QUESTION='2026年9月A102工序30有多少个已测量批次？'
@@ -19,7 +20,15 @@ SQL='SELECT count(DISTINCT batch_id) AS batch_count FROM measurement_observation
 
 class IndustrialQueryTest(unittest.TestCase):
     @classmethod
-    def setUpClass(cls):cls.catalog=Catalog(META,'demo_industrial');cls.client=TestClient(app)
+    def setUpClass(cls):
+        cls.catalog=Catalog(META,'demo_industrial');cls.client=TestClient(app)
+        # POST /v1/chat is a mutating route now gated by the default-deny identity middleware
+        # (identity + CSRF + same-origin). This class shares one client, so sign in once with a
+        # disposable fixture account; TestClient's "testclient" host is not granted demo admin.
+        auth_fixtures.login(cls.client)
+    @classmethod
+    def tearDownClass(cls):
+        auth_fixtures.cleanup(cls.client);cls.client.close()
 
     def test_catalog_boundary_and_search_path(self):
         self.assertEqual(set(self.catalog.tables),{'parts','measurement_observations'})

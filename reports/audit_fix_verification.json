@@ -4,7 +4,7 @@
   "baseline": "2d9ab18（复审基线 API 0.30.0）",
   "started_from": "68b8cf8（API 0.33.0）",
   "date": "2026-10-08",
-  "scope": "按复审 §7 排期修复 F01–F11，并为每条加入可执行验收断言。本文件记录逐条状态、修复方式、验收证据与未修原因。",
+  "scope": "按复审 §7 排期修复 F01–F12 与回归 R1，并为每条加入可执行验收断言。本文件记录逐条状态、修复方式、验收证据与未修原因。",
   "order_note": "复审给出的排期为：①F01 ②F02 ③F03+F11 ④F05+F06 ⑤F08+F09；F04/F07/F10 未进前五。",
   "findings": {
     "F01": {
@@ -157,7 +157,7 @@
     "F03": {
       "title": "存储服务绑定全部网卡",
       "severity_after_review": "P1'（部署前置）",
-      "status": "fixed_config_not_yet_effective",
+      "status": "fixed_and_effective",
       "by": "子代理",
       "files": [
         "deploy/compose.yaml"
@@ -167,7 +167,7 @@
         "docker compose config（只读）显示 postgres/qdrant 发布项 host_ip=127.0.0.1（改动前无 host_ip 字段）",
         "测试解析 YAML 逐条断言绑定回环"
       ],
-      "not_effective_yet": "容器未重建：docker ps 仍显示 0.0.0.0 与 [::] 监听；需下一次 docker compose up -d 重建这两个容器后才收敛。认证与口令方案未动（会破坏本机运行中的栈）。",
+      "effectiveness_history": "历史：配置改动需重建容器才生效。已执行 `docker compose -f deploy/compose.yaml up -d` 重建两个容器（复用既有卷），`docker ps` 现为 127.0.0.1:5432 与 127.0.0.1:6333-6334，数据完好（27 文档 / 169 切片），Qdrant green 169 点，API 健康 200；见 roadmap_progress.F03_effectiveness。认证与口令方案未动（会破坏本机运行中的栈）。",
       "tests": {
         "file": "tests/test_verify_isolation.py",
         "added": 12,
@@ -348,24 +348,54 @@
       "errors": 0,
       "exit_code": 0,
       "previous_stage_tests": 844,
-      "note": "运行验收中发现并修复契约读接口缺陷（+1 守护测试）后的完整隔离回归"
+      "note": "运行验收中发现并修复契约读接口缺陷（+1 守护测试）后的完整隔离回归，即本阶段记录的 845/845。其后新增测试会改变分母，当前唯一权威值以 PROGRESS.md 文首「当前状态」块为准（本次未重跑该回归）。"
     }
   },
   "concurrency_note": "另有 Codex（ChatGPT 桌面版 CLI）在同一检出与同一 PostgreSQL 上并行工作，此前已造成一次提交被其产物污染、一次回归被其并发测试干扰（30 个连接错误）。本轮所有提交只按显式路径 add，并在提交前核对 git diff --cached。",
   "follow_ups": [
-    "public_profile() 读取侧仍回传 headers/proxy，需与前端保存语义一起改（F05 同类暴露）",
-    "问答链路（sql_engine/rag_engine/pdf_answer）仍不含 proxy，需统一到共享解析函数（F06 剩余）",
     "复合指标（净销售额等引用其他指标的公式）未做递归展开比对，目前按提示类处理",
     "指标口径强制面仍窄（业绩/销量/退款额/订单量/客户总量未走注册表结构校验）",
-    "compose 回环绑定需重建容器才生效；跨机部署还需防火墙/反代",
-    "F10 延后：摄取跨存储一致性需 outbox 模式"
+    "跨机部署仍需防火墙或反向代理（compose 回环绑定已生效，见 F03）",
+    "`include_keys=True` 导出仍明文外带全部凭据（设计如此，admin 显式参数）",
+    "请求侧 proxy 仍是替换语义（保存路径已正确合并）；前端未改动时不回传 proxy，现状无实际缺口"
   ],
-  "api_version": "0.37.0",
+  "follow_ups_completed": [
+    "F05 读取侧脱敏：`public_profile()` 敏感头只出键名、proxy 去 userinfo —— 已完成（API 0.35.0/0.36.0）",
+    "F06 问答链路 proxy 传递：`sql_engine.settings()` 映射 `NEW_API_PROXY`、`model_profile()` 输出 `proxy` —— 已完成（API 0.35.0）",
+    "F10 摄取跨存储一致性：`publish_document` 顺序协议 —— 已完成（API 0.36.0）",
+    "F03 容器生效：已重建容器，端口仅回环 —— 已完成（API 0.36.0）",
+    "契约关系前端渲染：`web/app.js` 引用卡片渲染已存关系 —— 已完成（API 0.37.0，见 roadmap_progress.frontend_presentation）",
+    "profile 解析实现收敛：唯一入口 `resolve_profile_values()` —— 已完成（API 0.37.0，见 roadmap_progress.profile_resolver_unification）"
+  ],
+  "api_version": "0.38.0",
   "version_changes": {
-    "datamind/api.py": "0.33.0 → 0.34.0",
-    "web/index.html": "前端缓存版本 0.33.0 → 0.34.0（app.js 与 multifile.js 均变更，不提升会让回访浏览器继续用旧脚本、F08 修复不生效）",
+    "datamind/api.py": "0.33.0 → 0.34.0 → 0.35.0 → 0.36.0 → 0.37.0 → 0.38.0（当前 0.38.0；以 `datamind/api.py` 的 `version=` 与 `/openapi.json` 的 `info.version` 实测为准）",
+    "web/index.html": "前端缓存版本逐次递增（0.33.0 → 0.34.0 → 0.37.0 → 0.38.0）；每次改动 app.js/multifile.js/style.css 都必须同步提升，否则回访浏览器继续用旧脚本",
     "ingestion/office.py": "CONTRACT_PARSER_VERSION 'office-adapter-v1' → 'v2'（block id 方案、DOCX 顺序与 XLSX 状态语义变化，诚实升版以触发重新解析）"
   },
+  "release_history": [
+    {
+      "version": "0.34.0",
+      "summary": "独立审计修复 F01–F09、F11（列权限 AST scope、指标口径结构比对、回环绑定、stdin deadline、导出脱敏、profile 解析统一、恢复绑定计划、前端代次、Office 保真、验证脚本隔离）；F10 明确延后。"
+    },
+    {
+      "version": "0.35.0",
+      "summary": "F06 补齐问答链路 proxy 传递；修复 F06 时自查发现并修复 F12（本机地址一律直连、不用任何来源代理）。"
+    },
+    {
+      "version": "0.36.0",
+      "summary": "F10 摄取跨存储顺序协议（publish_document）；profile 读取侧脱敏（public_profile 只出键名）；契约关系进入引用载荷（迁移 016 补 target 索引）；F03 重建容器后生效；诚实记录并修复自查引入的回归 R1。"
+    },
+    {
+      "version": "0.37.0",
+      "summary": "前端呈现契约关系与 profile 解析收敛（唯一入口 resolve_profile_values）；移除本地 4000 网关、统一直连上游；运行验收与契约读接口缺陷修复（blocks/locators 分别返回）；摄取改为按 manifest.json 白名单；新增 requirements.lock（65 项）与守护测试；PROGRESS.md 建立唯一权威当前状态块。"
+    },
+    {
+      "version": "0.38.0",
+      "summary": "安全加固与契约/存储/摄取一致性修复批次。F01 跨源不继承已存密钥（400 MODEL_KEY_NOT_INHERITED）；F02 免登录只读 socket 对端 + 启动加 --no-proxy-headers；F03 同源改固定白名单（不再由 Host 推导）+ 敏感读同源；F04 中间件默认拒绝并把三条遗漏路由纳入；F07 GET /v1/auth/me 不再写库；health 暴露 vector_store。契约侧：CAD 块 id 定长摘要、document_id ≤64 失败关闭、块形状闭合（迁移 017 补 9 列）、cad_entity 保留源字段。摄取侧：OHR 走同一契约路径并声明 locator_unavailable（不再编造 bbox）、工业种子真正写入定位、ingest 改为按 manifest 白名单（修复知识库污染）、--reset 覆盖契约三表与事实三表。存储/CLI：import_contract 建资产行（/contract 不再 404）、read_locators 覆盖两套存储、/contract 暴露 parse_contract 与 unsupported_features。",
+      "verification": "安全项由协调者独立复现（本机 sink 阳性对照：跨源无密钥 0 次外送；跨源自带密钥正常外送且不泄露已存密钥；伪造 Origin 403；非回环匿名 401）"
+    }
+  ],
   "regressions_introduced_and_fixed": [
     {
       "id": "R1",
@@ -390,9 +420,9 @@
       "hardening_by_coordinator": [
         "对端字段更名 block_id → peer_block_id：locator 载荷里 block_id 是被引块，关系载荷里同名字段是对端，语义相反必须断开",
         "迁移 016 为 target_block_id 补索引（原按对端查询是顺序扫描），实测走 Index Scan",
-        "文档写明关系只是可追溯元数据，不参与排序/打分/重排/冲突消解，前端未展示"
+        "文档写明关系只是可追溯元数据，不参与排序/打分/重排/冲突消解（前端渲染见 roadmap_progress.frontend_presentation，API 0.37.0）"
       ],
-      "boundary": "关系尚未进入检索排序或冲突消解；前端未渲染该字段"
+      "boundary": "关系尚未进入检索排序或冲突消解；已随引用在前端渲染（API 0.37.0）"
     },
     "F03_effectiveness": {
       "status": "done",
@@ -401,7 +431,7 @@
     },
     "vision_model_blocker": {
       "status": "blocked_external",
-      "detail": "本机网关仅 deepseek-flash（纯文本），仓库无权重目录 → V-CAR“真实视觉载荷与模型规模对比”不可执行，需外部提供视觉模型；与 T6 授权真实输入同属外部依赖"
+      "detail": "本机可用的上游仅 deepseek-flash（纯文本）、仓库无权重目录（`.cache/` 不被 git 跟踪）→ V-CAR“真实视觉载荷与模型规模对比”不可执行，需外部提供视觉模型；与 T6 授权真实输入同属外部依赖"
     },
     "frontend_presentation": {
       "status": "done",
@@ -475,7 +505,7 @@
         "README.md"
       ],
       "detail": [
-        "审计 §5 指出仓库\"无 CI、无依赖锁\"。已生成 requirements.lock（65 个固定版本，覆盖 fastapi/uvicorn/psycopg2-binary/sqlglot/httpx/qdrant-client/pymupdf 等关键运行时依赖）",
+        "审计 §5 指出仓库\"无 CI、无依赖锁\"。已生成 requirements.lock（65 个固定版本，另有可选依赖说明注释；覆盖 fastapi/uvicorn/psycopg2-binary/sqlglot/httpx/qdrant-client/pymupdf 等关键运行时依赖）",
         "守护测试断言：每行都是 name==version、关键依赖齐备、**锁文件与实际安装版本一致**（漂移即失败）、且该漂移检查非空转",
         "README 快速开始补充\"需要严格复现隔离回归环境时用锁文件安装\"",
         "CI 仍未添加（需要 Postgres/Qdrant 服务容器，属部署决策），已如实保留为未做项"

@@ -9,6 +9,22 @@ references, manifest and a parse status; every block locates its origin through 
 This module is the contract and its validation only. It does not read files, call models
 or route real ingestion: callers map their own parser output into it. Missing information
 is never filled in from defaults or guesses.
+
+Relationship to other contracts:
+
+* The CAD source contract (``cad-contract-v1``, `ingestion/cad_contract.py`, hash-frozen in
+  `data/evaluation/frozen/cad_dxf_v1`) is **not** this contract. Its ``Locator``
+  (``source_sha256``, ``handle``, ``layer``, ``view_id``, ``coordinate_system``,
+  ``layout``) is the source contract; the unified ``cad_entity`` locator is a *projection*
+  of it, and the only place that builds the projection is `ingestion/cad_adapter.py`.
+  Because a projection may not silently lose evidence, every source field is either
+  required or optional here (`CAD_SOURCE_LOCATOR_FIELDS`), and any field the projection
+  deliberately discards is declared in `CAD_SOURCE_LOCATOR_DROPPED_FIELDS` (empty today).
+* A validated block is also a *storeable* block. Its keys are closed
+  (`BLOCK_REQUIRED_FIELDS` + `BLOCK_OPTIONAL_FIELDS`), every key has a column
+  (`db/migrations/015_contract_store.sql` and `017_contract_block_shape.sql`), and every
+  identifier is checked against that column's width (`BLOCK_COLUMN_WIDTHS`) so a block
+  that passes validation cannot then fail its INSERT.
 """
 from __future__ import annotations
 
@@ -55,12 +71,44 @@ LOCATOR_OPTIONAL_FIELDS = {
     'image_region': ('rotation_degrees', 'transform_chain', 'page_no'),
     'office_object': ('paragraph', 'table', 'cell', 'slide', 'shape', 'workbook', 'sheet'),
     'sheet_range': ('cell', 'range', 'formula', 'hidden'),
-    'cad_entity': ('view', 'view_id', 'render_ref', 'model_z', 'coordinate_system'),
+    # `source_sha256` is part of the CAD source contract's Locator; it is optional here so
+    # projecting a source locator keeps the evidence that ties the block to one drawing
+    # revision instead of dropping it (see CAD_SOURCE_LOCATOR_FIELDS).
+    'cad_entity': ('view', 'view_id', 'render_ref', 'model_z', 'coordinate_system', 'source_sha256'),
     'temporal_segment': ('speaker', 'frame_ref'),
     'model_spatial_object': ('transform', 'view'),
 }
+# Source locator of the frozen CAD contract (`ingestion/cad_contract.py`), field by field.
+# The unified `cad_entity` locator is its projection: `locator_kind`/`layout`/`handle`/
+# `layer` are required here, `view_id`/`coordinate_system`/`source_sha256` are optional
+# (accepted so the projection can carry them through), while `model_xy` and `unit` are
+# added from the drawing's insertion/bbox and INSUNITS because the source locator has no
+# such fields. tests/test_parse_contract.py asserts this set is fully covered above.
+CAD_SOURCE_LOCATOR_FIELDS = ('locator_kind', 'source_sha256', 'handle', 'layer', 'view_id',
+                             'coordinate_system', 'layout')
+# Source fields the projection deliberately discards, with the reason. Empty on purpose:
+# nothing in the frozen source locator is dropped today. A new entry here is a contract
+# change, not an implementation detail.
+CAD_SOURCE_LOCATOR_DROPPED_FIELDS = {}
 BLOCK_REQUIRED_FIELDS = ('block_id', 'document_id', 'source_version', 'parser_version', 'block_type',
                          'text', 'native_attributes', 'reading_order', 'locator', 'quality', 'content_hash')
+# Block keys a parser may add on top of the required ones. Closed set: the block shape is
+# exactly BLOCK_REQUIRED_FIELDS + BLOCK_OPTIONAL_FIELDS, and by migration 017 each of these
+# keys has a column in `document_contract_blocks` (F07: validation must not accept a field
+# the store has nowhere to put).
+BLOCK_OPTIONAL_FIELDS = ('page_no', 'heading_level', 'table_cells', 'formula_latex',
+                         'ocr_confidence', 'bbox')
+# Column widths of the stores a validated block is written into (document_blocks,
+# document_block_locators, document_contract_blocks, document_block_relations). Every one of
+# those stores holds `document_id` and `block_id` in a VARCHAR(64), so a longer value would
+# pass validation and then fail its INSERT; the width is checked here instead (F06). The
+# same rule is shared with the adapters through `require_document_id`, so an adapter refuses
+# an over-long id with the same stable reason instead of handing the caller a "parsed"
+# result that cannot be stored.
+BLOCK_COLUMN_WIDTHS = {'block_id': 64, 'document_id': 64, 'parser_version': 64,
+                       'source_version': 128}
+DOCUMENT_ID_MAX_LENGTH = BLOCK_COLUMN_WIDTHS['document_id']
+
 RELATION_REQUIRED_FIELDS = ('source_block_id', 'target_block_id', 'relation_type', 'evidence',
                             'recovery_method', 'state')
 RELATION_OPTIONAL_FIELDS = ('relation_id', 'note')
@@ -130,6 +178,23 @@ def validate_ingest_state(state):
     if state not in INGEST_STATES:
         fail('PARSE_STATUS_INVALID', subject='ingest_state', value=repr(state))
     return state
+
+
+def require_document_id(document_id, *, code='PARSE_BLOCK_INVALID', subject='block'):
+    """Refuse a document id the contract stores cannot hold (VARCHAR(64) everywhere).
+
+    `document_id` is an identifier on every contract table, so accepting a longer one would
+    produce a result that validates and then fails to persist. Adapters call this before
+    parsing so an over-long id is refused with a stable `document_id_too_long` reason
+    instead of a half-written parse. The *family* code belongs to the caller
+    (`PARSE_LOCATOR_INVALID` for a locator, `PARSE_BLOCK_INVALID` for a block,
+    `PARSE_RESULT_INVALID` for an adapter's own input) while the reason stays the same
+    everywhere, so the one stable signal to assert is `reason='document_id_too_long'`.
+    """
+    if isinstance(document_id, str) and len(document_id) > DOCUMENT_ID_MAX_LENGTH:
+        fail(code, subject=subject, reason='document_id_too_long',
+             length=len(document_id), limit=DOCUMENT_ID_MAX_LENGTH)
+    return document_id
 
 
 def ingest_step(state, target):
@@ -218,6 +283,10 @@ def _validate_cad(payload):
         fail('PARSE_LOCATOR_INVALID', subject=subject, reason='model_xy')
     if not _text(payload.get('unit')):
         fail('PARSE_LOCATOR_INVALID', subject=subject, reason='unit')
+    source_sha256 = payload.get('source_sha256')
+    if source_sha256 is not None and (not isinstance(source_sha256, str)
+                                      or not _SHA256.fullmatch(source_sha256)):
+        fail('PARSE_LOCATOR_INVALID', subject=subject, reason='source_sha256')
 
 
 def _validate_office(payload):
@@ -293,6 +362,9 @@ def validate_locator(payload):
     for field in _LOCATOR_COMMON[1:]:
         if not _text(data[field]):
             fail('PARSE_LOCATOR_INVALID', subject=f'locator.{kind}', reason=field)
+    # A locator is stored per block (`document_block_locators.document_id`), so the same
+    # column bound as for blocks applies here.
+    require_document_id(data['document_id'], code='PARSE_LOCATOR_INVALID', subject=f'locator.{kind}')
     _LOCATOR_VALIDATORS[kind](data)
     return SourceLocator(copy.deepcopy(dict(data)))
 
@@ -312,13 +384,28 @@ def pdf_region_locator(*, document_id, source_version, page_no, bbox, page_width
 
 
 def validate_block(payload):
-    """Validate one document block, including its locator."""
+    """Validate one document block, including its locator.
+
+    The block shape is closed: a key outside ``BLOCK_REQUIRED_FIELDS`` +
+    ``BLOCK_OPTIONAL_FIELDS`` is refused rather than accepted and then dropped by the
+    store, and every identifier is checked against its destination column's width so
+    "the contract accepted it" implies "the store can hold it".
+    """
     data = _mapping(payload, 'PARSE_BLOCK_INVALID', 'block')
     for field in BLOCK_REQUIRED_FIELDS:
         if field not in data:
             fail('PARSE_BLOCK_INVALID', subject='block', reason='missing_field', field=field)
+    unknown = sorted(set(data) - set(BLOCK_REQUIRED_FIELDS) - set(BLOCK_OPTIONAL_FIELDS))
+    if unknown:
+        fail('PARSE_BLOCK_INVALID', subject='block', reason='unknown_field', fields=unknown)
     if not _text(data['block_id']) or not _text(data['document_id']) or not _text(data['source_version']):
         fail('PARSE_BLOCK_INVALID', subject='block', reason='identity')
+    for field, limit in BLOCK_COLUMN_WIDTHS.items():
+        if not isinstance(data[field], str):
+            fail('PARSE_BLOCK_INVALID', subject='block', reason='not_text', field=field)
+        if len(data[field]) > limit:
+            fail('PARSE_BLOCK_INVALID', subject='block', reason=f'{field}_too_long',
+                 field=field, length=len(data[field]), limit=limit)
     if not _text(data['block_type']) or not isinstance(data['text'], str):
         fail('PARSE_BLOCK_INVALID', subject='block', reason='type_or_text')
     if not isinstance(data['reading_order'], int) or isinstance(data['reading_order'], bool) \
@@ -590,6 +677,18 @@ def _page_optional(table, page_no, default=None):
     return table.get(page_no, table.get(str(page_no), default))
 
 
+def _pdf_block_identifier(document_id, page_no, index):
+    """Return a stable, fixed-length id for a block the parser did not name itself.
+
+    ``{document_id}-p{page}-b{index}`` reaches 64 characters for a document_id of 59 and is
+    then no longer injective, so distinct blocks would share one id and the result would be
+    refused as a duplicate. The identity is hashed instead of truncated, exactly as
+    `ingestion/office.py:_block_identifier` and `ingestion/cad_adapter.py` do.
+    """
+    material = f'{document_id}\x1f{page_no}\x1f{index}'.encode('utf-8')
+    return 'pdf-' + hashlib.sha256(material).hexdigest()[:32]
+
+
 def from_pdf_blocks(blocks, *, page_sizes, parser_version, document_id=None, source_version=None,
                     page_rotations=None, page_transforms=None, page_labels=None):
     """Map real ingest/OCR block dictionaries into validated contract blocks.
@@ -615,7 +714,11 @@ def from_pdf_blocks(blocks, *, page_sizes, parser_version, document_id=None, sou
         block_source = source_version or data.get('source_version')
         if not _text(block_document) or not _text(block_source):
             fail('PARSE_BLOCK_INVALID', subject='block', reason='document_identity')
-        identifier = data.get('block_id') or f'{block_document}-p{page_no}-b{index}'
+        # Checked here rather than only inside the locator so the block family answers for
+        # the block's own document identity (the locator reports the same reason under
+        # PARSE_LOCATOR_INVALID when it is validated on its own).
+        require_document_id(block_document)
+        identifier = data.get('block_id') or _pdf_block_identifier(block_document, page_no, index)
         locator_payload = pdf_region_locator(
             document_id=block_document, source_version=block_source, page_no=page_no, bbox=bbox,
             page_width=width, page_height=height,

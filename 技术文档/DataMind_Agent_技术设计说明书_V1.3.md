@@ -2,18 +2,18 @@
 
 ## 面向赛题八：多模态数据驱动的可解释精准问数/问答智能体
 
-版本：**V1.3（复杂文件解析与工业问答整合版，0.37.0 基线）**  
+版本：**V1.3（复杂文件解析与工业问答整合版，0.38.0 基线）**  
 文档修订日期：2026 年 10 月 7 日  
-实施证据截止：2026 年 10 月 8 日（代码 API **0.37.0**）；本次对照仓库代码与已有报告整理，未重新运行模型、OCR 或应用验收。  
+实施证据截止：2026 年 10 月 8 日（代码 API **0.38.0**）；本次对照仓库代码与已有报告整理，未重新运行模型、OCR 或应用验收。  
 用途：方案设计、增量研发、实验验收、竞赛交付与答辩。
 
-> **方案摘要**：以“生产数据库＋工艺文件＋质检报告＋限定二维图纸”为工业主场景，建立从文件分类、原生/OCR 解析、结构恢复、业务事实提取，到 SQL 查询、跨源核验和来源定位的证据链。当前（API 0.37.0）已实现结构化单源问数、文档问答、真实扫描 OCR、限定工业温度规则核验、工业模型问数、紧凑格式 v2 与字段复核，以及本机身份/审批/来源权威、受控 CAD 契约与原生 DXF、图纸资产/关联复核/尺寸服务、受控多文件登记队列、原生 PDF 离线准备与私有知识发布/多文件检索，受控私有模型回答（只用本次选定的私有片段，生成后重查身份与证据），统一任务预算与进程时限（跨进程资源槽、挂钟 deadline、进程组终止），扫描页 OCR 与公式会话接入同一预算，以及已发布私有 PDF 向量点的受控修复与孤立点回收。下一阶段补齐紧凑格式之外的真实授权样本、统一 CPU/内存配额与跨主机租约，再推进通用 Adapter、V-CAR 与正式交付包。
+> **方案摘要**：以“生产数据库＋工艺文件＋质检报告＋限定二维图纸”为工业主场景，建立从文件分类、原生/OCR 解析、结构恢复、业务事实提取，到 SQL 查询、跨源核验和来源定位的证据链。当前（API 0.38.0）已实现结构化单源问数、文档问答、真实扫描 OCR、限定工业温度规则核验、工业模型问数、紧凑格式 v2 与字段复核，以及本机身份/审批/来源权威、受控 CAD 契约与原生 DXF、图纸资产/关联复核/尺寸服务、受控多文件登记队列、原生 PDF 离线准备与私有知识发布/多文件检索，受控私有模型回答（只用本次选定的私有片段，生成后重查身份与证据），统一任务预算与进程时限（跨进程资源槽、挂钟 deadline、进程组终止），扫描页 OCR 与公式会话接入同一预算，以及已发布私有 PDF 向量点的受控修复与孤立点回收。下一阶段补齐紧凑格式之外的真实授权样本、统一 CPU/内存配额与跨主机租约，再推进通用 Adapter、V-CAR 与正式交付包。
 
 ### 阅读与状态约定
 
 本版依据[复杂非结构化文件分类与解析技术文档](复杂非结构化文件分类与解析技术文档.md)，整合并精简 [V1.2 说明书](DataMind_Agent_技术设计说明书_V1.2.md)。参考材料用于提炼技术设计，其中的建议和工具清单不构成本项目的实现承诺。
 
-**已实现**表示仓库存在对应代码；**限定实现**表示只覆盖明示的格式、模板或业务范围；**规划**表示尚待编码或验收；**历史实测**表示已有报告，本次没有重跑。目标架构、示例契约和研发指标均不自动转化为实际成绩。当前 API 版本为 **0.37.0**。
+**已实现**表示仓库存在对应代码；**限定实现**表示只覆盖明示的格式、模板或业务范围；**规划**表示尚待编码或验收；**历史实测**表示已有报告，本次没有重跑。目标架构、示例契约和研发指标均不自动转化为实际成绩。当前 API 版本为 **0.38.0**。
 
 本版作为设计主入口。§18 汇总能力与历史成绩；V1.2 §18.2–§18.19 保留完整阶段记录、初始失败和修订过程，其旧“待实现”描述按后续记录与本版状态理解。代码入口和真实接口分别见 §14、§10；下一步完成条件见 §15。
 
@@ -243,7 +243,7 @@ Adapter 输入为源资产、不可变文件哈希、解析配置和允许的页
 | `temporal_segment` | 起止时间、说话人/帧引用 | 时间单位和时间基准必须明确 |
 | `model_spatial_object` | 原生对象 ID、坐标参考、变换/视图 | 空间数据使用原生坐标契约 |
 
-PDF 的目标统一约定为页序号从 1 开始、bbox 为 `[x0,y0,x1,y1]`、原页可视坐标原点在左上、单位为 point，并明确页面旋转。不同读取器的坐标需转换后入契约，验证 bbox 在原页范围内。当前已有 PDF 块位置；API 0.25.0 已把统一 Locator/Relation 落地为**可校验契约**（七类定位器、关系类型/状态/依据约束），Office/CAD 等格式仍无产出该契约的解析器。
+PDF 的目标统一约定为页序号从 1 开始、bbox 为 `[x0,y0,x1,y1]`、原页可视坐标原点在左上、单位为 point，并明确页面旋转。不同读取器的坐标需转换后入契约，验证 bbox 在原页范围内。当前已有 PDF 块位置；API 0.25.0 已把统一 Locator/Relation 落地为**可校验契约**（七类定位器、关系类型/状态/依据约束）；Office/CAD 等格式的解析器已在 API 0.29.0/0.30.0 补上（见 §18.15/§18.16，`ingestion/office.py`、`ingestion/cad_adapter.py`），`Chunk`/`DocumentFact`/`DrawingFeature` 仍未纳入本契约。
 
 ### 5.5 结构恢复与语义切片规则
 
@@ -554,10 +554,10 @@ SQL 源查询使用只读角色；工业 schema 位于元数据库，逻辑上�
 | `field_store.py`、`fact_reviews.py`、`auth.py`、`approvals.py`、`authority.py` | 字段读取/定位、追加复核与版本隔离、本机身份/角色、独立字段审批、来源权威规则 | 真实账户治理、缺失字段补录与正式多租户权限 |
 | `cad_dimensions.py`、`cad_store.py`、`cad_reviews.py`、`ingestion/cad_dxf.py`、`cad_contract.py`、`cad_dimension_contract.py`、`cad_render.py` | 受控 CAD 契约、原生 DXF 读取/渲染、图纸资产/版本、关联复核、尺寸绑定与独立批准 | DWG/图纸 PDF 路径、通用 CAD API 与真实图纸验收 |
 | `file_jobs.py`、`file_uploads.py`、`scripts/file_job_worker.py` | 受控多文件登记队列（DXF/单测量 JSON），限额/租约/幂等/重试/取消 | PDF/OCR/Office 并发化与硬资源隔离 |
-| `ingestion/pdf_prepare.py`、`pdf_index.py`、`pdf_publications.py`、`pdf_vectors.py`、`pdf_search.py` | 原生 PDF 离线准备、私有快照登记、私有知识发布、私有多文件检索 | 私有模型回答、统一预算/deadline、点损失修复与孤立回收 |
-| `ingestion/ingest.py`、`ocr.py`、`tables.py`、`formula.py`、`industrial_facts.py` | PDF/OCR/公式、表格候选、限定字段与切片（串行离线工具，并发不安全） | 区域路由、跨页表格与关系、并发安全 |
-| 规划 `ingestion/router.py`、`parsers/`、统一结构/Locator 模块 | 当前未创建为通用能力 | 分类/能力登记、PDF/Office/CAD Adapter、稳定产物契约 |
-| `db/migrations/001–012`、seed/Catalog 脚本 | 事实、工业数据、问数视图、复核表、身份/审批、权威、CAD 资产/关联/尺寸、队列、PDF 快照/知识 | 统一 Adapter/解析版本/关系与正式审批增量迁移 |
+| `ingestion/pdf_prepare.py`、`pdf_index.py`、`pdf_publications.py`、`pdf_vectors.py`、`pdf_search.py` | 原生 PDF 离线准备、私有快照登记、私有知识发布、私有多文件检索、私有模型回答、统一预算/deadline、点损失修复与孤立回收 | 真实认证私有 Qdrant 烟测、自动调度与告警 |
+| `ingestion/ingest.py`、`ocr.py`、`tables.py`、`formula.py`、`industrial_facts.py` | PDF/OCR/公式、表格候选、限定字段与切片（串行离线工具，并发不安全）；契约关系已入存储并在引用中消费（§18.16/18.17/18.22） | 区域路由、跨页表格、并发安全 |
+| 规划 `ingestion/router.py`、`parsers/`、统一结构/Locator 模块 | 当前未创建为通用能力（PDF/Office/CAD Adapter 已分别落在 `ingestion/ingest.py`、`office.py`、`cad_adapter.py`） | 统一结构/Locator 与 Chunk/DocumentFact 纳入契约、分类状态机与受控重解析 |
+| `db/migrations/001–016`、seed/Catalog 脚本 | 事实、工业数据、问数视图、复核表、身份/审批、权威、CAD 资产/关联/尺寸、队列、PDF 快照/知识、租约、块契约、契约存储与关系索引 | 真实账户治理/租户 ACL 与正式多租户部署增量迁移 |
 | `scripts/eval_*.py`、`tests/`、`data/evaluation/` | 现有组件与冻结阶段评测 | 新样本、关系/CAD/修复消融；保留旧集与初始报告 |
 | `web/`、`reports/` | 配置/问答/定位/复核/回放及历史证据 | 通用对象高亮、裁决交互、独立实验与交付材料 |
 
@@ -603,7 +603,7 @@ SQL 源查询使用只读角色；工业 schema 位于元数据库，逻辑上�
 - [V1.2 技术设计说明书](DataMind_Agent_技术设计说明书_V1.2.md)：原设计与全部历史实施记录，保留原文。
 - [进度总览](../PROGRESS.md)、[README](../README.md)：实现范围、启动方式与当前边界。
 - [工业规则数据契约](../data/industrial_demo/CONTRACT.md)、[工业模型问数契约](../data/industrial_demo/QUERY_CONTRACT.md)：业务键、粒度、时间、单位与支持范围。
-- [赛题原始资料](<../赛题/8 赛题八：网信产业应用赛道-多模态数据驱动的可解释精准问数问答智能体（中电云计算技术有限公司）.pdf>)：正式提交前核对。本次沿用旧稿需求记录，未重新核定评分或官方九项编号。
+- [赛题原始资料](<../赛题/8 赛题八：网信产业应用赛道-多模态数据驱动的可解释精准问数问答智能体（中电云计算技术有限公司）.pdf>)：正式提交前核对；官方基础/中级任务与评分项到本仓库实现的**逐条映射**见 [docs/OFFICIAL_REQUIREMENTS_MAPPING.md](../docs/OFFICIAL_REQUIREMENTS_MAPPING.md)（含页码与"已实现/部分/未实现"判定）。
 
 ### 17.2 参考内容如何转化为项目设计
 
@@ -623,13 +623,13 @@ SQL 源查询使用只读角色；工业 schema 位于元数据库，逻辑上�
 
 ### 18.1 当前能力状态总表
 
-状态来自现有仓库与截至 2026 年 10 月 8 日的实施证据（代码 API **0.37.0**）。整理时 Docker 中的 PostgreSQL/Qdrant 容器仍在运行（本地 4000 网关已于 0.37.0 移除，改为直连上游），8000 应用服务当时未启动，未做实时数据盘点或模型调用。
+状态来自现有仓库与截至 2026 年 10 月 8 日的实施证据（代码 API **0.38.0**）。整理时 Docker 中的 PostgreSQL/Qdrant 容器仍在运行（本地 4000 网关已于 0.37.0 移除，改为直连上游），8000 应用服务当时未启动，未做实时数据盘点或模型调用。
 
 | 能力 | 当前状态 | 尚缺完成条件 |
 |---|---|---|
 | 单源 SQL/Catalog/Guard/修复 | 已实现；工业 SQL 为限定单层实现 | 复杂工业 SQL、独立语义/Schema Linking 基准 |
 | 文档 Hybrid/RRF/模型引用/拒答 | 已实现；没有独立神经重排 | 语义蕴含、完整结构与工业文本检索 |
-| PDF/OCR/公式 | 原生文本/表格、原像素 OCR、公式 worker 已实现；块可映射进统一解析契约 | 混合区域/多栏、表头/续表、数学语义；Office/CAD 适配器未实现 |
+| PDF/OCR/公式 | 原生文本/表格、原像素 OCR、公式 worker 已实现；块可映射进统一解析契约 | 混合区域/多栏、表头/续表、数学语义（公式计算结果） |
 | 工业字段 | 限定模板与紧凑格式 v2 已实现；v1 后续模板首轮仅部分通过 | 真实授权模板与独立工厂样本 |
 | 温度跨源规则/冲突 | 限定单位/版本/逐测量核验与冲突持久化已实现 | 多指标/多工序、真实工厂授权裁决与通用计划 |
 | 字段复核与独立审批 | 认证复核、独立字段审批、追加历史、原页定位、版本绑定与幂等/并发已实现 | 真实账户治理、缺失字段补录 |
@@ -640,9 +640,9 @@ SQL 源查询使用只读角色；工业 schema 位于元数据库，逻辑上�
 | 原生 PDF 准备/私有发布/检索/回答/维护 | 按 SHA 固定源准备、私有快照登记、私有知识发布、1–4 文件证据检索、仅用本次选定片段的受控模型回答，以及按冻结计划修复丢失点与孤立点回收已实现 | 真实认证私有 Qdrant 烟测、自动调度与告警 |
 | 统一任务预算与进程时限 | 跨进程资源槽、挂钟 deadline、进程组终止（含孙进程）、取消传播、输出上限与稳定超时码已实现；登记 worker、PDF 准备 CLI、扫描页 OCR 与公式会话可选接入 | CPU/内存硬隔离与跨主机租约 |
 | API/前端/Trace | SQL/RAG/限定工业、SSE/回放/引用，新增 `/#cad`、`/#dimensions`、`/#files`、`/#authority` 与多文档问答 | 上传/统一 Adapter/通用 Locator 接口与交互 |
-| Office/工程通用适配 | 未实现 | 各自原生契约、定位、样本与评测 |
-| V-CAR/国产小视觉级联 | 通用依赖计划、统一预算、局部修复、断点恢复、进程组节点执行与 HTTP 入口已实现（`datamind/vcar.py`、`POST /v1/plans/execute`）；视觉级联未接入 | 视觉载荷、局部重识别、机制消融与跨主机租约 |
-| 正式交付与多用户部署 | 未完成 | 官方专项核对、模型 manifest、新机复现与认证部署 |
+| Office/工程通用适配 | 已实现（限定）：DOCX/PPTX/XLSX（`ingestion/office.py`）与原生 DXF（`ingestion/cad_adapter.py`）适配器已注册并映射进统一契约（API 0.29.0/0.30.0），块存 `document_contract_blocks` | 图纸 PDF/DWG 转换、合并单元格/公式语义、各格式样本与评测、接入事实抽取与检索 |
+| V-CAR/国产小视觉级联 | 通用依赖计划、统一预算、局部修复、断点恢复、进程组节点执行、HTTP 入口与机制消融（API 0.24.0，`datamind/vcar.py`、`datamind/ablation.py`、`POST /v1/plans/execute`）已实现；真实视觉级联/视觉载荷未接入 | 真实视觉载荷与模型规模对比、跨主机租约 |
+| 正式交付与多用户部署 | 未完成（权重清单与官方要求映射已补） | 交付包（ZIP/答辩 PPT/Word+PDF 技术文档）、新机复现与认证部署；模型权重清单见 [docs/MODEL_WEIGHTS.md](../docs/MODEL_WEIGHTS.md)、官方任务/评分项映射见 [docs/OFFICIAL_REQUIREMENTS_MAPPING.md](../docs/OFFICIAL_REQUIREMENTS_MAPPING.md) |
 
 ### 18.2 历史实验分母与证据
 
@@ -678,7 +678,7 @@ SQL 源查询使用只读角色；工业 schema 位于元数据库，逻辑上�
 | V-CAR 受控节点执行与 HTTP | 新增 10 项，总 549/549 | `reports/vcar_bounded_verification.json`；子进程隔离、取消杀进程组、资源槽 busy、HTTP fail closed |
 | V-CAR 机制消融与修复指标 | 新增 18 项，总 567/567 | `reports/vcar_ablation.json`、`reports/vcar_ablation_verification.json`；local 臂 2 例误修复、full 臂 0 误修复 |
 | 私有向量修复与孤立回收 | 新增 10 项，总 523/523 | `reports/pdf_maintenance_verification.json`；内存 Qdrant，未重跑真实认证私有 Qdrant |
-| 最新组件/集成回归 | 603/603 | `reports/parse_contract_verification.json`；非模型问答准确率 |
+| 最新组件/集成回归 | **851/851**（API 0.38.0，完整隔离回归；唯一权威值见 [PROGRESS.md](../PROGRESS.md) 文首「当前状态」） | `reports/audit_fix_verification.json`（845/845 阶段的逐条证据）；603/603 见 `reports/parse_contract_verification.json`，为**历史分母**，不跨轮拼接 |
 
 表中的 Recall@5 11/11 是既有套件的可回答题 gold 命中口径；扩展多证据集须按 §9.2 明确证据覆盖定义，不直接外推。历史报告保留各自模型/提示词/代码版本。四页 v1 材料为解析器完成后编写的合成模板；紧凑格式 v2 由同一实现者编写，均非独立工厂盲测，全部缺失与初始失败保留。
 
@@ -730,13 +730,13 @@ SQL 源查询使用只读角色；工业 schema 位于元数据库，逻辑上�
 
 新增 `datamind/vcar.py`：`plan()` 校验节点契约（id/依赖/无环/工具/权限/输入可序列化）并返回拓扑排序计划，`subgraph()` 计算受影响子图，`budget()` 合并校验 `deadline_s/max_steps/max_rows/max_tokens/max_repair/max_parallel`（`max_repair` 上限 2），`execute()` 按依赖并发执行、失败只跳过传递依赖、修复仅重跑受影响子图并保留原始失败、修复后后继重新执行，`unresolved` 冲突终止自动消解并返回双方证据，`validate_state()` 支持断点恢复。
 
-新增 16 项测试，完整隔离回归 **539/539**、失败/错误 0。边界：尚未接入 HTTP 路由，节点仍在执行进程内运行（未接 `task_budget` 进程组/资源槽），视觉载荷与局部重识别、机制消融、误修复率与错误消解率仍待做。见 `docs/VCAR.md` 与 `reports/vcar_verification.json`。
+新增 16 项测试，完整隔离回归 **539/539**、失败/错误 0。边界：尚未接入 HTTP 路由，节点仍在执行进程内运行（未接 `task_budget` 进程组/资源槽），视觉载荷与局部重识别、机制消融、误修复率与错误消解率仍待做（**本节为 API 0.22.0 时的边界**：0.23.0 已接入预算/进程组与 HTTP，0.24.0 已完成机制消融，见 §18.9/§18.10；真实视觉载荷仍待做）。见 `docs/VCAR.md` 与 `reports/vcar_verification.json`。
 
 ### 18.9 V-CAR 受控节点执行与 HTTP 入口（API 0.23.0，2026 年 10 月 7 日）
 
 `bounded_runners` 把「工具 → 可执行文件」的映射交给服务端，并在独立进程组内执行每个节点：节点时限取自「调用方给定值」与「全局剩余挂钟时间」的较小者，有 DSN 时按工具占跨进程资源槽，取消事件置位后终止在飞进程组并把未派发节点记为 `skipped/PLAN_CANCELLED`，节点返回的 `rows`/`tokens` 累加进全局预算。`execute` 自动绑定执行器自带的 `ExecutionContext`，避免调用方漏传 context 时节点时限静默退回默认值。新增 `POST /v1/plans/execute`（admin + CSRF + no-store，完成后重查身份）：请求体只含 `nodes` 与可选 `budget`，工具到模块函数的映射来自服务端 `DATAMIND_VCAR_TARGETS`，未配置即 `503/VCAR_TARGETS_NOT_CONFIGURED`，调用方无法指定可执行文件。
 
-新增 10 项测试，完整隔离回归 **549/549**、失败/错误 0。边界：HTTP 入口需运维显式配置注册表，仓库不附带；节点仍在同一主机执行，CPU/内存非 cgroup 硬隔离；V-CAR 尚未替换既有固定工业规则链路；视觉载荷与机制消融仍待做。见 `docs/VCAR.md` 与 `reports/vcar_bounded_verification.json`。
+新增 10 项测试，完整隔离回归 **549/549**、失败/错误 0。边界：HTTP 入口需运维显式配置注册表，仓库不附带；节点仍在同一主机执行，CPU/内存非 cgroup 硬隔离；V-CAR 尚未替换既有固定工业规则链路；视觉载荷与机制消融仍待做（**本节为 API 0.23.0 时的边界**：机制消融已于 0.24.0 完成，见 §18.10；真实视觉载荷仍待做）。见 `docs/VCAR.md` 与 `reports/vcar_bounded_verification.json`。
 
 ### 18.10 V-CAR 机制消融与修复指标（API 0.24.0，2026 年 10 月 7 日）
 
@@ -752,7 +752,7 @@ SQL 源查询使用只读角色；工业 schema 位于元数据库，逻辑上�
 
 并行推进两条线。**(A) 统一解析契约**（§5.2/§5.4，`datamind/parse_contract.py`）：`parse_status` 五态与摄取状态机（跳步拒绝）、七类 `SourceLocator` 的必需字段与取值校验（页号≥1、bbox 在页内且不倒置、unit/coordinate_system、CAD 句柄、A1 单元格、时间区间）、Block 必需字段与 content_hash、Relation 端点/类型/状态/证据与「不足以确认关系」的恢复方法黑名单、Adapter 能力登记（未登记类型明确拒绝，不返回空解析成功）、以及把真实 ingest/OCR 块形状映射进契约（只搬运解析器实际产出的键，页尺寸缺失即拒绝）。**(B) 资源限额与跨主机租约**（§13，`datamind/task_budget.py` + migration 013）：`cpu_seconds` 经 `RLIMIT_CPU` 生效并以 `TASK_CPU_LIMIT_EXCEEDED` 上报；`memory_bytes` 经 `RLIMIT_AS`，平台不支持时（本机 macOS）**失败关闭**返回 `TASK_BUDGET_RLIMIT_UNSUPPORTED`，绝不静默忽略；`task_leases` 提供 acquire/renew/release/holder/sweep 与**接管递增的 fence**，过期接管后旧 token 无法续期或释放。
 
-新增 25 项解析契约测试与 11 项资源/租约测试，完整隔离回归 **603/603**、失败/错误 0。边界：契约仅校验与映射，未接入统一 Adapter 路由与生产摄取；Office/CAD 无产出契约的解析器；Chunk/DocumentFact/DrawingFeature 未纳入；内存上限在 macOS 不可执行，CPU 上限与租约为挂钟/协作式机制而非 cgroup 硬隔离或分布式共识，且租约尚未接入执行路径。过程中并行子代理对仓库做了越界自动改写，已全部回退并只保留受控改动。见 `docs/PARSE_CONTRACT.md`、`docs/TASK_BUDGET.md` 与 `reports/parse_contract_verification.json`。
+新增 25 项解析契约测试与 11 项资源/租约测试，完整隔离回归 **603/603**、失败/错误 0。边界：契约仅校验与映射，未接入统一 Adapter 路由与生产摄取；Office/CAD 无产出契约的解析器（**本节为 API 0.25.0 时的边界**：0.26.0 起接入生产摄取、0.27.0 起有 Adapter 路由、0.29.0/0.30.0 补上 Office/DXF 适配器，见 §18.12–§18.16）；Chunk/DocumentFact/DrawingFeature 未纳入；内存上限在 macOS 不可执行，CPU 上限与租约为挂钟/协作式机制而非 cgroup 硬隔离或分布式共识，且租约尚未接入执行路径。过程中并行子代理对仓库做了越界自动改写，已全部回退并只保留受控改动。见 `docs/PARSE_CONTRACT.md`、`docs/TASK_BUDGET.md` 与 `reports/parse_contract_verification.json`。
 
 ### 18.12 解析契约接入生产摄取（API 0.26.0，2026 年 10 月 7 日）
 
@@ -760,7 +760,7 @@ SQL 源查询使用只读角色；工业 schema 位于元数据库，逻辑上�
 
 **契约违反不会中断摄取**：错误带码写入质量明细保持可见，既有块输出与 `parse_status` 不受影响；这避免了「为了满足契约而隐藏真实解析缺口」。真实原生 PDF、真实扫描页 OCR 与公式说明三类材料均验证为 `validation: parsed`、locator 全为 `pdf_region`。
 
-新增 4 项摄取集成测试，完整隔离回归 **607/607**、失败/错误 0。边界：Adapter 登记仍是进程内契约，**按 media type 的 Adapter 路由**与**契约结果写入 `document_blocks`** 均未实现；Office/CAD 仍无产出契约的解析器；`Chunk`/`DocumentFact`/`DrawingFeature` 未纳入契约。见 `docs/PARSE_CONTRACT.md` 与 `reports/parse_contract_verification.json`。
+新增 4 项摄取集成测试，完整隔离回归 **607/607**、失败/错误 0。边界：Adapter 登记仍是进程内契约，**按 media type 的 Adapter 路由**与**契约结果写入 `document_blocks`** 均未实现（**本节为 API 0.26.0 时的边界**：0.27.0 已实现路由、0.28.0 已写入定位，见 §18.13/§18.14）；Office/CAD 仍无产出契约的解析器（0.29.0/0.30.0 已补上，见 §18.15/§18.16）；`Chunk`/`DocumentFact`/`DrawingFeature` 未纳入契约。见 `docs/PARSE_CONTRACT.md` 与 `reports/parse_contract_verification.json`。
 
 ### 18.13 媒体类型探测与 Adapter 路由（API 0.27.0，2026 年 10 月 7 日）
 
@@ -824,7 +824,7 @@ Office/DXF 的块按 `part`/`paragraph`/`slide`/`sheet`/`handle` 定位，**没�
 
 ### 18.20 独立审计缺陷修复（API 0.34.0，2026 年 10 月 8 日）
 
-依据独立审计与复审（`reports/project_audit_20261008_2d9ab18_review.md`）按其 §7 排期修复 F01–F09 与 F11：**F01** 列权限改按 sqlglot AST scope 逐作用域解析（堵住 `SELECT c AS c FROM customers c` 与内层 CTE 别名覆盖外层表别名两条越权路径，同时不误伤 ORDER/GROUP 别名与 CTE 引用）；**F02** 指标口径改为与 `business_metrics.expression_sql` 注册表做结构比对，`verification_passed()` 使"非空结果"不再等于已验证，并把"已校验为错"（阻塞）与"无法独立校验"（记录、不阻断，避免误伤净销售额等复合指标）分开；**F03** 存储端口默认仅回环（需重建容器生效）；**F04** deadline 覆盖 stdin 写入（子进程不读 stdin 不再能绕过）；**F05** 无密钥导出经 `redact_profile()` 彻底脱敏；**F06** `api.py` 内 profile 解析统一为 `resolve_profile()`（问答链路仍待统一）；**F07** 恢复状态绑定 `Plan.digest`（裸映射失败关闭、摘要不符拒绝）；**F08** 前端引入请求代次防串屏；**F09** Office 保真（block id 摘要化、DOCX 真实正文顺序、XLSX 无缓存公式显式声明 `formula_without_cached_value`）；**F11** 验证脚本不再污染真实库且去掉硬编码规模。
+依据独立审计与复审（`reports/project_audit_20261008_2d9ab18_review.md`）按其 §7 排期修复 F01–F09 与 F11：**F01** 列权限改按 sqlglot AST scope 逐作用域解析（堵住 `SELECT c AS c FROM customers c` 与内层 CTE 别名覆盖外层表别名两条越权路径，同时不误伤 ORDER/GROUP 别名与 CTE 引用）；**F02** 指标口径改为与 `business_metrics.expression_sql` 注册表做结构比对，`verification_passed()` 使"非空结果"不再等于已验证，并把"已校验为错"（阻塞）与"无法独立校验"（记录、不阻断，避免误伤净销售额等复合指标）分开；**F03** 存储端口默认仅回环（需重建容器生效；0.36.0 已重建并生效，见 §18.22）；**F04** deadline 覆盖 stdin 写入（子进程不读 stdin 不再能绕过）；**F05** 无密钥导出经 `redact_profile()` 彻底脱敏；**F06** `api.py` 内 profile 解析统一为 `resolve_profile()`（问答链路 0.35.0 已补齐 proxy，见 §18.21）；**F07** 恢复状态绑定 `Plan.digest`（裸映射失败关闭、摘要不符拒绝）；**F08** 前端引入请求代次防串屏；**F09** Office 保真（block id 摘要化、DOCX 真实正文顺序、XLSX 无缓存公式显式声明 `formula_without_cached_value`）；**F11** 验证脚本不再污染真实库且去掉硬编码规模。
 
 **F10（摄取跨存储一致性）明确延后**：需要 outbox/状态机式多存储协议并改动依赖 Qdrant 与嵌入模型的摄取主链路，本轮无法充分验证，故不改动，方案已记录。
 
@@ -832,7 +832,7 @@ Office/DXF 的块按 `part`/`paragraph`/`slide`/`sheet`/`handle` 定位，**没�
 
 ### 18.21 F06 剩余部分与自查发现的 F12（API 0.35.0，2026 年 10 月 8 日）
 
-**F06 补齐**：`sql_engine.settings()` 把存储配置的 `proxy` 映射为 `NEW_API_PROXY`，`model_profile()` 输出 `proxy` 键；传输层 `providers.make_client()` 本就支持 `profile['proxy']`，缺的只是这条传递链。修复前"探活走代理、问答不走代理"，配了中继的部署会出现探活通过但问答不通。注意 `sql_engine.settings()` 与 `api.resolve_profile()` 仍是**两套解析实现**（行为已一致，实现未合并），这一点如实保留。
+**F06 补齐**：`sql_engine.settings()` 把存储配置的 `proxy` 映射为 `NEW_API_PROXY`，`model_profile()` 输出 `proxy` 键；传输层 `providers.make_client()` 本就支持 `profile['proxy']`，缺的只是这条传递链。修复前"探活走代理、问答不走代理"，配了中继的部署会出现探活通过但问答不通。注意 `sql_engine.settings()` 与 `api.resolve_profile()` 仍是**两套解析实现**（行为已一致，实现未合并；0.37.0 已收敛为唯一入口 `resolve_profile_values()`，见 §18.23），这一点如实保留。
 
 **F12（自查发现）**：补 F06 时写传输层测试才发现 `providers.make_client()` 先判断显式 `proxy`、再判断 `is_local`，因此 profile 里一旦配置 proxy，连 `http://localhost` 网关也会被塞进代理——正是该函数注释要避免的挂起或 502；而 F06 把 proxy 带进问答链路后该**暴露面反而变大**。现改为 `is_local(url)` 优先：本机地址一律直连且不使用任何来源的代理（含显式 profile proxy），远端 URL 才使用显式 proxy，无 proxy 时维持尊重系统/环境代理的原行为。
 
@@ -844,13 +844,13 @@ Office/DXF 的块按 `part`/`paragraph`/`slide`/`sheet`/`handle` 定位，**没�
 
 **profile 读取侧脱敏**：`public_profile()` 不再回传敏感头原值，敏感头**只出键名**（`header_keys`）、`proxy` 去掉 userinfo 并给出 `has_proxy`/`proxy_has_credentials`；保存路径新增键级合并（敏感头缺失/空白=保持原值，删除需显式哨兵），前端为每个敏感头键名生成空输入框（占位「留空表示保持不变」），避免"脱敏值被写回、真实凭据丢失"。`include_keys=True` 的带密钥搬迁路径**刻意保持原样**。
 
-**契约关系消费**：`contract_store.read_relations` 按 source/target 两向命中并归组；`citation_from_hit(..., relations=…)` 与 `ask_documents(..., relation_lookup=…)` 沿用 locator 的纪律（只附存储中确有的、一次查询、失败记录 `relation_lookup_error` 而不阻断）。对端字段命名 `peer_block_id`，刻意区别于 locator 载荷中表示**被引块**的 `block_id`。迁移 016 为 `target_block_id` 补索引。关系目前**只是可追溯元数据**，不参与排序、打分、重排或冲突消解，前端亦未渲染。
+**契约关系消费**：`contract_store.read_relations` 按 source/target 两向命中并归组；`citation_from_hit(..., relations=…)` 与 `ask_documents(..., relation_lookup=…)` 沿用 locator 的纪律（只附存储中确有的、一次查询、失败记录 `relation_lookup_error` 而不阻断）。对端字段命名 `peer_block_id`，刻意区别于 locator 载荷中表示**被引块**的 `block_id`。迁移 016 为 `target_block_id` 补索引。关系目前**只是可追溯元数据**，不参与排序、打分、重排或冲突消解，前端亦未渲染（0.37.0 已渲染，见 §18.23）。
 
 **F03 生效**：已重建 Postgres/Qdrant 容器（复用既有卷），端口现仅 `127.0.0.1`，数据完好（27 文档 / 169 切片）。
 
 **诚实记录——我自己引入的回归 R1（已修复并加守护）**：提交 `3a2ab33` 把 `block_id` 赋值从 `main()` 移进 `parse_pdf`，使不走该函数的生产者（OHR-Bench JSON 分支）失去 id，`build_chunks` 会 `KeyError`、完整摄取在该段中断。发现该问题的子代理把它归因为"预先存在"，**该归因不成立**——重构前的 `main()` 确实给每个块赋了 id。修复为 `ingest.ensure_block_ids`（按位置派生、已有 id 不改）；修复中新写的测试又当场抓出第二处缺陷（按 `reading_order` 派生会让共享该序号的两个块撞主键），改为位置派生 + 冲突后缀。守护见 `tests/test_ingest_block_identity.py`。
 
-新增 44 项测试，完整隔离回归 **804/804**、失败/错误 0。边界：关系未进入排序/消解、前端未渲染；`include_keys=True` 仍明文外带凭据；本机无视觉模型，V-CAR 真实视觉载荷与模型规模对比不可执行。
+新增 44 项测试，完整隔离回归 **804/804**、失败/错误 0。边界：关系未进入排序/消解、前端未渲染（**本节为 API 0.36.0 时的边界**：0.37.0 已在前端渲染关系，见 §18.23）；`include_keys=True` 仍明文外带凭据；本机无视觉模型，V-CAR 真实视觉载荷与模型规模对比不可执行。
 
 ### 18.23 前端呈现契约关系与 profile 解析收敛（API 0.37.0，2026 年 10 月 8 日）
 

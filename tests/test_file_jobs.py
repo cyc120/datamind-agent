@@ -322,9 +322,18 @@ class FileJobTests(unittest.TestCase):
         self.assertEqual(captured['claim']['type'],'drawing')
         self.assertEqual(captured['claim']['payload']['request_id'],
                          jobs._child_id(job['job_id'],'drawing'))
-        with psycopg2.connect(captured['dsn']) as conn,conn.cursor() as cur:
+        # 子进程必须拿到"经过 effective_dsn 处理"的连接串，而不是父进程的原始 DSN——隔离开跑器
+        # 正是靠这一点把子进程指向克隆库。这里比较**父子看到的库是否同一**，而不是硬编码
+        # `datamind_test_` 前缀：后者只在 scripts/test_isolated.py 下成立，直接对真实库跑会假失败
+        # （曾据此被误判为并发问题）。
+        with psycopg2.connect(self.dsn) as parent, parent.cursor() as parent_cur:
+            parent_cur.execute('SELECT current_database()')
+            parent_database = parent_cur.fetchone()[0]
+        with psycopg2.connect(captured['dsn']) as conn, conn.cursor() as cur:
             cur.execute('SELECT current_database()')
-            self.assertTrue(cur.fetchone()[0].startswith('datamind_test_'))
+            child_database = cur.fetchone()[0]
+        self.assertEqual(child_database, parent_database,
+                         '子进程必须与父进程看到同一个库（effective_dsn 生效）')
         final=self.poll(job)
         self.assertEqual(final['items'][0]['status'],'succeeded')
 

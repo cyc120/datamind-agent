@@ -204,9 +204,12 @@ class PdfIndexAPITest(unittest.TestCase):
         csrf = self.admin.headers.pop("X-CSRF-Token")
         self.assert_error(self.admin.post(BASE, json=self.payload), 403, "CSRF_REQUIRED")
         self.admin.headers["X-CSRF-Token"] = csrf
-        for headers in ({"Origin": "https://untrusted.invalid"}, {"Sec-Fetch-Site": "cross-site"}):
+        # 同源判定已改为**固定白名单**，不再从 Host 推导：`http://testserver` 是 TestClient 的
+        # Host，正好是"自证同源"的攻击面，必须被拒；正例改用白名单内的来源。
+        for headers in ({"Origin": "https://untrusted.invalid"}, {"Sec-Fetch-Site": "cross-site"},
+                        {"Origin": "http://testserver"}):
             self.assert_error(self.admin.post(BASE, json=self.payload, headers=headers), 403, "ORIGIN_NOT_ALLOWED")
-        response = self.admin.post(BASE, json=self.payload, headers={"Origin": "http://testserver"})
+        response = self.admin.post(BASE, json=self.payload, headers={"Origin": "http://127.0.0.1:8000"})
         self.assertEqual(response.status_code, 200, response.text)
 
     def test_strict_submission_rejects_spoofed_context_and_version_types(self):

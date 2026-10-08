@@ -18,6 +18,7 @@ import pymupdf
 
 from datamind.api import app
 from datamind.knowledge import ROOT
+import auth_fixtures
 
 
 WRITE_DSN = "host=127.0.0.1 port=5432 dbname=datamind_meta user=datamind_app password=datamind_app_dev"
@@ -28,9 +29,14 @@ REFS = [{"document_id": f"doc-api-{label}", "document_version": i,
 
 class MultiFileChatAPITest(unittest.TestCase):
     def setUp(self):
+        # /v1/chat and /v1/chat/stream are mutating routes now gated by the default-deny
+        # identity middleware (identity + CSRF + same-origin), so this client needs a session
+        # instead of the loopback demo shortcut TestClient's "testclient" host cannot claim.
         self.client = TestClient(app)
+        auth_fixtures.login(self.client)
 
     def tearDown(self):
+        auth_fixtures.cleanup(self.client)
         self.client.close()
 
     def body(self, scope=None):
@@ -99,6 +105,8 @@ class MultiFileChatAPITest(unittest.TestCase):
 
 class MultiFileSourceAPITest(unittest.TestCase):
     def setUp(self):
+        # Deliberately anonymous: every request below is a GET on /v1/documents/..., which the
+        # middleware keeps in its public read prefix, so no session is needed here.
         self.client = TestClient(app)
         self.document_id = "test-multifile-api-" + uuid.uuid4().hex[:16]
         self.directory = tempfile.TemporaryDirectory(prefix="multifile-api-", dir=ROOT / "data/knowledge_base")

@@ -1,5 +1,8 @@
-# DataMind Agent 基础数据库 — Python 依赖（Python 3.13）
-# 安装: py -3.13 -m pip install -r requirements.txt
+# DataMind Agent — Python 依赖（Python 3.13）
+# 安装: .venv/bin/python -m pip install -r requirements.txt
+# 需要严格复现隔离回归环境时用 requirements.lock（逐项固定版本）。
+
+# 运行时核心：服务、SQL/NL2SQL、文档解析与向量检索
 psycopg2-binary>=2.9
 sqlglot>=27,<30
 fastapi>=0.115,<1
@@ -10,8 +13,13 @@ pymupdf>=1.24
 fastembed>=0.3
 qdrant-client>=1.10
 pillow>=10.0
+numpy
+
+# 可选：材料生成/取样工具。仅重建演示/工业 PDF 语料或抽样 OHR-Bench parquet 时需要；
+# 服务运行与隔离回归（tests/）不导入它们，因此本机 .venv 未安装、requirements.lock
+# 也不为其固定版本（不编造版本号）。用法见 scripts/build_industrial_docs.py、
+# ingestion/generate_demo_docs.py 与 ingestion/sample_ohrbench.py。
 reportlab>=4.0
 matplotlib>=3.8
 img2pdf>=0.5
 pyarrow>=17.0
-numpy
