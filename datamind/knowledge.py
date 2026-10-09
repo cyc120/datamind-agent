@@ -15,6 +15,8 @@ import unicodedata
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
+from .visibility import published_document_sql
+
 
 ROOT = Path(__file__).resolve().parents[1]
 EMBED_MODEL = "BAAI/bge-small-zh-v1.5"
@@ -109,7 +111,10 @@ class KnowledgeRetriever:
             raise ValueError("INVALID_RETRIEVAL_MODE")
 
     def _read_rows(self, cur, collections: list[str], ids=None, *, present: dict | None = None) -> list[dict]:
-        cur.execute("""SELECT c.*, d.title, d.collection, d.origin, d.file_type, d.sha256 AS document_sha256,
+        # The document gate comes from the one policy layer; `'public'=ANY(c.acl)` below is
+        # the *chunk* ACL and is deliberately not part of it.
+        published = published_document_sql("d", collections)
+        cur.execute(f"""SELECT c.*, d.title, d.collection, d.origin, d.file_type, d.sha256 AS document_sha256,
                            d.doc_version, d.parser_version, d.quality_detail,
                            COALESCE((SELECT jsonb_agg(jsonb_build_object('block_id',b.block_id,
                              'page_no',b.page_no,'bbox',b.bbox,'content_hash',b.content_hash,
@@ -117,11 +122,12 @@ class KnowledgeRetriever:
                              ORDER BY b.reading_order) FROM document_blocks b
                              WHERE b.document_id=c.document_id AND b.block_id=ANY(c.block_ids)), '[]'::jsonb) AS source_blocks
                            FROM chunks c JOIN document_assets d USING(document_id)
-                           WHERE d.status='indexed' AND c.document_version=d.doc_version
-                             AND 'public'=ANY(c.acl) AND 'public'=ANY(d.acl)
-                             AND NOT d.needs_review AND d.collection=ANY(%s)
+                           WHERE c.document_version=d.doc_version
+                             AND {published.text}
+                             AND 'public'=ANY(c.acl)
                              AND (%s::text[] IS NULL OR c.document_id=ANY(%s::text[]))
-                           ORDER BY c.chunk_id LIMIT %s""", (collections, ids, ids, MAX_SCOPE_CHUNKS + (1 if ids else 0)))
+                           ORDER BY c.chunk_id LIMIT %s""",
+                    (*published.params, ids, ids, MAX_SCOPE_CHUNKS + (1 if ids else 0)))
         rows = [dict(row) for row in cur.fetchall()]
         if ids and len(rows) > MAX_SCOPE_CHUNKS:
             raise ValueError("DOCUMENT_SELECTION_TOO_LARGE")
@@ -145,10 +151,10 @@ class KnowledgeRetriever:
             # The heads and their chunks must be read from the same database snapshot.
             conn.set_session(isolation_level="REPEATABLE READ", readonly=True)
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute("""SELECT document_id,doc_version AS document_version,sha256 AS source_sha256,
+                published = published_document_sql("document_assets", collections)
+                cur.execute(f"""SELECT document_id,doc_version AS document_version,sha256 AS source_sha256,
                     parser_version,title,collection FROM document_assets
-                    WHERE document_id=ANY(%s) AND status='indexed' AND 'public'=ANY(acl)
-                    AND NOT needs_review AND collection=ANY(%s)""", (ids, collections))
+                    WHERE document_id=ANY(%s) AND {published.text}""", (ids, *published.params))
                 heads = {row["document_id"]: dict(row) for row in cur.fetchall()}
                 if set(heads) != set(ids):
                     raise ValueError("DOCUMENT_SELECTION_UNAVAILABLE")

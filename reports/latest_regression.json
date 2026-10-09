@@ -1,5 +1,5 @@
 {
-  "tests": 1216,
+  "tests": 1232,
   "failures": 0,
   "errors": 0,
   "metadata_isolated": true,
@@ -7,6 +7,6 @@
   "private_pdf_snapshot_rows_copied": false,
   "private_pdf_knowledge_rows_copied": false,
   "source_database_modified": false,
-  "commit": "dbd9ef8",
-  "ran_at": "2026-10-09T08:31:15.153393+00:00"
+  "commit": "a1350f4",
+  "ran_at": "2026-10-09T08:59:18.396229+00:00"
 }

@@ -31,6 +31,8 @@ from .settings_store import (DEFAULT_BASE_URL, DEFAULT_MODEL, PROFILE_FIELDS, PR
                              list_profiles, load_model_config, normalize_base_url,
                              public_model_config, public_profile, public_profiles, redact_profile,
                              resolve_profile_values, save_model_config, save_profile)
+from .visibility import (collection_is_publishable, has_public_acl, is_published,
+                         public_reviewed_sql, published_document_sql)
 
 
 class DocumentReference(BaseModel):
@@ -774,7 +776,12 @@ def health():
         with psycopg2.connect(_read_dsn()) as conn, conn.cursor() as cur:
             cur.execute("SELECT 1")
             cur.fetchone()
-            cur.execute("SELECT count(*) FROM document_assets WHERE status='indexed' AND 'public'=ANY(acl) AND NOT needs_review")
+            # The readiness probe goes through the policy layer too: `public_reviewed_sql`
+            # is the publish gate without the collection allow-list, which is what this
+            # count has always been.
+            readiness = public_reviewed_sql("document_assets")
+            cur.execute(f"SELECT count(*) FROM document_assets WHERE {readiness.text}",
+                        readiness.params)
             document_count = cur.fetchone()[0]
         knowledge = "ready" if document_count else "empty"
         vector_store = _vector_store_status()
@@ -1072,20 +1079,16 @@ def _document_asset(document_id: str) -> dict | None:
     return dict(row) if row else None
 
 
-def _published_document(document: dict | None) -> bool:
-    """The one publish predicate: indexed, public ACL, review cleared, known collection.
-
-    `_public_document` (detail/file/facts) and `_contract_visible` both call it, so "this
-    document is public" cannot diverge between the retrieval routes and the evidence route.
-    """
-    return bool(document) and document.get("status") == "indexed" \
-        and "public" in (document.get("acl") or []) and not document.get("needs_review") \
-        and document.get("collection") in COLLECTIONS
-
-
 def _public_document(document_id: str) -> dict:
+    """The raw `document_assets` row, published or not; rejects the unknown id.
+
+    One loader exists so the public detail routes and the contract route judge the *same*
+    row, and every judgement is `datamind.visibility.is_published` — the single publish
+    policy, shared with `knowledge`'s SQL gate and `authority`'s basis check — instead of
+    each route embedding its own filter that can drift apart.
+    """
     document = _document_asset(document_id)
-    if not _published_document(document):
+    if not is_published(document):
         raise HTTPException(404, detail={"error_code": "DOCUMENT_NOT_FOUND"})
     return document
 
@@ -1095,23 +1098,25 @@ def list_documents(collection: str | None = None):
     if collection and collection not in COLLECTIONS:
         raise HTTPException(400, detail={"error_code": "COLLECTION_NOT_ALLOWED"})
     # R05: this route is the Q&A file selector's data source, and the retriever
-    # (`datamind.knowledge`) reads `chunks` only. `status='indexed'` is the legacy publish
-    # gate and cannot say whether anything is retrievable, so every item states the derived
-    # fact explicitly, through the *same* `upload_pipeline.searchability` judgment the upload
-    # surfaces use (one rule, not two). Consumers that select files must require
-    # `searchable=true`; the publish filter itself is unchanged so no existing consumer
+    # (`datamind.knowledge`) reads `chunks` only. The published status alone cannot say
+    # whether anything is retrievable, so every item states the derived fact explicitly,
+    # through the *same* `upload_pipeline.searchability` judgment the upload surfaces use
+    # (one rule, not two). Consumers that select files must require `searchable=true`; the
+    # publish filter itself (`datamind.visibility`) is unchanged so no existing consumer
     # silently loses rows.
     from ingestion import upload_pipeline
     with psycopg2.connect(_read_dsn()) as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute("""SELECT document_id,title,collection,file_type,origin,page_count,doc_version,sha256,
+        published = published_document_sql(
+            "document_assets", [collection] if collection else sorted(COLLECTIONS))
+        cur.execute(f"""SELECT document_id,title,collection,file_type,origin,page_count,doc_version,sha256,
                               quality_score,quality_detail,parser_version,status,needs_review,
                               (SELECT count(*) FROM chunks c
                                WHERE c.document_id=document_assets.document_id) AS chunk_count,
                               (SELECT count(*) FROM document_contract_blocks b
                                WHERE b.document_id=document_assets.document_id) AS block_count
                        FROM document_assets
-                       WHERE status='indexed' AND 'public'=ANY(acl) AND NOT needs_review AND collection=ANY(%s)
-                       ORDER BY title LIMIT 200""", ([collection] if collection else sorted(COLLECTIONS),))
+                       WHERE {published.text}
+                       ORDER BY title LIMIT 200""", published.params)
         documents = []
         for row in cur.fetchall():
             item = dict(row)
@@ -1174,9 +1179,9 @@ def _pending_upload_evidence(document: dict | None) -> bool:
     an unreviewed upload's full text and locators leaked to anonymous callers.
     """
     return bool(document) and document.get("origin") == "upload" \
-        and "public" in (document.get("acl") or []) \
-        and document.get("collection") in COLLECTIONS \
-        and not _published_document(document)
+        and has_public_acl(document) \
+        and collection_is_publishable(document.get("collection")) \
+        and not is_published(document)
 
 
 def _identity_is_admin(identity) -> bool:
@@ -1197,7 +1202,7 @@ def _contract_visible(document: dict | None, identity) -> bool:
     Anything else is unreadable here, and the route answers 404 exactly as the detail route
     does: an unauthorised caller must not learn that the id exists.
     """
-    if _published_document(document):
+    if is_published(document):
         return True
     return _pending_upload_evidence(document) and _identity_is_admin(identity)
 
@@ -1265,7 +1270,7 @@ def document_contract(document_id: str, request: Request, response: Response,
         raise HTTPException(404, detail={"error_code": "DOCUMENT_NOT_FOUND"})
     stored = read_result(document_id, _read_dsn(), limit=limit, offset=offset)
     summary = (document.get("quality_detail") or {}).get("parse_contract") or {}
-    if not _published_document(document):
+    if not is_published(document):
         # Pre-approval evidence (or any non-published row an admin may still read) must not
         # be cached by a browser or an intermediary.
         response.headers["Cache-Control"] = "no-store"

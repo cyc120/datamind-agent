@@ -12,6 +12,7 @@ from psycopg2.extras import RealDictCursor
 from .field_store import read_verified_facts
 from .industrial_rules import RULE_VERSION, evaluate
 from .authority import load as load_authority, basis_valid, resolve as resolve_authority
+from .visibility import published_document_sql
 
 ROOT=Path(__file__).resolve().parents[1]
 SQL='''SELECT b.batch_id,b.part_id,b.produced_at,b.recorded_revision,m.measurement_id,m.operation_no,
@@ -49,7 +50,12 @@ def run(question, *, dsn, on_step=None, apply_authority=True):
             cur.execute("SELECT dataset_version,seed_sha256,pdf_sha256,provenance FROM demo_industrial.dataset_manifest WHERE dataset_version='industrial-demo-v1'")
             manifest=cur.fetchone()
             if not manifest: raise ValueError('INDUSTRIAL_DATA_NOT_READY')
-            cur.execute("SELECT * FROM document_assets WHERE collection='industrial_demo' AND status='indexed' AND 'public'=ANY(acl) AND NOT needs_review ORDER BY document_id")
+            # The publish gate itself, restricted to the synthetic industrial collection by the
+            # caller. It used to be spelled out here as a fourth copy of the condition; the
+            # policy layer now owns that spelling (see docs/DEPLOYMENT_BOUNDARIES.md §8).
+            gate = published_document_sql('document_assets', ('industrial_demo',))
+            cur.execute(f"SELECT * FROM document_assets WHERE {gate.text} ORDER BY document_id",
+                        gate.params)
             docs=[dict(d) for d in cur.fetchall()]
             facts=[]
             for doc in docs:

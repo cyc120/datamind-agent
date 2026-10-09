@@ -10,7 +10,7 @@ import psycopg2
 from psycopg2.extras import Json, RealDictCursor
 from .auth import lock_identity
 from .industrial_rules import timestamp
-from .knowledge import COLLECTIONS
+from .visibility import is_published
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = 'source-authority-v1'
@@ -70,7 +70,9 @@ def candidates(question,dsn):
 def basis_valid(cur,basis):
     cur.execute('SELECT * FROM document_assets WHERE document_id=%s',(basis['document_id'],))
     doc=cur.fetchone()
-    if not doc or doc['status']!='indexed' or 'public' not in doc['acl'] or doc['needs_review'] or doc['collection'] not in COLLECTIONS:return False
+    # The document publish gate (indexed, public ACL, review cleared, allowed collection)
+    # is the shared one; everything below is this module's own version/source binding.
+    if not is_published(doc):return False
     if doc['doc_version']!=basis['document_version'] or doc['sha256']!=basis['source_sha256']:return False
     if doc['file_type']!='pdf' or not 1<=basis['page_no']<=doc['page_count']:return False
     path=Path(doc.get('object_uri') or '').resolve()
