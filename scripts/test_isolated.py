@@ -6,6 +6,7 @@ SQL stays read-only. Model settings, private PDF registry rows and private
 knowledge publication/outbox rows are excluded from the database copy.
 """
 import argparse
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 import runpy
@@ -18,6 +19,15 @@ import psycopg2
 from psycopg2.extensions import parse_dsn
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _git_commit() -> str | None:
+    """The revision this run verified; None outside a checkout (exported snapshot)."""
+    try:
+        return subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], cwd=str(ROOT),
+                              check=True, capture_output=True, text=True).stdout.strip() or None
+    except Exception:
+        return None
 
 
 def main():
@@ -81,10 +91,18 @@ def main():
         runpy.run_path(str(ROOT/'db/seed_industrial.py'),run_name='__main__')
         suite=unittest.defaultTestLoader.discover(str(ROOT/'tests'),pattern=args.pattern)
         result=unittest.TextTestRunner(verbosity=2).run(suite)
-        print(json.dumps(dict(tests=result.testsRun,failures=len(result.failures),errors=len(result.errors),
-                              metadata_isolated=True,model_settings_copied=False,
-                              private_pdf_snapshot_rows_copied=False,private_pdf_knowledge_rows_copied=False,
-                              source_database_modified=False)))
+        summary=dict(tests=result.testsRun,failures=len(result.failures),errors=len(result.errors),
+                     metadata_isolated=True,model_settings_copied=False,
+                     private_pdf_snapshot_rows_copied=False,private_pdf_knowledge_rows_copied=False,
+                     source_database_modified=False)
+        # Record the run so the "current" numbers in PROGRESS.md / README.md can reference one
+        # source instead of being hand-edited (that drift was reported three times). The file is
+        # committed on purpose: it is the evidence of the last verified run, and
+        # `tests/test_status_docs_sync.py` fails when the documents disagree with it.
+        summary.update(commit=_git_commit(), ran_at=datetime.now(timezone.utc).isoformat())
+        (ROOT/'reports/latest_regression.json').write_text(
+            json.dumps(summary,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+        print(json.dumps(summary))
         return 0 if result.wasSuccessful() else 1
     finally:
         psycopg2.connect=original_connect

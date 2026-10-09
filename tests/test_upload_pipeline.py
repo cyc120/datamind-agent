@@ -419,6 +419,46 @@ class UploadPipelineTests(unittest.TestCase):
             self.assertEqual(response.status_code, 422, response.text)
             self.assertEqual(response.json()['detail']['error_code'], code)
 
+    def test_the_detail_get_is_a_pure_read_and_the_listing_reports_the_worker(self):
+        """Review 5.1: no route drives parsing any more; liveness is reported instead.
+
+        `GET /v1/uploads/{upload_id}` used to call `work_once`, so a browser poll was the
+        queue's clock. It is now read-only, and the queue's silence is made explicit
+        through `worker.alive`/`worker.last_seen_at` on the listing (and `/health`), so a
+        client can honestly say "后台处理器未运行" instead of showing `queued` as "解析中".
+        """
+        created = self.dxf()
+        upload_id = created.json()['upload_id']
+        document_id = self.docs[-1]
+        for _ in range(2):
+            body = self.detail(upload_id)
+            self.assertEqual(body['status'], 'queued', 'a GET must not advance the job')
+            self.assertEqual(body['attempt'], 0)
+        self.assertEqual(self.job_row(upload_id), ('queued', None))
+        self.assertEqual(self.asset_row(document_id)[0], 'parsing')
+        with psycopg2.connect(self.dsn) as conn, conn.cursor() as cur:
+            cur.execute('SELECT count(*) FROM ingest_job_claims WHERE job_id=%s',
+                        (upload_pipeline.job_id_for(upload_id),))
+            self.assertEqual(cur.fetchone()[0], 0, 'a GET must not open a claim generation')
+            cur.execute('SELECT count(*) FROM document_contract_blocks WHERE document_id=%s',
+                        (document_id,))
+            self.assertEqual(cur.fetchone()[0], 0, 'a GET must not parse or write results')
+
+        listing = self.admin.get('/v1/uploads', params={'limit': 200}).json()
+        self.assertEqual(set(listing), {'uploads', 'count', 'worker'})
+        worker = listing['worker']
+        self.assertEqual(set(worker), {'alive', 'last_seen_at', 'alive_seconds'})
+        self.assertIsInstance(worker['alive'], bool)
+        self.assertGreaterEqual(worker['alive_seconds'], 1)
+        self.assertEqual(self.admin.get('/health').json()['worker'], worker,
+                         '/health and the upload listing must agree on liveness')
+        self.assertEqual(self.detail(upload_id)['worker'], worker,
+                         'the detail a polling client reads must report liveness too')
+
+        # Only an explicit worker call moves the queue.
+        self.assertEqual(self.drain(upload_id)['claimed'], 1)
+        self.assertEqual(self.detail(upload_id)['status'], 'succeeded')
+
     def test_unknown_upload_detail_is_404(self):
         response = self.admin.get('/v1/uploads/upl-' + '0' * 40)
         self.assertEqual(response.status_code, 404)

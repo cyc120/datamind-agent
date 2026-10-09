@@ -383,7 +383,10 @@ function uploadResultCard(result) {
   // 复核通过 / 已入库都不代表可问答：searchable 才是判据，中文语义逐态给出。
   appendText(card, uploadIndexText(result), 'field-hint upload-index' +
     (uploadSearchable(result) ? '' : ' upload-index-blocked'));
-  if (result.poll_exhausted) {
+  if (result.worker_offline) {
+    appendText(card, '后台处理器未运行：任务不会自行推进。请启动上传 worker（或运行 scripts/start_local.sh）后刷新查看。',
+      'field-hint upload-pending');
+  } else if (result.poll_exhausted) {
     appendText(card, '轮询已达上限，仍在处理中；请稍后在「我的文件」里刷新查看。', 'field-hint upload-pending');
   }
 
@@ -487,6 +490,13 @@ async function pollUpload(result, token, actor, csrf, read) {
       return;
     }
     applyUploadFields(result, data);
+    // 任务只由独立 worker 推进（`GET` 已改为纯读），所以"排队中"在没有处理器时不会自行
+    // 结束。不能一直显示"排队中"并轮询到上限——如实说明并停止等待。
+    if (data && data.worker && data.worker.alive === false && result.status === 'queued') {
+      result.worker_offline = true;
+      if (read === MULTIFILE.detailToken) { renderUploadResults(); }
+      return;
+    }
     if (read === MULTIFILE.detailToken) { renderUploadResults(); }
   }
   result.poll_exhausted = true;

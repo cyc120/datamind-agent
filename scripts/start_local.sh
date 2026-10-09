@@ -71,13 +71,53 @@ if [[ "$rag_enabled" == 1 ]]; then
   .venv/bin/python db/build_industrial_catalog.py
 fi
 
+# 上传队列（/v1/uploads）不再由 GET 轮询推进（审查 5.1）：任务只由独立 worker 领取。所以
+# 启动 API 的同时必须启动 worker，并在停止路径里一并停掉，否则任务会永远停在 queued。
+upload_worker_log='.cache/api/upload_worker.log'
+upload_worker_pid=''
+start_upload_worker() {
+  mkdir -p .cache/api
+  .venv/bin/python -m ingestion.upload_worker --watch \
+    --interval "${DATAMIND_UPLOAD_WORKER_INTERVAL:-2}" >>"$upload_worker_log" 2>&1 &
+  upload_worker_pid=$!
+  echo "上传 worker 已启动（PID $upload_worker_pid，日志 $upload_worker_log）"
+}
+stop_upload_worker() {
+  if [[ -n "$upload_worker_pid" ]] && kill -0 "$upload_worker_pid" 2>/dev/null; then
+    # SIGTERM 不会打断已领取的解析：worker 跑完当前波次后退出。
+    kill -TERM "$upload_worker_pid" 2>/dev/null || true
+    wait "$upload_worker_pid" 2>/dev/null || true
+  fi
+}
+
 if curl -fsS --max-time 2 http://127.0.0.1:8000/health 2>/dev/null | grep -Eq '"agent":"(sql-only|sql\+rag)"'; then
   echo 'DataMind Agent 已运行：http://127.0.0.1:8000/（代码更新后请重启原服务进程）'
+  if [[ "$rag_enabled" == 1 ]]; then
+    echo '若上传任务停在 queued，说明后台处理器未运行；请另开终端执行：'
+    echo '  .venv/bin/python -m ingestion.upload_worker --watch'
+  fi
   exit 0
 fi
 
 echo '启动 DataMind Agent：http://127.0.0.1:8000/'
 if [[ "$background" == 1 ]]; then
-  exec .venv/bin/python scripts/start_api_background.py
+  background_args=()
+  if [[ "$rag_enabled" == 0 ]]; then
+    background_args=(--no-upload-worker)
+  fi
+  # 后台模式由 start_api_background.py 分离启动 API 与 worker（本脚本退出后仍在运行）。
+  exec .venv/bin/python scripts/start_api_background.py "${background_args[@]}"
 fi
-exec .venv/bin/uvicorn datamind.api:app --host 127.0.0.1 --port 8000 --no-proxy-headers
+
+if [[ "$rag_enabled" == 1 ]]; then
+  start_upload_worker
+fi
+trap stop_upload_worker EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+.venv/bin/uvicorn datamind.api:app --host 127.0.0.1 --port 8000 --no-proxy-headers &
+api_pid=$!
+api_status=0
+wait "$api_pid" || api_status=$?
+exit "$api_status"

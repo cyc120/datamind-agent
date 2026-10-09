@@ -7,6 +7,7 @@
 | 环节 | 当前实现 | 并发问题或限制 |
 |---|---|---|
 | PDF 演示摄取 | `ingestion/ingest.py` 收集目录后逐文件解析、提取、嵌入、落库 | `main()` 不是安全的多 worker 入口；没有任务领取、租约、取消或重试记录 |
+| **上传队列（新入口）** | 独立 worker `python -m ingestion.upload_worker`（`--once/--watch`）领取并解析；`GET /v1/uploads/{id}` **纯读**，不推进任务 | 领取带**不可复用 claim_token + 递增 attempt**，结果与终态在**同一事务**内按 token 栅栏提交（迟到代次零副作用）；跨进程并发受 `DATAMIND_TASK_SLOTS` advisory 槽约束；**无 worker 时任务停在 queued**，客户端按 `worker.alive`（心跳租约，阈值 30s）如实提示 |
 | 全局重建 | `--reset` 清空文档、块、切片、任务并删除共享 Qdrant collection | 任一重建可使其他读取/写入消失；并发普通摄取也有 collection 检测/创建竞争 |
 | 单文件刷新 | 原文件对应块/事实/切片执行 `DELETE` 后重建；Qdrant 先删旧 point 后 upsert，最后提交 PostgreSQL | 向量和元数据无法同一事务提交；中途失败可出现旧元数据配新向量、缺向量或孤立向量 |
 | PDF 标识与版本 | 文档 ID 基于标题和部分源 SHA，块/切片 ID 基于文档与序号；`doc_version`、向量 `document_version` 固定为 1 | 相同目标缺少版本 CAS；同一源改名可能撞 `(collection,sha256)`；旧版内容不能稳定保留 |

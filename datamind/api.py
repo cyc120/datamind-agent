@@ -639,10 +639,13 @@ def file_job_retry(job_id: str,request: Request):
 
 # ---------- upload pipeline: stage -> queue -> contract store -> review gate ----------
 # All three surfaces are admin-only (see `_required_permission`); the POSTs additionally
-# carry CSRF and a same-origin check from the shared middleware. Parsing is asynchronous:
-# `GET /v1/uploads/{upload_id}` drives the bounded worker for that one upload, so a
-# polling client is what advances a queued job. A parsed upload stays unretrievable
-# (`needs_review`, non-`indexed`) until `POST /v1/uploads/{upload_id}/approve`.
+# carry CSRF and a same-origin check from the shared middleware. Parsing is asynchronous
+# **and no route drives it** (review 5.1): the standalone worker
+# (`python -m ingestion.upload_worker --watch|--once`) advances queued jobs, so closing a
+# page cannot stall one. `GET /v1/uploads` reports `worker.alive`/`worker.last_seen_at` so
+# a client can honestly say the background processor is not running instead of rendering a
+# `queued` job as "解析中". A parsed upload stays unretrievable (`needs_review`,
+# non-`indexed`) until `POST /v1/uploads/{upload_id}/approve`.
 
 @app.post('/v1/uploads', status_code=201)
 async def upload_create(request: Request,filename: str=Query(min_length=1,max_length=200),
@@ -664,13 +667,11 @@ def upload_list(status: str | None=Query(default=None,max_length=32),
 @app.get('/v1/uploads/{upload_id}')
 def upload_detail(upload_id: str,request: Request):
     from ingestion import upload_pipeline
-    dsn=_write_dsn()
-    # Polling is the worker's clock: one *bounded* wave for this upload, then report the
-    # truth. `work_once` defaults to a child process under
-    # `upload_pipeline.wave_deadline()`, so this GET cannot block indefinitely; an
-    # unfinished parse is reported as `running` and stays claimable.
-    upload_pipeline.work_once(dsn,upload_id)
-    return jsonable_encoder(upload_pipeline.detail(upload_id,dsn))
+    # Pure read (review 5.1): a GET must not parse, claim or write anything at all. The
+    # job's progress is owned by the standalone worker; this endpoint only reports it —
+    # including `worker.alive`, so the polling client can honestly say the background
+    # processor is not running instead of waiting on a queue nothing is draining.
+    return jsonable_encoder(upload_pipeline.detail(upload_id,_write_dsn(),with_worker=True))
 
 
 @app.post('/v1/uploads/{upload_id}/approve')
@@ -779,10 +780,14 @@ def health():
         vector_store = _vector_store_status()
         if knowledge == "ready" and vector_store != "ready":
             knowledge = "degraded"
+        # 上传队列没有一个常驻 HTTP 调用者：任务只由独立 worker 推进（审查 5.1）。心跳读取
+        # 复用既有 `task_leases`（迁移 013，readonly_user 无权读），所以这里单独用写 DSN。
+        from ingestion import upload_pipeline
+        upload_worker = upload_pipeline.worker_heartbeat(_write_dsn())
         return {"status": "ok", "database": "ready", "agent": "sql+rag",
-                "capabilities": ["sql", "rag", "multifile_rag", "industrial_rules", "industrial_nl2sql", "fact_reviews", "local_identity", "fact_approvals", "source_authority", "cad_assets", "cad_dimensions", "file_jobs", "private_pdf_answer"],
+                "capabilities": ["sql", "rag", "multifile_rag", "industrial_rules", "industrial_nl2sql", "fact_reviews", "local_identity", "fact_approvals", "source_authority", "cad_assets", "cad_dimensions", "file_jobs", "private_pdf_answer", "upload_worker"],
                 "knowledge": knowledge, "document_count": document_count,
-                "vector_store": vector_store}
+                "vector_store": vector_store, "worker": upload_worker}
     except psycopg2.Error:
         raise HTTPException(503, detail={"error_code": "DATABASE_UNAVAILABLE"})
 

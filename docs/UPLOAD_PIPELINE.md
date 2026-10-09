@@ -1,8 +1,10 @@
 # 上传 → 解析 → 入库 → 查询 管道接口契约（冻结）
 
 本文件是 `/v1/uploads` 系列接口的**唯一规范来源**，供前端与后端并行实现时对齐。
-实现位于 `ingestion/upload_pipeline.py`（管道与队列）、`datamind/file_uploads.py`
-（暂存）、`datamind/api.py`（路由与权限）、`ingestion/contract_store.py`（统一契约存储）。
+实现位于 `ingestion/upload_pipeline.py`（管道与队列）、`ingestion/upload_worker.py`
+（独立 worker：领取、心跳、波次与并发上限）、`datamind/file_uploads.py`
+（暂存）、`datamind/api.py`（路由与权限）、`ingestion/contract_store.py`（统一契约存储）；
+领取代次的表结构见 `db/migrations/018_upload_claim_generation.sql`。
 
 约定：所有响应均为 JSON；除 `/v1/documents*`、`/v1/runs*` 之外，`/v1/uploads*` 全部
 位于**默认拒绝**中间件之内（`datamind/api.py: _required_permission` 把 `/v1/uploads`
@@ -67,11 +69,25 @@ Content-Type: application/octet-stream
 ```
 
 - `upload_id` / `job_id` / `document_id` 都是**内容寻址**：由暂存字节的 SHA-256 派生。
-  同一份字节重复上传是**幂等**的——返回同一 `upload_id`，队列被重新置为 `queued`，
-  复核门重新打开（`needs_review=true`、`status='parsing'`）。不同文件名/来源的同一份
-  字节仍映射到同一条记录。
+  同一份字节重复上传是**幂等**的——返回同一 `upload_id`，复核门重新打开
+  （`needs_review=true`、`status='parsing'`）。不同文件名/来源的同一份字节仍映射到同一条记录。
+- `status` 是**该 job 当前的真实队列状态**（不总是 `queued`）：见下方「重传规则」。
 - `review_required` 恒为 `true`：解析成功也**默认不可检索**，必须显式 approve；且 approve
   只是必要条件——是否可检索由 §2 的 `searchable` 派生判定给出。
+
+### 重传规则（R04，本版明确的一条可断言规则）
+
+同一份字节的再次上传**不会**无条件把任务重置为 `queued`：
+
+| 上传时 job 状态 | 行为 | 201 响应里的 `status` |
+| --- | --- | --- |
+| `running`（已有 worker 领取并正在解析） | **不重置、不开新代次**：`status`/`claim_token`/`attempt`/时间戳都不变，复用当前代次 | `"running"` |
+| `queued` | 保持 `queued`（刷新 `created_at`），代次未开启，`claim_token` 保持 NULL | `"queued"` |
+| 终态（`succeeded`/`failed`/`partial_failure`/`cancelled`） | 重新入队为 `queued`、清空 `claim_token`；**下一次领取**开启新代次（`attempt+1` + 新 token） | `"queued"` |
+
+理由：`running` 被重传重置会让**正在执行的领取失去归属**——旧的完成回调与新的领取同时
+认为自己在跑同一个任务，结果可能是假成功、也可能覆盖新结果（审查 R04 的原始缺陷）。
+守护测试：`tests/test_upload_claim_generation.py`（含两个管理员并发上传同内容）。
 
 ### 失败：稳定错误码
 
@@ -116,7 +132,8 @@ GET /v1/uploads?status=&media_type=&since=&limit=
 - 时间格式：`created_at` 为带时区的 ISO-8601（服务器本地时区，如
   `2026-10-08T20:20:54.793442+08:00`）。做「最近 N 分钟」过滤请用 epoch 秒或带时区的
   ISO 字符串，不要用无时区的本地时间字符串。
-- **列表不驱动解析**：只有详情轮询（或外部 worker 调用 `drain()`）会推进 job。
+- **列表不驱动解析**（详情也不驱动，见 §3）：只有独立 worker 调用 `work_once()`/`drain()`
+  才会推进 job。列表在此之上如实报告 `worker`（见下），消费方据此决定文案。
 
 响应：
 
@@ -142,9 +159,36 @@ GET /v1/uploads?status=&media_type=&since=&limit=
       "unsupported_features": ["locator_unavailable"]
     }
   ],
-  "count": 1
+  "count": 1,
+  "worker": {"alive": true, "last_seen_at": "2026-10-08T20:20:55.123456+00:00", "alive_seconds": 30.0}
 }
 ```
+
+列表项字段集**不变**（`worker` 是响应顶层的新字段，不是列表项字段）。
+
+### `worker` 字段（心跳，本版新增，审查 5.1）
+
+```json
+"worker": {"alive": false, "last_seen_at": null, "alive_seconds": 30.0}
+```
+
+| 字段 | 含义 |
+| --- | --- |
+| `alive` | 最近 `alive_seconds` 秒内**有**上传 worker 续过心跳。判定阈值 = `DATAMIND_UPLOAD_WORKER_ALIVE_SECONDS`（默认 **30s**），也是心跳租约的 TTL（`task_leases`，迁移 013）；worker 崩溃后租约自然过期，`alive` 自动变 false |
+| `last_seen_at` | 最近一次心跳时间（UTC ISO-8601）。优雅退出会删除心跳行，此时为 `null`；worker 崩溃后心跳行在被清理前仍在，可据此提示「最后心跳 …」 |
+| `alive_seconds` | 当前生效的阈值（秒），便于消费方解释判定 |
+| `error`（仅异常时出现） | 心跳表不可读等非数据库故障时为 `"UPLOAD_WORKER_HEARTBEAT_UNREADABLE"`，同时 `alive=false`：探测失败**不猜测**有 worker，也不让 `/health`、上传列表因此 500 |
+
+**诚实提示（必须遵守）**：`status='queued'` 且 `worker.alive=false` 时，不得显示「解析中」
+或任何等价进度文案；应如实提示「后台处理器未运行（任务不会自行推进）」，并给出启动方式：
+
+```
+python -m ingestion.upload_worker --watch
+```
+
+`/health` 也带同一个 `worker` 子字段（并新增 `upload_worker` 能力标记），内容与列表一致
+（同一函数 `ingestion.upload_pipeline.worker_heartbeat`）；`GET /v1/uploads/{upload_id}`
+也带它（见 §3），便于轮询详情的前端直接判断。
 
 ### `status` 枚举（队列语义，与既有 `file_jobs` 一致）
 
@@ -231,9 +275,15 @@ R05 的症状。
 
 ---
 
-## 3. `GET /v1/uploads/{upload_id}` —— 详情（**轮询即推进**）
+## 3. `GET /v1/uploads/{upload_id}` —— 详情（**纯读，不推进任何解析**）
 
-该请求先为这**一个**上传推进**一波有界解析**（见 §6），再返回当前真实状态。
+自本版起该请求**没有任何写副作用**：不领取、不解析、不改状态、不写契约。它只报告当前真实
+状态，因此页面关掉也不会让任务停摆（任务由 §6 的独立 worker 推进）。
+
+> 变更提示（审查 5.1）：旧版本这个 GET 会为该上传推进一波有界解析，于是「浏览器轮询」就是
+> 队列时钟；同时 `workers=1..4` 只约束单次调用，不约束多个 HTTP 请求/多个进程的合计并发。
+> 现在推进任务的唯一入口是 `python -m ingestion.upload_worker`（或显式调用
+> `drain()`/`work_once()` 的宿主进程）。
 
 - `upload_id` 必须匹配 `^upl-[0-9a-f]{40}$`，否则 404 `UPLOAD_NOT_FOUND`。
 - 不存在 → 404 `UPLOAD_NOT_FOUND`。
@@ -246,6 +296,7 @@ R05 的症状。
   "parser_version": "cad-contract-adapter-v1 或 null",
   "page_count": null,
   "collection": "demo_kb",
+  "attempt": 1,
   "analysis": {
     "parse_status": "parsed",
     "adapter": "dxf-native",
@@ -270,12 +321,19 @@ R05 的症状。
   "contract_url": "/v1/documents/doc-upload-.../contract",
   "approval": null,
   "started_at": "2026-10-08T20:20:54.5+08:00",
-  "finished_at": "2026-10-08T20:20:54.9+08:00"
+  "finished_at": "2026-10-08T20:20:54.9+08:00",
+  "worker": {"alive": true, "last_seen_at": "2026-10-08T20:20:55.123456+00:00", "alive_seconds": 30.0}
 }
 ```
 
-详情同样带列表项里的 `searchable` / `index_state` / `index_note`（定义见 §2，与 approve
-响应逐字段一致）。
+- `attempt`（int，本版新增）：该内容**已经被领取过多少次**（`ingest_job_claims.attempt`，
+  迁移 018）。`0` = 从未被领取（仍在 `queued` 或从未跑过）。它与 `claim_token` 一起构成
+  领取代次，`attempt` 只增不减，是"重试过几次"的可断言来源。
+- `worker`（本版新增）：**与列表、`/health` 完全相同的 `worker` 子字段**（同一函数）。轮询
+  详情的客户端因此不需要再请求列表，就能在 `status='queued'` 且 `worker.alive=false` 时如实
+  提示「后台处理器未运行」。
+- 详情同样带列表项里的 `searchable` / `index_state` / `index_note`（定义见 §2，与 approve
+  响应逐字段一致）。
 
 ### `analysis` 字段
 
@@ -443,59 +501,115 @@ R05 的症状。
 
 ---
 
-## 6. 异步与「轮询推进」语义（有界执行）
+## 6. 异步、独立 worker 与「重试 ≠ 断点恢复」（有界执行）
 
-**job 只在被轮询时推进。** 具体地：
+**job 只在 worker 领取时推进；没有任何 HTTP 路由会推进它。**
 
 1. `POST /v1/uploads` 只做：校验 → 暂存 → 写 `document_assets`（`status='parsing'`,
    `needs_review=true`）→ 写 `ingest_jobs`（`job_type='upload_parse'`, `status='queued'`）。
    **不解析**。
-2. `GET /v1/uploads/{upload_id}` 为该上传推进**恰好一波**有界解析：每一波都运行在
-   **独立子进程**中（`datamind.task_budget.run_bounded`，模块
-   `ingestion.upload_pipeline`，函数 `run_parse`），带硬时限
-   `wave_deadline()`。默认 **45 秒**，可用环境变量
-   `DATAMIND_UPLOAD_WAVE_DEADLINE_SECONDS` 覆盖；非法值回退默认值（**不会**变成无界）。
-   响应里的 `wave_deadline_seconds` 就是本次预算。
-3. 若这一波用尽预算：子进程被杀，job **保持 `running`**（不写成 failed、不假装成功），
-   `GET` 如实返回 `status='running'`、`error_code=null`，并把
-   `wave_timeouts` 计数 +1。下一次轮询在超过
-   `stale_running_seconds()`（= max(120s, 波次时限+30s)）后会重新抢占并继续。
-   波次超时**最多重试 `MAX_WAVE_ATTEMPTS = 3` 次**：第 3 次仍超时就把 job 置为
-   `failed`、`error_code='UPLOAD_WAVE_ATTEMPTS_EXHAUSTED'`，避免一个永远放不进任何一波
-   的上传被无限重试。
-4. `GET /v1/uploads`（列表）**只读**，不推进任何解析。
-5. **无人值守/生产路径**：调用 `ingestion.upload_pipeline.drain(dsn)`（或
-   `work_once`）的 worker 循环，而不是依赖浏览器轮询。`drain` 会连续推进所有可抢占的
-   job，并在下一次调用时回收陈旧 `running` 行。
+2. `GET /v1/uploads/{upload_id}` 与 `GET /v1/uploads` 都是**纯读**（§2/§3），不领取、不解析。
+3. **推进任务的唯一入口**是独立 worker：`python -m ingestion.upload_worker`。
+   **没有 worker 时任务会永远停在 `queued`**——这是部署事实，不是解析失败；客户端必须
+   依据 `worker.alive` 如实提示「后台处理器未运行」（§2），**不得**显示成「解析中」。
 
-并发安全：`_claim` 用 `SELECT ... FOR UPDATE SKIP LOCKED` 抢占，`running` 行带
-`started_at`；终态写入以 `WHERE status='running'` 作栅栏（父进程抢不回时不覆盖）。
+### worker CLI（`ingestion/upload_worker.py`）
 
-### 一次 GET 的最坏耗时
+```bash
+python -m ingestion.upload_worker --watch                  # 常驻；start_local.sh 用这个
+python -m ingestion.upload_worker --once                   # 排空后退出（cron / 测试）
+python -m ingestion.upload_worker --watch --interval 5 --workers 2 --deadline 60
+```
 
-- 上界 ≈ `wave_deadline_seconds` + 子进程启动/回收开销。实测（默认 45s 预算）：
-  DXF/DOCX/PDF/JSON 首次轮询 **0.23–0.57 s**（状态直接到终态），第二次轮询（终态）**~0.034 s**；
-  强制一个 400 页 PDF 在 `wave_deadline_seconds=0.5` 下超时，GET 实测 **0.556 s** 返回
-  `status='running'`（波次被杀、job 保持 running）。
-- PDF 分支在**子进程内**可能触发 OCR 与公式识别（`ingestion/ingest.py: parse_pdf`），
-  它们没有各自的子预算，但整段都在上述波次时限内，超时即整波被杀——因此一次 GET 不会
-  超过波次时限太多。
-- 一个永久超时上传的最坏总耗时（默认参数）≈ `MAX_WAVE_ATTEMPTS × (wave_deadline +
+| 参数 | 默认 | 说明 |
+| --- | --- | --- |
+| `--once` | — | 在**一个跨进程解析槽**内跑一次 `drain()`：推进所有可领取任务后退出（退出码 0，即使队列为空）。测试用的确定性路径 |
+| `--watch` | — | 常驻循环：每轮 `work_once()` 跑一波有界解析，无可领取任务时睡 `--interval` 秒 |
+| `--interval` | `2` | `--watch` 的空闲轮询间隔（秒，≥0.1） |
+| `--workers` | `1` | 单次波次**领取**几个任务（1–4）。同一波次内的任务**顺序执行**，所以它不等于并发解析数 |
+| `--deadline` | `wave_deadline()` | 单波次硬时限；默认 **45s**，可用 `DATAMIND_UPLOAD_WAVE_DEADLINE_SECONDS` 覆盖（非法值回退默认，**不会**变成无界） |
+
+- **合计并发上限**：每波持有一个跨进程 advisory slot（`datamind.task_budget.resource_slot`，
+  槽名 `upload-parse`，槽数 = `DATAMIND_TASK_SLOTS`，默认 2）。因此**多个 worker 进程 / 多个
+  `drain()` 调用者的合计并发波次数 ≤ `DATAMIND_TASK_SLOTS`**，不再由 HTTP 请求数决定。
+  槽被占满时立即返回 `TASK_BUDGET_BUSY`（不是无界排队）：`--once` 以退出码 **3** 结束、
+  什么都不领取；`--watch` 打印一行提示后按 `--interval` 重试。
+- **信号**：SIGINT/SIGTERM 只置停止标志，**不打断已领取的解析**（子进程在独立会话中，Ctrl-C
+  不会杀掉它）；当前波次结束后退出，退出码 0，并释放心跳租约。`--watch` 在**波次边界**退出；
+  `--once` 会把本次 drain 的剩余可领取任务做完再退出（不会丢弃已领取任务，也不会半途改写状态）。
+- **退出码**：`0` 正常完成（含空队列与信号停止）｜`1` 异常（含心跳注册失败，拒绝在无心跳下
+  启动，否则客户端会误报"处理器未运行"）｜`2` 参数错误｜`3` 解析槽全被占用、本轮未领取。
+- **进度**：stdout 每行一条 `[upload_worker] <UTC 时间戳> ...`（心跳、每一波、每个任务的
+  `outcome=... job_id=... attempt=... error_code=...`、停止）。
+- **心跳**：worker 在既有 `task_leases`（迁移 013）里注册一行
+  `upload_worker:<host>:<pid>:<nonce>` 并周期续租（间隔
+  `DATAMIND_UPLOAD_WORKER_HEARTBEAT_SECONDS`，默认 5s；租约 TTL = 阈值）。优雅退出时删除该行；
+  崩溃时租约到期后 `alive` 自动变为 false。判定阈值见 §2 的 `worker` 字段。
+
+### 波次超时与「重试 ≠ 断点恢复」（审查 5.1 明确区分）
+
+- 一波用尽预算：子进程被杀，job **保持 `running`**（不写成 failed、不假装成功），
+  `wave_timeouts` 计数 +1；`stale_running_seconds()`（= max(120s, 波次时限+30s)）之后可被
+  重新领取。波次超时**最多 `MAX_WAVE_ATTEMPTS = 3` 次**，第 3 次仍超时即如实失败为
+  `UPLOAD_WAVE_ATTEMPTS_EXHAUSTED`。
+- **重新领取 = 重试，不是断点恢复**：新代次会**从头解析整个文件**，不复用上一次的任何中间
+  产物，也不存在持久化检查点。因此：
+  - 大文件要么分段保存进度，要么明确给出"可完成的时间预算与大小上限"；
+  - UI/文档**不得**把"重试中"说成"从上次继续"；`attempt` 只表示"被领取过几次"。
+  - 与"解析已完成但提交前中断"不同：那种情况事务整体回滚（§7），**同一代次**重跑后结果一致，
+    不产生半套结果，也不需要新的代次。
+
+### 并发安全：领取代次（R04）
+
+- `_claim` 用 `SELECT ... FOR UPDATE SKIP LOCKED` 抢占，并在同一事务里写入
+  `ingest_job_claims`：`claim_token`（`secrets.token_urlsafe(32)`，不可复用）+ `attempt+1`
+  （只增不减）。`running` 行仍带 `started_at`，陈旧行按 `stale_running_seconds()` 可重抢。
+- **所有依赖该次领取的写入都校验同一 token**（`SELECT ... FOR UPDATE`）：契约结果、
+  `quality_detail`、终态状态、波次超时计数、取消/重抢。校验失败即**完全无副作用**（不改状态、
+  不改块/定位/质量明细）。详见 §7。
+
+### 一次波次的耗时上界
+
+- 上界 ≈ `--deadline`（默认 45s）+ 子进程启动/回收开销。历史实测（旧版由 GET 驱动，同一
+  波次机制）：DXF/DOCX/PDF/JSON 单波 **0.23–0.57 s** 直接到终态；强制 400 页 PDF 在
+  0.5s 预算下超时，调用方 **0.556 s** 拿回 `status='running'`。
+- `GET /v1/uploads/{upload_id}` 现在是纯读：响应时间与解析量**无关**（只有数据库读取）。
+- PDF 分支在**子进程内**可能触发 OCR 与公式识别（`ingestion/ingest.py: parse_pdf`），它们没有
+  各自的子预算，但整段都在波次时限内，超时即整波被杀。
+- 一个永久超时上传的最坏总时长（默认参数）≈ `MAX_WAVE_ATTEMPTS × (wave_deadline +
   stale_running)` ≈ 3 × (45s + 120s) ≈ 8 分钟，之后稳定失败为
   `UPLOAD_WAVE_ATTEMPTS_EXHAUSTED`。
+
+### 启动方式（照文档启动一次，任务就会自己推进）
+
+- 前台：`bash scripts/start_local.sh` —— 同一脚本启动 API 与 worker，`Ctrl-C`/退出时一并
+  停止 worker（日志 `.cache/api/upload_worker.log`）。
+- 后台：`bash scripts/start_local.sh --background` —— `scripts/start_api_background.py` 分离
+  启动 API 与 worker（`start_new_session`），PID 记在 `.cache/api/upload_worker.pid`；
+  该模式没有停止脚本，停止请 `kill -TERM "$(cat .cache/api/upload_worker.pid)"`。
+- `--sql-only`：不启动 worker（该部署没有上传管道）。
+- 手动：`.venv/bin/python -m ingestion.upload_worker --watch`。若任务停在 `queued` 且
+  `worker.alive=false`，先启动它。
 
 ### `run_parse` 不会做的事
 
 - 不调用 embedding 模型，不写 `chunks`/Qdrant（`vector_index` 恒为 `deferred`）。
-- 不在 API 进程内解析：`work_once`/`drain` 默认走子进程；`in_process=True` 是**显式**
-  选项（测试与已自带一次性进程的 worker 使用），默认不可达。
+- 不在 API 进程内解析：worker 的每一波默认走子进程（`datamind.task_budget.run_bounded`）；
+  `in_process=True` 是**显式**选项（测试与已自带一次性进程的宿主），默认不可达。
+
 
 ---
 
-## 7. 落库与契约
+## 7. 落库与契约（结果与终态同一事务 + 代次校验）
 
-解析成功后（`run_parse`）在**同一个数据库事务**内：
+`run_parse` **先解析（事务之外）**，解析结束后在**同一个数据库事务**内按顺序做：
 
+0. **校验领取代次**：`SELECT ... FROM ingest_jobs j JOIN ingest_job_claims c ON
+   c.job_id=j.job_id WHERE j.job_id=? AND j.status='running' AND c.claim_token=?
+   FOR UPDATE OF j, c`。不匹配 → **不写任何东西**（连终态都不写），返回 `claim_lost`；
+   `_execute` 把它记成 `outcome=claim_lost`、`error_code=UPLOAD_CLAIM_LOST`。
+   仅"在终态处加判断"是不够的——如果结果先独立提交，旧代次仍会污染块/定位/质量明细
+   （审查 R04 明确指出），所以校验必须在**写入之前**、且与该次写入在同一事务内。
 1. `ingestion.contract_store.persist_result(cur, document_id=..., payload=..., dsn=...)`
    写入 `document_contract_blocks` / `document_block_relations`（先删后插，幂等替换）。
    只有通过 `datamind/parse_contract.py` 校验的结果才会落库；校验失败即抛稳定错误码，
@@ -505,6 +619,24 @@ R05 的症状。
    其中 `parse_contract` 是 `/v1/documents/{id}/contract` 会回显的摘要，含
    `unsupported_features`（显式缺口如实声明，如 measurement JSON 的
    `locator_unavailable`）。
+3. 写终态：`ingest_jobs.status`（`succeeded`/`partial_failure`/`failed`）+
+   `finished_at`，清空 `ingest_job_claims.claim_token`，并按 `ASSET_TERMINAL`
+   更新 `document_assets.status`（`indexed` 永不降级）。
+
+因此：
+
+- **要么全落、要么全不落**：事务中途被中断（进程被杀、连接断开）→ 契约行、`quality_detail`
+  与终态一起回滚，job 仍是同一代次的 `running`，可被安全重跑；
+- 取消（`cancel`）会清空 `claim_token`：正在解析的 worker 之后**无法**写入结果或终态；
+- 一个被新代次取代的旧 worker 晚到时，`ingest_jobs` / 契约表 / 定位表 / `quality_detail`
+  **逐行不变**（守护测试：`tests/test_upload_claim_generation.py`）。
+
+代次存储：`ingest_job_claims`（迁移 `db/migrations/018_upload_claim_generation.sql`，
+`job_id` 主键 + `claim_token` + `attempt` + `claimed_at`，`ON DELETE CASCADE`）。
+**为什么不加在 `ingest_jobs` 上**：该表由 `deploy/init/02_metadata.sql` 以 `postgres` 身份创建、
+属主是 `postgres`，而 `db/migrate.py` 以 `datamind_app` 连接（只有 DML 权限、没有属主权限），
+`ALTER TABLE ingest_jobs ADD COLUMN ...` 会以 `must be owner of table ingest_jobs` 中止整个
+迁移流程。迁移 018 因此只新建自己的表（并 REVOKE 给 `readonly_user`）。
 
 `quality_detail` 中**不写任何明文凭据**；上传记录只含 `user_id`/`display_name`/`roles`
 与文件身份，不含 session 哈希。
@@ -519,3 +651,6 @@ R05 的症状。
 | `POST /v1/files/jobs` + `scripts/file_job_worker.py` | DXF/measurement 的**登记**队列（`cad_versions` / `dimension_measurement_versions`）。上传队列不写这两张表（原因见 `ingestion/upload_pipeline.py` 模块文档：`file_job_items.kind` 有 CHECK 约束，且两个 target 都不写统一契约与 `document_assets`）。 |
 | `GET /v1/documents/{id}/contract` | 上传的契约读取入口；`contract_url` 指向它。 |
 | `GET /v1/documents` | 问答文件选择器的数据源；只有 `indexed` 且 `needs_review=false` 才列出，且每项带 `searchable` / `index_state` / `index_note`（与上传端点同一判定函数）。选择器必须要求 `searchable=true`。 |
+| `ingestion/upload_worker.py` | 上传队列的**唯一常驻推进者**（`--watch`/`--once`）。与 `scripts/file_job_worker.py` 面向不同队列：后者处理 `file_jobs` 登记队列。 |
+| `datamind/task_budget.py` 的 `task_leases` | worker 心跳与跨进程解析槽都复用它（迁移 013），没有新增常驻进程/依赖。 |
+| 前端 `web/multifile.js` | **本版未改**：它按 `status` 轮询详情渲染，`queued` 显示为「排队中」，但**没有消费 `worker.alive`**，所以后台无 worker 时会一直轮询到上限并提示「仍在处理中」（`poll_exhausted`）——本版已在**详情/列表/`/health`** 三处提供该字段，UI 只需读取它即可改成「后台处理器未运行，任务不会自行推进」。这是本版**已知的跨任务待办**。 |
