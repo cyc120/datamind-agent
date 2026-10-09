@@ -70,7 +70,8 @@ Content-Type: application/octet-stream
   同一份字节重复上传是**幂等**的——返回同一 `upload_id`，队列被重新置为 `queued`，
   复核门重新打开（`needs_review=true`、`status='parsing'`）。不同文件名/来源的同一份
   字节仍映射到同一条记录。
-- `review_required` 恒为 `true`：解析成功也**默认不可检索**，必须显式 approve。
+- `review_required` 恒为 `true`：解析成功也**默认不可检索**，必须显式 approve；且 approve
+  只是必要条件——是否可检索由 §2 的 `searchable` 派生判定给出。
 
 ### 失败：稳定错误码
 
@@ -133,6 +134,9 @@ GET /v1/uploads?status=&media_type=&since=&limit=
       "created_at": "2026-10-08T20:20:54.793442+08:00",
       "review_state": "pending_review",
       "review_required": true,
+      "searchable": false,
+      "index_state": "not_approved",
+      "index_note": "UPLOAD_NOT_APPROVED",
       "block_count": 0,
       "locator_count": 0,
       "unsupported_features": ["locator_unavailable"]
@@ -162,6 +166,68 @@ GET /v1/uploads?status=&media_type=&since=&limit=
 
 `review_required` 是布尔镜像（= `needs_review`），与 `review_state` 同时出现在列表项与
 详情中。**没有** `not_applicable` / `rejected` 取值；失败的上传仍为 `pending_review`。
+
+### 可检索性 `searchable` / `index_state` / `index_note`（R05，本版新增）
+
+「解析完成」「人工复核」「检索就绪」是**三件独立的事**，本管道此前把它们混为一个
+`status='indexed'`：审批只要求契约有块，而检索器（`datamind/knowledge.py`）**只读
+`chunks`**，本管道又不写 `chunks`（`vector_index` 恒为 `deferred`）。结果是一份审批后的
+上传会出现在问答文件选择器里，却永远检索不到。
+
+从本版起，**可检索是派生判定，不是存储的状态**。列表项、详情与 approve 响应统一新增：
+
+```json
+{
+  "searchable": false,
+  "index_state": "no_chunks",
+  "index_note": "UPLOAD_HAS_NO_CHUNKS"
+}
+```
+
+- `searchable`（bool，**派生**）：
+  `searchable == (asset.status == 'indexed') AND NOT needs_review AND chunk_count > 0`。
+  消费方（问答文件选择器）必须要求 `searchable=true`；它是唯一可以据此宣称「该文件可
+  用于问答检索」的字段。
+- `index_state`（**恰好三个值**，`index_state=="indexed"` 当且仅当 `searchable=true`）：
+
+  | 值 | 含义 |
+  | --- | --- |
+  | `indexed` | 已复核、已发布、且 `chunks` 非空——真正可检索 |
+  | `no_chunks` | 已复核，但检索器要读的切片存储为空（本管道审批后的正常状态） |
+  | `not_approved` | 复核门未打开（`needs_review=true`），无论切片是否存在 |
+
+- `index_note`（str \| null）：机器可读的**原因码**，人类可读文案由消费方映射，**不要
+  直接展示原文**。取值集合：
+
+  | `index_note` | 出现条件 |
+  | --- | --- |
+  | `null` | `searchable=true` |
+  | `UPLOAD_NOT_APPROVED` | `index_state='not_approved'` |
+  | `UPLOAD_HAS_NO_CHUNKS` | 已复核、契约有块（`block_count>0`）、但 `chunks=0` |
+  | `UPLOAD_HAS_NO_CONTRACT_BLOCKS` | 已复核、契约也无块（`block_count=0`）、`chunks=0` |
+  | `UPLOAD_STATUS_NOT_INDEXED` | `chunks>0` 但资产未被标记 `indexed`（只可能由人工改库产生） |
+
+- 这三个字段在 `/v1/uploads` 列表项、`/v1/uploads/{upload_id}` 详情、approve 响应与
+  `GET /v1/documents` 的每一项中**含义完全一致**：四个端点全部调用**同一个**判定函数
+  `ingestion.upload_pipeline.searchability(status, needs_review, chunks, block_count=...)`，
+  不各自写一份条件（守护测试：
+  `test_upload_searchability.py::test_documents_and_upload_detail_agree_on_the_index_state`
+  —— 同一文档在两个端点上必须得到相同的 `index_state`/`index_note`）。它们**都不改变**
+  既有字段（`status`/`review_state`/`review_required`/`vector_index`/计数）的含义。
+- **诚实**：`vector_index` 仍为 `"deferred"`——本管道确实不建向量，也不写 `chunks`。
+  `searchable` 不会因此撒谎：将来某条路径真的写入切片并标记 `indexed` 后，同一判定会**自动**
+  变为 `true`（无需再加状态字段），`tests/test_upload_searchability.py` 的反向对照正是这么
+  断言的。
+
+### `GET /v1/documents` 的 `searchable` / `index_state` / `index_note`
+
+问答文件选择器的数据源 `GET /v1/documents` 的**每一项也新增这三个字段**（同一派生定义、
+同一批 code、同一函数）。该路由的发布过滤条件（`status='indexed'` + `public` + 非待复核）
+**本版未改**：历史遗留的「`indexed` 但 `chunks=0`」行仍会出现，但带
+`searchable=false` + `index_state="no_chunks"` + `index_note`（如
+`UPLOAD_HAS_NO_CHUNKS` / `UPLOAD_HAS_NO_CONTRACT_BLOCKS`），于是选择器既能排除它，也能对
+用户说明原因，而不是只给一句通用文案。消费方必须显式要求 `searchable=true`，否则会重现
+R05 的症状。
 
 ---
 
@@ -207,6 +273,9 @@ GET /v1/uploads?status=&media_type=&since=&limit=
   "finished_at": "2026-10-08T20:20:54.9+08:00"
 }
 ```
+
+详情同样带列表项里的 `searchable` / `index_state` / `index_note`（定义见 §2，与 approve
+响应逐字段一致）。
 
 ### `analysis` 字段
 
@@ -265,7 +334,10 @@ GET /v1/uploads?status=&media_type=&since=&limit=
 - 取值恒为字符串 `"deferred"`：**上传管道不做向量索引**，不写 `chunks`，不写 Qdrant。
 - `vector_index_note` 是**规范字段**（说明离线路径）。当前值见上方示例。
 - 离线向量化路径：`scripts/pdf_index_worker.py`、`ingestion/ingest.py`（PDF 资产离线
-  publish）。前端不得把 `status='indexed'` 解读为「已向量化」。
+  publish）。前端不得把 `status='indexed'` 解读为「已向量化」；要判断「能否用于问答」
+  只看 §2 派生的 `searchable`。
+- 一旦某条路径真的写入 `chunks` 并把资产标为 `indexed`，上述派生判定会**自动**变为
+  `searchable=true`——本字段无需迁移、无需回填，也不会因历史数据而撒谎。
 
 ### 失败的 `error_code`
 
@@ -291,8 +363,9 @@ GET /v1/uploads?status=&media_type=&since=&limit=
 
 - 请求体：无（可选 JSON `{"reason": "..."}`，当前实现忽略 body）。
 - 权限：admin + CSRF + 同源。
-- 成功：200，响应体 = **详情对象**（§3）的完整字段，另加 `indexed`（bool），
-  契约无块时再加 `index_note`。关键字段示例：
+- 成功：200，响应体 = **详情对象**（§3）的完整字段，另加 `indexed`（bool），并始终带
+  `searchable` / `index_state` / `index_note`。**`indexed == searchable`**，仅为 true 时
+  才是真的可检索。关键字段示例（本管道不写 `chunks`，所以审批后的正常结果是**不可检索**）：
 
 ```json
 {
@@ -300,16 +373,21 @@ GET /v1/uploads?status=&media_type=&since=&limit=
   "status": "succeeded",
   "review_state": "approved",
   "review_required": false,
-  "indexed": true,
+  "indexed": false,
+  "searchable": false,
+  "index_state": "no_chunks",
+  "index_note": "UPLOAD_HAS_NO_CHUNKS",
   "block_count": 8,
+  "vector_index": "deferred",
   "approval": {
     "user_id": "user-...",
     "display_name": "本机管理员",
     "roles": ["admin"],
     "approved_at": "2026-10-08T12:20:55.665966+00:00",
     "reason": null,
-    "indexed": true,
-    "block_count": 8
+    "indexed": false,
+    "block_count": 8,
+    "chunk_count": 0
   }
 }
 ```
@@ -317,14 +395,18 @@ GET /v1/uploads?status=&media_type=&since=&limit=
 行为：
 
 1. 记录操作者到 `document_assets.quality_detail.review_approval`（含 `user_id`、
-   `display_name`、`roles`、`approved_at`、`block_count`、`indexed`）。
-2. `needs_review := false`。
-3. **当且仅当**统一契约存储确有块（`document_contract_blocks` 行数 > 0）时
-   `status := 'indexed'`，否则 `status` 保持 `parsed` 并返回
-   `indexed=false` + `index_note="UPLOAD_HAS_NO_CONTRACT_BLOCKS"`。
-4. **幂等**：重复 approve 只是重新记录一次操作者与时间，仍返回 200，`needs_review`
-   保持 false。已 `indexed` 的资产不会被后续慢 worker 降级（`_finish` 带
-   `status<>'indexed'` 保护）。
+   `display_name`、`roles`、`approved_at`、`block_count`、`chunk_count`、`indexed`）。
+2. `needs_review := false`（复核门打开；这是 approve 唯一无条件做的事）。
+3. **当且仅当**检索器真正读取的切片存储非空（`chunks` 行数 > 0）时 `status := 'indexed'`；
+   否则 `status` **保持原值**（解析成功即 `parsed`），并返回 `indexed=false` +
+   `searchable=false` + `index_state="no_chunks"` + `index_note`（见 §2 的取值表；契约有块
+   时为 `UPLOAD_HAS_NO_CHUNKS`）。**契约块数 > 0 不再等于 `indexed`**——块是证据，不是索引。
+   因此本管道的审批结果**不会**出现在 `GET /v1/documents`（它按 `status='indexed'` 过滤），
+   也就不会出现在问答文件选择器里。
+4. **幂等**：重复 approve 只是重新记录一次操作者与时间，仍返回 200，`needs_review` 保持
+   false，不产生第二次状态变更、不新建 job。已 `indexed` 的资产不会被后续慢 worker 降级
+   （`_finish` 带 `status<>'indexed'` 保护）。若两次调用之间确有 `chunks` 写入，第二次
+   approve 会如实变为 `indexed=true`（判定是派生的，不是缓存的）。
 
 失败：
 
@@ -340,18 +422,24 @@ GET /v1/uploads?status=&media_type=&since=&limit=
 
 `document_assets` 行的可见性门是**两把锁同时打开**：`status='indexed'`
 **且** `needs_review=false`，且 `'public'=ANY(acl)`、`collection` 属于
-`{demo_kb, ohrbench_kb, industrial_demo}`。
+`{demo_kb, ohrbench_kb, industrial_demo}`。**但可见 ≠ 可检索**：`status='indexed'`
+只说明它通过了发布门，检索器仍要求 `chunks`（见 §2 的 `searchable` 定义）。
 
 - 未 approve 时：`needs_review=true` 且 `status` ∈ {`parsing`（队列中）, `parsed`
   （解析成功）, `failed`}。因此
   - `GET /v1/documents` **不列出**它；
   - `GET /v1/documents/{id}` 返回 404 `DOCUMENT_NOT_FOUND`；
   - 向量检索（RAG）选不中它（无 chunks，且 gate 为 indexed）。
-- approve 后（且契约确有块）：`status='indexed'` + `needs_review=false`，随即出现在
-  `/v1/documents`。
+- approve 后：`needs_review=false`；`status='indexed'` **仅当** `chunks>0`。本管道不写
+  `chunks`，所以审批后的上传**仍然不可检索**、**不出现在** `GET /v1/documents`
+  （`index_state='no_chunks'`），这正是 R05 的修复点。
+- 只有真正存在切片（例如离线路径写完 `chunks` 并把资产标为 `indexed`）后，`searchable`
+  才为 true、文档才出现在 `/v1/documents` 并被检索器选中。
 - **唯一例外**：`GET /v1/documents/{id}/contract` 对 `origin='upload'` 的行在
   approve **之前**也可读（契约是证据浏览，不是检索；上传详情的 `contract_url` 指向
   它）。其它 `/v1/documents*` 路由的门保持不变。
+- 守护测试：`tests/test_upload_searchability.py`（①未审批 ②已审批无切片 ③有切片反向对照
+  ④`/v1/documents` 每项带 `searchable` ⑤幂等 ⑥失败解析不可审批）。
 
 ---
 
@@ -430,4 +518,4 @@ GET /v1/uploads?status=&media_type=&since=&limit=
 | `POST /v1/files/uploads` | 旧暂存路径，上限 `.dxf` 2 MiB / `.json` 1 MiB，错误码见 §1 注记。本管道**未改动**它。 |
 | `POST /v1/files/jobs` + `scripts/file_job_worker.py` | DXF/measurement 的**登记**队列（`cad_versions` / `dimension_measurement_versions`）。上传队列不写这两张表（原因见 `ingestion/upload_pipeline.py` 模块文档：`file_job_items.kind` 有 CHECK 约束，且两个 target 都不写统一契约与 `document_assets`）。 |
 | `GET /v1/documents/{id}/contract` | 上传的契约读取入口；`contract_url` 指向它。 |
-| `GET /v1/documents` | 复核门所在；只有 `indexed` 且 `needs_review=false` 才列出。 |
+| `GET /v1/documents` | 问答文件选择器的数据源；只有 `indexed` 且 `needs_review=false` 才列出，且每项带 `searchable` / `index_state` / `index_note`（与上传端点同一判定函数）。选择器必须要求 `searchable=true`。 |

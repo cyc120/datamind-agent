@@ -289,16 +289,25 @@ class UploadPipelineTests(unittest.TestCase):
         body = approved.json()
         self.assertFalse(body['review_required'])
         self.assertEqual(body['review_state'], 'approved')
-        self.assertTrue(body['indexed'])
+        # R05: approve clears the review gate; it does not invent an index. This path writes
+        # no `chunks`, and `datamind.knowledge` reads `chunks` only, so `indexed`/`searchable`
+        # must stay false and the reason must be stated, not implied.
+        self.assertFalse(body['indexed'])
+        self.assertFalse(body['searchable'])
+        self.assertEqual(body['index_state'], 'no_chunks')
+        self.assertEqual(body['index_note'], 'UPLOAD_HAS_NO_CHUNKS')
+        self.assertEqual(body['vector_index'], 'deferred')
         operator = body['approval']
         self.assertEqual(operator['user_id'], self.admin._fixture_users[0])
         self.assertTrue(operator['approved_at'])
         self.assertEqual(operator['roles'], ['admin'])
+        self.assertFalse(operator['indexed'], 'the recorded decision must not claim an index')
 
-        self.assertIn(document_id, self.listed_document_ids())
-        self.assertEqual(self.admin.get(f'/v1/documents/{document_id}').status_code, 200)
+        # And it stays out of the Q&A selector until something actually builds chunks.
+        self.assertNotIn(document_id, self.listed_document_ids())
+        self.assertEqual(self.admin.get(f'/v1/documents/{document_id}').status_code, 404)
         status, needs_review, detail, _uri, _parser = self.asset_row(document_id)
-        self.assertEqual((status, needs_review), ('indexed', False))
+        self.assertEqual((status, needs_review), ('parsed', False))
         self.assertEqual(detail['review_approval']['user_id'], self.admin._fixture_users[0])
 
     def test_a_queued_upload_cannot_be_approved(self):
@@ -359,6 +368,8 @@ class UploadPipelineTests(unittest.TestCase):
         approved = self.admin.post(f'/v1/uploads/{upload_id}/approve')
         self.assertEqual(approved.status_code, 200, approved.text)
         self.assertFalse(approved.json()['indexed'])
+        self.assertFalse(approved.json()['searchable'])
+        self.assertEqual(approved.json()['index_state'], 'no_chunks')
         self.assertEqual(approved.json()['index_note'], 'UPLOAD_HAS_NO_CONTRACT_BLOCKS')
         self.assertNotIn(document_id, self.listed_document_ids())
 
@@ -380,8 +391,14 @@ class UploadPipelineTests(unittest.TestCase):
         item = next(row for row in everything['uploads'] if row['upload_id'] == first['upload_id'])
         self.assertEqual(set(item), {'upload_id', 'job_id', 'document_id', 'filename',
                                       'media_type', 'provenance', 'status', 'created_at',
-                                      'review_state', 'review_required', 'block_count',
+                                      'review_state', 'review_required', 'searchable',
+                                      'index_state', 'index_note', 'block_count',
                                       'locator_count', 'unsupported_features'})
+        # R05: the list states retrievability per item instead of leaving it to be inferred
+        # from `status`/`review_state`.
+        self.assertFalse(item['searchable'])
+        self.assertEqual(item['index_state'], 'not_approved')
+        self.assertEqual(item['index_note'], 'UPLOAD_NOT_APPROVED')
 
         succeeded = self.admin.get('/v1/uploads', params={'status': 'succeeded'}).json()
         succeeded_ids = {row['upload_id'] for row in succeeded['uploads']}

@@ -199,6 +199,9 @@ th{background:#f3f8f5;color:#3b5e50;position:sticky;top:0}tr:last-child td{borde
 @media(max-width:650px){ .dimension-selectors { grid-template-columns:1fr; } .dimension-evidence dl { grid-template-columns:1fr; gap:3px; } .dimension-evidence dd { margin-bottom:7px; } }
 
 .multifile-documents{display:grid;gap:8px;max-height:280px;overflow:auto;margin-top:12px}.multifile-document{display:flex;align-items:flex-start;gap:8px}.multifile-document input{width:auto;margin-top:4px}#fileBatchForm{display:grid;gap:12px}details summary{cursor:pointer;margin:12px 0}
+.multifile-documents-heading{margin:4px 0 0;font-size:12.5px;font-weight:700;color:#3d5a50}
+.multifile-documents-heading-blocked{color:#8a5a2b}
+.multifile-document-blocked{margin:0;font-size:12.5px;color:#8a5a2b;overflow-wrap:anywhere}
 
 /* ---------- 上传并入库 / 我的文件 / 详情 ---------- */
 .upload-results{display:grid;gap:12px;margin-top:14px}
@@ -208,6 +211,8 @@ th{background:#f3f8f5;color:#3b5e50;position:sticky;top:0}tr:last-child td{borde
 .upload-counts,.upload-gaps,.upload-failure{margin:5px 0;font-size:13px;overflow-wrap:anywhere}
 .upload-failure{color:#a74428;font-weight:600}
 .upload-vector{margin:5px 0}
+.upload-index{margin:5px 0}
+.upload-index-blocked{color:#8a5a2b}
 .upload-review-gate{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0 4px}
 .upload-review-gate button{padding:7px 12px;font-size:12px;border-radius:8px}
 .upload-contract{margin:8px 0 0;font-size:13px}

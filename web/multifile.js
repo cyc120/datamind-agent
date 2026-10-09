@@ -69,6 +69,25 @@ var REVIEW_STATE_LABELS = {
   approved: '已复核', rejected: '已拒绝', not_required: '无需复核'
 };
 var REVIEW_GATE_NOTE = '未复核前不会出现在可检索文档中。';
+/* 冻结的上传接口新增字段：能否参与问答检索只由 searchable 决定，index_state 给出可读原因，
+ * index_note 是后端给的机器可读说明。复核通过（review_state=approved）不等于索引就绪，
+ * 不得据此推断"可以问答"。 */
+var INDEX_STATE_LABELS = {
+  indexed: '已建立索引，可用于问答',
+  no_chunks: '已解析，尚未建立问答索引（暂不可问答）',
+  not_approved: '待复核'
+};
+/* 后端冻结的 index_note 机器码 → 人话。null 表示"可问答，无提示"，未收录码走兜底文案。 */
+var INDEX_NOTE_LABELS = {
+  UPLOAD_NOT_APPROVED: '待复核',
+  UPLOAD_HAS_NO_CHUNKS: '已复核，但尚未建立问答索引，暂不可问答',
+  UPLOAD_HAS_NO_CONTRACT_BLOCKS: '解析未产出可入库的块',
+  UPLOAD_STATUS_NOT_INDEXED: '暂不可问答（该文档状态不是 indexed）'
+};
+/* 暂不可问答的文档必须可见并给出原因，不能从选择器里静默消失。 */
+var QUESTION_BLOCKED_NOTE = '已解析，尚未建立问答索引（暂不可问答）';
+var QUESTION_SEARCHABLE_HEADING = '可用于问答的文件（searchable=true）';
+var QUESTION_BLOCKED_HEADING = '暂不可问答的文件（searchable=false）';
 var ANALYSIS_KEYS = ['parse_status', 'adapter', 'blocks', 'locators_written'];
 
 function uploadLabel(table, key) {
@@ -153,6 +172,38 @@ function uploadVectorText(value) {
   if (label) { return label; }
   if (value) { return '向量索引状态：' + value; }
   return '向量索引状态未知；解析完成前不能据此判断可否用于问答检索。';
+}
+
+/* searchable 是"真的能参与问答检索"的唯一判据；缺失一律按不可问答处理，不默认放行。 */
+function uploadSearchable(upload) {
+  return !!(upload && upload.searchable === true);
+}
+
+function uploadIndexStateLabel(state) {
+  if (!state) { return null; }
+  return uploadLabel(INDEX_STATE_LABELS, state);
+}
+
+function uploadIndexNoteText(note) {
+  if (!note) { return null; }  // null → 可问答，不附提示
+  var label = uploadLabel(INDEX_NOTE_LABELS, note);
+  // 未收录的机器码不得被静默吞掉，也不能编造成"可问答"。
+  return label || ('索引说明：' + note);
+}
+
+function uploadIndexText(upload) {
+  var label = uploadIndexStateLabel(upload && upload.index_state);
+  var text = label ? '问答索引：' + label
+    : '问答索引状态未知（接口未返回 index_state）；确认可参与问答检索前不要把它当作可问答文件';
+  text += ' · searchable=' + (uploadSearchable(upload) ? 'true' : 'false');
+  // 本管道 vector_index 仍为 deferred：searchable=true 只说明靠词法检索可用，不得被读成
+  // "已建向量索引"。
+  if (uploadSearchable(upload) && upload.vector_index === 'deferred') {
+    text += ' · 本管道 vector_index=deferred：靠词法检索可用，未建立向量索引';
+  }
+  var note = uploadIndexNoteText(upload && upload.index_note);
+  if (note && note !== label) { text += ' · 说明：' + note; }
+  return text;
 }
 
 async function uploadJson(response) {
@@ -240,7 +291,7 @@ function precheckUpload(file) {
 function applyUploadFields(result, data) {
   ['upload_id', 'job_id', 'filename', 'media_type', 'status', 'created_at', 'review_state',
    'review_required', 'block_count', 'locator_count', 'unsupported_features', 'analysis',
-   'vector_index', 'contract_url'].forEach(function(key) {
+   'vector_index', 'contract_url', 'searchable', 'index_state', 'index_note'].forEach(function(key) {
     if (Object.prototype.hasOwnProperty.call(data, key)) { result[key] = data[key]; }
   });
   if (data.error_code) { result.error_code = data.error_code; }
@@ -329,6 +380,9 @@ function uploadResultCard(result) {
     ' · 定位数 ' + uploadCountText(result.locator_count), 'upload-counts');
   appendText(card, '缺口：' + uploadGapText(result.unsupported_features), 'upload-gaps');
   appendText(card, uploadVectorText(result.vector_index), 'field-hint upload-vector');
+  // 复核通过 / 已入库都不代表可问答：searchable 才是判据，中文语义逐态给出。
+  appendText(card, uploadIndexText(result), 'field-hint upload-index' +
+    (uploadSearchable(result) ? '' : ' upload-index-blocked'));
   if (result.poll_exhausted) {
     appendText(card, '轮询已达上限，仍在处理中；请稍后在「我的文件」里刷新查看。', 'field-hint upload-pending');
   }
@@ -660,6 +714,7 @@ function renderUploadDetail() {
   uploadDetailRow(list, '定位数', uploadCountText(upload.locator_count));
   uploadDetailRow(list, '缺口（unsupported_features）', uploadGapText(upload.unsupported_features));
   uploadDetailRow(list, '向量索引（vector_index）', uploadVectorText(upload.vector_index));
+  uploadDetailRow(list, '问答索引（searchable / index_state）', uploadIndexText(upload));
   if (upload.error_code) {
     uploadDetailRow(list, '失败原因',
       upload.error_code + '：' + uploadErrorMessage(upload.error_code, upload.http_status));
@@ -673,7 +728,14 @@ function renderUploadDetail() {
   if (uploadNeedsReview(upload)) {
     card.append(uploadApproveButton(upload, approveUpload));
   } else if (upload.status === 'succeeded') {
-    appendText(card, '已复核：该文件可进入可检索文档集合。', 'field-hint');
+    if (uploadSearchable(upload)) {
+      appendText(card, '已复核：该文件可进入可检索文档集合（searchable=true）。', 'field-hint');
+    } else if (upload.index_state === 'no_chunks') {
+      appendText(card, '已复核，但尚未建立问答索引，暂不可用于问答。', 'field-hint upload-index-blocked');
+    } else {
+      appendText(card, '已复核：该文件可进入可检索文档集合，但问答索引状态未知（接口未返回 ' +
+        'index_state），是否可问答未确认。', 'field-hint upload-index-blocked');
+    }
   }
 
   var link = uploadContractLink(upload);
@@ -736,14 +798,28 @@ async function approveUpload(id) {
     if (!response.ok) {
       throw new Error(uploadErrorMessage(uploadErrorCode(data), response.status));
     }
+    // 冻结接口：approve 的 indexed 只有在真正可检索时才为 true；为 false 时给
+    // index_state/index_note。复核通过不等于索引就绪，绝不据此宣称可问答。
+    var indexed = (data && typeof data.indexed === 'boolean') ? data.indexed : null;
+    var markApproved = function(target) {
+      target.review_state = 'approved';
+      if (indexed === true) {
+        target.searchable = true;
+        target.index_state = 'indexed';
+      } else if (indexed === false) {
+        target.searchable = false;
+        target.index_state = (data && data.index_state) || 'no_chunks';
+        if (data && data.index_note) { target.index_note = data.index_note; }
+      }
+    };
     MULTIFILE.results.forEach(function(result) {
-      if (result.upload_id === id) { result.review_state = 'approved'; }
+      if (result.upload_id === id) { markApproved(result); }
     });
     if (MULTIFILE.uploadDetail && MULTIFILE.uploadDetail.upload_id === id) {
-      MULTIFILE.uploadDetail.review_state = 'approved';
+      markApproved(MULTIFILE.uploadDetail);
     }
     MULTIFILE.uploads.forEach(function(upload) {
-      if (upload.upload_id === id) { upload.review_state = 'approved'; }
+      if (upload.upload_id === id) { markApproved(upload); }
     });
     // 规范未定义 approve 的响应体：若返回的就是详情载荷就顺带采用，否则只保留上面的
     // 乐观标记，随后仍会用真实读取结果覆盖。
@@ -754,6 +830,9 @@ async function approveUpload(id) {
       MULTIFILE.uploads.forEach(function(upload) {
         if (upload.upload_id === id) { applyUploadFields(upload, data); }
       });
+      MULTIFILE.results.forEach(function(result) {
+        if (result.upload_id === id) { applyUploadFields(result, data); }
+      });
     }
     MULTIFILE.approving = null;
     renderMultifileAuth();
@@ -762,7 +841,14 @@ async function approveUpload(id) {
       renderUploadList();
       renderUploadDetail();
     }
-    $('fileMessage').textContent = '复核已通过：该文件才会进入可检索文档集合。';
+    if (indexed === false) {
+      var blockedLabel = uploadIndexStateLabel((data && data.index_state) || 'no_chunks') ||
+        QUESTION_BLOCKED_NOTE;
+      $('fileMessage').textContent = '已复核，但尚未建立问答索引，暂不可用于问答（' +
+        blockedLabel + '）；该文件不会作为可选问答文件。';
+    } else {
+      $('fileMessage').textContent = '复核已通过：该文件才会进入可检索文档集合。';
+    }
     await loadUploads();
     if (MULTIFILE.uploadId === id) { await selectUpload(id); }
   } catch (error) {
@@ -777,7 +863,79 @@ async function approveUpload(id) {
   }
 }
 
-/* ---------------- 限定问答文件（沿用既有实现） ---------------- */
+/* ---------------- 限定问答文件 ---------------- */
+
+/* 冻结接口：GET /v1/documents 的每一项新增 searchable。只有 searchable===true 的文件
+ * 才真的能参与问答检索（有切片），必须只把这类文件列为可勾选；其余列出但不可选，
+ * 并明确写出"暂不可问答"的原因，不能静默消失、也不能混进可选项。 */
+function questionDocumentSearchable(doc) {
+  return !!(doc && doc.searchable === true);
+}
+
+function questionDocumentLine(doc) {
+  var title = (doc && (doc.title || doc.document_id)) || '未知文件';
+  var version = (doc && doc.doc_version !== undefined && doc.doc_version !== null) ?
+    doc.doc_version : '未知';
+  return title + ' · v' + version;
+}
+
+function appendQuestionHint(area, text, className) {
+  var hint = document.createElement('p');
+  hint.className = className || 'field-hint';
+  hint.textContent = text;
+  area.append(hint);
+  return hint;
+}
+
+function appendQuestionCheckbox(area, doc) {
+  var label = document.createElement('label');
+  label.className = 'multifile-document multifile-document-searchable';
+  label.dataset.documentId = doc.document_id;
+  var check = document.createElement('input');
+  check.type = 'checkbox';
+  check.value = doc.document_id;
+  check.addEventListener('change', function() {
+    var count = document.querySelectorAll('#questionDocuments input:checked').length;
+    if (count > 8) {
+      check.checked = false;
+      $('questionDocumentsMessage').textContent = '最多选择8份文件。';
+    } else {
+      $('questionDocumentsMessage').textContent = '已选择 ' + count + ' 份；每份保留版本与出处。';
+    }
+  });
+  label.append(check, document.createTextNode(questionDocumentLine(doc)));
+  area.append(label);
+  return label;
+}
+
+function appendQuestionBlocked(area, doc) {
+  var row = document.createElement('p');
+  row.className = 'multifile-document-blocked';
+  row.dataset.documentId = doc.document_id;
+  row.textContent = questionDocumentLine(doc) + ' · ' + QUESTION_BLOCKED_NOTE;
+  area.append(row);
+  return row;
+}
+
+function renderQuestionDocuments(docs) {
+  var area = $('questionDocuments');
+  area.replaceChildren();
+  var searchable = docs.filter(questionDocumentSearchable);
+  var blocked = docs.filter(function(doc) { return !questionDocumentSearchable(doc); });
+
+  appendQuestionHint(area, QUESTION_SEARCHABLE_HEADING, 'multifile-documents-heading');
+  if (searchable.length) {
+    searchable.forEach(function(doc) { appendQuestionCheckbox(area, doc); });
+  } else {
+    appendQuestionHint(area, '当前没有可直接参与问答检索的文件。', 'field-hint');
+  }
+  if (blocked.length) {
+    appendQuestionHint(area, QUESTION_BLOCKED_HEADING,
+      'multifile-documents-heading multifile-documents-heading-blocked');
+    blocked.forEach(function(doc) { appendQuestionBlocked(area, doc); });
+  }
+  return {searchable: searchable.length, blocked: blocked.length};
+}
 
 async function loadQuestionDocuments() {
   var token = ++MULTIFILE.docToken;
@@ -785,27 +943,17 @@ async function loadQuestionDocuments() {
   try {
     var data = await uploadJson(await apiFetch('/v1/documents'));
     if (token !== MULTIFILE.docToken) { return; }
-    MULTIFILE.docs = data.documents || [];
-    $('questionDocuments').replaceChildren();
-    MULTIFILE.docs.forEach(function(doc) {
-      var label = document.createElement('label');
-      label.className = 'multifile-document';
-      var check = document.createElement('input');
-      check.type = 'checkbox';
-      check.value = doc.document_id;
-      check.addEventListener('change', function() {
-        var count = document.querySelectorAll('#questionDocuments input:checked').length;
-        if (count > 8) {
-          check.checked = false;
-          $('questionDocumentsMessage').textContent = '最多选择8份文件。';
-        } else {
-          $('questionDocumentsMessage').textContent = '已选择 ' + count + ' 份；每份保留版本与出处。';
-        }
-      });
-      label.append(check, document.createTextNode(doc.title + ' · v' + doc.doc_version));
-      $('questionDocuments').append(label);
-    });
-    $('questionDocumentsMessage').textContent = '不勾选时沿用问题范围；勾选后只使用所选文件，跨文件同名对象不自动关联。';
+    if (!Array.isArray(data.documents)) {
+      // 载荷缺失不能被读成"没有可问答的文件"。
+      $('questionDocuments').textContent =
+        '文件列表返回了预期之外的载荷（缺少 documents 数组），请查看后端日志。';
+      return;
+    }
+    MULTIFILE.docs = data.documents;
+    var counts = renderQuestionDocuments(MULTIFILE.docs);
+    $('questionDocumentsMessage').textContent = '可问答 ' + counts.searchable + ' 份，暂不可问答 ' +
+      counts.blocked + ' 份；只有 searchable=true 的文件可勾选。不勾选时沿用问题范围；勾选后只使用所选文件，' +
+      '跨文件同名对象不自动关联。';
   } catch (error) {
     if (token === MULTIFILE.docToken) { $('questionDocuments').textContent = error.message; }
   }
@@ -818,6 +966,10 @@ function applyDocumentSelection(request) {
   if (!selected.length) { return; }
   if (selected.length > 8 || selected.some(function(doc) { return !doc; })) {
     throw new Error('请刷新文件列表，选择最多8份文件。');
+  }
+  // 纵深防御：即使有人绕过渲染把暂不可问答的文件塞进勾选，也不得进入检索范围。
+  if (selected.some(function(doc) { return !questionDocumentSearchable(doc); })) {
+    throw new Error('所选文件尚未建立问答索引（暂不可问答），请刷新文件列表后重新选择。');
   }
   request.mode = 'rag';
   request.scope = {

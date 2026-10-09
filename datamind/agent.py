@@ -341,6 +341,12 @@ class DataMindAgent:
                                         "verification_reasons": result.get("verification_reasons")})
             return self._finish("COMPLETED", answer, ("medium" if source=='demo_industrial' else "high") if verified else "insufficient", result=result)
         except Exception as exc:
+            if isinstance(exc, ValueError) and str(exc) == "DOCUMENT_SELECTION_NOT_SEARCHABLE":
+                # 与"版本/范围已变化"不同：文件存在且可见，但它没有可用切片，选中它只会
+                # 得到无证据的回答。如实说明，而不是返回一个空引用的"成功"答案。
+                return self._finish("FAILED_WITH_EVIDENCE",
+                                    "所选文件尚未建立问答索引（没有可用于检索的切片），暂不可问答；请取消选择该文件后重试。",
+                                    "insufficient", error_code=str(exc))
             if isinstance(exc, ValueError) and str(exc).startswith("DOCUMENT_SELECTION_"):
                 return self._finish("FAILED_WITH_EVIDENCE", "选定文件的版本、状态或范围已变化，请刷新并重新选择。", "insufficient", error_code=str(exc))
             if isinstance(exc, ValueError) and str(exc) == "COLLECTION_NOT_ALLOWED":

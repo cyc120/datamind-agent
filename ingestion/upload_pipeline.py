@@ -46,6 +46,12 @@ Honesty rules enforced here
 ---------------------------
 * `vector_index` is always the string `"deferred"`: the upload path writes metadata and
   contract evidence only, never `chunks`/Qdrant rows, so it never claims an index.
+* Retrievability is **derived, never stored** (R05): every item carries
+  `searchable = (status == 'indexed') and not needs_review and chunk_count > 0`, plus the
+  reason as `index_state` (`indexed`/`no_chunks`/`not_approved`) and `index_note`.
+  `approve` clears the review gate, but it only marks the asset `indexed` when the chunk
+  store the retriever actually reads (`datamind.knowledge` reads `chunks` only) is
+  non-empty. A contract with blocks is evidence, not an index.
 * A parse result the contract refuses is stored as a stable `error_code`, never as a
   successful empty document; an explicit contract gap (`unsupported_features`) is carried
   through into the summary the `/contract` endpoint repeats.
@@ -106,6 +112,15 @@ ADAPTERS = {'.dxf': 'dxf-native', '.json': 'measurement-json', '.pdf': 'pdf-nati
 VECTOR_INDEX = 'deferred'
 VECTOR_INDEX_NOTE = ('上传管道只落元数据与契约证据，不写 chunks/Qdrant 行；'
                      '向量索引由离线路径完成（scripts/pdf_index_worker.py、ingestion/ingest.py）。')
+#: Derived searchability (R05). `index_state` is the frozen trichotomy; `index_note` is the
+#: machine-readable reason a caller maps to human text (never shown raw in a UI).
+INDEX_STATE_INDEXED = 'indexed'
+INDEX_STATE_NO_CHUNKS = 'no_chunks'
+INDEX_STATE_NOT_APPROVED = 'not_approved'
+INDEX_NOTE_NOT_APPROVED = 'UPLOAD_NOT_APPROVED'
+INDEX_NOTE_NO_CHUNKS = 'UPLOAD_HAS_NO_CHUNKS'
+INDEX_NOTE_NO_CONTRACT_BLOCKS = 'UPLOAD_HAS_NO_CONTRACT_BLOCKS'
+INDEX_NOTE_STATUS_NOT_INDEXED = 'UPLOAD_STATUS_NOT_INDEXED'
 _UPLOAD_ID = re.compile(r'^upl-[a-f0-9]{40}$')
 
 
@@ -257,7 +272,11 @@ def _counts(cur, document_id):
     cur.execute('SELECT count(*) AS n FROM document_block_locators WHERE document_id=%s',
                 (document_id,))
     page_shaped = cur.fetchone()['n']
-    return {'contract_blocks': blocks, 'page_shaped': page_shaped,
+    # The retriever (`datamind.knowledge`) reads `chunks` and nothing else, so this count is
+    # what decides whether "approved" can honestly be called "searchable".
+    cur.execute('SELECT count(*) AS n FROM chunks WHERE document_id=%s', (document_id,))
+    chunks = cur.fetchone()['n']
+    return {'contract_blocks': blocks, 'page_shaped': page_shaped, 'chunks': chunks,
             'block_count': blocks, 'locator_count': blocks + page_shaped}
 
 
@@ -272,15 +291,64 @@ def _grouped_counts(cur, table, document_ids):
     return counts
 
 
+def _asset_status(asset):
+    """The *asset* status behind one item, never the queue status.
+
+    `listing` joins `ingest_jobs j` with `document_assets a` and returns `j.status` under the
+    frozen `status` key, so the asset status travels under its own `asset_status` name; a
+    plain `document_assets` row keeps reading its own `status`.
+    """
+    return asset.get('asset_status') or asset['status']
+
+
+def searchability(status, needs_review, chunks, *, block_count=0):
+    """The **one** derived searchability judgment: `(searchable, index_state, index_note)`.
+
+    Every surface that reports retrievability — `GET /v1/uploads`, `GET /v1/uploads/{id}`,
+    `POST /v1/uploads/{id}/approve` (via `_item`) and `GET /v1/documents` — calls this
+    function, so the three fields cannot drift into two slightly different rules.
+
+    Retrievability is three independent facts and they must not be conflated: the review
+    gate is open (`NOT needs_review`), the asset is published (`status == 'indexed'`), and
+    the chunk store the retriever actually reads (`datamind.knowledge` reads `chunks` only)
+    is non-empty. `approve` clears only the first; because this path writes no chunks
+    (`vector_index='deferred'`), a freshly approved upload is honestly reported as
+    `no_chunks`, not as `indexed`.
+    """
+    approved = not needs_review
+    chunks = int(chunks or 0)
+    if approved and status == 'indexed' and chunks > 0:
+        return True, INDEX_STATE_INDEXED, None
+    if not approved:
+        return False, INDEX_STATE_NOT_APPROVED, INDEX_NOTE_NOT_APPROVED
+    if chunks > 0:
+        # Chunks exist but the row was never published as retrievable. Unreachable through
+        # these routes for an upload (approve sets `indexed` exactly when chunks exist), but
+        # a hand-edited or imported row must still be reported, not silently called
+        # searchable.
+        return False, INDEX_STATE_NO_CHUNKS, INDEX_NOTE_STATUS_NOT_INDEXED
+    note = (INDEX_NOTE_NO_CHUNKS if int(block_count or 0) > 0
+            else INDEX_NOTE_NO_CONTRACT_BLOCKS)
+    return False, INDEX_STATE_NO_CHUNKS, note
+
+
+def _searchability(asset, counts):
+    """`searchability` over one upload item's asset row and counted stores."""
+    return searchability(_asset_status(asset), asset['needs_review'],
+                         counts.get('chunks'), block_count=counts.get('block_count'))
+
+
 def _item(job, asset, counts):
     upload = _upload_meta(asset)
     summary = (asset.get('quality_detail') or {}).get('parse_contract') or {}
+    searchable, index_state, index_note = _searchability(asset, counts)
     return {'upload_id': upload['upload_id'], 'job_id': job['job_id'],
             'document_id': asset['document_id'], 'filename': upload.get('filename'),
             'media_type': upload.get('media_type'), 'provenance': upload.get('provenance'),
             'status': job['status'], 'created_at': job['created_at'],
             'review_state': 'approved' if not asset['needs_review'] else 'pending_review',
             'review_required': bool(asset['needs_review']),
+            'searchable': searchable, 'index_state': index_state, 'index_note': index_note,
             'block_count': counts['block_count'], 'locator_count': counts['locator_count'],
             'unsupported_features': list(summary.get('unsupported_features') or [])}
 
@@ -365,18 +433,20 @@ def listing(dsn, *, status=None, media_type=None, since=None, limit=50):
     params.append(int(limit))
     with psycopg2.connect(dsn) as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
         conn.set_session(isolation_level='REPEATABLE READ')
-        cur.execute('''SELECT j.*, a.title,a.file_type,a.needs_review,a.quality_detail,a.sha256,
-            a.parser_version,a.page_count,a.collection,a.object_uri
+        cur.execute('''SELECT j.*, a.title,a.file_type,a.status AS asset_status,a.needs_review,
+            a.quality_detail,a.sha256,a.parser_version,a.page_count,a.collection,a.object_uri
             FROM ingest_jobs j JOIN document_assets a USING(document_id)
             WHERE ''' + ' AND '.join(where) + ' ORDER BY j.created_at DESC LIMIT %s', tuple(params))
         rows = cur.fetchall()
         document_ids = [row['document_id'] for row in rows]
         blocks = _grouped_counts(cur, 'document_contract_blocks', document_ids)
         page_shaped = _grouped_counts(cur, 'document_block_locators', document_ids)
+        chunk_rows = _grouped_counts(cur, 'chunks', document_ids)
     uploads = []
     for row in rows:
         counts = {'contract_blocks': blocks.get(row['document_id'], 0),
                   'page_shaped': page_shaped.get(row['document_id'], 0),
+                  'chunks': chunk_rows.get(row['document_id'], 0),
                   'block_count': blocks.get(row['document_id'], 0)}
         counts['locator_count'] = counts['contract_blocks'] + counts['page_shaped']
         uploads.append(_item(row, row, counts))
@@ -585,12 +655,15 @@ def cancel(upload_id, dsn, identity):
 
 
 def approve(upload_id, dsn, identity, *, reason=None):
-    """Clear the review gate and index the asset when the contract stored blocks.
+    """Clear the review gate, and publish the asset only if it is really retrievable.
 
-    The operator is recorded in `quality_detail.review_approval`. `status` only becomes
-    `indexed` when the contract store actually holds blocks for this document; an upload
-    whose parse declared a gap (no locatable block) stays non-`indexed` and the response
-    says why.
+    The operator is recorded in `quality_detail.review_approval`. `status` becomes `indexed`
+    **only when the retriever's own store is non-empty** (`chunks`; see
+    `datamind.knowledge.KnowledgeRetriever`, which reads `chunks` and nothing else). An
+    approved parse with contract blocks but no chunks keeps its non-`indexed` status and the
+    response says so through `index_state='no_chunks'`/`index_note`; contract blocks are
+    evidence, not an index. The call stays idempotent — repeating it only re-records the
+    operator and never produces a second state change.
     """
     with psycopg2.connect(dsn) as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
         actor = lock_identity(cur, identity, 'admin')
@@ -598,20 +671,20 @@ def approve(upload_id, dsn, identity, *, reason=None):
         if job['status'] not in ('succeeded', 'partial_failure'):
             fail('UPLOAD_NOT_REVIEWABLE', 409, job_status=job['status'])
         counts = _counts(cur, asset['document_id'])
-        indexed = counts['block_count'] > 0
+        searchable = counts['chunks'] > 0
         quality = dict(asset.get('quality_detail') or {})
         quality['review_approval'] = {
             'user_id': actor['user_id'], 'display_name': actor['display_name'],
             'roles': list(actor['roles']), 'approved_at': datetime.now(timezone.utc).isoformat(),
-            'reason': reason, 'indexed': indexed, 'block_count': counts['block_count']}
+            'reason': reason, 'indexed': searchable, 'block_count': counts['block_count'],
+            'chunk_count': counts['chunks']}
+        status = 'indexed' if searchable else asset['status']
         cur.execute('''UPDATE document_assets SET needs_review=FALSE,status=%s,quality_detail=%s
             WHERE document_id=%s''',
-                    ('indexed' if indexed else asset['status'], Json(quality),
-                     asset['document_id']))
-        result = _detail(job, {**asset, 'needs_review': False, 'quality_detail': quality}, counts)
-    result['indexed'] = indexed
-    if not indexed:
-        result['index_note'] = 'UPLOAD_HAS_NO_CONTRACT_BLOCKS'
+                    (status, Json(quality), asset['document_id']))
+        result = _detail(job, {**asset, 'needs_review': False, 'status': status,
+                               'quality_detail': quality}, counts)
+    result['indexed'] = result['searchable']
     return result
 
 

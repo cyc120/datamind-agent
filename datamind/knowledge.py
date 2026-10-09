@@ -108,7 +108,7 @@ class KnowledgeRetriever:
         if self.mode not in {"hybrid", "lexical"}:
             raise ValueError("INVALID_RETRIEVAL_MODE")
 
-    def _read_rows(self, cur, collections: list[str], ids=None) -> list[dict]:
+    def _read_rows(self, cur, collections: list[str], ids=None, *, present: dict | None = None) -> list[dict]:
         cur.execute("""SELECT c.*, d.title, d.collection, d.origin, d.file_type, d.sha256 AS document_sha256,
                            d.doc_version, d.parser_version, d.quality_detail,
                            COALESCE((SELECT jsonb_agg(jsonb_build_object('block_id',b.block_id,
@@ -125,6 +125,12 @@ class KnowledgeRetriever:
         rows = [dict(row) for row in cur.fetchall()]
         if ids and len(rows) > MAX_SCOPE_CHUNKS:
             raise ValueError("DOCUMENT_SELECTION_TOO_LARGE")
+        if present is not None:
+            # Counted *before* the digest filter: "this document has no chunk at all" and
+            # "this document has chunks whose text no longer matches its digest" are
+            # different facts and must not be collapsed into one refusal.
+            for row in rows:
+                present[row["document_id"]] = present.get(row["document_id"], 0) + 1
         # A changed text cannot retain its old digest and still become evidence.
         return [row for row in rows if row.get("exact_text") and
                 hashlib.sha256(row["exact_text"].encode()).hexdigest() == row["content_hash"]]
@@ -148,7 +154,8 @@ class KnowledgeRetriever:
                     raise ValueError("DOCUMENT_SELECTION_UNAVAILABLE")
                 if any(any(heads[ref["document_id"]][key] != value for key, value in ref.items()) for ref in refs):
                     raise ValueError("DOCUMENT_SELECTION_CHANGED")
-                rows = self._read_rows(cur, collections, ids)
+                present: dict[str, int] = {}
+                rows = self._read_rows(cur, collections, ids, present=present)
         snapshots = []
         for ref in refs:
             entries = [{key: row.get(key) for key in ("chunk_id", "content_hash", "document_version",
@@ -158,6 +165,20 @@ class KnowledgeRetriever:
             snapshots.append({**heads[ref["document_id"]], "eligible_chunks": len(entries),
                 "chunks_sha256": hashlib.sha256(json.dumps(entries, ensure_ascii=False,
                     sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()})
+        # A selected document with **no chunk row at all** cannot contribute evidence. Accepting
+        # it silently produced an answer with `eligible_chunks=0` and `all_covered=false` — the
+        # document was "approved"/"indexed" but had never been chunked (the upload pipeline does
+        # not build a vector index yet). Refusing here is the server-side half of the fix; the
+        # Q&A selector filtering on `searchable` is only the client-side half, and a selection can
+        # go stale between the list read and this submit.
+        #
+        # A document that *has* chunks whose text no longer matches its digest is deliberately
+        # **not** refused here: that is the tampered/drifted-evidence case, and the existing
+        # `eligible_chunks=0` + incomplete-coverage reporting tells the caller what happened
+        # without blocking the rest of the selection.
+        empty = [ref["document_id"] for ref in refs if not present.get(ref["document_id"])]
+        if empty:
+            raise ValueError("DOCUMENT_SELECTION_NOT_SEARCHABLE")
         return rows, snapshots
 
     def revalidate_selection(self, collections: list[str], refs: list[dict], snapshots: list[dict]) -> None:

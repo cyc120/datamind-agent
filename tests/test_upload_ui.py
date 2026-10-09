@@ -19,11 +19,13 @@
   ``CAD_DWG_CONVERTER_UNAVAILABLE``（DWG 明确拒绝）。
 * ``GET /v1/uploads?status=&media_type=&since=&limit=`` → ``{"uploads":[...],"count":N}``，每项含
   ``upload_id/filename/media_type/status/created_at/review_state/block_count/locator_count/
-  unsupported_features``。
+  unsupported_features``；R05 起每项还含 ``searchable``(bool) 与 ``index_state``
+  (indexed|no_chunks|not_approved) / ``index_note``(str|None)。
 * ``GET /v1/uploads/{upload_id}`` → 上述字段 + ``analysis`` + 失败时的 ``error_code`` +
   ``vector_index``(deferred/done) + ``contract_url``。
 * ``status`` ∈ queued|running|succeeded|failed|partial_failure|cancelled。
-* ``POST /v1/uploads/{upload_id}/approve``（admin+CSRF+同源）。
+* ``POST /v1/uploads/{upload_id}/approve``（admin+CSRF+同源）；``indexed`` 仅在真正可检索时为
+  true，为 false 时给 ``index_state``/``index_note``。
 """
 from pathlib import Path
 import re
@@ -40,7 +42,9 @@ INDEX_HTML = ROOT / 'web' / 'index.html'
 # 前端读取的字段名必须逐个来自冻结规范。
 FROZEN_FIELDS = ('upload_id', 'job_id', 'filename', 'media_type', 'status', 'created_at',
                  'review_state', 'review_required', 'block_count', 'locator_count',
-                 'unsupported_features', 'analysis', 'vector_index', 'contract_url', 'error_code')
+                 'unsupported_features', 'analysis', 'vector_index', 'contract_url', 'error_code',
+                 # R05：能否参与问答检索由 searchable 决定，index_state/index_note 给出原因。
+                 'searchable', 'index_state', 'index_note')
 # 规范冻结的状态取值 → 中文语义。
 STATUS_LABELS = (('queued', '排队中'), ('running', '解析中'), ('succeeded', '已入库（待复核）'),
                  ('failed', '失败'), ('partial_failure', '部分失败'), ('cancelled', '已取消'))
@@ -379,7 +383,8 @@ function pollScript() {
     { status: 'running' },
     { status: 'succeeded', block_count: 3, locator_count: 2, unsupported_features: ['table_layout'],
       analysis: { parse_status: 'parsed', adapter: 'pdf_text', blocks: 3, locators_written: 2 },
-      vector_index: 'deferred', contract_url: '/v1/documents/doc-1/contract', review_state: 'pending' }
+      vector_index: 'deferred', contract_url: '/v1/documents/doc-1/contract', review_state: 'pending',
+      searchable: false, index_state: 'not_approved' }
   ];
 }
 async function apiFetch(url, options) {
@@ -406,8 +411,14 @@ async function apiFetch(url, options) {
   }
   if (method === 'POST' && /^\/v1\/uploads\/[^/]+\/approve$/.test(url)) {
     const id = decodeURIComponent(url.split('/')[3]);
-    if (uploads[id]) { uploads[id].list.review_state = 'approved'; }
-    return jsonResponse({ upload_id: id, review_state: 'approved' }, 200);
+    if (uploads[id]) {
+      uploads[id].list.review_state = 'approved';
+      // 该夹具代表"复核后确实有切片可检索"：indexed=true 并同步 searchable/index_state。
+      uploads[id].list.searchable = true;
+      uploads[id].list.index_state = 'indexed';
+    }
+    return jsonResponse({ upload_id: id, review_state: 'approved', indexed: true,
+      index_state: 'indexed', searchable: true }, 200);
   }
   if (method === 'GET' && url.indexOf('/v1/uploads?') === 0) {
     const list = Object.keys(uploads).map(function (key) { return uploads[key].list; });
@@ -482,6 +493,10 @@ function flush() { return new Promise(function (resolve) { setImmediate(resolve)
   assert.ok(results.indexOf('缺口：table_layout') !== -1, 'unsupported_features missing');
   assert.ok(results.indexOf('未建立向量索引（暂不可用于问答检索）') !== -1,
     'deferred vector_index must be stated explicitly');
+  assert.ok(results.indexOf('待复核') !== -1,
+    'index_state=not_approved must map to the Chinese semantics');
+  assert.ok(results.indexOf('searchable=false') !== -1,
+    'the card must state that the upload is not yet searchable');
   assert.ok(results.indexOf('CAD_DWG_CONVERTER_UNAVAILABLE') !== -1, 'DWG error code missing');
   assert.ok(results.indexOf('DWG 需要外部转换器，暂不支持') !== -1, 'DWG human explanation missing');
   assert.ok(results.indexOf('未复核前不会出现在可检索文档中。') !== -1, 'review gate note missing');
@@ -511,6 +526,8 @@ function flush() { return new Promise(function (resolve) { setImmediate(resolve)
   }), 'approve must POST /v1/uploads/{id}/approve');
   assert.ok(areaText('fileDetail').indexOf('该文件可进入可检索文档集合') !== -1,
     'approved state must be shown after the gate opens');
+  assert.ok(areaText('fileDetail').indexOf('已建立索引，可用于问答') !== -1,
+    'index_state=indexed must be shown after a searchable approval');
 
   // 6. front-end filtering
   element('uploadStatusFilter').value = 'failed';

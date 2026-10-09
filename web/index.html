@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>DataMind Agent · 问数与文档问答</title>
-  <link rel="stylesheet" href="/assets/style.css?v=0.39.0">
-  <script src="/assets/app.js?v=0.39.0" defer></script>
-  <script src="/assets/multifile.js?v=0.39.0" defer></script>
+  <link rel="stylesheet" href="/assets/style.css?v=0.40.0">
+  <script src="/assets/app.js?v=0.40.0" defer></script>
+  <script src="/assets/multifile.js?v=0.40.0" defer></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -56,7 +56,7 @@
             <div><label for="question">自然语言问题</label><textarea id="question">2024年一共有多少笔订单？</textarea></div>
             <div><label for="source">问题范围</label><select id="source"><option value="auto">自动选择</option><option value="demo_retail">零售数据库</option><option value="chinook">Chinook 音乐库</option><option value="demo_kb">演示文档知识库</option><option value="ohrbench_kb">OHR-Bench 文档样本</option><option value="demo_industrial">工业合成演示核验</option><option value="industrial_sql">工业生产问数（模型）</option></select></div>
           </div>
-          <details><summary>限定问答文件（最多8份，可跨知识库）</summary><button id="refreshQuestionDocuments" class="secondary" type="button">刷新文件列表</button><div id="questionDocuments" class="multifile-documents"></div><p id="questionDocumentsMessage" class="field-hint"></p></details>
+          <details><summary>限定问答文件（最多8份，可跨知识库）</summary><button id="refreshQuestionDocuments" class="secondary" type="button">刷新文件列表</button><p class="field-hint">只有 searchable=true（真的能参与问答检索）的文件可勾选；已解析但尚未建立问答索引的文件会单独列出并标注「暂不可问答」，不会出现在可选项里。</p><div id="questionDocuments" class="multifile-documents"></div><p id="questionDocumentsMessage" class="field-hint"></p></details>
           <div class="chips">
             <button class="chip" data-q="2025年销售额最高的前三个产品是什么？">销售额前三产品</button>
             <button class="chip" data-q="VIP客户有多少人？">VIP 客户数</button>

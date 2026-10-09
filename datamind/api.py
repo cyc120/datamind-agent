@@ -1089,12 +1089,33 @@ def _public_document(document_id: str) -> dict:
 def list_documents(collection: str | None = None):
     if collection and collection not in COLLECTIONS:
         raise HTTPException(400, detail={"error_code": "COLLECTION_NOT_ALLOWED"})
+    # R05: this route is the Q&A file selector's data source, and the retriever
+    # (`datamind.knowledge`) reads `chunks` only. `status='indexed'` is the legacy publish
+    # gate and cannot say whether anything is retrievable, so every item states the derived
+    # fact explicitly, through the *same* `upload_pipeline.searchability` judgment the upload
+    # surfaces use (one rule, not two). Consumers that select files must require
+    # `searchable=true`; the publish filter itself is unchanged so no existing consumer
+    # silently loses rows.
+    from ingestion import upload_pipeline
     with psycopg2.connect(_read_dsn()) as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute("""SELECT document_id,title,collection,file_type,origin,page_count,doc_version,sha256,
-                              quality_score,quality_detail,parser_version FROM document_assets
+                              quality_score,quality_detail,parser_version,status,needs_review,
+                              (SELECT count(*) FROM chunks c
+                               WHERE c.document_id=document_assets.document_id) AS chunk_count,
+                              (SELECT count(*) FROM document_contract_blocks b
+                               WHERE b.document_id=document_assets.document_id) AS block_count
+                       FROM document_assets
                        WHERE status='indexed' AND 'public'=ANY(acl) AND NOT needs_review AND collection=ANY(%s)
                        ORDER BY title LIMIT 200""", ([collection] if collection else sorted(COLLECTIONS),))
-        return {"documents": jsonable_encoder([dict(row) for row in cur.fetchall()])}
+        documents = []
+        for row in cur.fetchall():
+            item = dict(row)
+            searchable, index_state, index_note = upload_pipeline.searchability(
+                item.pop("status"), item.pop("needs_review"), item.pop("chunk_count"),
+                block_count=item.pop("block_count"))
+            item.update(searchable=searchable, index_state=index_state, index_note=index_note)
+            documents.append(item)
+    return {"documents": jsonable_encoder(documents)}
 
 
 @app.get("/v1/documents/{document_id}")
