@@ -1,5 +1,7 @@
 """Native DXF into the unified contract, plus the explicit DWG refusal."""
+import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -214,11 +216,14 @@ class DxfAdapterTests(unittest.TestCase):
         self.assertEqual(result.payload['parse_status'], 'partial')
 
     def test_block_limit_is_declared(self):
-        with patch.object(cad_adapter, 'MAX_BLOCKS', 3):
-            result = self.parse()
+        # The cap used to be the module constant `MAX_BLOCKS`, which the test patched. It is
+        # now resolved per call (`max_blocks=` argument or `DATAMIND_CAD_MAX_BLOCKS`) because a
+        # hard-coded bound was neither configurable nor visible in `manifest.limits`.
+        result = self.parse(max_blocks=3)
         self.assertEqual(result.payload['parse_status'], 'partial')
         self.assertIn('block_limit_reached', result.payload['unsupported_features'])
         self.assertEqual(len(result.payload['blocks']), 3)
+        self.assertEqual(result.payload['manifest']['limits']['max_blocks'], 3)
 
     def test_dwg_is_refused_with_the_converter_reason(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -382,7 +387,7 @@ class V2AdapterTests(unittest.TestCase):
         self.assertEqual(manifest['profile'], 'datamind-2d-engineering-dxf-v2')
         self.assertEqual(manifest['cad_contract_version'], 'cad-contract-v2')
         self.assertEqual(manifest['encoding'], 'utf-8')
-        self.assertEqual(manifest['limits'], {'max_bytes': 1})
+        self.assertEqual(manifest['limits'], {'max_bytes': 1, 'max_blocks': 2000})
 
 
 class DrawingCliTests(unittest.TestCase):
@@ -451,6 +456,66 @@ class PositionalIdentityAdapterTests(unittest.TestCase):
         # answer `source` rather than leaving the manifest without an identity mode.
         result = self.parse(fake_bundle())
         self.assertEqual(result.payload['manifest']['identity_mode'], 'source')
+
+
+class BlockCapTests(unittest.TestCase):
+    """The block cap must be visible in the result, not just implied by `partial`.
+
+    A real drawing with more entities than the cap came back `partial` +
+    `block_limit_reached`, but `manifest.limits` listed five other limits and not this one, so a
+    consumer could not read *what* the cap was. Found by the multi-scale timing sweep
+    (`scripts/eval_scale.py`), where 5000 and 20000 entities both reported exactly 2000 blocks.
+    """
+
+    @staticmethod
+    def _dxf(entities):
+        import ezdxf
+        doc = ezdxf.new("R2010")
+        doc.header["$INSUNITS"] = 4
+        model = doc.modelspace()
+        for index in range(entities):
+            model.add_line((float(index), 0.0), (float(index) + 1.0, 0.5))
+        return doc
+
+    def _parse(self, doc, **options):
+        stream = io.StringIO()
+        doc.write(stream)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "cap.dxf"
+            path.write_bytes(stream.getvalue().encode("utf-8"))
+            return cad_adapter.parse(path, document_id="doc-cap", source_version="v1",
+                                     provenance="synthetic_demo", **options).payload
+
+    def test_the_default_cap_is_declared_in_the_manifest_and_lifts_on_request(self):
+        doc = self._dxf(cad_adapter.DEFAULT_MAX_BLOCKS + 25)
+        capped = self._parse(doc)
+        self.assertEqual(capped['parse_status'], 'partial')
+        self.assertIn('block_limit_reached', capped['unsupported_features'])
+        self.assertEqual(capped['manifest']['limits']['max_blocks'], cad_adapter.DEFAULT_MAX_BLOCKS)
+        self.assertEqual(len(capped['blocks']), cad_adapter.DEFAULT_MAX_BLOCKS)
+
+        raised = self._parse(doc, max_blocks=cad_adapter.DEFAULT_MAX_BLOCKS + 25)
+        self.assertEqual(raised['parse_status'], 'parsed')
+        self.assertNotIn('block_limit_reached', raised['unsupported_features'])
+        self.assertEqual(raised['manifest']['limits']['max_blocks'],
+                         cad_adapter.DEFAULT_MAX_BLOCKS + 25)
+        self.assertGreater(len(raised['blocks']), cad_adapter.DEFAULT_MAX_BLOCKS)
+
+    def test_an_invalid_cap_falls_back_to_the_documented_default(self):
+        """Fail safe, not fail open: a bogus limit must not remove the bound."""
+        doc = self._dxf(5)
+        for bogus in (0, -1, True, 1.5, 'many', cad_adapter.MAX_BLOCKS_CEILING + 1):
+            with self.subTest(bogus=bogus):
+                payload = self._parse(doc, max_blocks=bogus)
+                self.assertEqual(payload['manifest']['limits']['max_blocks'],
+                                 cad_adapter.DEFAULT_MAX_BLOCKS)
+
+    def test_the_environment_can_raise_the_cap(self):
+        doc = self._dxf(30)
+        with patch.dict(os.environ, {"DATAMIND_CAD_MAX_BLOCKS": "40"}):
+            payload = self._parse(doc)
+        self.assertEqual(payload['manifest']['limits']['max_blocks'], 40)
+        self.assertEqual(payload['parse_status'], 'parsed')
 
 
 if __name__ == '__main__':

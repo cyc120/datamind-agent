@@ -13,7 +13,8 @@ from psycopg2.extras import Json
 
 from .catalog import Catalog
 from .rag_engine import PROMPT_VERSION as RAG_PROMPT_VERSION, ask_documents
-from .sql_engine import PROMPT_VERSION, ask, query_frame, settings, source_for, verification_passed
+from .sql_engine import (PROMPT_VERSION, ask, normalize_history, query_frame, settings, source_for,
+                         verification_passed)
 
 
 MODEL_ERROR_MESSAGES = {
@@ -109,7 +110,12 @@ class DataMindAgent:
             cur.execute("""UPDATE runs SET status=%s, answer=%s, confidence_level=%s, ended_at=now()
                            WHERE run_id=%s""", (status, answer, confidence, self.run_id))
         final = {"run_id": self.run_id, "status": status, "answer": answer,
-                 "confidence_level": confidence, "error_code": error_code}
+                 "confidence_level": confidence, "error_code": error_code,
+                 # Honest, per-request count of the history turns the answering model received.
+                 # It is 0 whenever no generation step ran (clarification, no evidence, the
+                 # industrial route, a rejected request) — never a default that pretends the
+                 # model saw a transcript.
+                 "turns_used": int((result or {}).get("turns_used") or 0)}
         if result and result.get("status") == "completed":
             if "sql" in result and result.get('kind') != 'industrial':
                 final["sql_result"] = {k: _plain(result[k]) for k in
@@ -205,7 +211,8 @@ class DataMindAgent:
         self._event("evidence.attached", "rag_agent", "succeeded",
                     output_summary={"chunk_count": len(chunk_nodes), "claim_count": len(result.get("claims", []))})
 
-    def _run_rag(self, question: str, plan: dict, collections, *, document_refs=None, generator=None, retriever=None) -> dict:
+    def _run_rag(self, question: str, plan: dict, collections, *, document_refs=None, generator=None,
+                 retriever=None, history=None) -> dict:
         self._event("query.parsed", "query_understanding", "succeeded", output_summary={"route": "rag", "collections": collections,"document_refs":document_refs})
         self._event("plan.created", "planner", "succeeded", output_summary={"plan_id": plan["plan_id"], "tasks": plan["tasks"], "route": "rag"})
         self._event("tool.started", "rag_agent", "running", tool_name="knowledge.retrieve")
@@ -235,6 +242,10 @@ class DataMindAgent:
             return read_relations(block_ids, _read_dsn())
 
         kwargs={'document_refs':document_refs} if document_refs is not None else {}
+        # A conversation transcript is passed only when it is non-empty: with no history the call
+        # (and therefore the prompt the engine builds) is identical to the pre-multi-turn one.
+        if history:
+            kwargs['history']=history
         result = ask_documents(question, collections=collections, generator=generator, retriever=retriever,
                                on_retrieval=retrieved, locator_lookup=locator_lookup,
                                relation_lookup=relation_lookup, **kwargs)
@@ -255,7 +266,14 @@ class DataMindAgent:
 
     def run(self, question: str, *, database_sources: list[str] | None = None,
             document_collections: list[str] | None = None, document_refs: list[dict] | None = None, mode: str = "auto",
-            generator=None, rag_generator=None, retriever=None) -> dict:
+            history: list[dict] | None = None, generator=None, rag_generator=None, retriever=None) -> dict:
+        """Run one request. ``history`` is optional client-supplied multi-turn context.
+
+        The agent keeps no session: the transcript belongs to this call only. ``scope`` is never
+        inherited from an earlier call — a request without a scope uses the default scope, exactly
+        as it did before multi-turn support existed.
+        """
+        history = normalize_history(history)
         sources = database_sources if database_sources is not None else ["demo_retail", "chinook", "demo_industrial"]
         route = "rag" if document_refs is not None and mode=="auto" else route_for(question, mode)
         tool = "industrial" if route == "industrial" else "rag" if route == "rag" else "sql"
@@ -287,7 +305,8 @@ class DataMindAgent:
             if route == 'industrial':
                 return self._run_industrial(question, plan, database_sources, document_collections)
             if route == "rag":
-                return self._run_rag(question, plan, document_collections, document_refs=document_refs, generator=rag_generator, retriever=retriever)
+                return self._run_rag(question, plan, document_collections, document_refs=document_refs,
+                                     generator=rag_generator, retriever=retriever, history=history)
             if not sources or any(s not in {"demo_retail", "chinook", "demo_industrial"} for s in sources):
                 return self._finish("FAILED_WITH_EVIDENCE", "当前请求范围不允许访问该数据源。",
                                     "insufficient", error_code="SOURCE_NOT_ALLOWED")
@@ -308,7 +327,12 @@ class DataMindAgent:
                                    "profile": settings().get("MODEL_PROFILE_NAME")}), self.run_id))
             self._event("tool.started", "sql_agent", "running", tool_name="nl2sql",
                         input_summary={"source_id": source, "snapshot_id": catalog.snapshot_id})
-            result = ask(question, source, generator=generator, run_id=self.run_id)
+            ask_kwargs = {"generator": generator, "run_id": self.run_id}
+            # Only a non-empty transcript changes the call; an absent/empty one keeps the exact
+            # pre-multi-turn invocation (and prompt) unchanged.
+            if history:
+                ask_kwargs["history"] = history
+            result = ask(question, source, **ask_kwargs)
             if result["status"] == "clarification_required":
                 return self._finish("NEEDS_CLARIFICATION", result["clarification"], "insufficient",
                                     error_code="AMBIGUOUS_QUERY")

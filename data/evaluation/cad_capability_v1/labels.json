@@ -1,0 +1,1551 @@
+{
+  "suite_id": "cad-capability-v1",
+  "provenance": "author-built synthetic acceptance suite (not independent factory data)",
+  "limitation": "作者自建合成材料；两份真实图纸仅作开发样本 (data/cad_demo/DEVELOPMENT_SAMPLES.md)。通过率不是识别准确率。",
+  "cases": [
+    {
+      "case_id": "unit_in",
+      "material": "materials/unit_in.dxf",
+      "document_id": "doc-capsuite-unit-in",
+      "layers": [
+        "unit",
+        "layout"
+      ],
+      "expected": {
+        "parse_status": "parsed",
+        "unit": "in",
+        "identity_mode": "source",
+        "locator_layout": "Model",
+        "entity_counts": {
+          "LINE": 1,
+          "CIRCLE": 1
+        },
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": {
+          "min": 2,
+          "max": 2
+        },
+        "unsupported_codes": [],
+        "error_codes_any": [],
+        "reader": {
+          "entities": [
+            {
+              "match": {
+                "entity_type": "LINE"
+              },
+              "expect": {
+                "start": {
+                  "x": 0.0,
+                  "y": 0.0
+                },
+                "end": {
+                  "x": 10.0,
+                  "y": 0.0
+                }
+              }
+            }
+          ]
+        },
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "unit_mm",
+      "material": "materials/unit_mm.dxf",
+      "document_id": "doc-capsuite-unit-mm",
+      "layers": [
+        "unit",
+        "layout"
+      ],
+      "expected": {
+        "parse_status": "parsed",
+        "unit": "mm",
+        "identity_mode": "source",
+        "locator_layout": "Model",
+        "entity_counts": {
+          "LINE": 1,
+          "CIRCLE": 1
+        },
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": {
+          "min": 2,
+          "max": 2
+        },
+        "unsupported_codes": [],
+        "error_codes_any": [],
+        "reader": {},
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "unit_missing",
+      "material": "materials/unit_missing.dxf",
+      "document_id": "doc-capsuite-unit-missing",
+      "layers": [
+        "unit",
+        "version",
+        "layout"
+      ],
+      "expected": {
+        "parse_status": "parsed",
+        "unit": "unknown",
+        "identity_mode": "source",
+        "locator_layout": "Model",
+        "entity_counts": {
+          "LINE": 1,
+          "CIRCLE": 1
+        },
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": null,
+        "unsupported_codes": [],
+        "error_codes_any": [],
+        "reader": {
+          "entities": [
+            {
+              "match": {
+                "entity_type": "CIRCLE"
+              },
+              "expect": {
+                "radius": 2.0
+              }
+            }
+          ]
+        },
+        "absent_codes": [
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_ENTITY_LIMIT_REACHED",
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_UNIT_CODE_NOT_MODELLED",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached"
+        ]
+      }
+    },
+    {
+      "case_id": "unit_cm_not_modelled",
+      "material": "materials/unit_cm_not_modelled.dxf",
+      "document_id": "doc-capsuite-unit-cm-not-modelled",
+      "layers": [
+        "unit"
+      ],
+      "expected": {
+        "parse_status": "partial",
+        "unit": "unknown",
+        "identity_mode": "source",
+        "locator_layout": "Model",
+        "entity_counts": {
+          "LINE": 1
+        },
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": null,
+        "unsupported_codes": [
+          "CAD_UNIT_CODE_NOT_MODELLED:5"
+        ],
+        "error_codes_any": [],
+        "reader": {},
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "version_r12",
+      "material": "materials/version_r12.dxf",
+      "document_id": "doc-capsuite-version-r12",
+      "layers": [
+        "version",
+        "entity",
+        "handle"
+      ],
+      "expected": {
+        "parse_status": "parsed",
+        "unit": "unknown",
+        "identity_mode": "source",
+        "locator_layout": "Model",
+        "entity_counts": {
+          "LINE": 1,
+          "CIRCLE": 1,
+          "ARC": 1,
+          "POLYLINE": 1,
+          "TEXT": 1
+        },
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": {
+          "min": 5,
+          "max": 5
+        },
+        "unsupported_codes": [],
+        "error_codes_any": [],
+        "reader": {
+          "entities": [
+            {
+              "match": {
+                "entity_type": "POLYLINE"
+              },
+              "expect": {
+                "closed": true
+              }
+            },
+            {
+              "match": {
+                "entity_type": "TEXT"
+              },
+              "expect": {
+                "rotation": 30.0
+              }
+            },
+            {
+              "match": {
+                "entity_type": "ARC"
+              },
+              "expect": {
+                "start_angle": 0.0,
+                "end_angle": 90.0
+              }
+            }
+          ]
+        },
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "version_r2000",
+      "material": "materials/version_r2000.dxf",
+      "document_id": "doc-capsuite-version-r2000",
+      "layers": [
+        "version",
+        "entity"
+      ],
+      "expected": {
+        "parse_status": "parsed",
+        "unit": "mm",
+        "identity_mode": "source",
+        "locator_layout": "Model",
+        "entity_counts": {
+          "LINE": 1,
+          "CIRCLE": 1,
+          "ARC": 1,
+          "LWPOLYLINE": 1,
+          "TEXT": 1,
+          "MTEXT": 1
+        },
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": {
+          "min": 6,
+          "max": 6
+        },
+        "unsupported_codes": [],
+        "error_codes_any": [],
+        "reader": {},
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "version_r2004",
+      "material": "materials/version_r2004.dxf",
+      "document_id": "doc-capsuite-version-r2004",
+      "layers": [
+        "version"
+      ],
+      "expected": {
+        "parse_status": "parsed",
+        "unit": "mm",
+        "identity_mode": "source",
+        "locator_layout": "Model",
+        "entity_counts": {
+          "LINE": 1,
+          "CIRCLE": 1,
+          "ARC": 1,
+          "LWPOLYLINE": 1,
+          "TEXT": 1,
+          "MTEXT": 1
+        },
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": null,
+        "unsupported_codes": [],
+        "error_codes_any": [],
+        "reader": {},
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "version_r2007",
+      "material": "materials/version_r2007.dxf",
+      "document_id": "doc-capsuite-version-r2007",
+      "layers": [
+        "version"
+      ],
+      "expected": {
+        "parse_status": "parsed",
+        "unit": "mm",
+        "identity_mode": "source",
+        "locator_layout": "Model",
+        "entity_counts": {
+          "LINE": 1,
+          "CIRCLE": 1,
+          "ARC": 1,
+          "LWPOLYLINE": 1,
+          "TEXT": 1,
+          "MTEXT": 1
+        },
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": null,
+        "unsupported_codes": [],
+        "error_codes_any": [],
+        "reader": {},
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "version_r2010",
+      "material": "materials/version_r2010.dxf",
+      "document_id": "doc-capsuite-version-r2010",
+      "layers": [
+        "version"
+      ],
+      "expected": {
+        "parse_status": "parsed",
+        "unit": "mm",
+        "identity_mode": "source",
+        "locator_layout": "Model",
+        "entity_counts": {
+          "LINE": 1,
+          "CIRCLE": 1,
+          "ARC": 1,
+          "LWPOLYLINE": 1,
+          "TEXT": 1,
+          "MTEXT": 1
+        },
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": null,
+        "unsupported_codes": [],
+        "error_codes_any": [],
+        "reader": {},
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "version_r2013",
+      "material": "materials/version_r2013.dxf",
+      "document_id": "doc-capsuite-version-r2013",
+      "layers": [
+        "version"
+      ],
+      "expected": {
+        "parse_status": "parsed",
+        "unit": "mm",
+        "identity_mode": "source",
+        "locator_layout": "Model",
+        "entity_counts": {
+          "LINE": 1,
+          "CIRCLE": 1,
+          "ARC": 1,
+          "LWPOLYLINE": 1,
+          "TEXT": 1,
+          "MTEXT": 1
+        },
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": null,
+        "unsupported_codes": [],
+        "error_codes_any": [],
+        "reader": {},
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "version_r2018",
+      "material": "materials/version_r2018.dxf",
+      "document_id": "doc-capsuite-version-r2018",
+      "layers": [
+        "version"
+      ],
+      "expected": {
+        "parse_status": "parsed",
+        "unit": "mm",
+        "identity_mode": "source",
+        "locator_layout": "Model",
+        "entity_counts": {
+          "LINE": 1,
+          "CIRCLE": 1,
+          "ARC": 1,
+          "LWPOLYLINE": 1,
+          "TEXT": 1,
+          "MTEXT": 1
+        },
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": null,
+        "unsupported_codes": [],
+        "error_codes_any": [],
+        "reader": {},
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "handle_source_lf",
+      "material": "materials/handle_source_lf.dxf",
+      "document_id": "doc-capsuite-handle-source-lf",
+      "layers": [
+        "handle",
+        "layout"
+      ],
+      "expected": {
+        "parse_status": "parsed",
+        "unit": "mm",
+        "identity_mode": "source",
+        "locator_layout": "Model",
+        "entity_counts": {
+          "LINE": 1,
+          "CIRCLE": 1,
+          "TEXT": 1
+        },
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": null,
+        "unsupported_codes": [],
+        "error_codes_any": [],
+        "reader": {
+          "require_handle_present": true
+        },
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "handle_source_crlf",
+      "material": "materials/handle_source_crlf.dxf",
+      "document_id": "doc-capsuite-handle-source-crlf",
+      "layers": [
+        "handle"
+      ],
+      "expected": {
+        "parse_status": "parsed",
+        "unit": "mm",
+        "identity_mode": "source",
+        "locator_layout": "Model",
+        "entity_counts": {
+          "LINE": 1,
+          "CIRCLE": 1,
+          "TEXT": 1
+        },
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": null,
+        "unsupported_codes": [],
+        "error_codes_any": [],
+        "reader": {
+          "require_handle_present": true
+        },
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "handle_positional_lf",
+      "material": "materials/handle_positional_lf.dxf",
+      "document_id": "doc-capsuite-handle-positional-lf",
+      "layers": [
+        "handle",
+        "entity",
+        "layout"
+      ],
+      "expected": {
+        "parse_status": "partial",
+        "unit": "unknown",
+        "identity_mode": "positional",
+        "locator_layout": "Model",
+        "entity_counts": {
+          "POLYLINE": 2,
+          "INSERT": 1
+        },
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": {
+          "min": 3,
+          "max": 3
+        },
+        "unsupported_codes": [
+          "CAD_SOURCE_HANDLE_UNAVAILABLE",
+          "CAD_POSITIONAL_BLOCK_UNSUPPORTED"
+        ],
+        "error_codes_any": [],
+        "reader": {
+          "entity_indices": [
+            1,
+            2,
+            3
+          ],
+          "require_no_handle": true,
+          "require_handle_present": false,
+          "entities": [
+            {
+              "match": {
+                "entity_type": "POLYLINE"
+              },
+              "expect": {
+                "closed": false
+              }
+            },
+            {
+              "match": {
+                "entity_type": "INSERT"
+              },
+              "expect": {
+                "expansion_status": "skipped"
+              }
+            }
+          ]
+        },
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "handle_positional_crlf",
+      "material": "materials/handle_positional_crlf.dxf",
+      "document_id": "doc-capsuite-handle-positional-crlf",
+      "layers": [
+        "handle",
+        "entity",
+        "layout"
+      ],
+      "expected": {
+        "parse_status": "partial",
+        "unit": "unknown",
+        "identity_mode": "positional",
+        "locator_layout": "Model",
+        "entity_counts": {
+          "POLYLINE": 2,
+          "INSERT": 1
+        },
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": null,
+        "unsupported_codes": [
+          "CAD_SOURCE_HANDLE_UNAVAILABLE",
+          "CAD_POSITIONAL_BLOCK_UNSUPPORTED"
+        ],
+        "error_codes_any": [],
+        "reader": {
+          "entity_indices": [
+            1,
+            2,
+            3
+          ],
+          "require_no_handle": true
+        },
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "handle_duplicate",
+      "material": "materials/handle_duplicate.dxf",
+      "document_id": "doc-capsuite-handle-duplicate",
+      "layers": [
+        "handle",
+        "rejected"
+      ],
+      "expected": {
+        "parse_status": "rejected",
+        "unit": null,
+        "identity_mode": null,
+        "locator_layout": null,
+        "entity_counts": {},
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": null,
+        "unsupported_codes": [],
+        "error_codes_any": [
+          "CAD_DUPLICATE_SOURCE_HANDLE"
+        ],
+        "reader": {},
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "handle_partial",
+      "material": "materials/handle_partial.dxf",
+      "document_id": "doc-capsuite-handle-partial",
+      "layers": [
+        "handle",
+        "rejected"
+      ],
+      "expected": {
+        "parse_status": "rejected",
+        "unit": null,
+        "identity_mode": null,
+        "locator_layout": null,
+        "entity_counts": {},
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": null,
+        "unsupported_codes": [],
+        "error_codes_any": [
+          "CAD_ENTITY_HANDLE_INVALID"
+        ],
+        "reader": {},
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "entity_primitives",
+      "material": "materials/entity_primitives.dxf",
+      "document_id": "doc-capsuite-entity-primitives",
+      "layers": [
+        "entity"
+      ],
+      "expected": {
+        "parse_status": "parsed",
+        "unit": "mm",
+        "identity_mode": "source",
+        "locator_layout": "Model",
+        "entity_counts": {
+          "LINE": 1,
+          "CIRCLE": 1,
+          "ARC": 1,
+          "TEXT": 1,
+          "MTEXT": 1
+        },
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": {
+          "min": 5,
+          "max": 5
+        },
+        "unsupported_codes": [],
+        "error_codes_any": [],
+        "reader": {
+          "entities": [
+            {
+              "match": {
+                "entity_type": "TEXT"
+              },
+              "expect": {
+                "text": "HELLO",
+                "rotation": 30.0,
+                "height": 2.5
+              }
+            },
+            {
+              "match": {
+                "entity_type": "MTEXT"
+              },
+              "expect": {
+                "text": "M1\nM2",
+                "raw_text": "M1\\PM2"
+              }
+            }
+          ]
+        },
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "entity_lwpolyline_closed",
+      "material": "materials/entity_lwpolyline_closed.dxf",
+      "document_id": "doc-capsuite-entity-lwpolyline-closed",
+      "layers": [
+        "entity"
+      ],
+      "expected": {
+        "parse_status": "parsed",
+        "unit": "mm",
+        "identity_mode": "source",
+        "locator_layout": "Model",
+        "entity_counts": {
+          "LWPOLYLINE": 2
+        },
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": null,
+        "unsupported_codes": [],
+        "error_codes_any": [],
+        "reader": {
+          "entities": [
+            {
+              "match": {
+                "entity_type": "LWPOLYLINE",
+                "occurrence": 0
+              },
+              "expect": {
+                "closed": true
+              }
+            },
+            {
+              "match": {
+                "entity_type": "LWPOLYLINE",
+                "occurrence": 1
+              },
+              "expect": {
+                "closed": false
+              }
+            }
+          ]
+        },
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "entity_polyline_bulge",
+      "material": "materials/entity_polyline_bulge.dxf",
+      "document_id": "doc-capsuite-entity-polyline-bulge",
+      "layers": [
+        "entity"
+      ],
+      "expected": {
+        "parse_status": "partial",
+        "unit": "mm",
+        "identity_mode": "source",
+        "locator_layout": "Model",
+        "entity_counts": {
+          "POLYLINE": 1
+        },
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": {
+          "min": 1,
+          "max": 1
+        },
+        "unsupported_codes": [
+          "CAD_POLYLINE_BULGE_UNSUPPORTED"
+        ],
+        "error_codes_any": [],
+        "reader": {
+          "entities": [
+            {
+              "match": {
+                "entity_type": "POLYLINE"
+              },
+              "expect": {
+                "closed": true
+              }
+            }
+          ]
+        },
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "entity_native_dimension",
+      "material": "materials/entity_native_dimension.dxf",
+      "document_id": "doc-capsuite-entity-native-dimension",
+      "layers": [
+        "entity"
+      ],
+      "expected": {
+        "parse_status": "parsed",
+        "unit": "mm",
+        "identity_mode": "source",
+        "locator_layout": "Model",
+        "entity_counts": {
+          "LINE": 1,
+          "DIMENSION": 2
+        },
+        "block_counts": {
+          "figure": 1,
+          "paragraph": 2,
+          "dimension": 2
+        },
+        "feature_counts": {
+          "native_dimension": 2
+        },
+        "entity_total": {
+          "min": 3,
+          "max": 3
+        },
+        "unsupported_codes": [],
+        "error_codes_any": [],
+        "reader": {
+          "feature_count": 2,
+          "features": [
+            {
+              "index": 0,
+              "expect": {
+                "value_authority": "dimension_measurement",
+                "declared_text": null,
+                "geometry_measurement": "10.0"
+              }
+            },
+            {
+              "index": 1,
+              "expect": {
+                "value_authority": "declared_text",
+                "declared_text": "25.4",
+                "declared_value": "25.4",
+                "geometry_measurement": "10.0"
+              }
+            }
+          ]
+        },
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "entity_insert_nested",
+      "material": "materials/entity_insert_nested.dxf",
+      "document_id": "doc-capsuite-entity-insert-nested",
+      "layers": [
+        "entity"
+      ],
+      "expected": {
+        "parse_status": "parsed",
+        "unit": "mm",
+        "identity_mode": "source",
+        "locator_layout": "Model",
+        "entity_counts": {
+          "INSERT": 3,
+          "LINE": 3
+        },
+        "block_counts": {
+          "figure": 6
+        },
+        "feature_counts": {},
+        "entity_total": {
+          "min": 6,
+          "max": 6
+        },
+        "unsupported_codes": [],
+        "error_codes_any": [],
+        "reader": {
+          "max_block_path_depth": 2,
+          "any": [
+            {
+              "match": {
+                "entity_type": "LINE",
+                "block_path_len": 2
+              }
+            }
+          ]
+        },
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "entity_block_cycle",
+      "material": "materials/entity_block_cycle.dxf",
+      "document_id": "doc-capsuite-entity-block-cycle",
+      "layers": [
+        "entity",
+        "rejected"
+      ],
+      "expected": {
+        "parse_status": "rejected",
+        "unit": null,
+        "identity_mode": null,
+        "locator_layout": null,
+        "entity_counts": {},
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": null,
+        "unsupported_codes": [],
+        "error_codes_any": [
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_BLOCK_RECURSION_CYCLE"
+        ],
+        "reader": {},
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "entity_block_missing",
+      "material": "materials/entity_block_missing.dxf",
+      "document_id": "doc-capsuite-entity-block-missing",
+      "layers": [
+        "entity",
+        "rejected"
+      ],
+      "expected": {
+        "parse_status": "partial",
+        "unit": "mm",
+        "identity_mode": "source",
+        "locator_layout": "Model",
+        "entity_counts": {
+          "LINE": 1
+        },
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": {
+          "min": 1,
+          "max": 1
+        },
+        "unsupported_codes": [
+          "CAD_BLOCK_MISSING",
+          "CAD_DXF_AUDIT_ENTITY_REMOVED"
+        ],
+        "error_codes_any": [],
+        "reader": {},
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "reject_spline_only",
+      "material": "materials/reject_spline_only.dxf",
+      "document_id": "doc-capsuite-reject-spline-only",
+      "layers": [
+        "rejected",
+        "entity"
+      ],
+      "expected": {
+        "parse_status": "unsupported",
+        "unit": null,
+        "identity_mode": "source",
+        "locator_layout": null,
+        "entity_counts": {},
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": {
+          "min": 0,
+          "max": 0
+        },
+        "unsupported_codes": [
+          "CAD_ENTITY_TYPE_UNSUPPORTED:SPLINE"
+        ],
+        "error_codes_any": [],
+        "reader": {},
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "reject_mixed_unsupported",
+      "material": "materials/reject_mixed_unsupported.dxf",
+      "document_id": "doc-capsuite-reject-mixed-unsupported",
+      "layers": [
+        "rejected",
+        "entity"
+      ],
+      "expected": {
+        "parse_status": "partial",
+        "unit": "mm",
+        "identity_mode": "source",
+        "locator_layout": "Model",
+        "entity_counts": {
+          "LINE": 1
+        },
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": {
+          "min": 1,
+          "max": 1
+        },
+        "unsupported_codes": [
+          "CAD_ENTITY_TYPE_UNSUPPORTED:SPLINE",
+          "CAD_ENTITY_TYPE_UNSUPPORTED:HATCH",
+          "CAD_ENTITY_TYPE_UNSUPPORTED:3DFACE"
+        ],
+        "error_codes_any": [],
+        "reader": {},
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "layout_paperspace",
+      "material": "materials/layout_paperspace.dxf",
+      "document_id": "doc-capsuite-layout-paperspace",
+      "layers": [
+        "layout",
+        "rejected"
+      ],
+      "expected": {
+        "parse_status": "partial",
+        "unit": "mm",
+        "identity_mode": "source",
+        "locator_layout": "Model",
+        "entity_counts": {
+          "LINE": 1
+        },
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": {
+          "min": 1,
+          "max": 1
+        },
+        "unsupported_codes": [
+          "CAD_PAPERSPACE_ENTITIES_SKIPPED"
+        ],
+        "error_codes_any": [],
+        "reader": {},
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "reject_3d_z",
+      "material": "materials/reject_3d_z.dxf",
+      "document_id": "doc-capsuite-reject-3d-z",
+      "layers": [
+        "rejected",
+        "entity"
+      ],
+      "expected": {
+        "parse_status": "partial",
+        "unit": "mm",
+        "identity_mode": "source",
+        "locator_layout": "Model",
+        "entity_counts": {
+          "LINE": 1
+        },
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": {
+          "min": 1,
+          "max": 1
+        },
+        "unsupported_codes": [
+          "CAD_3D_OR_NONFINITE_UNSUPPORTED"
+        ],
+        "error_codes_any": [],
+        "reader": {},
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "reject_ocs_extrusion",
+      "material": "materials/reject_ocs_extrusion.dxf",
+      "document_id": "doc-capsuite-reject-ocs-extrusion",
+      "layers": [
+        "rejected",
+        "entity"
+      ],
+      "expected": {
+        "parse_status": "partial",
+        "unit": "mm",
+        "identity_mode": "source",
+        "locator_layout": "Model",
+        "entity_counts": {
+          "LINE": 1
+        },
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": {
+          "min": 1,
+          "max": 1
+        },
+        "unsupported_codes": [
+          "CAD_OCS_OR_THICKNESS_UNSUPPORTED"
+        ],
+        "error_codes_any": [],
+        "reader": {},
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "reject_hidden_layer",
+      "material": "materials/reject_hidden_layer.dxf",
+      "document_id": "doc-capsuite-reject-hidden-layer",
+      "layers": [
+        "rejected",
+        "entity"
+      ],
+      "expected": {
+        "parse_status": "partial",
+        "unit": "mm",
+        "identity_mode": "source",
+        "locator_layout": "Model",
+        "entity_counts": {
+          "LINE": 1
+        },
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": {
+          "min": 1,
+          "max": 1
+        },
+        "unsupported_codes": [
+          "CAD_HIDDEN_ENTITY_UNSUPPORTED"
+        ],
+        "error_codes_any": [],
+        "reader": {},
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    },
+    {
+      "case_id": "layout_model_only",
+      "material": "materials/layout_model_only.dxf",
+      "document_id": "doc-capsuite-layout-model-only",
+      "layers": [
+        "layout"
+      ],
+      "expected": {
+        "parse_status": "parsed",
+        "unit": "mm",
+        "identity_mode": "source",
+        "locator_layout": "Model",
+        "entity_counts": {
+          "LINE": 1
+        },
+        "block_counts": {},
+        "feature_counts": {},
+        "entity_total": {
+          "min": 1,
+          "max": 1
+        },
+        "unsupported_codes": [],
+        "error_codes_any": [],
+        "reader": {},
+        "absent_codes": [
+          "CAD_ENTITY_LOSS_OR_LAYOUT_UNSUPPORTED",
+          "CAD_BLOCK_ENTITY_LOSS_UNSUPPORTED",
+          "CAD_OUTPUT_CONTRACT_INVALID",
+          "CAD_DXF_INVALID",
+          "CAD_DXF_TAGS_INVALID",
+          "CAD_BINARY_DXF_UNSUPPORTED",
+          "CAD_ENTITY_COUNT_INVALID",
+          "CAD_SOURCE_SIZE_INVALID",
+          "CAD_DXF_AUDIT_ERRORS",
+          "CAD_NO_SUPPORTED_ENTITIES",
+          "PARSE_ADAPTER_UNSUPPORTED",
+          "PARSE_RESULT_INVALID",
+          "block_limit_reached",
+          "CAD_ENTITY_LIMIT_REACHED"
+        ]
+      }
+    }
+  ]
+}

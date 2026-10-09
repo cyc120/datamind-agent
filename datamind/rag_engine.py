@@ -8,7 +8,7 @@ from typing import Callable
 
 from .knowledge import KnowledgeRetriever, normalize
 from .providers import chat as provider_chat
-from .sql_engine import model_profile
+from .sql_engine import history_prompt_block, model_profile, normalize_history
 
 
 PROMPT_VERSION = "rag-v3-multifile"
@@ -27,7 +27,13 @@ SYSTEM_PROMPT = """你是文档证据问答助手。只返回 JSON，不使用�
 拒答格式：{"abstain":true,"claims":[]}。"""
 
 
-def _draft(question: str, hits: list[dict], feedback: str | None = None) -> dict:
+def _draft(question: str, hits: list[dict], feedback: str | None = None,
+           history: str | None = None) -> dict:
+    """Draft claims from retrieved evidence; ``history`` is a rendered untrusted transcript.
+
+    The history block is prepended to the user message as prompt text only. It is evidence-free
+    context for resolving references, never a source of truth and never executed.
+    """
     sources = [{"chunk_id": hit["chunk_id"], "document_id": hit["document_id"], "title": hit["title"],
                 "document_version": hit["document_version"], "source_sha256": hit["document_sha256"],
                 "parser_version": hit["parser_version"],
@@ -38,9 +44,11 @@ def _draft(question: str, hits: list[dict], feedback: str | None = None) -> dict
                 "parse_warnings": sorted({warning for page in (hit.get("quality_detail") or {}).get("pages", [])
                                           for warning in page.get("warnings", [])}),
                 "text": hit["exact_text"]} for hit in hits]
-    reply = provider_chat(model_profile(), SYSTEM_PROMPT,
-        json.dumps({"question": question, "evidence": sources, "previous_error": feedback}, ensure_ascii=False),
-        max_tokens=2200)
+    payload = json.dumps({"question": question, "evidence": sources, "previous_error": feedback},
+                         ensure_ascii=False)
+    if history:
+        payload = history + "\n" + payload
+    reply = provider_chat(model_profile(), SYSTEM_PROMPT, payload, max_tokens=2200)
     if not reply.get("ok"):
         raise RuntimeError(reply.get("error_code") or "MODEL_UPSTREAM_ERROR")
     text = re.sub(r"^```(?:json)?\s*|\s*```$", "", reply["text"].strip())
@@ -145,8 +153,24 @@ def ask_documents(question: str, *, collections: list[str] | None = None,
                   retriever: KnowledgeRetriever | None = None, generator: Callable | None = None,
                   on_retrieval: Callable | None = None, document_refs: list[dict] | None = None,
                   locator_lookup: Callable | None = None,
-                  relation_lookup: Callable | None = None) -> dict:
+                  relation_lookup: Callable | None = None,
+                  history: list[dict] | None = None) -> dict:
+    """Answer from documents. ``history`` is optional client-supplied multi-turn context.
+
+    No session is stored anywhere: the transcript travels with the single request. When ``history``
+    is absent or empty this function behaves exactly as before (three-argument generator calls, no
+    ``turns_used`` key). When it is present the delimited block is handed to the generation step as
+    a fourth positional argument and ``turns_used`` reports the number of turns handed over. An
+    over-long history is rejected with a stable ``HISTORY_*`` error code, never truncated.
+    """
     started = time.monotonic()
+    try:
+        history = normalize_history(history)
+    except ValueError as exc:
+        return {"prompt_version": PROMPT_VERSION, "retrieval": {}, "attempts": [],
+                "retrieved_evidence": [], "status": "failed", "error_code": str(exc),
+                "claims": [], "citations": [], "turns_used": 0}
+    history_block = history_prompt_block(history) if history else None
     retriever = retriever or KnowledgeRetriever()
     kwargs = {"collections": collections, "limit": 5}
     if document_refs is not None:
@@ -175,7 +199,13 @@ def ask_documents(question: str, *, collections: list[str] | None = None,
     feedback = None
     for attempt in range(2):
         try:
-            draft = (generator or _draft)(question, hits, feedback)
+            if history_block:
+                # As in the SQL path: the block is prompt text handed to the answering model,
+                # never evidence and never a citation source.
+                result["turns_used"] = len(history)
+                draft = (generator or _draft)(question, hits, feedback, history_block)
+            else:
+                draft = (generator or _draft)(question, hits, feedback)
             if draft.get("abstain") is True:
                 return {**result, "status": "abstained", "answer": ABSTAIN_ANSWER,
                         "error_code": "INSUFFICIENT_EVIDENCE", "claims": [], "citations": [],

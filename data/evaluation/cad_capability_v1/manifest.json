@@ -1,0 +1,605 @@
+{
+  "suite_id": "cad-capability-v1",
+  "suite_version": "cad-capability-v1",
+  "created_at": "2026-10-09T11:44:15.660116+00:00",
+  "generator": "data/evaluation/cad_capability_v1/build_suite.py",
+  "generator_sha256": "ad6f47edf514987a421a49e0e1d694753e6c716833f6f3410d48cdc5ab7e2823",
+  "ezdxf_version": "1.4.4",
+  "python_version": "3.14.5 (v3.14.5:5607950ef23, May 10 2026, 07:38:09) [Clang 21.0.0 (clang-2100.0.123.102)]",
+  "profile": "datamind-2d-engineering-dxf-v2",
+  "parser_version": "dxf-native-v2",
+  "provenance": {
+    "kind": "author-built synthetic acceptance suite",
+    "is_independent_factory_data": false,
+    "real_drawings_used_for_grading": false,
+    "development_samples": [
+      "data/cad_demo/DEVELOPMENT_SAMPLES.md"
+    ],
+    "measurement_path": "ingestion.cad_adapter.parse (production v2 path)"
+  },
+  "evaluated_code": [
+    "ingestion/cad_adapter.py",
+    "ingestion/cad_dxf_v2.py",
+    "ingestion/cad_contract_v2.py",
+    "datamind/parse_contract.py"
+  ],
+  "pinned_v2_manifest": "data/evaluation/frozen/cad_dxf_v2/manifest.json",
+  "labels_file": "labels.json",
+  "labels_sha256": "5bd7ae748bf3033c2cfbe1983c543b36571f2c51cb0b0d90c51666bca9cecd0e",
+  "cases_count": 31,
+  "layers": {
+    "unit": 4,
+    "version": 8,
+    "handle": 7,
+    "entity": 16,
+    "layout": 8,
+    "rejected": 10
+  },
+  "materials": [
+    {
+      "case_id": "unit_in",
+      "file": "materials/unit_in.dxf",
+      "sha256": "e82698dedd74f02c126863b80e9b2cf6aa359e8a8cd780040de00ab74a9c425d",
+      "layers": [
+        "unit",
+        "layout"
+      ],
+      "dxf_version": "AC1027",
+      "declared_insunits": "1",
+      "declared_handling": null,
+      "code_5_tags": 212,
+      "crlf_newlines": 0,
+      "lf_newlines": 12928,
+      "bytes": 54629
+    },
+    {
+      "case_id": "unit_mm",
+      "file": "materials/unit_mm.dxf",
+      "sha256": "8331f48bca509cd7871dca6d436417f39e3004f622a29fca85b8df403745a898",
+      "layers": [
+        "unit",
+        "layout"
+      ],
+      "dxf_version": "AC1027",
+      "declared_insunits": "4",
+      "declared_handling": null,
+      "code_5_tags": 212,
+      "crlf_newlines": 0,
+      "lf_newlines": 12928,
+      "bytes": 54629
+    },
+    {
+      "case_id": "unit_missing",
+      "file": "materials/unit_missing.dxf",
+      "sha256": "861f004e84f6656daf580ba30420f74f482dfb55da62c8bb6076e3571247c3e2",
+      "layers": [
+        "unit",
+        "version",
+        "layout"
+      ],
+      "dxf_version": "AC1027",
+      "declared_insunits": null,
+      "declared_handling": null,
+      "code_5_tags": 212,
+      "crlf_newlines": 0,
+      "lf_newlines": 12924,
+      "bytes": 54609
+    },
+    {
+      "case_id": "unit_cm_not_modelled",
+      "file": "materials/unit_cm_not_modelled.dxf",
+      "sha256": "a3cc4ed2c4c816ce4d3c0cadb2622af8e7a9c8663fd58769ad1c4c20403e8c69",
+      "layers": [
+        "unit"
+      ],
+      "dxf_version": "AC1027",
+      "declared_insunits": "5",
+      "declared_handling": null,
+      "code_5_tags": 212,
+      "crlf_newlines": 0,
+      "lf_newlines": 12908,
+      "bytes": 54536
+    },
+    {
+      "case_id": "version_r12",
+      "file": "materials/version_r12.dxf",
+      "sha256": "9e74033f8066ab75ad97f7598250f77dcfe57669f45f2fd193fee465588a8f6d",
+      "layers": [
+        "version",
+        "entity",
+        "handle"
+      ],
+      "dxf_version": "AC1009",
+      "declared_insunits": null,
+      "declared_handling": "1",
+      "code_5_tags": 95,
+      "crlf_newlines": 0,
+      "lf_newlines": 3328,
+      "bytes": 15997
+    },
+    {
+      "case_id": "version_r2000",
+      "file": "materials/version_r2000.dxf",
+      "sha256": "cb33c44d02ac1c517a5bfe4f26a7c8a748a4832bce71b833eb05f8892eeb3118",
+      "layers": [
+        "version",
+        "entity"
+      ],
+      "dxf_version": "AC1015",
+      "declared_insunits": "4",
+      "declared_handling": null,
+      "code_5_tags": 166,
+      "crlf_newlines": 0,
+      "lf_newlines": 6868,
+      "bytes": 34570
+    },
+    {
+      "case_id": "version_r2004",
+      "file": "materials/version_r2004.dxf",
+      "sha256": "718a0dc1adae55a1b77418602bc27ab2df3afcdbb4683c041e379258e72b013d",
+      "layers": [
+        "version"
+      ],
+      "dxf_version": "AC1018",
+      "declared_insunits": "4",
+      "declared_handling": null,
+      "code_5_tags": 166,
+      "crlf_newlines": 0,
+      "lf_newlines": 6946,
+      "bytes": 34954
+    },
+    {
+      "case_id": "version_r2007",
+      "file": "materials/version_r2007.dxf",
+      "sha256": "d441e86bd7ddbd1ab5545e55880f5b4c7290f0ded1f3d6703593ca4339d440a2",
+      "layers": [
+        "version"
+      ],
+      "dxf_version": "AC1021",
+      "declared_insunits": "4",
+      "declared_handling": null,
+      "code_5_tags": 166,
+      "crlf_newlines": 0,
+      "lf_newlines": 7180,
+      "bytes": 36172
+    },
+    {
+      "case_id": "version_r2010",
+      "file": "materials/version_r2010.dxf",
+      "sha256": "c1d82500af675203f59ef279bd9872575f71cf1821ad86d8ffdfab487dc3f36a",
+      "layers": [
+        "version"
+      ],
+      "dxf_version": "AC1024",
+      "declared_insunits": "4",
+      "declared_handling": null,
+      "code_5_tags": 166,
+      "crlf_newlines": 0,
+      "lf_newlines": 7184,
+      "bytes": 36198
+    },
+    {
+      "case_id": "version_r2013",
+      "file": "materials/version_r2013.dxf",
+      "sha256": "753859197b57676d07dd5a96262f3f33f76a9ad7282297c01c2d2ec133af405f",
+      "layers": [
+        "version"
+      ],
+      "dxf_version": "AC1027",
+      "declared_insunits": "4",
+      "declared_handling": null,
+      "code_5_tags": 216,
+      "crlf_newlines": 0,
+      "lf_newlines": 13038,
+      "bytes": 55128
+    },
+    {
+      "case_id": "version_r2018",
+      "file": "materials/version_r2018.dxf",
+      "sha256": "5a90c9394c3bfb3ae9b716784a0e381f349481dcd83aa29d48dfd0ec60ea62b3",
+      "layers": [
+        "version"
+      ],
+      "dxf_version": "AC1032",
+      "declared_insunits": "4",
+      "declared_handling": null,
+      "code_5_tags": 216,
+      "crlf_newlines": 0,
+      "lf_newlines": 13038,
+      "bytes": 55126
+    },
+    {
+      "case_id": "handle_source_lf",
+      "file": "materials/handle_source_lf.dxf",
+      "sha256": "f0b6b32390c321750487be3302f3ff85a8c0ad9024143a809f0f9e217f65efc6",
+      "layers": [
+        "handle",
+        "layout"
+      ],
+      "dxf_version": "AC1027",
+      "declared_insunits": "4",
+      "declared_handling": null,
+      "code_5_tags": 213,
+      "crlf_newlines": 0,
+      "lf_newlines": 12960,
+      "bytes": 54774
+    },
+    {
+      "case_id": "handle_source_crlf",
+      "file": "materials/handle_source_crlf.dxf",
+      "sha256": "2318275eff9e5e91375d4b3401df0961e1c07cbba7ac245e6cd5e61caffb5458",
+      "layers": [
+        "handle"
+      ],
+      "dxf_version": "AC1027",
+      "declared_insunits": "4",
+      "declared_handling": null,
+      "code_5_tags": 213,
+      "crlf_newlines": 12960,
+      "lf_newlines": 0,
+      "bytes": 67734
+    },
+    {
+      "case_id": "handle_positional_lf",
+      "file": "materials/handle_positional_lf.dxf",
+      "sha256": "afbf9a1d5f26daa8bf5da2be0e03c2236392840071aa3700f08013af24306cff",
+      "layers": [
+        "handle",
+        "entity",
+        "layout"
+      ],
+      "dxf_version": "AC1009",
+      "declared_insunits": null,
+      "declared_handling": null,
+      "code_5_tags": 0,
+      "crlf_newlines": 0,
+      "lf_newlines": 192,
+      "bytes": 711
+    },
+    {
+      "case_id": "handle_positional_crlf",
+      "file": "materials/handle_positional_crlf.dxf",
+      "sha256": "cb9bc5ab044740f1f47972c2afc6d98e86fa4e961debffbbb0268946611e9769",
+      "layers": [
+        "handle",
+        "entity",
+        "layout"
+      ],
+      "dxf_version": "AC1009",
+      "declared_insunits": null,
+      "declared_handling": null,
+      "code_5_tags": 0,
+      "crlf_newlines": 192,
+      "lf_newlines": 0,
+      "bytes": 903
+    },
+    {
+      "case_id": "handle_duplicate",
+      "file": "materials/handle_duplicate.dxf",
+      "sha256": "681be477fc12746f03ef4b803f2f95a4c0042506d8ae0d3e5f53a0190c889c2c",
+      "layers": [
+        "handle",
+        "rejected"
+      ],
+      "dxf_version": "AC1009",
+      "declared_insunits": null,
+      "declared_handling": "1",
+      "code_5_tags": 2,
+      "crlf_newlines": 0,
+      "lf_newlines": 82,
+      "bytes": 312
+    },
+    {
+      "case_id": "handle_partial",
+      "file": "materials/handle_partial.dxf",
+      "sha256": "741c4285e359a6f0f4d8032791f15f31483125202dad07c732489dc134d30581",
+      "layers": [
+        "handle",
+        "rejected"
+      ],
+      "dxf_version": "AC1009",
+      "declared_insunits": null,
+      "declared_handling": "1",
+      "code_5_tags": 1,
+      "crlf_newlines": 0,
+      "lf_newlines": 80,
+      "bytes": 307
+    },
+    {
+      "case_id": "entity_primitives",
+      "file": "materials/entity_primitives.dxf",
+      "sha256": "81ec2bd00258fb29b9fcdd454f557cb1fb415c14573c452b7b8abe1b93f03cae",
+      "layers": [
+        "entity"
+      ],
+      "dxf_version": "AC1027",
+      "declared_insunits": "4",
+      "declared_handling": null,
+      "code_5_tags": 215,
+      "crlf_newlines": 0,
+      "lf_newlines": 13010,
+      "bytes": 55001
+    },
+    {
+      "case_id": "entity_lwpolyline_closed",
+      "file": "materials/entity_lwpolyline_closed.dxf",
+      "sha256": "cb8cfa0dd4459c737309abdca292daba8c47ae77cc413f949ef714401448b458",
+      "layers": [
+        "entity"
+      ],
+      "dxf_version": "AC1027",
+      "declared_insunits": "4",
+      "declared_handling": null,
+      "code_5_tags": 212,
+      "crlf_newlines": 0,
+      "lf_newlines": 12936,
+      "bytes": 54670
+    },
+    {
+      "case_id": "entity_polyline_bulge",
+      "file": "materials/entity_polyline_bulge.dxf",
+      "sha256": "5a88e63e702daf5bbd71f27e59c9d08b72dd8e578a9f29b7f3448deadfaa3704",
+      "layers": [
+        "entity"
+      ],
+      "dxf_version": "AC1027",
+      "declared_insunits": "4",
+      "declared_handling": null,
+      "code_5_tags": 220,
+      "crlf_newlines": 0,
+      "lf_newlines": 13082,
+      "bytes": 55387
+    },
+    {
+      "case_id": "entity_native_dimension",
+      "file": "materials/entity_native_dimension.dxf",
+      "sha256": "7d4cecc4204de10e707012a722d8833c0f4a8b829c9f9e03e2c4d2ad040f1990",
+      "layers": [
+        "entity"
+      ],
+      "dxf_version": "AC1027",
+      "declared_insunits": "4",
+      "declared_handling": null,
+      "code_5_tags": 240,
+      "crlf_newlines": 0,
+      "lf_newlines": 13560,
+      "bytes": 57786
+    },
+    {
+      "case_id": "entity_insert_nested",
+      "file": "materials/entity_insert_nested.dxf",
+      "sha256": "b74306ebac58d3071bcdf0d0c47153f1b3a8c66c687ccccb0089b0ae9656b7dc",
+      "layers": [
+        "entity"
+      ],
+      "dxf_version": "AC1027",
+      "declared_insunits": "4",
+      "declared_handling": null,
+      "code_5_tags": 220,
+      "crlf_newlines": 0,
+      "lf_newlines": 13108,
+      "bytes": 55581
+    },
+    {
+      "case_id": "entity_block_cycle",
+      "file": "materials/entity_block_cycle.dxf",
+      "sha256": "874d864b5c03288b809fdb2709e74f2f6a5d638e43c5a8ca2289c78faa03e08b",
+      "layers": [
+        "entity",
+        "rejected"
+      ],
+      "dxf_version": "AC1027",
+      "declared_insunits": "4",
+      "declared_handling": null,
+      "code_5_tags": 220,
+      "crlf_newlines": 0,
+      "lf_newlines": 13108,
+      "bytes": 55543
+    },
+    {
+      "case_id": "entity_block_missing",
+      "file": "materials/entity_block_missing.dxf",
+      "sha256": "d2ea4a61c178289f42682b93c35c6415fc70a6348b81b1dc0e1f0b293e2de327",
+      "layers": [
+        "entity",
+        "rejected"
+      ],
+      "dxf_version": "AC1027",
+      "declared_insunits": "4",
+      "declared_handling": null,
+      "code_5_tags": 212,
+      "crlf_newlines": 0,
+      "lf_newlines": 12928,
+      "bytes": 54642
+    },
+    {
+      "case_id": "reject_spline_only",
+      "file": "materials/reject_spline_only.dxf",
+      "sha256": "514671c2859c3332b60c1725f428a712e0bda6cfdbfa96e52cb5db79fe0fb492",
+      "layers": [
+        "rejected",
+        "entity"
+      ],
+      "dxf_version": "AC1027",
+      "declared_insunits": "4",
+      "declared_handling": null,
+      "code_5_tags": 211,
+      "crlf_newlines": 0,
+      "lf_newlines": 12924,
+      "bytes": 54594
+    },
+    {
+      "case_id": "reject_mixed_unsupported",
+      "file": "materials/reject_mixed_unsupported.dxf",
+      "sha256": "29d958ae636e44dd04933edadec7ffe47688612035bc5e301ffaf634551a541b",
+      "layers": [
+        "rejected",
+        "entity"
+      ],
+      "dxf_version": "AC1027",
+      "declared_insunits": "4",
+      "declared_handling": null,
+      "code_5_tags": 214,
+      "crlf_newlines": 0,
+      "lf_newlines": 13046,
+      "bytes": 55094
+    },
+    {
+      "case_id": "layout_paperspace",
+      "file": "materials/layout_paperspace.dxf",
+      "sha256": "dbdce0e5aaaa5ed6bf42d9cbe7e51df5bc4d06cbdaebfbc1c17394f87f299479",
+      "layers": [
+        "layout",
+        "rejected"
+      ],
+      "dxf_version": "AC1027",
+      "declared_insunits": "4",
+      "declared_handling": null,
+      "code_5_tags": 213,
+      "crlf_newlines": 0,
+      "lf_newlines": 12966,
+      "bytes": 54796
+    },
+    {
+      "case_id": "reject_3d_z",
+      "file": "materials/reject_3d_z.dxf",
+      "sha256": "dd9fe32c5f3c3ac84410831fe12307520c8cbb9585b28c824460ecf5475952fb",
+      "layers": [
+        "rejected",
+        "entity"
+      ],
+      "dxf_version": "AC1027",
+      "declared_insunits": "4",
+      "declared_handling": null,
+      "code_5_tags": 212,
+      "crlf_newlines": 0,
+      "lf_newlines": 12932,
+      "bytes": 54642
+    },
+    {
+      "case_id": "reject_ocs_extrusion",
+      "file": "materials/reject_ocs_extrusion.dxf",
+      "sha256": "054dc751c0953b4d565785433a4fdf4705c292f1b3e743b00b38ff6ce37a64e4",
+      "layers": [
+        "rejected",
+        "entity"
+      ],
+      "dxf_version": "AC1027",
+      "declared_insunits": "4",
+      "declared_handling": null,
+      "code_5_tags": 212,
+      "crlf_newlines": 0,
+      "lf_newlines": 12934,
+      "bytes": 54653
+    },
+    {
+      "case_id": "reject_hidden_layer",
+      "file": "materials/reject_hidden_layer.dxf",
+      "sha256": "cb994964a56236809e50af3c13c1956c0c1a37a6778876edd4d729029f70ac13",
+      "layers": [
+        "rejected",
+        "entity"
+      ],
+      "dxf_version": "AC1027",
+      "declared_insunits": "4",
+      "declared_handling": null,
+      "code_5_tags": 213,
+      "crlf_newlines": 0,
+      "lf_newlines": 12956,
+      "bytes": 54789
+    },
+    {
+      "case_id": "layout_model_only",
+      "file": "materials/layout_model_only.dxf",
+      "sha256": "43a824d920f31e968aeac790c74200208b773bffcf9f815585d35592a84401d0",
+      "layers": [
+        "layout"
+      ],
+      "dxf_version": "AC1027",
+      "declared_insunits": "4",
+      "declared_handling": null,
+      "code_5_tags": 211,
+      "crlf_newlines": 0,
+      "lf_newlines": 12908,
+      "bytes": 54536
+    }
+  ],
+  "uncovered": [
+    {
+      "capability": "DWG",
+      "reason": "专有格式，需外部转换器；读取器以 CAD_DWG_CONVERTER_UNAVAILABLE 明确拒绝，需真实转换器环境才能评测。"
+    },
+    {
+      "capability": "DXF AC1012/AC1014 (R13/R14)",
+      "reason": "ezdxf 1.4.4 只能写 AC1009 与 AC1015+；R13/R14 无法在本环境生成材料。"
+    },
+    {
+      "capability": "AC1009 (R12) 的 LWPOLYLINE/MTEXT/DIMENSION",
+      "reason": "ezdxf 以 DXFVersionError 拒绝在 R12 写这些实体；R12 材料只含 R12 合法实体。"
+    },
+    {
+      "capability": "二进制 DXF",
+      "reason": "未构造材料；读取器以 CAD_BINARY_DXF_UNSUPPORTED 拒绝。"
+    },
+    {
+      "capability": "非 UTF-8 / $DWGCODEPAGE 回退编码",
+      "reason": "材料均为 UTF-8；CAD_ENCODING_FALLBACK 与文本保真度未覆盖。"
+    },
+    {
+      "capability": "$INSUNITS 的其他取值（2=ft,3=mi,5 之外的非建模码等）",
+      "reason": "只覆盖 0/1/4 与一个非建模码 5(cm)；其余取值同为 CAD_UNIT_CODE_NOT_MODELLED 分支，但未逐一枚举。"
+    },
+    {
+      "capability": "非法格式句柄 / $HANDLING 显式与标签矛盾",
+      "reason": "只覆盖重复句柄与\"部分带句柄\"；CAD_ENTITY_HANDLE_INVALID 的非法格式分支与 CAD_HANDLING_FLAG_INCONSISTENT 未覆盖。"
+    },
+    {
+      "capability": "折线宽度 / 三维或网格折线",
+      "reason": "只覆盖 bulge；CAD_POLYLINE_WIDTH_UNSUPPORTED、CAD_POLYLINE_3D_OR_MESH_UNSUPPORTED 未覆盖。"
+    },
+    {
+      "capability": "文字变形（oblique/width/halign/valign/generation flag）与超长 MTEXT 截断",
+      "reason": "CAD_TEXT_TRANSFORM_UNSUPPORTED、CAD_MTEXT_TRUNCATED、CAD_TEXT_CONTROL_CHARACTER_UNSUPPORTED 未覆盖。"
+    },
+    {
+      "capability": "块内 DIMENSION、非均匀/零缩放 INSERT、MINSERT 阵列、块深度上限、展开实体上限、声明条数截断",
+      "reason": "CAD_DIMENSION_IN_BLOCK_UNSUPPORTED、CAD_INSERT_*、CAD_MINSERT_ARRAY_UNSUPPORTED、CAD_BLOCK_DEPTH_LIMIT_REACHED、CAD_UNSUPPORTED_ITEMS_TRUNCATED 未覆盖。"
+    },
+    {
+      "capability": "CAD_BLOCK_RECURSION_CYCLE 的读取器防御分支",
+      "reason": "本轮实测循环块引用被 ezdxf 审计先行以 CAD_DXF_AUDIT_ERRORS 整图拒绝，读取器的 CAD_BLOCK_RECURSION_CYCLE 分支未能在材料上触达（防御性代码路径）。"
+    },
+    {
+      "capability": "直径特征（DATAMIND XDATA 关联）与 LLM 抽屉合同层 declared_sizes 取值纪律",
+      "reason": "本套件只评 adapter/reader 路径；直径 XDATA 与 cad_contract_v2.declared_sizes 的排除码属合同层，未纳入。"
+    },
+    {
+      "capability": "纸空间实体读取本身",
+      "reason": "读取器按设计声明跳过纸空间（CAD_PAPERSPACE_ENTITIES_SKIPPED），从不读取；套件只断言\"声明跳过\"，不声称支持纸空间几何。"
+    },
+    {
+      "capability": "positional 模式下的块展开",
+      "reason": "读取器按设计不展开（CAD_POSITIONAL_BLOCK_UNSUPPORTED），套件只断言\"逐项声明 + skipped\"。"
+    },
+    {
+      "capability": "预览/渲染（ingestion/cad_render.py）",
+      "reason": "cad_render 只校验 v1 的 DrawingSnapshot，v2 实体不可渲染；本套件不评渲染。"
+    },
+    {
+      "capability": "真实工厂图纸分布与泛化准确率",
+      "reason": "本套件是作者合成样本；真实图纸只作开发样本，见 data/cad_demo/DEVELOPMENT_SAMPLES.md。任何\"准确率\"结论都超出本套件证据范围。"
+    }
+  ],
+  "not_measured": [
+    "本套件是作者自建合成验收集，不是独立工厂数据，也不是盲测。",
+    "通过率是\"逐项断言通过比例\"，不是\"识别准确率\"或\"泛化准确率\"；报告不给出 accuracy 指标。",
+    "geometry_measurement（几何测量值）不得当作制造尺寸；只有 declared_text/declared_value 才是文字声明的尺寸。",
+    "验收集不含任何真实图纸；两份真实图纸是开发样本，其缺陷已被用于修改读取器。",
+    "评测不调用任何模型、数据库或网络；不写入真实业务库。"
+  ],
+  "notes": [
+    "Materials are generated by build_suite.py with pinned timestamps/GUIDs, so a rebuild with the same ezdxf version is byte-identical.",
+    "labels.json is frozen together with the materials; manifest.labels_sha256 detects a labels-only edit.",
+    "No real drawing is graded here; the two real drawings are development samples (data/cad_demo/DEVELOPMENT_SAMPLES.md)."
+  ]
+}

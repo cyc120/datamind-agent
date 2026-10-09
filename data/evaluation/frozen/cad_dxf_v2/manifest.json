@@ -2,19 +2,19 @@
   "parser_version": "dxf-native-v2",
   "profile": "datamind-2d-engineering-dxf-v2",
   "contract_version": "cad-contract-v2",
-  "frozen_at": "2026-10-09T04:26:31.724528+00:00",
+  "frozen_at": "2026-10-09T11:48:47.231520+00:00",
   "first_frozen_at": "2026-10-08T12:31:54.760468+00:00",
   "status": "development hash record, NOT an accepted frozen baseline: v2 was created and then extended within the same working session (positional identity for handle-less DXF, the CRLF newline fix, and the raw-source $INSUNITS/$HANDLING reads), so the pinned hashes exist to detect unintended drift only. Re-freeze as an accepted baseline after the real-drawing verification. The eight v1 hashes are untouched and still verify (v1_code_hashes_unchanged=true).",
   "ezdxf_version": "1.4.4",
   "code_hashes": {
     "ingestion/cad_dxf_v2.py": "8b1041c3b43be1001a35666e8f5263e860a03dd26e8c352a45f0b939324faa5a",
     "ingestion/cad_contract_v2.py": "b7538e129486ae641ac5a518322c658510e19ac61714e715c0f971754fdefcd6",
-    "ingestion/cad_adapter.py": "ea81ba41626bda9ab185e59300cf8da4d83e1799a85df297eb66a92219adf9f4",
+    "ingestion/cad_adapter.py": "7e20cb4b3fef2ebbeeb6d40256aee5b6b93f26ccf505a76e4fc51142810b0c9c",
     "datamind/parse_contract.py": "774604a7bdb33600090dee6e0f82ad32716e69dc6db45ae93f5675eda917e923",
     "tests/test_cad_dxf_v2.py": "43f334c43aeb60010714d59f54a371aba0a66057779dd1198fcd8f1b2a397cda",
-    "tests/test_cad_adapter.py": "f48fc3a7a8e5d3ca293446621d9cb407e50ca298a8a0fe9dc330b9040c81ba51",
+    "tests/test_cad_adapter.py": "7f58ea09907e3c24ae0b3ac4649723201f3405e32bec9f5ba635fe1134a89c4b",
     "tests/test_parse_contract.py": "667c4efb530b2c5e4c37febbfe5d18e6ee5b57b65a38205a9917b5282645f39f",
-    "data/cad_demo/DXF_PROFILE_V2.md": "286f90e7c9a8ab0d7d829f3c6db04fedcf9903d1c73718b214e9d4fb2c745a0e",
+    "data/cad_demo/DXF_PROFILE_V2.md": "c067d7f58716c0218afd437d79ca1fe3ec792039ec7a864e1b30f43f9c5bb929",
     "tests/test_cad_handleless.py": "17cb41697807d8a78f32994beab8cf42c886df36470004534ae176abd7ed31ff"
   },
   "v1_manifest": "data/evaluation/frozen/cad_dxf_v1/manifest.json",
@@ -56,6 +56,9 @@
     "Any edit to a pinned file requires regenerating this manifest; FrozenV2ManifestTests refuses a stale freeze.",
     "Re-pinned at 2026-10-08T14:37:45.816503+00:00 for the positional-identity + CRLF change; the previous freeze time is preserved in first_frozen_at.",
     "tests/test_cad_handleless.py is pinned too: it is the guard for the handle-less (positional) mode and the CRLF normalisation.",
-    "Recomputed once after the LEADER fix (`_visited` read `.dxf` off plain coordinate tuples in `LEADER.vertices`, so a real drawing crashed as PARSE_ADAPTER_UNSUPPORTED/handler_failed) and its regression test. v1 hashes re-verified unchanged."
+    "Recomputed once after the LEADER fix (`_visited` read `.dxf` off plain coordinate tuples in `LEADER.vertices`, so a real drawing crashed as PARSE_ADAPTER_UNSUPPORTED/handler_failed) and its regression test. v1 hashes re-verified unchanged.",
+    "Recomputed once after the block cap became configurable (`DATAMIND_CAD_MAX_BLOCKS` / `max_blocks=`) and started being reported in `manifest.limits.max_blocks` — the cap was found by the multi-scale sweep (5000 and 20000 entities both returned exactly 2000 blocks) and was previously undiscoverable from the result. v1 hashes re-verified unchanged.",
+    "Recomputed again because DXF_PROFILE_V2.md gained the `max_blocks` section after the previous recompute. Note for whoever edits next: finish *all* edits to pinned files first, then recompute once — two drifts were caught by the guard test and by the independent verification agent, not by the editor.",
+    "Recomputed after the capability suite reported that an `unsupported` result omitted `manifest.limits`; the docs promise the cap is readable from the result, so the shape now always carries `limits` (with `max_blocks`)."
   ]
 }

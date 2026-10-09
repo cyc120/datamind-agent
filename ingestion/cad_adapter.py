@@ -30,6 +30,7 @@ than being guessed at.
 from __future__ import annotations
 
 import hashlib
+import os
 from pathlib import Path
 
 from datamind import parse_contract
@@ -42,7 +43,25 @@ DEFAULT_PROFILE = 'v2'
 PROFILES = ('v1', 'v2')
 PARSER_VERSIONS = {'v1': 'cad-contract-adapter-v1', 'v2': 'cad-contract-adapter-v2'}
 CONTRACT_PARSER_VERSION = PARSER_VERSIONS[DEFAULT_PROFILE]
-MAX_BLOCKS = 2000
+#: Contract blocks produced per document. Conservative by default: raising it stores more rows
+#: and lengthens the parse. Overridable like the reader's other limits, and reported in
+#: `manifest.limits` so a consumer can see the cap from the result instead of guessing why a
+#: large drawing came back `partial` with `block_limit_reached`.
+DEFAULT_MAX_BLOCKS = 2000
+MAX_BLOCKS_CEILING = 200000
+
+
+def _max_blocks() -> int:
+    raw = os.environ.get('DATAMIND_CAD_MAX_BLOCKS')
+    if raw is None or not str(raw).strip():
+        return DEFAULT_MAX_BLOCKS
+    try:
+        value = int(str(raw).strip())
+    except ValueError:
+        return DEFAULT_MAX_BLOCKS
+    if not 1 <= value <= MAX_BLOCKS_CEILING:
+        return DEFAULT_MAX_BLOCKS
+    return value
 # `ingestion/cad_contract.py` bounds its Identifier to 128 characters and that module is
 # hash-pinned in the frozen profile's manifest. The unified contract is stricter (64, the
 # width of every contract store column), so a contract-legal document id is always valid
@@ -215,7 +234,7 @@ def _feature_native(feature):
 
 
 def _unsupported_result(*, source_name, profile, parser_version, declarations,
-                        manifest_extra=None):
+                        manifest_extra=None, block_cap=DEFAULT_MAX_BLOCKS):
     """A contract-valid result for a drawing with no supported entity at all.
 
     The reader declares every unread entity, so the refusal is not silent: each one is
@@ -233,6 +252,11 @@ def _unsupported_result(*, source_name, profile, parser_version, declarations,
             'manifest': {'parser_version': parser_version, 'profile': cad_dxf_v2.PROFILE,
                          'cad_contract_version': 'cad-contract-v2', 'source_sha256': None,
                          'identity_mode': declarations.get('identity') or 'source',
+                         # `limits` is present in every shape, including this one: the docs
+                         # promise the cap can be read from the result, and the capability
+                         # suite flagged the gap (an `unsupported` result used to omit it).
+                         'limits': {**((manifest_extra or {}).get('limits') or {}),
+                                    'max_blocks': block_cap},
                          **(manifest_extra or {})},
             'parse_status': 'unsupported'}
 
@@ -248,6 +272,15 @@ def parse_dxf(path, *, document_id, source_version=None, provenance='synthetic_d
     so it is handed to the profile unchanged -- the caller's identity is never rewritten.
     """
     parse_contract.require_document_id(document_id, code='PARSE_RESULT_INVALID', subject='cad')
+    # Resolved once per call: an explicit argument wins over the environment, and both are
+    # validated (an out-of-range value falls back to the documented default rather than
+    # silently truncating a drawing at an arbitrary number).
+    block_cap = reader_options.pop('max_blocks', None)
+    if block_cap is None:
+        block_cap = _max_blocks()
+    elif isinstance(block_cap, bool) or not isinstance(block_cap, int) \
+            or not 1 <= block_cap <= MAX_BLOCKS_CEILING:
+        block_cap = DEFAULT_MAX_BLOCKS
     if profile not in PROFILES:
         parse_contract.fail('CAD_PROFILE_UNSUPPORTED', subject='cad', profile=repr(profile),
                             supported=list(PROFILES))
@@ -266,7 +299,7 @@ def parse_dxf(path, *, document_id, source_version=None, provenance='synthetic_d
         if profile == 'v2' and error.code == 'CAD_NO_SUPPORTED_ENTITIES':
             return _unsupported_result(source_name=Path(path).name, profile=profile,
                                        parser_version=reader.PARSER_VERSION,
-                                       declarations=error.details)
+                                       declarations=error.details, block_cap=block_cap)
         # Surface the reader's own stable code instead of a generic handler failure.
         parse_contract.fail(error.code, subject='cad', **error.details)
     snapshot = bundle['snapshot']
@@ -301,7 +334,7 @@ def parse_dxf(path, *, document_id, source_version=None, provenance='synthetic_d
         return block
 
     for entity in snapshot['entities']:
-        if index >= MAX_BLOCKS:
+        if index >= block_cap:
             declare('block_limit_reached')
             break
         locator = _locator(document_id, version, entity, unit=unit, layout=layout,
@@ -317,7 +350,7 @@ def parse_dxf(path, *, document_id, source_version=None, provenance='synthetic_d
     native_dimensions = 0
     relations = []
     for feature in snapshot['features']:
-        if index >= MAX_BLOCKS:
+        if index >= block_cap:
             declare('block_limit_reached')
             break
         locator_payload = feature['locator']
@@ -364,11 +397,12 @@ def parse_dxf(path, *, document_id, source_version=None, provenance='synthetic_d
     return _payload(path=path, profile=profile, reader=reader, metadata=metadata, snapshot=snapshot,
                     blocks=blocks, relations=relations, unsupported=unsupported,
                     native_dimensions=native_dimensions, source_sha256=source_sha256,
-                    identity_mode=identity_mode, identity=identity)
+                    identity_mode=identity_mode, identity=identity, block_cap=block_cap)
 
 
 def _payload(*, path, profile, reader, metadata, snapshot, blocks, relations, unsupported,
-             native_dimensions, source_sha256, identity_mode='source', identity=None):
+             native_dimensions, source_sha256, identity_mode='source', identity=None,
+             block_cap=DEFAULT_MAX_BLOCKS):
     quality = list(metadata.get('warnings') or [])
     if identity_mode == 'positional':
         # The mode is stated in the *manifest* as well as in every locator, so a consumer
@@ -394,6 +428,9 @@ def _payload(*, path, profile, reader, metadata, snapshot, blocks, relations, un
     for key in ('encoding', 'limits', 'unsupported_counts', 'counts'):
         if metadata.get(key) is not None:
             manifest[key] = metadata[key]
+    # The block cap belongs next to the reader's other limits: without it a consumer sees
+    # `partial` + `block_limit_reached` but cannot read *what* the cap was.
+    manifest.setdefault('limits', {})['max_blocks'] = block_cap
     return {'classification': {'detected_media_type': parse_contract.DXF_MEDIA_TYPE,
                               'source_name': Path(path).name},
             'adapter_capabilities': list(_CAPABILITIES[profile]),

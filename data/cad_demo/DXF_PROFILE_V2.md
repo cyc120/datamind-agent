@@ -117,3 +117,14 @@ cad_adapter.parse(path, document_id='doc-1', profile='v1')       # 冻结的 v1 
 - 预览/渲染未扩展：`ingestion/cad_render.py` 仍只校验 v1 的 `DrawingSnapshot`，v2 实体暂不可渲染（本轮在允许改动清单之外）。
 - 图纸资产登记路径（`datamind/cad_store.register`，被 `datamind/file_jobs.py` 的 `drawing` 目标使用）仍直接调用 v1 `parse_bytes`，因此**仍要求 DM_* 标题层**；本轮的 v2 只覆盖统一契约/ingest 解析链路。协调者集成时应决定是否把该路径切到 v2（该文件不在本轮改动清单内）。
 - 没有新的评测 gold、没有模型调用、没有覆盖任何旧首轮报告；v1 的 6 图首轮结果与 `dxf_reader_v1_freeze.json` 不变。
+
+## 块上限（`max_blocks`）
+
+- 每个文档产出的契约块数有上限，**默认 2000**（`ingestion/cad_adapter.py` 的 `DEFAULT_MAX_BLOCKS`）。
+- 超出部分**不是静默丢失**：`parse_status` 降级为 `partial`，并在 `unsupported_features` 里给出 `block_limit_reached`。
+- 上限**可配置**：调用参数 `cad_adapter.parse(..., max_blocks=N)` 优先，其次环境变量
+  `DATAMIND_CAD_MAX_BLOCKS`，非法值回退默认 2000，硬上限 200000。
+- 生效值会写进结果的 `manifest.limits.max_blocks`，因此消费方**可以从结果读到上限**，
+  不必去猜"为什么这份图是 partial"。
+- 实测（`scripts/eval_scale.py`）：5000 实体默认返回 2000 块 + `partial`；显式
+  `max_blocks=10000` 时同一文件返回 5100 块 + `parsed`。

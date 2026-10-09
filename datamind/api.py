@@ -8,7 +8,7 @@ import queue
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import psycopg2
 from fastapi import FastAPI, HTTPException, Query, Request, Response
@@ -31,6 +31,7 @@ from .settings_store import (DEFAULT_BASE_URL, DEFAULT_MODEL, PROFILE_FIELDS, PR
                              list_profiles, load_model_config, normalize_base_url,
                              public_model_config, public_profile, public_profiles, redact_profile,
                              resolve_profile_values, save_model_config, save_profile)
+from .sql_engine import normalize_history
 from .visibility import (collection_is_publishable, has_public_acl, is_published,
                          public_reviewed_sql, published_document_sql)
 
@@ -54,6 +55,34 @@ class ChatRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
     scope: Scope | None = None
     mode: Literal["auto", "sql", "rag", "industrial"] = "auto"
+    #: Optional client-supplied multi-turn history: ``[{"role": "user"|"assistant",
+    #: "content": "<non-empty>"}, ...]``. The server keeps **no** session and never inherits a
+    #: previous request's scope; the transcript belongs to this one request only. The type is
+    #: deliberately loose (``Any``) because the contract is validated by ``normalize_history``
+    #: below, which answers 422 + a stable ``HISTORY_*`` error code for a structural violation
+    #: instead of a framework-shaped validation error.
+    history: Any = None
+
+
+def _chat_kwargs(payload: ChatRequest) -> dict:
+    """Agent keyword arguments for one chat request, with history validated first.
+
+    ``history`` is added **only when non-empty**, so a request without history (or with ``[]``)
+    calls ``DataMindAgent.run`` with exactly the pre-multi-turn keyword set — and therefore builds
+    exactly the same prompts and returns the same result payload (apart from the new
+    ``turns_used: 0``). A history over the contract is rejected, never truncated.
+    """
+    try:
+        history = normalize_history(payload.history)
+    except ValueError as exc:
+        raise HTTPException(422, detail={"error_code": str(exc)})
+    kwargs = {"mode": payload.mode,
+              "database_sources": payload.scope.database_sources if payload.scope else None,
+              "document_collections": payload.scope.document_collections if payload.scope else None,
+              "document_refs":[r.model_dump() for r in payload.scope.document_refs] if payload.scope and payload.scope.document_refs is not None else None}
+    if history:
+        kwargs["history"] = history
+    return kwargs
 
 
 class FactReviewRequest(BaseModel):
@@ -1010,12 +1039,10 @@ def probe_chat(request: ProfileRequest):
 
 @app.post("/v1/chat")
 def chat(request: ChatRequest):
+    kwargs = _chat_kwargs(request)
     agent = DataMindAgent()
     try:
-        return jsonable_encoder(agent.run(request.question,
-            mode=request.mode, database_sources=request.scope.database_sources if request.scope else None,
-            document_collections=request.scope.document_collections if request.scope else None,
-            document_refs=[r.model_dump() for r in request.scope.document_refs] if request.scope and request.scope.document_refs is not None else None))
+        return jsonable_encoder(agent.run(request.question, **kwargs))
     finally:
         agent.close()
 
@@ -1036,15 +1063,15 @@ def diagnostic_sql():
 
 @app.post("/v1/chat/stream")
 def chat_stream(request: ChatRequest):
+    # Same validation and same agent keyword set as `/v1/chat`; the terminal `answer.completed`
+    # trace event carries the same `turns_used` the non-streaming response would report.
+    kwargs = _chat_kwargs(request)
     updates: queue.Queue = queue.Queue()
     agent = DataMindAgent(sink=updates.put)
 
     def worker():
         try:
-            agent.run(request.question, mode=request.mode,
-                      database_sources=request.scope.database_sources if request.scope else None,
-                      document_collections=request.scope.document_collections if request.scope else None,
-            document_refs=[r.model_dump() for r in request.scope.document_refs] if request.scope and request.scope.document_refs is not None else None)
+            agent.run(request.question, **kwargs)
         finally:
             agent.close()
             updates.put(None)
