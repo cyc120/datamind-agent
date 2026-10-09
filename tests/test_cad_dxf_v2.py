@@ -329,6 +329,42 @@ class BlockExpansionTests(unittest.TestCase):
         self.assertIn('CAD_BLOCK_MISSING', codes(bundle))
 
 
+class LeaderRegressionTests(unittest.TestCase):
+    """A LEADER must be declared unsupported, never crash the parse.
+
+    `LEADER.vertices` holds plain coordinate **tuples**, while `POLYLINE.vertices` holds
+    entity objects. `_visited` read `.dxf` off every member, so one LEADER in a real
+    drawing raised `AttributeError: 'tuple' object has no attribute 'dxf'` and the whole
+    parse surfaced as a generic `PARSE_ADAPTER_UNSUPPORTED / handler_failed` — the defect
+    was found by parsing a real customer drawing, not by the generated fixtures.
+    """
+
+    @staticmethod
+    def _doc():
+        doc = new_doc()
+        add_titles(doc.modelspace())
+        model = doc.modelspace()
+        model.add_line((0, 0), (10, 0))
+        model.add_leader([(0, 0), (5, 5), (10, 5)])
+        return doc
+
+    def test_a_leader_is_declared_instead_of_crashing(self):
+        bundle = parsed(self._doc())
+        declared = [item for item in bundle['metadata']['unsupported']
+                    if item['code'] == 'CAD_ENTITY_TYPE_UNSUPPORTED'
+                    and item.get('entity_type') == 'LEADER']
+        self.assertEqual(len(declared), 1, bundle['metadata']['unsupported'])
+        self.assertTrue(declared[0]['handle'])
+        # The supported geometry next to it is still parsed.
+        self.assertGreaterEqual(len(bundle['snapshot']['entities']), 2)
+
+    def test_the_declared_leader_does_not_hide_the_other_entities(self):
+        bundle = parsed(self._doc())
+        kinds = [e['entity_type'] for e in bundle['snapshot']['entities']]
+        self.assertIn('LINE', kinds)
+        self.assertNotIn('LEADER', kinds, '不支持的实体不得出现在已解析实体里')
+
+
 class DeclaredRefusalTests(unittest.TestCase):
     def test_an_unsupported_entity_type_is_declared_with_type_and_handle(self):
         doc = engineering_doc()

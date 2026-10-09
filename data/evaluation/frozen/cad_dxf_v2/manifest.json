@@ -2,16 +2,16 @@
   "parser_version": "dxf-native-v2",
   "profile": "datamind-2d-engineering-dxf-v2",
   "contract_version": "cad-contract-v2",
-  "frozen_at": "2026-10-08T14:37:45.816503+00:00",
+  "frozen_at": "2026-10-09T04:26:31.724528+00:00",
   "first_frozen_at": "2026-10-08T12:31:54.760468+00:00",
   "status": "development hash record, NOT an accepted frozen baseline: v2 was created and then extended within the same working session (positional identity for handle-less DXF, the CRLF newline fix, and the raw-source $INSUNITS/$HANDLING reads), so the pinned hashes exist to detect unintended drift only. Re-freeze as an accepted baseline after the real-drawing verification. The eight v1 hashes are untouched and still verify (v1_code_hashes_unchanged=true).",
   "ezdxf_version": "1.4.4",
   "code_hashes": {
-    "ingestion/cad_dxf_v2.py": "3ff2d412992055f11ecb98dcd0a2a2f44b11c5c3cf01edb5b19ef2b0acc5ddb5",
+    "ingestion/cad_dxf_v2.py": "8b1041c3b43be1001a35666e8f5263e860a03dd26e8c352a45f0b939324faa5a",
     "ingestion/cad_contract_v2.py": "b7538e129486ae641ac5a518322c658510e19ac61714e715c0f971754fdefcd6",
     "ingestion/cad_adapter.py": "ea81ba41626bda9ab185e59300cf8da4d83e1799a85df297eb66a92219adf9f4",
     "datamind/parse_contract.py": "774604a7bdb33600090dee6e0f82ad32716e69dc6db45ae93f5675eda917e923",
-    "tests/test_cad_dxf_v2.py": "4e9064912e542abc668d1bbcf3a96da4236b0feb369b09a77109394678865951",
+    "tests/test_cad_dxf_v2.py": "43f334c43aeb60010714d59f54a371aba0a66057779dd1198fcd8f1b2a397cda",
     "tests/test_cad_adapter.py": "f48fc3a7a8e5d3ca293446621d9cb407e50ca298a8a0fe9dc330b9040c81ba51",
     "tests/test_parse_contract.py": "667c4efb530b2c5e4c37febbfe5d18e6ee5b57b65a38205a9917b5282645f39f",
     "data/cad_demo/DXF_PROFILE_V2.md": "286f90e7c9a8ab0d7d829f3c6db04fedcf9903d1c73718b214e9d4fb2c745a0e",
@@ -55,6 +55,7 @@
     "runtime_snapshot_directory is null: v2 has no captured runtime sample directory.",
     "Any edit to a pinned file requires regenerating this manifest; FrozenV2ManifestTests refuses a stale freeze.",
     "Re-pinned at 2026-10-08T14:37:45.816503+00:00 for the positional-identity + CRLF change; the previous freeze time is preserved in first_frozen_at.",
-    "tests/test_cad_handleless.py is pinned too: it is the guard for the handle-less (positional) mode and the CRLF normalisation."
+    "tests/test_cad_handleless.py is pinned too: it is the guard for the handle-less (positional) mode and the CRLF normalisation.",
+    "Recomputed once after the LEADER fix (`_visited` read `.dxf` off plain coordinate tuples in `LEADER.vertices`, so a real drawing crashed as PARSE_ADAPTER_UNSUPPORTED/handler_failed) and its regression test. v1 hashes re-verified unchanged."
   ]
 }

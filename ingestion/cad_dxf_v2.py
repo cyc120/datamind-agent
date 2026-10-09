@@ -393,18 +393,28 @@ def _sub_entities(entity, name):
 
 
 def _visited(entity):
-    """The handle of one entity plus the handles it owns inline."""
+    """The handle of one entity plus the handles it owns inline.
+
+    `_sub_entities` is name-driven, and the same attribute name does not always hold
+    entities: `LEADER.vertices`, for instance, is a list of plain coordinate **tuples**
+    while `POLYLINE.vertices` holds entity objects. Only members that really are entities
+    carry a handle, so each one is checked before it is read — a real drawing containing a
+    LEADER used to crash the whole parse here (`AttributeError: 'tuple' object has no
+    attribute 'dxf'`) instead of being declared unsupported.
+    """
     handles = [entity.dxf.get('handle')]
     for vertex in _sub_entities(entity, 'vertices'):
-        handles.append(vertex.dxf.get('handle'))
+        if hasattr(vertex, 'dxf'):
+            handles.append(vertex.dxf.get('handle'))
     try:
         seqend = getattr(entity, 'seqend', None)
     except Exception:
         seqend = None
-    if seqend is not None and not callable(seqend):
+    if seqend is not None and not callable(seqend) and hasattr(seqend, 'dxf'):
         handles.append(seqend.dxf.get('handle'))
     for attrib in _sub_entities(entity, 'attribs'):
-        handles.append(attrib.dxf.get('handle'))
+        if hasattr(attrib, 'dxf'):
+            handles.append(attrib.dxf.get('handle'))
     return handles
 
 
