@@ -99,7 +99,13 @@ def main():
         # source instead of being hand-edited (that drift was reported three times). The file is
         # committed on purpose: it is the evidence of the last verified run, and
         # `tests/test_status_docs_sync.py` fails when the documents disagree with it.
-        summary.update(commit=_git_commit(), ran_at=datetime.now(timezone.utc).isoformat())
+        # Which tests failed, not just how many: `status_sync.py` distinguishes "the only red
+        # tests are the status-drift ones" (publishing the numbers *is* the repair) from a real
+        # regression (never publish). Without this the mechanism deadlocks: stale docs make the
+        # drift test fail, and a red run would then refuse to publish the numbers that fix it.
+        summary.update(commit=_git_commit(), ran_at=datetime.now(timezone.utc).isoformat(),
+                       failed_tests=sorted(test.id() for test, _ in
+                                           list(result.failures) + list(result.errors)))
         (ROOT/'reports/latest_regression.json').write_text(
             json.dumps(summary,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
         print(json.dumps(summary))

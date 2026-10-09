@@ -7,6 +7,7 @@
   "private_pdf_snapshot_rows_copied": false,
   "private_pdf_knowledge_rows_copied": false,
   "source_database_modified": false,
-  "commit": "a1350f4",
-  "ran_at": "2026-10-09T08:59:18.396229+00:00"
+  "commit": "b3db3bf",
+  "ran_at": "2026-10-09T09:13:24.623198+00:00",
+  "failed_tests": []
 }

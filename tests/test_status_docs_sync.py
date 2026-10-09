@@ -29,9 +29,14 @@ class StatusDocumentsSyncTest(unittest.TestCase):
     def _text(self, name):
         return (ROOT / name).read_text(encoding="utf-8")
 
-    def test_the_recorded_run_is_green(self):
-        self.assertEqual(self.summary["failures"], 0, self.summary)
-        self.assertEqual(self.summary["errors"], 0, self.summary)
+    def test_the_recorded_run_is_isolated(self):
+        """Only invariants that do not depend on the *current* run's outcome.
+
+        Asserting `failures == 0` here was self-referential: the record read during a run is the
+        previous run's, so one red record made every later run red as well, permanently. "Do not
+        publish a red run" belongs to `status_sync.py`, which also carries the deliberate
+        exception for drift-only failures.
+        """
         self.assertTrue(self.summary["metadata_isolated"])
         self.assertFalse(self.summary["source_database_modified"],
                          "a run that wrote to the source database must not be published")
