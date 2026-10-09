@@ -115,7 +115,13 @@ class DataMindAgent:
                 final["sql_result"] = {k: _plain(result[k]) for k in
                                        ("sql", "sql_hash", "columns", "rows", "row_count", "elapsed_ms",
                                         "source_snapshot_id", "validator_findings")}
-                for key in ('source_id','prompt_version','semantic_contract','model_used','query_frame','attempts','model_sql'):
+                # `executed` / `semantically_verified` / `verification_contract` /
+                # `verification_reasons` come from `sql_engine.semantic_verification`: a query
+                # that ran is not automatically one whose metric semantics were proven, and that
+                # difference has to reach the API and the event log instead of being flattened
+                # into "completed".
+                for key in ('source_id','prompt_version','semantic_contract','model_used','query_frame','attempts','model_sql',
+                            'executed','semantically_verified','verification_contract','verification_reasons'):
                     if key in result:
                         final['sql_result'][key] = _plain(result[key])
                 if result.get('source_id')=='demo_industrial':
@@ -157,6 +163,12 @@ class DataMindAgent:
                          [row_id], ("medium" if result.get('source_id')=='demo_industrial' else "high") if verified else "insufficient",
                          Json({"sql_hash_matches": True, "row_count": result["row_count"],
                                "validator_findings": result.get("validator_findings", []),
+                               # The claim records which contract it was actually judged under, so a
+                               # reader can tell "metric semantics proven" from "only the time scope
+                               # was normalized" without re-deriving it from the finding list.
+                               **({key: result[key] for key in
+                                   ("semantically_verified", "verification_contract", "verification_reasons")
+                                   if key in result}),
                                **({'synthetic_demo':True,'semantic_contract':result['semantic_contract'],
                                    'full_semantic_entailment':'not_independently_verified'} if result.get('source_id')=='demo_industrial' else {})})))
         self._event("evidence.attached", "verification_agent", "succeeded",
@@ -314,12 +326,19 @@ class DataMindAgent:
             answer = _result_answer(result)
             if source=='demo_industrial':
                 answer += '\n' + result['semantic_contract']
-            verified = verification_passed(result["validator_findings"])
+            # A weak contract must not produce a strong label: `semantically_verified` is False
+            # for `time_scope_only` even when no finding fired, so such an answer is delivered
+            # but downgraded to `insufficient` instead of claiming `high` confidence.
+            verified = result.get("semantically_verified")
+            if verified is None:
+                verified = verification_passed(result["validator_findings"])
             self._record_evidence(result, answer, verified)
             self._event("verification.passed" if verified else "verification.failed", "verification_agent",
                         "succeeded" if verified else "failed",
                         output_summary={"sql_hash_matches": True, "row_count": result["row_count"],
-                                        "validator_findings": result["validator_findings"]})
+                                        "validator_findings": result["validator_findings"],
+                                        "verification_contract": result.get("verification_contract"),
+                                        "verification_reasons": result.get("verification_reasons")})
             return self._finish("COMPLETED", answer, ("medium" if source=='demo_industrial' else "high") if verified else "insufficient", result=result)
         except Exception as exc:
             if isinstance(exc, ValueError) and str(exc).startswith("DOCUMENT_SELECTION_"):

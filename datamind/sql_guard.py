@@ -61,12 +61,38 @@ def _scope_projection_names(scope) -> set[str]:
     return names
 
 
-def _check_columns(tree, catalog: Catalog, cte_names: set, base_tables: list) -> None:
+def cte_reference_table_ids(tree) -> set[int]:
+    """``id()`` of the ``exp.Table`` nodes that really reference a CTE.
+
+    Classification uses the *source object of the node's own scope*, never a global set of
+    CTE names. Two consequences matter for the security boundary:
+
+    - a table reference that is schema qualified (``public.customers``) can never be a CTE
+      reference, so it can never inherit a same-named CTE's exemption; and
+    - a CTE reference must resolve to a ``Scope`` whose ``is_cte`` is true in that scope,
+      so an inner CTE that shadows an outer name does not exempt the outer real table.
+    """
+    ids: set[int] = set()
+    for scope in traverse_scope(tree):
+        if not scope.cte_sources:
+            continue
+        for table in scope.tables:
+            if table.catalog or table.db:
+                continue  # schema/catalog-qualified names are always real tables
+            source = scope.sources.get(table.alias_or_name)
+            if isinstance(source, Scope) and getattr(source, "is_cte", False):
+                ids.add(id(table))
+    return ids
+
+
+def _check_columns(tree, catalog: Catalog, base_tables: list) -> None:
     """Resolve every column against the sources of *its own* query scope.
 
     A single global alias table is unsafe: an inner CTE alias can shadow an outer table
     alias, and a projection alias (`SELECT c AS c`) would then exempt the very column it
-    renames. Both were reachable bypasses, so resolution is per scope.
+    renames. Both were reachable bypasses, so resolution is per scope. ``scope.sources``
+    already distinguishes a real ``exp.Table`` from a CTE ``Scope``; there is deliberately
+    no name-based shortcut left here.
     """
     for scope in traverse_scope(tree):
         sources = {alias: source.name for alias, source in scope.sources.items()
@@ -85,10 +111,8 @@ def _check_columns(tree, catalog: Catalog, cte_names: set, base_tables: list) ->
                 if column.table not in sources:
                     raise PolicyError("UNKNOWN_TABLE_ALIAS")
                 possible = [sources[column.table]]
-                if possible[0] in cte_names:
-                    continue
             else:
-                possible = [name for name in sources.values() if name not in cte_names]
+                possible = list(sources.values())
                 if not possible:
                     possible = list(base_tables)
             matches = [catalog.columns[(name, column.name)] for name in possible
@@ -147,11 +171,15 @@ def guard_sql(sql: str, catalog: Catalog, max_rows: int = 100) -> SafeSQL:
         if fn.name.lower() not in {"date_trunc", "round", "coalesce", "nullif", "concat", "lower", "upper",
                                    "substring", "to_char", "abs", "greatest", "least"}:
             raise PolicyError("UNAPPROVED_FUNCTION")
-    cte_names = {cte.alias for cte in tree.find_all(exp.CTE)}
+    # CTE references are identified by their scope source object, not by name. A real table
+    # that merely shares a name with a CTE (especially a schema-qualified one) must still be
+    # validated here; the old global name set let `public.customers` skip both the schema
+    # check and the restricted-column check.
+    cte_refs = cte_reference_table_ids(tree)
     aliases: dict[str, str] = {}
     base_tables = []
     for table in tree.find_all(exp.Table):
-        if table.name in cte_names:
+        if id(table) in cte_refs:
             aliases[table.alias_or_name] = table.name
             continue
         if table.db and table.db not in catalog.schemas:
@@ -163,7 +191,7 @@ def guard_sql(sql: str, catalog: Catalog, max_rows: int = 100) -> SafeSQL:
         aliases[table.alias_or_name] = table.name
     if not base_tables:
         raise PolicyError("NO_BASE_TABLE")
-    _check_columns(tree, catalog, cte_names, base_tables)
+    _check_columns(tree, catalog, base_tables)
     for join in tree.find_all(exp.Join):
         if join.args.get("kind") == "CROSS" or not (join.args.get("on") or join.args.get("using")):
             raise PolicyError("CARTESIAN_JOIN")
@@ -172,7 +200,7 @@ def guard_sql(sql: str, catalog: Catalog, max_rows: int = 100) -> SafeSQL:
         if any(isinstance(node, exp.Or) for node in join.args["on"].walk()):
             raise PolicyError("AMBIGUOUS_JOIN_CONDITION")
         joined = join.this
-        if not isinstance(joined, exp.Table) or joined.name in cte_names:
+        if not isinstance(joined, exp.Table) or id(joined) in cte_refs:
             raise PolicyError("DERIVED_JOIN_NOT_VERIFIED")
         pairs = [_column_pair(n, aliases) for n in join.args["on"].walk() if isinstance(n, exp.EQ)]
         if not any(p and _approved_equality(p, catalog) and joined.name in (p[0][0], p[1][0]) for p in pairs):

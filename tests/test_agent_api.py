@@ -62,9 +62,34 @@ class AgentAPITest(unittest.TestCase):
         later = self.client.get(f"/v1/runs/{agent.run_id}/events", params={"after": after}).json()
         self.assertTrue(all(e["event_id"] > after for e in later["events"]))
         evidence = self.client.get(f"/v1/runs/{agent.run_id}/evidence").json()
-        self.assertEqual(evidence["claims"][0]["status"], "verified")
+        # 「有多少笔订单」不是注册指标问题，当前只做了时间范围规范化（`time_scope_only`），
+        # 因此**不得**标为 verified：执行成功不等于语义已验证。答案照常返回（COMPLETED），
+        # 但 claim 与 confidence 如实降级。强契约（销售额指标）另见下一个用例。
+        self.assertEqual(evidence["claims"][0]["status"], "insufficient_evidence")
+        self.assertEqual(evidence["claims"][0]["confidence_level"], "insufficient")
+        verification = evidence["claims"][0]["verification"]
+        self.assertFalse(verification["semantically_verified"])
+        self.assertEqual(verification["verification_contract"], "time_scope_only")
+        self.assertTrue(any(str(reason).startswith("SEMANTIC_CONTRACT_WEAK")
+                            for reason in verification["verification_reasons"]))
         self.assertEqual(evidence["nodes"][0]["run_id"], agent.run_id)
         self.assertEqual(len(evidence["edges"]), 2)
+
+    def test_a_registered_metric_question_is_verified_under_the_strong_contract(self):
+        """正向对照：销售额问题走完整指标 AST 契约，仍必须标为 verified。
+
+        没有这条，上面的降级就可能被"一律标 insufficient"伪修掉。
+        """
+        sales_sql = ("SELECT COALESCE(SUM(oi.quantity * oi.unit_price * (1 - oi.discount)), 0) AS amt "
+                     "FROM orders o JOIN order_items oi ON oi.order_id = o.order_id "
+                     "WHERE o.created_at >= '2024-01-01' AND o.created_at < '2025-01-01' "
+                     "AND o.order_status IN ('completed','shipped','refunded')")
+        ask_result = real_ask("2024年销售额是多少？", "demo_retail",
+                              generator=lambda *_: {"sql": sales_sql})
+        self.assertEqual(ask_result["status"], "completed")
+        self.assertTrue(ask_result["semantically_verified"])
+        self.assertEqual(ask_result["verification_contract"], "retail_metric_ast_contract")
+        self.assertFalse(ask_result["verification_reasons"])
 
     def test_stream_and_scope(self):
         with patch("datamind.agent.ask", side_effect=seeded_ask):
