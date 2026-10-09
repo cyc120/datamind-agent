@@ -4,7 +4,7 @@
   "baseline": "2d9ab18（复审基线 API 0.30.0）",
   "started_from": "68b8cf8（API 0.33.0）",
   "date": "2026-10-08",
-  "scope": "按复审 §7 排期修复 F01–F12 与回归 R1，并为每条加入可执行验收断言。本文件记录逐条状态、修复方式、验收证据与未修原因。",
+  "scope": "按复审 §7 排期修复 F01–F12 与回归 R1，并为每条加入可执行验收断言。本文件记录逐条状态、修复方式、验收证据与未修原因。；另有 2026-10-09 独立复查（基线 561316c）在同一基线上复现 R01–R05，见 reports/project_audit_20261009_561316c.md —— 本文件的“已修”只针对 F01–F12 原反例，不代表缺陷类别穷尽。",
   "order_note": "复审给出的排期为：①F01 ②F02 ③F03+F11 ④F05+F06 ⑤F08+F09；F04/F07/F10 未进前五。",
   "findings": {
     "F01": {
@@ -367,7 +367,7 @@
     "契约关系前端渲染：`web/app.js` 引用卡片渲染已存关系 —— 已完成（API 0.37.0，见 roadmap_progress.frontend_presentation）",
     "profile 解析实现收敛：唯一入口 `resolve_profile_values()` —— 已完成（API 0.37.0，见 roadmap_progress.profile_resolver_unification）"
   ],
-  "api_version": "0.38.0",
+  "api_version": "0.39.0",
   "version_changes": {
     "datamind/api.py": "0.33.0 → 0.34.0 → 0.35.0 → 0.36.0 → 0.37.0 → 0.38.0（当前 0.38.0；以 `datamind/api.py` 的 `version=` 与 `/openapi.json` 的 `info.version` 实测为准）",
     "web/index.html": "前端缓存版本逐次递增（0.33.0 → 0.34.0 → 0.37.0 → 0.38.0）；每次改动 app.js/multifile.js/style.css 都必须同步提升，否则回访浏览器继续用旧脚本",

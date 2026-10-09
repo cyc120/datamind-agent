@@ -164,14 +164,64 @@ def persist_result(cur, *, document_id, payload, dsn=None, available_columns=Non
             'locators': len(blocks), 'relations': relations, 'omitted_columns': list(omitted)}
 
 
-def read_result(document_id, dsn, *, limit=2000):
-    """Read back everything the contract stored for one document.
+#: One page of a read is bounded; the caller walks further pages with `offset`. The default
+#: stays 2000 so an existing caller reads exactly the same rows it used to, and the ceiling
+#: keeps one request from materializing an unbounded slice of a large drawing.
+DEFAULT_PAGE_LIMIT = 2000
+MAX_PAGE_LIMIT = 5000
+MAX_PAGE_OFFSET = 1_000_000
+
+
+def page_window(limit=DEFAULT_PAGE_LIMIT, offset=0):
+    """Validate one LIMIT/OFFSET window; a bad value is a stable error, never a clamp.
+
+    Shared by `read_result` and the `/contract` route so the store and the endpoint accept
+    exactly the same window and refuse the same values with the same code, rather than one
+    silently clamping what the other rejects. `bool` is refused explicitly because it is an
+    `int` subclass in Python and `True` would otherwise pass as `limit=1`.
+    """
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= MAX_PAGE_LIMIT:
+        raise ValueError('CONTRACT_PAGE_LIMIT_INVALID')
+    if isinstance(offset, bool) or not isinstance(offset, int) or not 0 <= offset <= MAX_PAGE_OFFSET:
+        raise ValueError('CONTRACT_PAGE_OFFSET_INVALID')
+    return limit, offset
+
+
+def _store_page(limit, offset, total, returned):
+    """One store's window plus the two names callers use for "more rows exist beyond it"."""
+    end = offset + returned
+    return {'limit': limit, 'offset': offset, 'total': total, 'returned': returned,
+            'truncated': end < total, 'has_more': end < total}
+
+
+def read_result(document_id, dsn, *, limit=DEFAULT_PAGE_LIMIT, offset=0):
+    """Read one bounded page of everything the contract stored for one document.
 
     Two stores exist on purpose: page-shaped PDF parses keep their blocks in
     `document_blocks` with the validated locator in `document_block_locators`, while formats
     without a page concept (Office, DXF) land in `document_contract_blocks`. Returning only
     one of them would report "nothing stored" for a document that does have validated
     locators, so both are read here and reported under their own keys.
+
+    **Pagination is explicit, and a partial read never looks complete.** `limit`/`offset`
+    window *each* store the same way, over a stable order (`reading_order, block_id` for
+    blocks, `relation_id` for relations), so consecutive pages neither repeat nor skip a
+    row. The legacy flat keys keep their historical meaning and count *this page*, never the
+    database: `block_count` / `locator_count` / `block_locator_count` / `locator_total` /
+    `relation_count`. The database totals and the page facts are separate keys:
+
+    * `totals` — rows in the database per store: `blocks`, `page_locators`,
+      `block_locators` (contract blocks whose embedded `locator` is non-empty), `relations`;
+    * `counts` — rows on this page: `blocks_returned`, `page_locators_returned`,
+      `block_locators_in_page`, `relations_returned`;
+    * `page` — the window applied to the contract-block store, with `truncated` / `has_more`;
+    * `store_pages` — one such window per store, so a truncated *relation* list is reported
+      even when the block page is complete. A relation can therefore name a block outside
+      the returned page; the per-store flags are what make that honest instead of implied.
+
+    `truncated` and `has_more` state the same fact (rows exist beyond this page) under both
+    names callers use. An invalid window raises `CONTRACT_PAGE_LIMIT_INVALID` /
+    `CONTRACT_PAGE_OFFSET_INVALID` instead of being clamped.
 
     Contract blocks are read with the columns the database has: a row written before
     migration 017 has no value for the newer fields, and this returns them as None rather
@@ -185,6 +235,7 @@ def read_result(document_id, dsn, *, limit=2000):
     verification fail *silently* (it returns no facts rather than an error), so callers must
     never compare one against the other. `tests/test_contract_store.py` pins the difference.
     """
+    limit, offset = page_window(limit, offset)
     available = block_columns(dsn)
     columns = [name for name in BLOCK_COLUMNS + BLOCK_EXTENDED_COLUMNS if name in available]
     if not columns:
@@ -194,35 +245,70 @@ def read_result(document_id, dsn, *, limit=2000):
                   if name not in ('block_id', 'contract_version', 'block_type', 'text',
                                   'reading_order'))
     with psycopg2.connect(dsn) as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute('''SELECT count(*) AS count FROM document_contract_blocks
+            WHERE document_id=%s''', (document_id,))
+        total_blocks = cur.fetchone()['count']
+        cur.execute('''SELECT count(*) AS count FROM document_contract_blocks
+            WHERE document_id=%s AND locator IS NOT NULL AND locator <> '{}'::jsonb''',
+                    (document_id,))
+        total_block_locators = cur.fetchone()['count']
         cur.execute(f'''SELECT {selected} FROM document_contract_blocks
-            WHERE document_id=%s ORDER BY reading_order LIMIT %s''', (document_id, limit))
+            WHERE document_id=%s ORDER BY reading_order, block_id LIMIT %s OFFSET %s''',
+                    (document_id, limit, offset))
         blocks = []
         for row in cur.fetchall():
             stored = dict(row)
             for name in BLOCK_EXTENDED_COLUMNS:
                 stored.setdefault(name, None)
             blocks.append(stored)
+        cur.execute('''SELECT count(*) AS count FROM document_block_locators
+            WHERE document_id=%s''', (document_id,))
+        total_page_locators = cur.fetchone()['count']
         cur.execute('''SELECT b.block_id, l.contract_version, b.block_type, b.text,
             b.reading_order, b.page_no, b.bbox, b.content_hash, l.locator
             FROM document_block_locators l JOIN document_blocks b USING(block_id)
-            WHERE l.document_id=%s ORDER BY b.reading_order LIMIT %s''', (document_id, limit))
+            WHERE l.document_id=%s ORDER BY b.reading_order, b.block_id
+            LIMIT %s OFFSET %s''', (document_id, limit, offset))
         locators = [dict(row) for row in cur.fetchall()]
+        cur.execute('''SELECT count(*) AS count FROM document_block_relations
+            WHERE document_id=%s''', (document_id,))
+        total_relations = cur.fetchone()['count']
         cur.execute('''SELECT relation_id, source_block_id, target_block_id, relation_type,
             relation_state, recovery_method, evidence FROM document_block_relations
-            WHERE document_id=%s ORDER BY relation_id''', (document_id,))
+            WHERE document_id=%s ORDER BY relation_id LIMIT %s OFFSET %s''',
+                    (document_id, limit, offset))
         relations = [dict(row) for row in cur.fetchall()]
     # Two stores hold locators in different shapes, and a single count would mislead: a DXF
     # has every locator *inside* its contract blocks (`blocks[].locator`) with zero rows in
     # the page-shaped table, so reporting only `locator_count` showed "8 blocks, 0 locators"
     # for a fully located drawing. All three counts are returned so a caller never has to
-    # guess which store a number came from.
-    block_locator_count = sum(1 for block in blocks if block.get('locator'))
+    # guess which store a number came from — and `totals` says how many exist in the
+    # database while `counts` says how many of them are on this page.
+    blocks_returned = len(blocks)
+    page_locators_returned = len(locators)
+    block_locators_in_page = sum(1 for block in blocks if block.get('locator'))
+    relations_returned = len(relations)
     return {'document_id': document_id, 'blocks': blocks, 'relations': relations,
-            'locators': locators, 'block_count': len(blocks),
-            'locator_count': len(locators),                    # 分页型：document_block_locators
-            'block_locator_count': block_locator_count,        # 契约块内嵌：blocks[].locator
-            'locator_total': len(locators) + block_locator_count,
-            'relation_count': len(relations)}
+            'locators': locators,
+            # 旧扁平键：含义不变，仍然只表示“本页”。
+            'block_count': blocks_returned,
+            'locator_count': page_locators_returned,           # 分页型：document_block_locators
+            'block_locator_count': block_locators_in_page,     # 契约块内嵌：blocks[].locator
+            'locator_total': page_locators_returned + block_locators_in_page,
+            'relation_count': relations_returned,
+            # 库内总数与本页数量的显式区分。
+            'totals': {'blocks': total_blocks, 'page_locators': total_page_locators,
+                       'block_locators': total_block_locators, 'relations': total_relations},
+            'counts': {'blocks_returned': blocks_returned,
+                       'page_locators_returned': page_locators_returned,
+                       'block_locators_in_page': block_locators_in_page,
+                       'relations_returned': relations_returned},
+            'page': _store_page(limit, offset, total_blocks, blocks_returned),
+            'store_pages': {
+                'blocks': _store_page(limit, offset, total_blocks, blocks_returned),
+                'page_locators': _store_page(limit, offset, total_page_locators,
+                                             page_locators_returned),
+                'relations': _store_page(limit, offset, total_relations, relations_returned)}}
 
 
 MAX_LOCATOR_QUERY = 512

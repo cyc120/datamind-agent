@@ -1054,15 +1054,35 @@ def chat_stream(request: ChatRequest):
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
-def _public_document(document_id: str) -> dict:
+def _document_asset(document_id: str) -> dict | None:
+    """The raw `document_assets` row, published or not; None when the id is unknown.
+
+    One loader exists so the public detail routes and the contract route judge the *same*
+    row with the *same* predicates, instead of each embedding its own SQL filter that can
+    drift apart.
+    """
     with psycopg2.connect(_read_dsn()) as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute("""SELECT * FROM document_assets WHERE document_id=%s AND status='indexed'
-                       AND 'public'=ANY(acl) AND NOT needs_review AND collection=ANY(%s)""",
-                    (document_id, sorted(COLLECTIONS)))
+        cur.execute("""SELECT * FROM document_assets WHERE document_id=%s""", (document_id,))
         row = cur.fetchone()
-    if not row:
+    return dict(row) if row else None
+
+
+def _published_document(document: dict | None) -> bool:
+    """The one publish predicate: indexed, public ACL, review cleared, known collection.
+
+    `_public_document` (detail/file/facts) and `_contract_visible` both call it, so "this
+    document is public" cannot diverge between the retrieval routes and the evidence route.
+    """
+    return bool(document) and document.get("status") == "indexed" \
+        and "public" in (document.get("acl") or []) and not document.get("needs_review") \
+        and document.get("collection") in COLLECTIONS
+
+
+def _public_document(document_id: str) -> dict:
+    document = _document_asset(document_id)
+    if not _published_document(document):
         raise HTTPException(404, detail={"error_code": "DOCUMENT_NOT_FOUND"})
-    return dict(row)
+    return document
 
 
 @app.get("/v1/documents")
@@ -1118,32 +1138,87 @@ def document_file(document_id: str,expected_version: int | None=Query(default=No
                         filename=path.name, content_disposition_type="inline")
 
 
-def _upload_document(document_id: str):
-    """An upload's contract is readable before review.
+def _pending_upload_evidence(document: dict | None) -> bool:
+    """An upload row whose only readable reason is pre-approval evidence browsing.
 
-    Uploads keep `needs_review` and a non-`indexed` status until an explicit approve, and
-    `_public_document` refuses exactly those rows — that is the retrieval gate. The
-    contract endpoint is evidence browsing rather than retrieval, and the upload detail
-    links to it as `contract_url`, so an `origin='upload'` row is readable here (and only
-    here) before approval. `/v1/documents`, RAG and every other document route keep the
-    gate unchanged.
+    The upload pipeline marks its own rows `origin='upload'` and keeps `needs_review=TRUE`
+    with a non-`indexed` status until an explicit approve, but it also writes the default
+    `public` ACL. ACL alone is therefore not a publish decision for these rows, and the
+    contract route sits inside the anonymous public-read prefix: without an identity check
+    an unreviewed upload's full text and locators leaked to anonymous callers.
     """
-    with psycopg2.connect(_read_dsn()) as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute("""SELECT * FROM document_assets WHERE document_id=%s AND origin='upload'
-                       AND 'public'=ANY(acl) AND collection=ANY(%s)""",
-                    (document_id, sorted(COLLECTIONS)))
-        row = cur.fetchone()
-    return dict(row) if row else None
+    return bool(document) and document.get("origin") == "upload" \
+        and "public" in (document.get("acl") or []) \
+        and document.get("collection") in COLLECTIONS \
+        and not _published_document(document)
+
+
+def _identity_is_admin(identity) -> bool:
+    return bool(identity) and "admin" in (identity.get("roles") or [])
+
+
+def _contract_visible(document: dict | None, identity) -> bool:
+    """The single authority for reading one document's contract.
+
+    Two disjoint reasons grant access, and the caller of this function owns no other one:
+
+    * **published** — the same predicate the detail/file/facts routes use, so a normally
+      indexed document (including anonymous public read) behaves exactly as before;
+    * **pre-approval upload evidence** — an authenticated administrator only. The loopback
+      no-login demo admin resolves to an admin identity, so the local review flow keeps
+      working.
+
+    Anything else is unreadable here, and the route answers 404 exactly as the detail route
+    does: an unauthorised caller must not learn that the id exists.
+    """
+    if _published_document(document):
+        return True
+    return _pending_upload_evidence(document) and _identity_is_admin(identity)
+
+
+def _contract_window(limit, offset):
+    """Parse the raw query values into a validated `(limit, offset)` page window.
+
+    Conversion and bounds share the store's `page_window`, so the route cannot drift from
+    `read_result`. A blank value takes the default; a non-numeric or out-of-range value is a
+    stable 400 with the store's own error code, never a silent clamp.
+    """
+    from ingestion.contract_store import DEFAULT_PAGE_LIMIT, page_window
+
+    def number(raw, default, code):
+        if raw is None or (isinstance(raw, str) and not raw.strip()):
+            return default
+        try:
+            return int(str(raw).strip())
+        except (TypeError, ValueError):
+            raise HTTPException(400, detail={'error_code': code})
+
+    parsed = (number(limit, DEFAULT_PAGE_LIMIT, 'CONTRACT_PAGE_LIMIT_INVALID'),
+              number(offset, 0, 'CONTRACT_PAGE_OFFSET_INVALID'))
+    try:
+        return page_window(*parsed)
+    except ValueError as error:
+        raise HTTPException(400, detail={'error_code': str(error)})
 
 
 @app.get("/v1/documents/{document_id}/contract")
-def document_contract(document_id: str):
-    """Everything the contract stored for one document, from both stores.
+def document_contract(document_id: str, request: Request, response: Response,
+                      limit: str | None = Query(default=None),
+                      offset: str | None = Query(default=None)):
+    """One bounded page of everything the contract stored for one document, from both stores.
 
     `blocks` holds the contract blocks of formats without a page concept (Office, DXF);
     `locators` holds the validated locators of page-shaped PDF parses, which live beside
     `document_blocks`. A document may have either or both; returning only one would report
     "nothing stored" for a document that does have validated locators.
+
+    **Who may read it** is decided by `_contract_visible`: a published document is public
+    (anonymous included, unchanged), while an unreviewed upload is readable only by an
+    authenticated administrator and then carries `Cache-Control: no-store`.
+
+    **Pagination.** `limit`/`offset` window each store; the legacy `*_count` keys keep
+    counting this page, while `page`/`store_pages`/`totals`/`counts` separate the page from
+    the database so a truncated read is never presented as the whole contract.
 
     `parse_contract` repeats the summary the ingest path recorded, including
     `unsupported_features`. Without it a document whose format cannot carry a locator (an
@@ -1151,15 +1226,23 @@ def document_contract(document_id: str):
     exists) reads as "indexed but nothing stored" — the counts alone cannot distinguish
     "nothing was parsed" from "a gap was declared".
     """
+    from .auth import current
     from ingestion.contract_store import read_result
-    try:
-        document = _public_document(document_id)
-    except HTTPException:
-        document = _upload_document(document_id)
-        if document is None:
-            raise
-    stored = read_result(document_id, _read_dsn())
+    limit, offset = _contract_window(limit, offset)
+    # This route is inside the anonymous public-read prefix, so the middleware did not
+    # resolve an identity. Identity lives in the auth tables, which the read-only role
+    # cannot see, so this uses the same DSN the middleware uses — and `provision_demo=False`
+    # keeps a read from ever writing the demo user row.
+    identity = current(request, _write_dsn(), required=False, provision_demo=False)
+    document = _document_asset(document_id)
+    if not _contract_visible(document, identity):
+        raise HTTPException(404, detail={"error_code": "DOCUMENT_NOT_FOUND"})
+    stored = read_result(document_id, _read_dsn(), limit=limit, offset=offset)
     summary = (document.get("quality_detail") or {}).get("parse_contract") or {}
+    if not _published_document(document):
+        # Pre-approval evidence (or any non-published row an admin may still read) must not
+        # be cached by a browser or an intermediary.
+        response.headers["Cache-Control"] = "no-store"
     return {"document_id": document_id, "document_version": document["doc_version"],
             "source_sha256": document["sha256"], "parser_version": document["parser_version"],
             "contract_version": document.get("contract_version"),
@@ -1167,6 +1250,8 @@ def document_contract(document_id: str):
             "block_locator_count": stored.get("block_locator_count"),
             "locator_total": stored.get("locator_total"),
             "relation_count": stored["relation_count"],
+            "page": stored["page"], "store_pages": stored["store_pages"],
+            "totals": stored["totals"], "counts": stored["counts"],
             "parse_contract": jsonable_encoder(summary),
             "unsupported_features": list(summary.get("unsupported_features") or []),
             "blocks": jsonable_encoder(stored["blocks"]),

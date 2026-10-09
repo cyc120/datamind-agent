@@ -621,5 +621,132 @@ class PreMigrationShapeFallbackTests(unittest.TestCase):
         self.assertNotIn('heading_level', first)
 
 
+class ContractPaginationHonestyTests(unittest.TestCase):
+    """5.2: a read that hit the page bound must say so, and hand out the rest by offset.
+
+    Regression: `read_result` returned the first 2000 rows of each store and `/contract`
+    reported that list length as `block_count`, so a 2001-block document read as exactly
+    2000 with nothing to indicate that a row was missing — and the relation query had no
+    bound of its own at all.
+    """
+
+    BLOCKS = 2001
+
+    def setUp(self):
+        self.dsn = _write_dsn()
+        self.document_id = f'doc-page-{uuid.uuid4().hex[:12]}'
+        with psycopg2.connect(self.dsn) as conn, conn.cursor() as cur:
+            cur.execute("""INSERT INTO document_assets(document_id, title, file_type, sha256,
+                status, acl, needs_review, collection)
+                VALUES (%s, 'pagination test', 'dxf', %s, 'indexed', '{public}', FALSE, 'demo_kb')""",
+                        (self.document_id, hashlib.sha256(self.document_id.encode()).hexdigest()))
+            self._insert_blocks(cur, self.document_id, self.BLOCKS)
+        self.addCleanup(self.cleanup)
+
+    @staticmethod
+    def _insert_blocks(cur, document_id, count, prefix='blk-page'):
+        cur.executemany("""INSERT INTO document_contract_blocks(block_id, document_id,
+            contract_version, block_type, text, reading_order, locator, content_hash)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
+                        [(f'{prefix}-{index:05d}', document_id, 'parse-contract-v1', 'paragraph',
+                          f'正文 {index}', index, '{}', 'd' * 64) for index in range(count)])
+
+    @staticmethod
+    def _insert_relations(cur, document_id, count, prefix='blk-page', relation_prefix='rel-page'):
+        for index in range(count):
+            cur.execute("""INSERT INTO document_block_relations(relation_id, document_id,
+                source_block_id, target_block_id, relation_type, relation_state,
+                recovery_method, evidence) VALUES (%s,%s,%s,%s,'references','verified',
+                'native_reference','证据 %s')""",
+                        (f'{relation_prefix}-{index}', document_id, f'{prefix}-{index:05d}',
+                         f'{prefix}-{index + 1:05d}', index))
+
+    def cleanup(self):
+        with psycopg2.connect(self.dsn) as conn, conn.cursor() as cur:
+            cur.execute('DELETE FROM document_block_relations WHERE document_id=%s',
+                        (self.document_id,))
+            cur.execute('DELETE FROM document_contract_blocks WHERE document_id=%s',
+                        (self.document_id,))
+            cur.execute('DELETE FROM document_assets WHERE document_id=%s', (self.document_id,))
+
+    def test_a_full_page_reports_the_database_total_and_the_truncation(self):
+        read = contract_store.read_result(self.document_id, self.dsn)
+        # The legacy flat key keeps its "this page" meaning...
+        self.assertEqual(read['block_count'], contract_store.DEFAULT_PAGE_LIMIT)
+        self.assertEqual(read['counts']['blocks_returned'], read['block_count'])
+        self.assertLessEqual(read['counts']['blocks_returned'], read['page']['limit'])
+        # ...while `totals` is the store count, and the page says it was cut.
+        self.assertEqual(read['totals']['blocks'], self.BLOCKS)
+        self.assertEqual(read['page']['total'], self.BLOCKS)
+        self.assertTrue(read['page']['truncated'])
+        self.assertTrue(read['page']['has_more'])
+        self.assertEqual(read['store_pages']['blocks']['total'], self.BLOCKS)
+        self.assertTrue(read['store_pages']['blocks']['has_more'])
+
+    def test_offset_pages_cover_every_block_exactly_once(self):
+        seen = []
+        offset = 0
+        while True:
+            page = contract_store.read_result(self.document_id, self.dsn, limit=500, offset=offset)
+            seen.extend(block['block_id'] for block in page['blocks'])
+            if not page['page']['has_more']:
+                break
+            offset += len(page['blocks'])
+        self.assertEqual(len(seen), self.BLOCKS)
+        self.assertEqual(len(set(seen)), self.BLOCKS, '分页出现重复行')
+        self.assertEqual(set(seen), {f'blk-page-{index:05d}' for index in range(self.BLOCKS)})
+
+    def test_the_relation_store_is_bounded_by_the_same_window(self):
+        with psycopg2.connect(self.dsn) as conn, conn.cursor() as cur:
+            self._insert_relations(cur, self.document_id, 3)
+        read = contract_store.read_result(self.document_id, self.dsn, limit=2)
+        self.assertEqual(read['totals']['relations'], 3)
+        self.assertEqual(read['counts']['relations_returned'], 2)
+        self.assertEqual(read['relation_count'], 2, 'relation_count 继续表示本页')
+        self.assertLessEqual(read['counts']['relations_returned'], read['page']['limit'])
+        self.assertTrue(read['store_pages']['relations']['truncated'])
+        self.assertTrue(read['store_pages']['relations']['has_more'])
+
+    def test_a_complete_block_page_can_still_report_truncated_relations(self):
+        """Each store carries its own window: a full block page is not a claim about
+        relations, so the relation flags must be computed and reported separately."""
+        document_id = f'doc-page-small-{uuid.uuid4().hex[:12]}'
+        with psycopg2.connect(self.dsn) as conn, conn.cursor() as cur:
+            cur.execute("""INSERT INTO document_assets(document_id, title, file_type, sha256,
+                status, acl, needs_review, collection)
+                VALUES (%s, 'small pagination test', 'dxf', %s, 'indexed', '{public}', FALSE,
+                'demo_kb')""",
+                        (document_id, hashlib.sha256(document_id.encode()).hexdigest()))
+            self._insert_blocks(cur, document_id, 2, prefix='blk-small')
+            self._insert_relations(cur, document_id, 3, prefix='blk-small',
+                                   relation_prefix='rel-small')
+        self.addCleanup(self._cleanup_document, document_id)
+        read = contract_store.read_result(document_id, self.dsn, limit=2)
+        self.assertFalse(read['page']['truncated'], '块已整页返回')
+        self.assertEqual(read['counts']['blocks_returned'], 2)
+        self.assertEqual(read['totals']['relations'], 3)
+        self.assertEqual(read['counts']['relations_returned'], 2)
+        self.assertTrue(read['store_pages']['relations']['truncated'])
+
+    def _cleanup_document(self, document_id):
+        with psycopg2.connect(self.dsn) as conn, conn.cursor() as cur:
+            cur.execute('DELETE FROM document_block_relations WHERE document_id=%s', (document_id,))
+            cur.execute('DELETE FROM document_contract_blocks WHERE document_id=%s', (document_id,))
+            cur.execute('DELETE FROM document_assets WHERE document_id=%s', (document_id,))
+
+    def test_an_invalid_window_is_refused_instead_of_clamped(self):
+        cases = ((0, 0, 'CONTRACT_PAGE_LIMIT_INVALID'),
+                 (contract_store.MAX_PAGE_LIMIT + 1, 0, 'CONTRACT_PAGE_LIMIT_INVALID'),
+                 (True, 0, 'CONTRACT_PAGE_LIMIT_INVALID'),
+                 (2000, -1, 'CONTRACT_PAGE_OFFSET_INVALID'),
+                 (2000, contract_store.MAX_PAGE_OFFSET + 1, 'CONTRACT_PAGE_OFFSET_INVALID'))
+        for limit, offset, code in cases:
+            with self.subTest(limit=limit, offset=offset):
+                with self.assertRaises(ValueError) as caught:
+                    contract_store.read_result(self.document_id, self.dsn,
+                                               limit=limit, offset=offset)
+                self.assertEqual(str(caught.exception), code)
+
+
 if __name__ == '__main__':
     unittest.main()

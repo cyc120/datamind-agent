@@ -237,6 +237,29 @@ GET /v1/uploads?status=&media_type=&since=&limit=
   即可，不要再从单一的 `locator_count` 推断"没有定位"。
   守护测试：`tests/test_contract_store.py::LocatorCountSemanticsTests`。
 
+### `/contract` 的可见性与分页（本版新增，必须知悉）
+
+**可见性**（`datamind/api.py` 的 `_published_document` + `_contract_visible`，与发布路径共用同一判定）：
+
+| 文档状态 | 匿名 | viewer | 已认证 admin |
+|---|---|---|---|
+| 已发布（`indexed` + `public` + 非待复核） | **可读** | 可读 | 可读 |
+| 待复核上传（`origin='upload'`，未 `indexed`） | **404** | **404** | **可读**（复核流程依赖） |
+| 未解析 / 取消 / 失败 | 404 | 404 | 404 |
+
+- 非 admin 的 404 响应体与"该 id 不存在"**逐字节相同**，因此不泄露存在性；
+- 待复核分支的响应带 `Cache-Control: no-store`，已发布分支不带；
+- 该路由位于公开读前缀，因此**身份在路由内解析**（`current(..., required=False, provision_demo=False)`），身份解析用写 DSN、且 GET 不写库。
+- 守护测试：`tests/test_contract_visibility.py`。
+
+**分页与截断诚实性**（`read_result` 三存储统一 `LIMIT/OFFSET` + 稳定排序）：
+
+- 旧的扁平键（`block_count`/`locator_count`/`block_locator_count`/`locator_total`/`relation_count`）**含义不变，仍是"本页数量"**；
+- 新增 `totals`（库内总数）、`counts`（本页数量）、`page`（契约块的窗口：`limit/offset/total/returned/truncated/has_more`）、`store_pages`（三存储各自的窗口）；
+- 查询参数 `limit`（默认 2000，1..5000）与 `offset`（0..1000000）；非法值返回 400 `CONTRACT_PAGE_LIMIT_INVALID` / `CONTRACT_PAGE_OFFSET_INVALID`，**不静默钳制**；
+- 关系查询与块查询受同一显式上限约束，`store_pages.relations.truncated` 可让"关系可能指向本页之外的块"这件事**显式可查**。
+- 守护测试：`tests/test_contract_store.py::ContractPaginationHonestyTests`。
+
 ### `vector_index`
 
 - 取值恒为字符串 `"deferred"`：**上传管道不做向量索引**，不写 `chunks`，不写 Qdrant。
