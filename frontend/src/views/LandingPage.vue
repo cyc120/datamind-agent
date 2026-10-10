@@ -104,7 +104,7 @@ const sampleEdges: EvidenceEdge[] = [
         <!-- 小字介绍：整段连续，不人为断行 -->
         <p class="sub">
           DataMind Agent —— 面向数据库与知识库的
-          <RotatingText :texts="rotating" class="rotator overflow-hidden" :rotation-interval="2200"
+          <RotatingText :texts="rotating" class="rotator" :rotation-interval="2200"
                         :transition="{ type: 'spring', damping: 26, stiffness: 320 }" />
           智能体。每一句答案，都能回溯到它的 SQL、检索片段与原始数据。
         </p>
@@ -404,30 +404,38 @@ const sampleEdges: EvidenceEdge[] = [
 
 .sub {
   margin: 0;
-  max-width: 640px;
+  /* 收在大标题宽度之内：大标题 7 个字约占内容列 96%，这里取 92% 保证永不超出，
+     同时右边缘看起来是与标题对齐的 */
+  max-width: 92%;
   color: var(--color-body);
   font-size: clamp(0.98rem, 1.25vw, 1.2rem);
   line-height: 1.85;
 }
 /* 轮换词胶囊。
    RotatingText 的根与「分片层」都带 flex-wrap，列一窄就会把单词逐个字符换行
-   （实测在窄列里出现「文/档/问/答」竖排）。这里强制不换行。
-   选择器 .rotator[data-v-x] span 的特异性高于 Tailwind 的 .flex-wrap，
-   所以不需要 !important。 */
+   （实测出现「跨/源/核/验」竖排）。
+   注意：该组件里的 Motion 虽然写了 tag="span"，实际渲染出来的是 <div>，
+   所以必须用通配后代选择器——写成 :deep(span) 会一条都匹配不到。
+   .rotator[data-v-x] * 的特异性 (0,2,0) 高于 Tailwind 的 .flex-wrap (0,1,0)，
+   不需要 !important。 */
 .rotator,
-.rotator :deep(span) {
+.rotator :deep(*) {
   flex-wrap: nowrap;
   white-space: nowrap;
 }
 .rotator {
   display: inline-flex;
+  align-items: center;
+  /* 固定一行高：进出场时新旧两个词会同时留在 DOM 里，不锁高会把整段顶下去 */
+  height: 1.75em;
   vertical-align: baseline;
   margin: 0 4px;
-  padding: 1px 10px;
+  padding: 0 10px;
   border-radius: 8px;
   background: rgba(37, 99, 235, 0.08);
   color: var(--color-accent);
   font-weight: 600;
+  overflow: hidden;
 }
 .hero-cta {
   display: flex;
