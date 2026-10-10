@@ -52,10 +52,13 @@ class StatusDocumentsSyncTest(unittest.TestCase):
 
     def test_readme_states_the_same_denominator_and_version(self):
         text = self._text("README.md")
-        self.assertIn(f"**当前完整隔离回归 {self.fraction}**", text)
-        self.assertIn(f"| **当前隔离回归 {self.fraction}**（API {self.version}）", text)
-        self.assertNotRegex(text, r"当前隔离回归 (?!\*\*" + re.escape(self.fraction) + r"\*\*)\*\*[0-9]+/[0-9]+\*\*",
-                            "README 不得残留另一个'当前'分母")
+        self.assertRegex(text, r"\| 代码 API \| \*\*" + re.escape(self.version) + r"\*\*")
+        self.assertRegex(text, r"\| 完整隔离回归 \| \*\*" + re.escape(self.fraction) + r"\*\*")
+        self.assertEqual(re.findall(r"\| 完整隔离回归 \| \*\*([0-9]+/[0-9]+)\*\*", text),
+                         [self.fraction], "README 应只有一条与机读记录同步的回归分母")
+        commit = self.summary.get("commit")
+        if commit:
+            self.assertIn(f"| 验证基线 | 提交 `{commit}`", text)
 
     def test_the_sync_script_reports_no_drift(self):
         """The script is the mechanism; if it disagrees, the documents were edited by hand."""
