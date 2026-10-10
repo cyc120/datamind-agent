@@ -73,3 +73,10 @@ spec_text.txt
 /output/
 *.log
 /reports/project_audit_*
+
+# ===== Vue 前端构建产物 =====
+# 由 frontend/ 执行 `npm run deploy` 生成。文件名带内容哈希，每构建一次就是
+# 全部文件换名，多人协作时每次 pull 都会在这些压缩产物上冲突且无法手工合并，
+# 因此不入库：拉下来先跑一次 npm run deploy 即可（api.py 在产物缺失时会返回
+# 503 并提示去构建）。
+/web/vue/
