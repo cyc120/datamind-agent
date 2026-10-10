@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-import StarField from '../components/StarField.vue'
+import WarpText from '../components/bits/WarpText/WarpText.vue'
+import FoldText from '../components/bits/FoldText/FoldText.vue'
+import BlurText from '../components/bits/BlurText/BlurText.vue'
+import FallingText from '../components/bits/FallingText/FallingText.vue'
+import RotatingText from '../components/bits/RotatingText/RotatingText.vue'
+import TrueFocus from '../components/bits/TrueFocus/TrueFocus.vue'
+import PixelSwap from '../components/bits/PixelSwap/PixelSwap.vue'
 import FlipCard from '../components/FlipCard.vue'
 import ConstellationGraph from '../components/stargraph/ConstellationGraph.vue'
 import { useReveal } from '../composables/useReveal'
@@ -8,6 +14,12 @@ import type { EvidenceNode, EvidenceEdge } from '../api/types'
 
 const router = useRouter()
 useReveal()
+
+/** Hero 副标题里轮换的能力词。 */
+const rotating = ['精准问数', '文档问答', '跨源核验']
+
+/** 关键词条：TrueFocus 会逐个聚焦。 */
+const keywords = '可解释 可溯源 跨源核验 图文对照 冲突并陈'
 
 const features = [
   {
@@ -73,28 +85,45 @@ const sampleEdges: EvidenceEdge[] = [
 
     <!-- Hero -->
     <section id="top" class="hero">
-      <StarField :density="2.2" />
       <div class="hero-inner">
         <div class="pill">多模态数据驱动 · 可解释 · 可溯源</div>
-        <h1>把 AI 的黑箱，<br />拆成一张<span class="gradient-text glow-text">看得见的星图</span></h1>
+
+        <!-- 曲速文本：大标题 -->
+        <div class="warp-slot">
+          <WarpText text="把黑箱拆成星图" color="#0b1220" :font-size="'clamp(2.6rem, 8vw, 6.5rem)'"
+                    :font-weight="800" :letter-spacing="'-0.045em'" :speed="0.5" :warp-strength="0.06" />
+        </div>
+        <h1 class="sr-only">把 AI 的黑箱，拆成一张看得见的星图</h1>
+
+        <!-- 轮换文本：关键词 -->
         <p class="sub">
-          DataMind Agent —— 面向数据库与知识库的精准问数智能体。<br />
+          DataMind Agent —— 面向数据库与知识库的
+          <RotatingText :texts="rotating" class="rotator overflow-hidden" :rotation-interval="2200"
+                        :transition="{ type: 'spring', damping: 26, stiffness: 320 }" />
+          智能体。<br />
           每一句答案，都能回溯到它的 SQL、检索片段与原始数据。
         </p>
+
         <div class="hero-cta">
           <button class="primary" @click="router.push('/app')">点击即试 →</button>
           <a class="ghost" href="#principle">了解原理</a>
         </div>
       </div>
-      <div class="scroll-hint">↓ 往下看</div>
     </section>
 
-    <!-- 原理：翻牌卡 -->
+    <!-- 关键词条：真正的专注 -->
+    <section class="keyword-strip">
+      <TrueFocus :sentence="keywords" :blur-amount="4" border-color="#2563eb"
+                  glow-color="rgba(37, 99, 235, 0.35)" :animation-duration="0.45"
+                  :pause-between-animations="0.9" />
+    </section>
+
+    <!-- 原理：翻牌卡 + 折叠文字 -->
     <section id="principle" class="section">
       <div class="sec-head reveal">
         <div class="eyebrow">Why DataMind</div>
-        <h2>AI 黑箱？</h2>
-        <p>翻过来，看看我们。</p>
+        <FoldText text="答案要经得起追问" split-by="word" hinge="top" font-size="clamp(1.8rem, 4vw, 3rem)"
+                  font-weight="800" color="#0b1220" :duration="0.6" :stagger="0.06" trigger="scroll" />
       </div>
 
       <div class="flip-wrap reveal">
@@ -130,11 +159,12 @@ const sampleEdges: EvidenceEdge[] = [
       </div>
     </section>
 
-    <!-- 能力 -->
-    <section id="features" class="section">
-      <div class="sec-head reveal">
+    <!-- 能力：模糊文字 + 三卡 -->
+    <section id="features" class="section soft">
+      <div class="sec-head">
         <div class="eyebrow">Capabilities</div>
-        <h2>三个关键词</h2>
+        <BlurText text="三个关键词" :delay="120" animate-by="words" direction="top"
+                  class="blur-heading" />
       </div>
       <div class="feat-grid">
         <div v-for="(f, i) in features" :key="f.title" class="feat glass reveal" :style="{ transitionDelay: i * 90 + 'ms' }">
@@ -145,31 +175,41 @@ const sampleEdges: EvidenceEdge[] = [
       </div>
     </section>
 
-    <!-- 星图 -->
+    <!-- 星图：落差文字做小字说明 -->
     <section id="starmap" class="section">
-      <div class="sec-head reveal">
+      <div class="sec-head">
         <div class="eyebrow">Evidence Constellation</div>
-        <h2>每一颗星，都是一条证据</h2>
-        <p>答案是中心的恒星，证据是环绕的星点，连线是推导关系。</p>
+        <BlurText text="每一颗星，都是一条证据" :delay="90" animate-by="words" class="blur-heading" />
+        <p class="sec-note">答案是中心的恒星，证据是环绕的星点，连线是推导关系。</p>
       </div>
+
       <div class="starmap glass reveal">
-        <ConstellationGraph :nodes="sampleNodes" :edges="sampleEdges" :interactive="false" :width="700" :height="480" />
+        <!-- 画布比例贴近内容的实际包围盒：径向布局按较短边铺开，
+             太高会在上下留出大片空白 -->
+        <ConstellationGraph :nodes="sampleNodes" :edges="sampleEdges" :interactive="false" :width="620" :height="430" />
       </div>
+
+      <!-- 落差文字：小字 -->
+      <div class="falling-slot reveal">
+        <FallingText text="点开任意一颗星，回到证据诞生的地方" trigger="scroll" :gravity="0.9"
+                     :mouse-constraint-stiffness="0.12" font-size="1.05rem" />
+      </div>
+
       <div class="legend reveal">
-        <span><i style="background:#fcd34d"></i>答案主张</span>
-        <span><i style="background:#38bdf8"></i>SQL</span>
-        <span><i style="background:#818cf8"></i>检索片段</span>
-        <span><i style="background:#a78bfa"></i>文档</span>
-        <span><i style="background:#4ade80"></i>核验</span>
-        <span><i style="background:#fb7185"></i>冲突</span>
+        <span><i style="background:#d97706"></i>答案主张</span>
+        <span><i style="background:#0284c7"></i>SQL</span>
+        <span><i style="background:#4f46e5"></i>检索片段</span>
+        <span><i style="background:#7c3aed"></i>文档</span>
+        <span><i style="background:#16a34a"></i>核验</span>
+        <span><i style="background:#e11d48"></i>冲突</span>
       </div>
     </section>
 
     <!-- 流程 -->
-    <section id="how" class="section">
-      <div class="sec-head reveal">
+    <section id="how" class="section soft">
+      <div class="sec-head">
         <div class="eyebrow">How it works</div>
-        <h2>一条问题，四步落地</h2>
+        <BlurText text="一条问题，四步落地" :delay="90" animate-by="words" class="blur-heading" />
       </div>
       <div class="steps">
         <div v-for="(s, i) in steps" :key="s.n" class="step reveal" :style="{ transitionDelay: i * 90 + 'ms' }">
@@ -180,12 +220,21 @@ const sampleEdges: EvidenceEdge[] = [
       </div>
     </section>
 
-    <!-- 最终 CTA -->
+    <!-- 最终 CTA：像素交换做宣传语 -->
     <section id="try" class="final">
-      <StarField :density="1.6" />
       <div class="final-inner reveal">
-        <h2>心动了？<span class="gradient-text">点击即试</span></h2>
-        <p>现在就问一句，看证据如何点亮。</p>
+        <div class="swap-slot">
+          <PixelSwap trigger="hover" pattern="center" :pixel-size="52" :duration="1100"
+                     :pixel-duration="420" aspect-ratio="16 / 5" easing="cubic-bezier(0.22, 1, 0.36, 1)">
+            <template #first>
+              <div class="swap-face"><span>现在就问一句</span></div>
+            </template>
+            <template #second>
+              <div class="swap-face alt"><span>看证据如何点亮</span></div>
+            </template>
+          </PixelSwap>
+        </div>
+        <p class="final-note">鼠标悬停上方文字可切换</p>
         <button class="primary big" @click="router.push('/app')">开始体验 →</button>
       </div>
     </section>
@@ -199,13 +248,26 @@ const sampleEdges: EvidenceEdge[] = [
 
 <style scoped>
 .landing {
-  background:
-    radial-gradient(1400px 800px at 80% -10%, rgba(56, 189, 248, 0.1), transparent 55%),
-    radial-gradient(1200px 700px at 10% 30%, rgba(129, 140, 248, 0.08), transparent 55%),
-    var(--color-void);
-  color: #e5e9f0;
+  /* 纯色背景，不使用任何星空/渐变叠层 */
+  background: var(--color-void);
+  color: var(--color-text);
   overflow-x: hidden;
 }
+
+/* 仅给读屏与搜索引擎，视觉上隐藏（曲速文本是 canvas，需要有语义标题兜底） */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── 导航 ── */
 .nav {
   position: fixed;
   top: 0;
@@ -216,7 +278,7 @@ const sampleEdges: EvidenceEdge[] = [
   align-items: center;
   gap: 28px;
   padding: 16px 40px;
-  background: rgba(5, 7, 13, 0.55);
+  background: rgba(255, 255, 255, 0.82);
   backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--color-line);
 }
@@ -232,8 +294,9 @@ const sampleEdges: EvidenceEdge[] = [
   display: grid;
   place-items: center;
   font-weight: 700;
-  color: #04101d;
-  background: linear-gradient(135deg, #7dd3fc, #818cf8);
+  color: #ffffff;
+  background: linear-gradient(135deg, #2563eb, #6366f1);
+  font-size: 13px;
 }
 .brand strong {
   font-size: 15px;
@@ -245,253 +308,291 @@ const sampleEdges: EvidenceEdge[] = [
   margin-left: auto;
 }
 .links a {
-  color: #94a3b8;
+  color: var(--color-body);
   text-decoration: none;
   font-size: 14px;
-  transition: color 0.15s;
+  transition: color 0.2s;
 }
 .links a:hover {
-  color: #e5e9f0;
+  color: var(--color-text);
 }
 .cta {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid var(--color-line);
-  color: #e5e9f0;
-  border-radius: 999px;
   padding: 8px 18px;
+  border-radius: 999px;
+  border: none;
+  background: var(--color-text);
+  color: #ffffff;
   font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: opacity 0.2s;
 }
 .cta:hover {
-  background: rgba(56, 189, 248, 0.16);
-  border-color: rgba(56, 189, 248, 0.4);
+  opacity: 0.85;
 }
 
+/* ── Hero ── */
 .hero {
   position: relative;
-  min-height: 100vh;
+  padding: 150px 24px 40px;
   display: flex;
-  align-items: center;
   justify-content: center;
-  padding: 120px 24px 80px;
 }
 .hero-inner {
-  position: relative;
+  width: 100%;
+  max-width: 1040px;
   text-align: center;
-  max-width: 860px;
-  animation: fadeup 1.1s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .pill {
   display: inline-block;
-  font-size: 12.5px;
-  color: #a5b4fc;
-  border: 1px solid rgba(129, 140, 248, 0.3);
-  background: rgba(129, 140, 248, 0.08);
+  padding: 6px 14px;
   border-radius: 999px;
-  padding: 6px 16px;
-  margin-bottom: 26px;
+  border: 1px solid var(--color-line);
+  background: var(--color-ink);
+  color: var(--color-body);
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
 }
-.hero h1 {
-  font-size: clamp(34px, 6vw, 64px);
-  line-height: 1.15;
-  font-weight: 700;
-  margin: 0;
-  letter-spacing: -0.02em;
+/* 曲速文本是 WebGL 画布：必须给它一个有高度的容器 */
+.warp-slot {
+  margin: 18px auto 6px;
+  min-height: 260px;
+  width: 100%;
 }
 .sub {
-  margin-top: 22px;
-  font-size: clamp(15px, 2vw, 18px);
-  line-height: 1.8;
-  color: #94a3b8;
+  margin: 0 auto;
+  max-width: 720px;
+  color: var(--color-body);
+  font-size: 16px;
+  line-height: 1.9;
+}
+.rotator {
+  display: inline-flex;
+  vertical-align: bottom;
+  margin: 0 4px;
+  padding: 2px 10px;
+  border-radius: 8px;
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--color-accent);
+  font-weight: 600;
 }
 .hero-cta {
-  margin-top: 34px;
   display: flex;
-  gap: 14px;
+  gap: 12px;
   justify-content: center;
+  margin-top: 30px;
 }
 .primary {
-  background: linear-gradient(135deg, #38bdf8, #6366f1);
-  color: #04101d;
+  padding: 13px 26px;
   border: none;
-  border-radius: 999px;
-  padding: 13px 30px;
-  font-size: 16px;
+  border-radius: 10px;
+  background: var(--color-accent);
+  color: #ffffff;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s;
+  transition: background 0.2s, transform 0.2s;
 }
 .primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 32px rgba(56, 189, 248, 0.3);
+  background: #1d4ed8;
+  transform: translateY(-1px);
 }
 .primary.big {
-  padding: 15px 38px;
-  font-size: 17px;
+  padding: 15px 34px;
+  font-size: 16px;
 }
 .ghost {
-  display: inline-flex;
-  align-items: center;
-  color: #cbd5e1;
+  padding: 13px 24px;
+  border-radius: 10px;
   border: 1px solid var(--color-line);
-  border-radius: 999px;
-  padding: 13px 28px;
-  font-size: 16px;
+  color: var(--color-text);
   text-decoration: none;
-  transition: all 0.15s;
+  font-size: 15px;
+  background: #ffffff;
+  transition: border-color 0.2s, background 0.2s;
 }
 .ghost:hover {
-  border-color: rgba(148, 163, 184, 0.4);
-  background: rgba(255, 255, 255, 0.04);
-}
-.scroll-hint {
-  position: absolute;
-  bottom: 26px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 12px;
-  color: #475569;
-  animation: floaty 2.4s ease-in-out infinite;
+  border-color: rgba(15, 23, 42, 0.24);
+  background: var(--color-ink);
 }
 
+/* ── 关键词条 ── */
+.keyword-strip {
+  padding: 26px 24px 10px;
+  display: flex;
+  justify-content: center;
+}
+/* TrueFocus 把每个词写死成 Tailwind 的 text-7xl（72px），直接用在页面上会撑破一行。
+   这里覆盖成受控字号；选择器特异性高于工具类，无需 !important。 */
+.keyword-strip :deep(span.font-black) {
+  font-size: clamp(0.95rem, 1.9vw, 1.45rem);
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+}
+
+/* ── 通用区块 ── */
 .section {
-  max-width: 1100px;
+  padding: 92px 24px;
+  max-width: 1120px;
   margin: 0 auto;
-  padding: 96px 24px;
+}
+.section.soft {
+  max-width: none;
+  background: var(--color-ink);
+  padding: 92px 24px;
+}
+.section.soft > * {
+  max-width: 1120px;
+  margin-left: auto;
+  margin-right: auto;
 }
 .sec-head {
   text-align: center;
-  margin-bottom: 48px;
+  margin-bottom: 44px;
 }
 .eyebrow {
   font-size: 12px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--color-muted);
+  margin-bottom: 12px;
 }
-.sec-head h2 {
-  font-size: clamp(26px, 4vw, 40px);
-  font-weight: 700;
-  margin: 10px 0 8px;
+.sec-note {
+  margin: 14px auto 0;
+  max-width: 620px;
+  color: var(--color-body);
+  font-size: 15px;
+  line-height: 1.8;
 }
-.sec-head p {
-  color: #94a3b8;
-  font-size: 16px;
-  line-height: 1.7;
+/* BlurText 根元素是 <p>，这里把它当标题用 */
+.blur-heading {
+  justify-content: center;
   margin: 0;
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  font-weight: 800;
+  color: var(--color-text);
+  letter-spacing: -0.02em;
 }
 
+/* ── 原理 ── */
 .flip-wrap {
   display: grid;
-  grid-template-columns: minmax(0, 420px) 1fr;
+  grid-template-columns: minmax(280px, 380px) 1fr;
   gap: 48px;
   align-items: center;
-  justify-items: center;
 }
 .flipcard {
-  width: 100%;
-  max-width: 380px;
-  height: 300px;
+  height: 260px;
 }
 .face-content {
-  padding: 28px;
+  padding: 26px;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  align-items: center;
   justify-content: center;
-  gap: 14px;
+  gap: 10px;
 }
 .face-content .big {
-  font-size: 34px;
-  font-weight: 700;
-  color: #e5e9f0;
+  font-size: 26px;
+  font-weight: 800;
 }
 .face-content .big.light {
-  color: #e0f2fe;
+  color: var(--color-accent);
 }
 .face-content p {
-  color: #94a3b8;
-  font-size: 14px;
-  line-height: 1.7;
   margin: 0;
+  color: var(--color-body);
+  font-size: 14px;
+  line-height: 1.8;
 }
-.hint {
+.face-content .hint {
   font-size: 12px;
-  color: #475569;
+  color: var(--color-muted);
 }
 .checks {
-  list-style: none;
   margin: 0;
   padding: 0;
-  text-align: left;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  font-size: 15px;
-  color: #dbe4f0;
+  list-style: none;
+  color: var(--color-body);
+  font-size: 14px;
+  line-height: 2;
 }
 .principle-text h3 {
+  margin: 0 0 12px;
   font-size: 22px;
-  margin: 0 0 14px;
+  font-weight: 700;
 }
 .principle-text p {
-  color: #94a3b8;
-  font-size: 15.5px;
+  margin: 0 0 14px;
+  color: var(--color-body);
+  font-size: 15px;
   line-height: 1.9;
-  margin: 0 0 20px;
 }
 .link {
-  color: #7dd3fc;
+  color: var(--color-accent);
   text-decoration: none;
   font-size: 14px;
+  font-weight: 500;
 }
 
+/* ── 能力卡 ── */
 .feat-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 20px;
 }
 .feat {
-  border-radius: 20px;
-  padding: 28px;
+  border-radius: 14px;
+  padding: 26px 24px;
 }
 .feat-icon {
-  width: 46px;
-  height: 46px;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-  font-size: 20px;
-  color: #04101d;
-  background: linear-gradient(135deg, #7dd3fc, #818cf8);
-  margin-bottom: 18px;
+  font-size: 22px;
+  color: var(--color-accent);
+  margin-bottom: 12px;
 }
 .feat h3 {
-  font-size: 19px;
-  margin: 0 0 10px;
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 700;
 }
 .feat p {
-  color: #94a3b8;
-  font-size: 14px;
-  line-height: 1.8;
   margin: 0;
+  color: var(--color-body);
+  font-size: 14px;
+  line-height: 1.85;
 }
 
+/* ── 星图 ── */
 .starmap {
-  border-radius: 24px;
-  padding: 20px;
-  max-width: 760px;
+  border-radius: 16px;
+  padding: 18px;
+  /* 图只有 7 个节点，铺满 1120px 会显得空；收窄到合适宽度让它读起来是「一幅图」 */
+  max-width: 680px;
   margin: 0 auto;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+}
+/* 落差文字需要父容器给定高度 */
+.falling-slot {
+  height: 190px;
+  margin: 20px auto 0;
+  max-width: 760px;
+  border-radius: 14px;
+  border: 1px dashed var(--color-line);
+  background: var(--color-ink);
+  overflow: hidden;
+  color: var(--color-body);
 }
 .legend {
   display: flex;
   flex-wrap: wrap;
+  gap: 8px 20px;
   justify-content: center;
-  gap: 18px;
-  margin-top: 26px;
+  margin-top: 20px;
+  color: var(--color-body);
   font-size: 13px;
-  color: #94a3b8;
 }
 .legend span {
   display: inline-flex;
@@ -499,83 +600,108 @@ const sampleEdges: EvidenceEdge[] = [
   gap: 7px;
 }
 .legend i {
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   display: inline-block;
-  box-shadow: 0 0 8px currentColor;
 }
 
+/* ── 流程 ── */
 .steps {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 22px;
 }
 .step {
-  border-radius: 18px;
-  padding: 24px;
-  background: rgba(255, 255, 255, 0.02);
+  padding: 22px;
+  border-radius: 14px;
+  background: #ffffff;
   border: 1px solid var(--color-line);
 }
 .step-n {
   font-size: 13px;
   font-weight: 700;
-  color: #7dd3fc;
-  margin-bottom: 12px;
+  color: var(--color-accent);
+  letter-spacing: 0.08em;
 }
 .step h3 {
+  margin: 10px 0 8px;
   font-size: 16px;
-  margin: 0 0 8px;
+  font-weight: 700;
 }
 .step p {
-  color: #94a3b8;
-  font-size: 13px;
-  line-height: 1.7;
   margin: 0;
+  color: var(--color-body);
+  font-size: 13.5px;
+  line-height: 1.8;
 }
 
+/* ── 底部 CTA ── */
 .final {
-  position: relative;
-  padding: 130px 24px;
+  padding: 96px 24px 80px;
   text-align: center;
+  border-top: 1px solid var(--color-line);
 }
 .final-inner {
-  position: relative;
+  max-width: 760px;
+  margin: 0 auto;
 }
-.final h2 {
-  font-size: clamp(28px, 5vw, 46px);
-  margin: 0 0 16px;
+.swap-slot {
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  cursor: pointer;
 }
-.final p {
-  color: #94a3b8;
-  font-size: 16px;
-  margin: 0 0 34px;
+/* PixelSwap 的两个插槽层本身就是绝对定位铺满，这里只负责排版 */
+.swap-face {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  background: var(--color-ink);
+}
+.swap-face span {
+  font-size: clamp(1.5rem, 4.4vw, 3rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
+.swap-face.alt {
+  background: var(--color-accent);
+}
+.swap-face.alt span {
+  color: #ffffff;
+}
+.final-note {
+  margin: 12px 0 26px;
+  color: var(--color-muted);
+  font-size: 12.5px;
 }
 
+/* ── 页脚 ── */
 .foot {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  align-items: center;
-  padding: 30px 24px 44px;
-  color: #475569;
-  font-size: 12px;
   border-top: 1px solid var(--color-line);
+  padding: 26px 40px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  justify-content: space-between;
+  color: var(--color-muted);
+  font-size: 12.5px;
 }
 
 @media (max-width: 900px) {
+  .flip-wrap {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+  .nav {
+    padding: 14px 20px;
+  }
   .links {
     display: none;
   }
-  .flip-wrap {
-    grid-template-columns: 1fr;
-    gap: 32px;
-  }
-  .feat-grid {
-    grid-template-columns: 1fr;
-  }
-  .steps {
-    grid-template-columns: 1fr 1fr;
+  .warp-slot {
+    min-height: 190px;
   }
 }
 </style>

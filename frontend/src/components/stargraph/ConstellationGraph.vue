@@ -19,22 +19,24 @@ const selectedId = ref<string | null>(null)
 const hoveredId = ref<string | null>(null)
 
 const TYPE_STYLE: Record<NodeType, { color: string; short: string; label: string; size: number }> = {
-  Claim: { color: '#fcd34d', short: '答案', label: '答案主张', size: 9 },
-  SQLQuery: { color: '#38bdf8', short: 'SQL', label: 'SQL 查询', size: 6.5 },
-  SQLRow: { color: '#22d3ee', short: '结果', label: '结果行', size: 5.5 },
-  Document: { color: '#a78bfa', short: '文档', label: '文档', size: 6.5 },
-  Chunk: { color: '#818cf8', short: '片段', label: '检索片段', size: 5.5 },
-  DocumentFact: { color: '#2dd4bf', short: '字段', label: '字段', size: 5.5 },
-  VerificationCheck: { color: '#4ade80', short: '核验', label: '核验', size: 6 },
-  ConflictRecord: { color: '#fb7185', short: '冲突', label: '冲突', size: 7 },
-  AuthorityRule: { color: '#fbbf24', short: '规则', label: '权威规则', size: 6 },
+  // 浅色主题：原先的浅粉彩色（#fcd34d / #38bdf8 …）是为深底选的，在白底上对比度不足，
+  // 这里统一换成同色系的 600 级深色版本，图例与此保持一致。
+  Claim: { color: '#d97706', short: '答案', label: '答案主张', size: 9 },
+  SQLQuery: { color: '#0284c7', short: 'SQL', label: 'SQL 查询', size: 6.5 },
+  SQLRow: { color: '#0891b2', short: '结果', label: '结果行', size: 5.5 },
+  Document: { color: '#7c3aed', short: '文档', label: '文档', size: 6.5 },
+  Chunk: { color: '#4f46e5', short: '片段', label: '检索片段', size: 5.5 },
+  DocumentFact: { color: '#0d9488', short: '字段', label: '字段', size: 5.5 },
+  VerificationCheck: { color: '#16a34a', short: '核验', label: '核验', size: 6 },
+  ConflictRecord: { color: '#e11d48', short: '冲突', label: '冲突', size: 7 },
+  AuthorityRule: { color: '#ca8a04', short: '规则', label: '权威规则', size: 6 },
 }
 
 const EDGE_STYLE: Record<string, { dash: string; color: string }> = {
-  derived_from: { dash: '', color: 'rgba(148,163,184,0.45)' },
-  supports: { dash: '4 3', color: 'rgba(56,189,248,0.6)' },
-  retrieved_from: { dash: '1 5', color: 'rgba(129,140,248,0.45)' },
-  resolved_by: { dash: '2 2', color: 'rgba(251,191,36,0.6)' },
+  derived_from: { dash: '', color: 'rgba(100,116,139,0.50)' },
+  supports: { dash: '4 3', color: 'rgba(2,132,199,0.55)' },
+  retrieved_from: { dash: '1 5', color: 'rgba(79,70,229,0.50)' },
+  resolved_by: { dash: '2 2', color: 'rgba(202,138,4,0.60)' },
 }
 
 interface Placed {
@@ -95,7 +97,9 @@ function layoutGraph(nodes: EvidenceNode[], edges: EvidenceEdge[], w: number, h:
   const placed: Placed[] = []
   layers.forEach((layerNodes, l) => {
     const ll = l >= 99 ? maxLayer + 1 : l
-    const radius = ll === 0 ? 0 : Math.min(w, h) * 0.46 * (ll / (maxLayer + 1))
+    // 半径以外接正方形为基准：原来按 min(w,h) 且只用到 0.46 的外圈，
+    // 在横向画布上会让星座缩在中间一小块。这里按对角线方向铺开并逐层接近边缘。
+    const radius = ll === 0 ? 0 : Math.min(w, h) * 0.62 * (ll / (maxLayer + 1))
     const count = layerNodes.length
     layerNodes.forEach((n, i) => {
       // 同层多节点时错开角度，避免重叠
@@ -163,8 +167,9 @@ function onSelect(id: string) {
   >
     <defs>
       <radialGradient id="starGlow" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9" />
-        <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+        <!-- 浅色主题：原来的白色光晕在白底上完全不可见，改为极淡的深色晕圈 -->
+        <stop offset="0%" stop-color="#0b1220" stop-opacity="0.14" />
+        <stop offset="100%" stop-color="#0b1220" stop-opacity="0" />
       </radialGradient>
     </defs>
 
@@ -205,14 +210,14 @@ function onSelect(id: string) {
         :cy="p.y"
         :r="styleOf(nodeById.get(p.id)!).size"
         :fill="styleOf(nodeById.get(p.id)!).color"
-        :stroke="selectedId === p.id ? '#fff' : 'transparent'"
+        :stroke="selectedId === p.id ? '#0b1220' : 'transparent'"
         stroke-width="1.5"
       />
       <text
         :x="p.x"
         :y="p.y + styleOf(nodeById.get(p.id)!).size + 16"
         text-anchor="middle"
-        :fill="hoveredId === p.id ? '#e5e9f0' : 'rgba(148,163,184,0.7)'"
+        :fill="hoveredId === p.id ? '#0b1220' : 'rgba(71,85,105,0.85)'"
         font-size="11"
         :style="{ transition: 'fill .2s' }"
       >
@@ -238,18 +243,31 @@ function onSelect(id: string) {
 .node:hover :deep(circle:last-of-type) {
   filter: drop-shadow(0 0 6px currentColor);
 }
+/* 入场只做缩放，不做透明度。
+   原来 from 里带 opacity: 0，配合 backwards 填充与逐层延迟，意味着每个节点在它那段
+   延迟结束前都是不可见的——一旦动画因任何原因不播放（无头渲染、降低动效、渲染异常），
+   节点会永久消失，只剩连线。缩放入场既能表达「星点依次点亮」，又保证任何时刻都可见。 */
 @keyframes nodeIn {
   from {
-    opacity: 0;
     transform: scale(0.2);
     transform-origin: center;
     transform-box: fill-box;
   }
   to {
-    opacity: 1;
     transform: scale(1);
     transform-origin: center;
     transform-box: fill-box;
+  }
+}
+
+/* 降低动效偏好时不做入场，直接呈现终态。写在 scoped 块内才能与上面的 .node 规则
+   同特异性并靠顺序生效——放全局会被 scoped 选择器压掉。 */
+@media (prefers-reduced-motion: reduce) {
+  .node {
+    animation: none;
+  }
+  .node circle {
+    transition: none;
   }
 }
 </style>

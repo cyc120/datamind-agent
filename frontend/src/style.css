@@ -1,18 +1,29 @@
 @import "tailwindcss";
 
-/* ============ 设计令牌 ============ */
+/* ============ 设计令牌（浅色） ============
+   变量名沿用改造前的一套，只换取值，避免各组件里的 var() 引用断裂。
+   语义对照：
+     --color-void   页面底色（原：近黑）        --color-panel  卡片/浮层底
+     --color-ink    次级底色/浅灰区块           --color-text   正文与标题色
+     --color-line   分隔线与描边                --color-body   段落文字
+*/
 @theme {
   --font-sans: "Inter", "PingFang SC", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
 
-  --color-void: #05070d;
-  --color-ink: #0a0e18;
-  --color-panel: #0e1422;
-  --color-line: rgba(148, 163, 184, 0.14);
+  --color-void: #ffffff;
+  --color-ink: #f6f7f9;
+  --color-panel: #ffffff;
+  --color-line: rgba(15, 23, 42, 0.10);
 
-  --color-accent: #38bdf8;
-  --color-accent-2: #818cf8;
-  --color-glow: #22d3ee;
-  --color-star: #e0f2fe;
+  --color-text: #0b1220;
+  --color-body: #4b5563;
+  --color-muted: #6b7280;
+
+  --color-accent: #2563eb;
+  --color-accent-2: #6366f1;
+  --color-glow: #0ea5e9;
+  /* 原为星空色，浅色主题下留作强调文字色的深色端 */
+  --color-star: #0b1220;
 }
 
 /* ============ 基础 ============ */
@@ -23,48 +34,38 @@ html {
 body {
   margin: 0;
   background-color: var(--color-void);
-  color: #e5e9f0;
+  color: var(--color-text);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
 ::selection {
-  background: rgba(56, 189, 248, 0.28);
-  color: #f0fbff;
+  background: rgba(37, 99, 235, 0.16);
+  color: #0b1220;
 }
 
 /* 细滚动条 */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
+  scrollbar-color: rgba(15, 23, 42, 0.18) transparent;
 }
 *::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 *::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.16);
   border-radius: 999px;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.4);
+  background: rgba(15, 23, 42, 0.28);
 }
 
 /* ============ 关键帧 ============ */
-@keyframes twinkle {
-  0%, 100% { opacity: 0.25; }
-  50% { opacity: 1; }
-}
-
 @keyframes floaty {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-10px); }
-}
-
-@keyframes glowpulse {
-  0%, 100% { filter: drop-shadow(0 0 3px rgba(56, 189, 248, 0.5)); }
-  50% { filter: drop-shadow(0 0 12px rgba(56, 189, 248, 0.9)); }
 }
 
 @keyframes fadeup {
@@ -89,27 +90,37 @@ body {
   transform: translateY(0);
 }
 
+/* 浅色卡片：白底 + 细描边 + 极轻阴影 */
 .glass {
-  background: rgba(255, 255, 255, 0.04);
+  background: #ffffff;
   border: 1px solid var(--color-line);
-  backdrop-filter: blur(14px);
-}
-
-.glow-text {
-  text-shadow: 0 0 24px rgba(56, 189, 248, 0.45);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 .gradient-text {
-  background: linear-gradient(120deg, #7dd3fc 0%, #a5b4fc 50%, #c4b5fd 100%);
+  background: linear-gradient(120deg, #2563eb 0%, #4f46e5 50%, #7c3aed 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
-.star-dot {
-  animation: twinkle 3.4s ease-in-out infinite;
-}
-
 .breathe {
   animation: breathe 3s ease-in-out infinite;
+}
+
+/* ============ 降低动效偏好 ============
+   关注无障碍，同时保证「动画未播放」时内容也是可见的终态，而不是停在 opacity:0。 */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .reveal,
+  .reveal.is-visible {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .breathe {
+    animation: none;
+  }
 }
