@@ -140,8 +140,8 @@ const sampleEdges: EvidenceEdge[] = [
           <aside class="folder-corner">
             <div class="folder-tilt">
               <Folder color="#2563eb" :size="3.4" :items="topFeatures">
-                <template #item-1><div class="paper p-left">{{ topFeatures[0] }}</div></template>
-                <template #item-2><div class="paper p-right">{{ topFeatures[1] }}</div></template>
+                <template #item-1><div class="paper">{{ topFeatures[0] }}</div></template>
+                <template #item-2><div class="paper">{{ topFeatures[1] }}</div></template>
                 <template #item-3><div class="paper">{{ topFeatures[2] }}</div></template>
               </Folder>
             </div>
@@ -420,7 +420,7 @@ const sampleEdges: EvidenceEdge[] = [
      左右各外扩约 42px——原来只留 30px，实测被视口右边缘切掉。 */
   /* 只向右出血：负的右边距把它推出内容区，交给 .hero 的 overflow: hidden
      在屏幕右边缘截断。下方不做出血——底部要完整可见，不能被下边界切。 */
-  margin: 0 -56px 0 0;
+  margin: 0;
 }
 /* 向左倾斜，让文件夹的出口（原本朝正上方）指向 10 点钟方向。
    钟面上 10 点位于正上方逆时针 60°，但整只文件夹连同纸张一起转会
@@ -459,15 +459,6 @@ const sampleEdges: EvidenceEdge[] = [
   text-align: center;
   /* pre-line 让 \n 生效，同时不合并空格 */
   white-space: nowrap;
-}
-/* 左右两张纸的内半边压在翻盖下面（翻盖 z-30、纸张 z-20），文字要挤向露出的
-   那一侧。这里用不对称内边距而不是 text-align——实测在这套「绝对定位 + 旋转」
-   的纸张里 text-align 不产生实际位移，内边距可靠。 */
-.folder-tilt :deep(.p-left) {
-  padding-right: 104px;
-}
-.folder-tilt :deep(.p-right) {
-  padding-left: 104px;
 }
 
 /* 巨大标题：参考 Dify 的hero——极大字号、行高收紧、字距微负。
