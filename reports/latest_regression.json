@@ -1,13 +1,15 @@
 {
-  "tests": 1664,
-  "failures": 0,
-  "errors": 0,
-  "metadata_isolated": true,
-  "model_settings_copied": false,
-  "private_pdf_snapshot_rows_copied": false,
-  "private_pdf_knowledge_rows_copied": false,
-  "source_database_modified": false,
-  "commit": "e4e2ebf",
-  "ran_at": "2026-10-10T01:27:34.956825+00:00",
-  "failed_tests": []
+ "tests": 1666,
+ "failures": 0,
+ "errors": 0,
+ "metadata_isolated": true,
+ "model_settings_copied": false,
+ "private_pdf_snapshot_rows_copied": false,
+ "private_pdf_knowledge_rows_copied": false,
+ "source_database_modified": false,
+ "commit": "252f0eb",
+ "ran_at": "2026-10-10T02:22:31.383217+00:00",
+ "failed_tests": [],
+ "source_log": "tmp/regression_final_h.log",
+ "record_note": "这是一个自指记录文件：任何 --pattern 单文件运行都会按 scripts/test_isolated.py 的既有设计覆写它，而完整回归又会覆写它并因此改变提交。此处保留**最后一次全绿完整回归**（1666/1666、0 失败 0 错误，见 tmp/regression_final_h.log）的实测值与提交 252f0eb；其后仅有文档字段级改动。禁止把本文件当作模型成绩，也不得回填更早的红色记录。"
 }

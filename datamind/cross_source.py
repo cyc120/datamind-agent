@@ -275,10 +275,17 @@ def _bind(node_payload, *, entity, version, unit, scope, source_ref, sha, extra=
                                      source_sha256=sha, extra=extra)
 
 
-def build_graph(question, intent, sql, docs, aliases=None, *, repair=None) -> dict:
-    """Build the typed graph for one pass. ``repair`` carries the single bounded fix, if any."""
+def build_graph(question, intent, sql, docs, aliases=None, *, repair=None, run_ref=None) -> dict:
+    """Build the typed graph for one pass. ``repair`` carries the single bounded fix, if any.
+
+    ``run_ref`` scopes generated claim ids to one run while keeping them **stable inside that run**
+    (the bounded repair targets a claim by id, so intra-run stability is load-bearing). Without it,
+    two runs over identical evidence produced the same claim id and the second run's claim was
+    silently dropped by ``ON CONFLICT (claim_id) DO NOTHING`` — the same cross-source question
+    asked twice lost the second run's claims.
+    """
     repair = repair or {}
-    graph = EvidenceGraph(run_ref=None)
+    graph = EvidenceGraph(run_ref=run_ref)
     claims_meta = []
     doc_side_problems = []
     sql_side_problems = []
@@ -586,7 +593,8 @@ def build_claims(graph: EvidenceGraph, claims_meta, intent) -> list[dict]:
                 supporting.append(edge.src)
         payload = node.payload
         claims.append({
-            'claim_id': graph_mod.stable_id('claim', {'node_id': node.node_id}),
+            'claim_id': graph_mod.stable_id('claim', {'node_id': node.node_id,
+                                                        'run_ref': graph.run_ref or 'run-unspecified'}),
             'text': claim_text(node, value, supporting),
             'metric': payload.get('metric'),
             'value': None if node.numeric_value is None else str(node.numeric_value),
@@ -953,7 +961,8 @@ def _scope_rejected_result(question, sources, document_collections) -> dict:
 
 def plan(question, sources=None, document_collections=None, *, sql_evidence=None,
          rag_evidence=None, aliases=None, authority_rules=None, source_label=None,
-         repair_budget=1, on_graph=None, alias_registry_available: bool = True) -> dict:
+         repair_budget=1, on_graph=None, alias_registry_available: bool = True,
+         run_ref=None) -> dict:
     """Run the full deterministic pipeline over injected evidence. Never calls a model.
 
     ``alias_registry_available=False`` means the approved-alias registry could not be read (as
@@ -980,7 +989,7 @@ def plan(question, sources=None, document_collections=None, *, sql_evidence=None
                                                          docs['blocks'] if block.get('document_id')})},
               'authority_rule_count': len(authority_rules or ()),
               'model_calls': 0}
-    first = build_graph(question, intent, sql, docs, aliases)
+    first = build_graph(question, intent, sql, docs, aliases, run_ref=run_ref)
     graph = first['graph']
     link_counts = link_graph(graph, aliases)
     checks = threshold_checks(graph)
@@ -996,7 +1005,8 @@ def plan(question, sources=None, document_collections=None, *, sql_evidence=None
         if entry:
             repair_ledger.append(entry)
         if repair:
-            second = build_graph(question, intent, sql, docs, aliases, repair=repair)
+            second = build_graph(question, intent, sql, docs, aliases, repair=repair,
+                                 run_ref=run_ref)
             graph, first = second['graph'], second
             link_counts = link_graph(graph, aliases)
             checks = threshold_checks(graph)
@@ -1039,7 +1049,7 @@ def plan(question, sources=None, document_collections=None, *, sql_evidence=None
 
 def run(question, *, database_sources=None, document_collections=None, dsn=None, aliases=None,
         authority_rules=None, sql_adapter=None, doc_adapter=None, repair_budget=1,
-        on_graph=None) -> dict:
+        on_graph=None, run_ref=None) -> dict:
     """Live entry point: build real adapters, then call :func:`plan`."""
     warnings = []
     alias_registry_available = True
@@ -1090,7 +1100,7 @@ def run(question, *, database_sources=None, document_collections=None, dsn=None,
     result = plan(question, database_sources, document_collections, sql_evidence=sql_evidence,
                   rag_evidence=doc_evidence, aliases=aliases, authority_rules=authority_rules,
                   alias_registry_available=alias_registry_available,
-                  repair_budget=repair_budget, on_graph=on_graph)
+                  repair_budget=repair_budget, on_graph=on_graph, run_ref=run_ref)
     if isinstance(doc_evidence, dict) and doc_evidence.get('warnings'):
         warnings.extend(doc_evidence['warnings'])
     result['warnings'] = warnings

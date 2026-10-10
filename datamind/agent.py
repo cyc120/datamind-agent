@@ -536,10 +536,11 @@ class DataMindAgent:
                     rag_evidence={'blocks': evidence.get('docs') or []},
                     aliases=evidence.get('aliases'), authority_rules=evidence.get('authority_rules'),
                     alias_registry_available=evidence.get('alias_registry_available', True),
-                    on_graph=persist)
+                    on_graph=persist, run_ref=self.run_id)
             else:
                 result = cross_source.run(question, database_sources=sources,
-                                          document_collections=collections, on_graph=persist)
+                                          document_collections=collections, on_graph=persist,
+                                          run_ref=self.run_id)
         except cross_source.CrossSourceError as exc:
             # A refused scope (empty allow-list reaching the SQL adapter, H1) is not an internal
             # failure: it keeps its own stable code instead of degrading into INTERNAL_ERROR.

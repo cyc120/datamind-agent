@@ -199,9 +199,17 @@ class EvidenceGraph:
         return node
 
     def make_node(self, node_type, ref, **kwargs) -> EvidenceNode:
-        node_id = kwargs.pop('node_id', None) or stable_id(
-            'n', {'node_type': node_type, 'ref': ref,
-                  'source_ref': kwargs.get('payload', {}).get('source_ref')})
+        # ``run_ref`` is part of the identity because the store keys nodes by ``evidence_id`` alone
+        # (deploy/init shape). A content-only id meant two runs over the same evidence produced the
+        # same id, so the second run's nodes were dropped by ``ON CONFLICT DO NOTHING`` while its
+        # edges still pointed at the first run's rows. Scoping keeps ids *stable inside a run* (the
+        # repair targets them by id) and unique per run. The key is omitted entirely when no run
+        # ref is set, so offline/frozen graphs keep their exact previous content-only ids.
+        identity = {'node_type': node_type, 'ref': ref,
+                    'source_ref': kwargs.get('payload', {}).get('source_ref')}
+        if self.run_ref:
+            identity['run_ref'] = self.run_ref
+        node_id = kwargs.pop('node_id', None) or stable_id('n', identity)
         return self.add_node(EvidenceNode(node_id, node_type, ref, **kwargs))
 
     def add_edge(self, src, dst, edge_type, *, evidence, binding_type=None, confidence=None):
@@ -490,7 +498,12 @@ def persist(conn, run_id: str, graph: EvidenceGraph) -> dict:
     written (``evidence_id`` / ``run_id`` / ``node_type`` / ``ref_key`` / ``payload`` and
     ``src_evidence_id`` / ``dst_evidence_id`` / ``edge_type``); the richer binding fields live in
     the node payload so no column has to exist first. The caller owns the transaction.
+
+    When the graph names a run (``graph.run_ref``), that is the run the rows belong to: the claim
+    ids are scoped by the same reference, so persisting under a *different* ``run_id`` would leave
+    the nodes and the claims of one run split across two run ids.
     """
+    run_id = graph.run_ref or run_id
     nodes = edges = 0
     with conn.cursor() as cur:
         for node in graph.nodes():
@@ -512,5 +525,15 @@ def persist(conn, run_id: str, graph: EvidenceGraph) -> dict:
 
 
 def _jsonb(payload):
+    """JSONB-encode a node payload, tolerating real database value types.
+
+    A live SQL row carries ``Decimal`` / ``date`` / ``datetime``; ``psycopg2.extras.Json`` uses the
+    stdlib encoder and raises ``TypeError`` on them. That error lands in the caller's best-effort
+    persistence guard as ``persistence_error``, so before this fix the evidence graph **silently
+    never persisted** for any real (non-fixture) run while the frozen fixtures — plain strings —
+    kept passing. The same ``default=str`` discipline this module already applies to the graph
+    digest is used here, so the typed value stays in ``value`` / ``unit`` / ``time_scope`` and only
+    the text projection is stringified.
+    """
     from psycopg2.extras import Json
-    return Json(payload)
+    return Json(payload, dumps=lambda value: json.dumps(value, ensure_ascii=False, default=str))

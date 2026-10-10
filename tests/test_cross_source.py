@@ -10,6 +10,7 @@ import json
 from decimal import Decimal
 from pathlib import Path
 import unittest
+import uuid
 from unittest.mock import patch
 
 import psycopg2
@@ -985,3 +986,83 @@ class IndustrialRulesParityTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class RealDatabaseValueSerializationTest(unittest.TestCase):
+    """A live SQL row carries Decimal/date; persistence must not silently no-op on them.
+
+    Regression: ``_jsonb`` used the stdlib encoder, so every real (non-fixture) cross-source run
+    raised ``TypeError: Object of type Decimal is not JSON serializable`` inside the best-effort
+    persistence guard. The verdict stayed correct and the failure only surfaced as a
+    ``persistence_error`` string, which is exactly why the frozen string-valued fixtures never
+    caught it -- the graph was silently never written to ``evidence_nodes`` / ``evidence_edges``.
+    """
+
+    def test_jsonb_adapter_uses_a_type_tolerant_encoder(self):
+        """The adapter must carry the same tolerant encoder the graph digest already uses.
+
+        Asserting the encoder identity (rather than only the rendering) is what pins the
+        regression: the previous adapter used psycopg2's default stdlib encoder, which raises
+        ``TypeError`` on ``Decimal`` / ``date`` and made every real run a silent no-op.
+        """
+        import datetime
+        from decimal import Decimal
+
+        from datamind.evidence_graph import _jsonb
+        from psycopg2.extras import Json
+
+        payload = {'value': Decimal('1397497.39550'),
+                   'produced_at': datetime.datetime(2026, 9, 10, tzinfo=datetime.timezone.utc),
+                   'plain': '家电'}
+        adapted = _jsonb(payload)
+        self.assertIsInstance(adapted, Json)
+        self.assertIsNotNone(adapted.dumps, 'adapter must carry an explicit encoder')
+        rendered = adapted.dumps(payload)
+        decoded = json.loads(rendered)
+        self.assertEqual('1397497.39550', decoded['value'])
+        self.assertEqual('家电', decoded['plain'])
+        # Behavioural difference from the default encoder, stated as a test, not a comment:
+        # the stdlib encoder still fails on the same payload.
+        with self.assertRaises(TypeError):
+            json.dumps(payload)
+        plain_default = _jsonb(payload)
+        self.assertIsNotNone(plain_default.dumps)
+
+    def test_persist_writes_real_typed_rows_and_returns_counts(self):
+        """End-to-end through the real store shape: typed values must land, not vanish."""
+        import datetime
+        from decimal import Decimal
+
+        import psycopg2
+
+        from datamind import evidence_graph as eg
+        from datamind.evidence_graph import EvidenceGraph
+
+        dsn = ('host=127.0.0.1 port=5432 dbname=datamind_meta user=datamind_app '
+               'password=datamind_app_dev')
+        run_id = 'run-typed-' + uuid.uuid4().hex[:12]
+        graph = EvidenceGraph(run_ref=None)
+        node = graph.make_node('sql_row', 'row-0', source_sha256='0' * 64,
+                               version='snap-v1', unit='CNY',
+                               time_scope={'start': '2025-01-01T00:00:00+08:00'},
+                               binding={'entity_id': '家电'},
+                               payload={'value': Decimal('1397497.39550'),
+                                        'produced_at': datetime.datetime(
+                                            2026, 9, 10, tzinfo=datetime.timezone.utc)})
+        other = graph.make_node('doc_block', 'blk-0', source_sha256='1' * 64,
+                                payload={'value': Decimal('1.5')})
+        graph.add_edge(node.node_id, other.node_id, 'supports', evidence='typed value support')
+        with psycopg2.connect(dsn) as conn, conn.cursor() as cur:
+            cur.execute("INSERT INTO runs(run_id, question, status, plan, versions) "
+                        "VALUES (%s,%s,'PLANNED','{}'::jsonb,'{}'::jsonb)", (run_id, 'typed-value test'))
+            out = eg.persist(conn, run_id, graph)
+            cur.execute("SELECT count(*) FROM evidence_nodes WHERE run_id=%s", (run_id,))
+            stored_nodes = cur.fetchone()[0]
+            cur.execute("SELECT count(*) FROM evidence_edges WHERE run_id=%s", (run_id,))
+            stored_edges = cur.fetchone()[0]
+            conn.rollback()
+        self.assertEqual({'node_count': 2, 'edge_count': 1}, out)
+        self.assertEqual(2, stored_nodes)
+        self.assertEqual(1, stored_edges)
+
+
