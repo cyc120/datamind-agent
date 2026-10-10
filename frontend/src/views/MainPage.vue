@@ -309,7 +309,9 @@ onMounted(async () => {
 
 /* ── 右侧证据面板：更窄、可折叠 ── */
 .right {
-  width: 340px;
+  /* 原来写死 340px，星链图舒展不开（中间对话区反而空得慌）。
+     改为按视口比例伸缩，1440px 宽时约 490px。 */
+  width: clamp(380px, 34vw, 560px);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
