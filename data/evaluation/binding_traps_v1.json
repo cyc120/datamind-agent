@@ -1,0 +1,3072 @@
+{
+  "suite": "binding_traps_v1",
+  "suite_version": "1.0.0",
+  "frozen_at": "2026-10-10",
+  "kind": "binding-trap-set",
+  "binding_eval_version": "binding-eval-v1",
+  "trap_kinds": {
+    "cross_version": "同对象跨版本：V1/V2 数值或适用范围不同，必须按登记的有效期窗口绑定版本",
+    "unit_mismatch": "单位不同或不可归一：英寸/毫米、degC/degF、无法归一的自定义单位",
+    "time_scope_mismatch": "时间口径不同：自然月 / 季度 / 生产批次期间",
+    "doc_db_opposite": "文档与库数值相反：同一对象同一版本两侧数值矛盾"
+  },
+  "resolution_vocabulary": {
+    "resolved_by_authority": "由登记依据确定性收敛：source_authority_rules 登记规则、登记版本有效期窗口、或登记单位等价换算——三者都是已登记、确定、不猜测的依据",
+    "unresolved": "同一 entity+metric+version 的可比数值互相矛盾且没有登记权威：必须保留双方原值、拒答",
+    "needs_review": "两侧不可比（单位不可归一、时间口径不同、版本适用性未知、时区缺失）：不得合并，标记待复核"
+  },
+  "label_policy": "标签在任何臂实现之前冻结；expected_binding 的 entity/unit/time_scope 由主声称的 fixture 机械导出，version 与 answerable/conflict/resolution 由人工声明；--check 重新生成并逐字节比对，任何放宽都会以 BINDING_TRAPS_LABELS_LOOSENED 报错。",
+  "case_count": 40,
+  "counts_by_trap_kind": {
+    "cross_version": 10,
+    "unit_mismatch": 10,
+    "time_scope_mismatch": 10,
+    "doc_db_opposite": 10
+  },
+  "cases": [
+    {
+      "case_id": "bt-a-01",
+      "trap_kind": "cross_version",
+      "question": "A102 在 2025-05-01 的保温温度上限按哪一版工艺规范？",
+      "provenance": "自建冻结陷阱（同对象跨版本）：生产行未声明版本，登记窗口把声称绑定到 V2",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "0c75a8a30a08b03cc042da3626c9e8c784401f2db4bdee04220e694c7ebf843a",
+        "rows": [
+          {
+            "row_id": "bt-a-01-row",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "value": "880",
+            "unit": "degC",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-05-10T09:00:00+08:00",
+            "time_basis": "production_batch"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "doc-A102-v1",
+            "document_version": "A102-V1",
+            "chunk_id": "doc-A102-v1-c1",
+            "title": "工艺规范 A102（A102-V1）",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "unit": "degC",
+            "clause": {
+              "clause_id": "doc-A102-v1-clause",
+              "metric": "holding_temperature",
+              "op": "<=",
+              "limit": "850",
+              "unit": "degC",
+              "entity_label": "A102",
+              "valid_from": "2024-01-01T00:00:00+08:00",
+              "valid_to": "2025-03-01T00:00:00+08:00"
+            },
+            "text": "A102 工艺规范 A102-V1：holding_temperature 不得超过 850 degC，适用期至 2025-03-01。",
+            "source_sha256": "0db088e4e2a6b91835555c88d9473334ce813e90819173818fb694a61826d40f"
+          },
+          {
+            "document_id": "doc-A102-v2",
+            "document_version": "A102-V2",
+            "chunk_id": "doc-A102-v2-c1",
+            "title": "工艺规范 A102（A102-V2）",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "unit": "degC",
+            "clause": {
+              "clause_id": "doc-A102-v2-clause",
+              "metric": "holding_temperature",
+              "op": "<=",
+              "limit": "900",
+              "unit": "degC",
+              "entity_label": "A102",
+              "valid_from": "2025-03-01T00:00:00+08:00",
+              "valid_to": null
+            },
+            "text": "A102 工艺规范 A102-V2：holding_temperature 不得超过 900 degC，自 2025-03-01 起适用。",
+            "source_sha256": "14873464ec4c8dd94f4dc42ef8539e7425b8dd4e3818998514e4e314b5e31625"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "holding_temperature"
+      },
+      "expected_binding": {
+        "entity_id": "A102",
+        "version": "A102-V2",
+        "unit": "degC",
+        "time_scope": {
+          "start": "2025-05-01T00:00:00+08:00",
+          "end": "2025-06-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": true,
+      "expected_conflict": false,
+      "expected_resolution": "resolved_by_authority",
+      "expected_value": "880"
+    },
+    {
+      "case_id": "bt-a-02",
+      "trap_kind": "cross_version",
+      "question": "A102 在 2025-04-01 的保温温度上限按哪一版工艺规范？",
+      "provenance": "自建冻结陷阱（同对象跨版本）：生产行声明的是过期版本 V1，登记窗口要求 V2",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "85cea1fbcefd5eaa886ed6dbc249f3ff72a7cc7013be12bd418797c44a05c03f",
+        "rows": [
+          {
+            "row_id": "bt-a-02-row",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "value": "880",
+            "unit": "degC",
+            "applies_to_version": "A102-V1",
+            "time_scope": {
+              "start": "2025-04-01T00:00:00+08:00",
+              "end": "2025-05-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-04-06T08:30:00+08:00",
+            "time_basis": "production_batch"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "doc-A102-v1",
+            "document_version": "A102-V1",
+            "chunk_id": "doc-A102-v1-c1",
+            "title": "工艺规范 A102（A102-V1）",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "unit": "degC",
+            "clause": {
+              "clause_id": "doc-A102-v1-clause",
+              "metric": "holding_temperature",
+              "op": "<=",
+              "limit": "850",
+              "unit": "degC",
+              "entity_label": "A102",
+              "valid_from": "2024-01-01T00:00:00+08:00",
+              "valid_to": "2025-03-01T00:00:00+08:00"
+            },
+            "text": "A102 工艺规范 A102-V1：holding_temperature 不得超过 850 degC，适用期至 2025-03-01。",
+            "source_sha256": "0db088e4e2a6b91835555c88d9473334ce813e90819173818fb694a61826d40f"
+          },
+          {
+            "document_id": "doc-A102-v2",
+            "document_version": "A102-V2",
+            "chunk_id": "doc-A102-v2-c1",
+            "title": "工艺规范 A102（A102-V2）",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "unit": "degC",
+            "clause": {
+              "clause_id": "doc-A102-v2-clause",
+              "metric": "holding_temperature",
+              "op": "<=",
+              "limit": "900",
+              "unit": "degC",
+              "entity_label": "A102",
+              "valid_from": "2025-03-01T00:00:00+08:00",
+              "valid_to": null
+            },
+            "text": "A102 工艺规范 A102-V2：holding_temperature 不得超过 900 degC，自 2025-03-01 起适用。",
+            "source_sha256": "14873464ec4c8dd94f4dc42ef8539e7425b8dd4e3818998514e4e314b5e31625"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "holding_temperature"
+      },
+      "expected_binding": {
+        "entity_id": "A102",
+        "version": "A102-V2",
+        "unit": "degC",
+        "time_scope": {
+          "start": "2025-04-01T00:00:00+08:00",
+          "end": "2025-05-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": true,
+      "expected_conflict": false,
+      "expected_resolution": "resolved_by_authority",
+      "expected_value": "880"
+    },
+    {
+      "case_id": "bt-a-03",
+      "trap_kind": "cross_version",
+      "question": "A102 在 2025-07-01 的保温温度上限按哪一版工艺规范？",
+      "provenance": "自建冻结陷阱（同对象跨版本）：过期版本声明 + 更晚的声称时点",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "3b48ae626d6a9c8bcc86fa43d0a361e66f67a34e54069e6e0cb11d29c19a4bcd",
+        "rows": [
+          {
+            "row_id": "bt-a-03-row",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "value": "880",
+            "unit": "degC",
+            "applies_to_version": "A102-V1",
+            "time_scope": {
+              "start": "2025-07-01T00:00:00+08:00",
+              "end": "2025-08-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-07-18T10:15:00+08:00",
+            "time_basis": "production_batch"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "doc-A102-v1",
+            "document_version": "A102-V1",
+            "chunk_id": "doc-A102-v1-c1",
+            "title": "工艺规范 A102（A102-V1）",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "unit": "degC",
+            "clause": {
+              "clause_id": "doc-A102-v1-clause",
+              "metric": "holding_temperature",
+              "op": "<=",
+              "limit": "850",
+              "unit": "degC",
+              "entity_label": "A102",
+              "valid_from": "2024-01-01T00:00:00+08:00",
+              "valid_to": "2025-03-01T00:00:00+08:00"
+            },
+            "text": "A102 工艺规范 A102-V1：holding_temperature 不得超过 850 degC，适用期至 2025-03-01。",
+            "source_sha256": "0db088e4e2a6b91835555c88d9473334ce813e90819173818fb694a61826d40f"
+          },
+          {
+            "document_id": "doc-A102-v2",
+            "document_version": "A102-V2",
+            "chunk_id": "doc-A102-v2-c1",
+            "title": "工艺规范 A102（A102-V2）",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "unit": "degC",
+            "clause": {
+              "clause_id": "doc-A102-v2-clause",
+              "metric": "holding_temperature",
+              "op": "<=",
+              "limit": "900",
+              "unit": "degC",
+              "entity_label": "A102",
+              "valid_from": "2025-03-01T00:00:00+08:00",
+              "valid_to": null
+            },
+            "text": "A102 工艺规范 A102-V2：holding_temperature 不得超过 900 degC，自 2025-03-01 起适用。",
+            "source_sha256": "14873464ec4c8dd94f4dc42ef8539e7425b8dd4e3818998514e4e314b5e31625"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "holding_temperature"
+      },
+      "expected_binding": {
+        "entity_id": "A102",
+        "version": "A102-V2",
+        "unit": "degC",
+        "time_scope": {
+          "start": "2025-07-01T00:00:00+08:00",
+          "end": "2025-08-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": true,
+      "expected_conflict": false,
+      "expected_resolution": "resolved_by_authority",
+      "expected_value": "880"
+    },
+    {
+      "case_id": "bt-a-04",
+      "trap_kind": "cross_version",
+      "question": "A103 在 2025-09-01 的保温温度上限按哪一版工艺规范？",
+      "provenance": "自建冻结陷阱（同对象跨版本）：同对象跨版本换实体（A103）",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "7ea1168c9dfa0189424cd03d2f0caa3617c1edbf21829ebbc0b2c25b17463510",
+        "rows": [
+          {
+            "row_id": "bt-a-04-row",
+            "entity_label": "3号淬火线",
+            "metric": "holding_temperature",
+            "value": "880",
+            "unit": "degC",
+            "time_scope": {
+              "start": "2025-09-01T00:00:00+08:00",
+              "end": "2025-10-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-09-09T09:00:00+08:00",
+            "time_basis": "production_batch"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "doc-A103-v1",
+            "document_version": "A103-V1",
+            "chunk_id": "doc-A103-v1-c1",
+            "title": "工艺规范 A103（A103-V1）",
+            "entity_label": "A103",
+            "metric": "holding_temperature",
+            "unit": "degC",
+            "clause": {
+              "clause_id": "doc-A103-v1-clause",
+              "metric": "holding_temperature",
+              "op": "<=",
+              "limit": "850",
+              "unit": "degC",
+              "entity_label": "A103",
+              "valid_from": "2024-01-01T00:00:00+08:00",
+              "valid_to": "2025-03-01T00:00:00+08:00"
+            },
+            "text": "A103 工艺规范 A103-V1：holding_temperature 不得超过 850 degC，适用期至 2025-03-01。",
+            "source_sha256": "3340f65610d7174ce1a39db3f998592680faca9225102495df5188da08912f7b"
+          },
+          {
+            "document_id": "doc-A103-v2",
+            "document_version": "A103-V2",
+            "chunk_id": "doc-A103-v2-c1",
+            "title": "工艺规范 A103（A103-V2）",
+            "entity_label": "A103",
+            "metric": "holding_temperature",
+            "unit": "degC",
+            "clause": {
+              "clause_id": "doc-A103-v2-clause",
+              "metric": "holding_temperature",
+              "op": "<=",
+              "limit": "900",
+              "unit": "degC",
+              "entity_label": "A103",
+              "valid_from": "2025-03-01T00:00:00+08:00",
+              "valid_to": null
+            },
+            "text": "A103 工艺规范 A103-V2：holding_temperature 不得超过 900 degC，自 2025-03-01 起适用。",
+            "source_sha256": "db8e0cd9640f0b5e6d3fbce47def701246d083cfcb8742d02fda63790938a7c9"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [
+        {
+          "alias": "3号淬火线",
+          "canonical_name": "A103"
+        }
+      ],
+      "primary": {
+        "side": "sql",
+        "metric": "holding_temperature"
+      },
+      "expected_binding": {
+        "entity_id": "A103",
+        "version": "A103-V2",
+        "unit": "degC",
+        "time_scope": {
+          "start": "2025-09-01T00:00:00+08:00",
+          "end": "2025-10-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": true,
+      "expected_conflict": false,
+      "expected_resolution": "resolved_by_authority",
+      "expected_value": "880"
+    },
+    {
+      "case_id": "bt-a-05",
+      "trap_kind": "cross_version",
+      "question": "A103 在 2024-11-01 的保温温度上限按哪一版工艺规范？",
+      "provenance": "自建冻结陷阱（同对象跨版本）：反向过期：声称声明 V2，但时点落在 V1 窗口内",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "633861a7b24b17c6bc87897ecf7dfa896d8a9948c2be626cb0da69c710eb6dff",
+        "rows": [
+          {
+            "row_id": "bt-a-05-row",
+            "entity_label": "3号淬火线",
+            "metric": "holding_temperature",
+            "value": "880",
+            "unit": "degC",
+            "applies_to_version": "A103-V2",
+            "time_scope": {
+              "start": "2024-11-01T00:00:00+08:00",
+              "end": "2024-12-01T00:00:00+08:00"
+            },
+            "measured_at": "2024-11-20T14:00:00+08:00",
+            "time_basis": "production_batch"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "doc-A103-v1",
+            "document_version": "A103-V1",
+            "chunk_id": "doc-A103-v1-c1",
+            "title": "工艺规范 A103（A103-V1）",
+            "entity_label": "A103",
+            "metric": "holding_temperature",
+            "unit": "degC",
+            "clause": {
+              "clause_id": "doc-A103-v1-clause",
+              "metric": "holding_temperature",
+              "op": "<=",
+              "limit": "850",
+              "unit": "degC",
+              "entity_label": "A103",
+              "valid_from": "2024-01-01T00:00:00+08:00",
+              "valid_to": "2025-03-01T00:00:00+08:00"
+            },
+            "text": "A103 工艺规范 A103-V1：holding_temperature 不得超过 850 degC，适用期至 2025-03-01。",
+            "source_sha256": "3340f65610d7174ce1a39db3f998592680faca9225102495df5188da08912f7b"
+          },
+          {
+            "document_id": "doc-A103-v2",
+            "document_version": "A103-V2",
+            "chunk_id": "doc-A103-v2-c1",
+            "title": "工艺规范 A103（A103-V2）",
+            "entity_label": "A103",
+            "metric": "holding_temperature",
+            "unit": "degC",
+            "clause": {
+              "clause_id": "doc-A103-v2-clause",
+              "metric": "holding_temperature",
+              "op": "<=",
+              "limit": "900",
+              "unit": "degC",
+              "entity_label": "A103",
+              "valid_from": "2025-03-01T00:00:00+08:00",
+              "valid_to": null
+            },
+            "text": "A103 工艺规范 A103-V2：holding_temperature 不得超过 900 degC，自 2025-03-01 起适用。",
+            "source_sha256": "db8e0cd9640f0b5e6d3fbce47def701246d083cfcb8742d02fda63790938a7c9"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [
+        {
+          "alias": "3号淬火线",
+          "canonical_name": "A103"
+        }
+      ],
+      "primary": {
+        "side": "sql",
+        "metric": "holding_temperature"
+      },
+      "expected_binding": {
+        "entity_id": "A103",
+        "version": "A103-V1",
+        "unit": "degC",
+        "time_scope": {
+          "start": "2024-11-01T00:00:00+08:00",
+          "end": "2024-12-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": true,
+      "expected_conflict": false,
+      "expected_resolution": "resolved_by_authority",
+      "expected_value": "880"
+    },
+    {
+      "case_id": "bt-a-06",
+      "trap_kind": "cross_version",
+      "question": "A102 在 2025-03-01 的保温温度上限按哪一版工艺规范？",
+      "provenance": "自建冻结陷阱（同对象跨版本）：半开区间边界：窗口起点归属新版本",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "7c2bda2c42f86225fa08552abe30a859fd11b53cfd0aacd384d93470036edd37",
+        "rows": [
+          {
+            "row_id": "bt-a-06-row",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "value": "880",
+            "unit": "degC",
+            "applies_to_version": "A102-V1",
+            "time_scope": {
+              "start": "2025-03-01T00:00:00+08:00",
+              "end": "2025-03-02T00:00:00+08:00"
+            },
+            "measured_at": "2025-03-01T00:00:00+08:00",
+            "time_basis": "production_batch"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "doc-A102-v1",
+            "document_version": "A102-V1",
+            "chunk_id": "doc-A102-v1-c1",
+            "title": "工艺规范 A102（A102-V1）",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "unit": "degC",
+            "clause": {
+              "clause_id": "doc-A102-v1-clause",
+              "metric": "holding_temperature",
+              "op": "<=",
+              "limit": "850",
+              "unit": "degC",
+              "entity_label": "A102",
+              "valid_from": "2024-01-01T00:00:00+08:00",
+              "valid_to": "2025-03-01T00:00:00+08:00"
+            },
+            "text": "A102 工艺规范 A102-V1：holding_temperature 不得超过 850 degC，适用期至 2025-03-01。",
+            "source_sha256": "0db088e4e2a6b91835555c88d9473334ce813e90819173818fb694a61826d40f"
+          },
+          {
+            "document_id": "doc-A102-v2",
+            "document_version": "A102-V2",
+            "chunk_id": "doc-A102-v2-c1",
+            "title": "工艺规范 A102（A102-V2）",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "unit": "degC",
+            "clause": {
+              "clause_id": "doc-A102-v2-clause",
+              "metric": "holding_temperature",
+              "op": "<=",
+              "limit": "900",
+              "unit": "degC",
+              "entity_label": "A102",
+              "valid_from": "2025-03-01T00:00:00+08:00",
+              "valid_to": null
+            },
+            "text": "A102 工艺规范 A102-V2：holding_temperature 不得超过 900 degC，自 2025-03-01 起适用。",
+            "source_sha256": "14873464ec4c8dd94f4dc42ef8539e7425b8dd4e3818998514e4e314b5e31625"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "holding_temperature"
+      },
+      "expected_binding": {
+        "entity_id": "A102",
+        "version": "A102-V2",
+        "unit": "degC",
+        "time_scope": {
+          "start": "2025-03-01T00:00:00+08:00",
+          "end": "2025-03-02T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": true,
+      "expected_conflict": false,
+      "expected_resolution": "resolved_by_authority",
+      "expected_value": "880"
+    },
+    {
+      "case_id": "bt-a-07",
+      "trap_kind": "cross_version",
+      "question": "A102 在 2024-12-28 的保温温度上限按哪一版工艺规范？",
+      "provenance": "自建冻结陷阱（同对象跨版本）：窗口结束前一刻仍属 V1",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "63af84d2a6c5b41343145d12049254f3662b136e50a38691b5d6e04b4ce6a911",
+        "rows": [
+          {
+            "row_id": "bt-a-07-row",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "value": "880",
+            "unit": "degC",
+            "time_scope": {
+              "start": "2024-12-28T00:00:00+08:00",
+              "end": "2024-12-31T00:00:00+08:00"
+            },
+            "measured_at": "2024-12-29T11:00:00+08:00",
+            "time_basis": "production_batch"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "doc-A102-v1",
+            "document_version": "A102-V1",
+            "chunk_id": "doc-A102-v1-c1",
+            "title": "工艺规范 A102（A102-V1）",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "unit": "degC",
+            "clause": {
+              "clause_id": "doc-A102-v1-clause",
+              "metric": "holding_temperature",
+              "op": "<=",
+              "limit": "850",
+              "unit": "degC",
+              "entity_label": "A102",
+              "valid_from": "2024-01-01T00:00:00+08:00",
+              "valid_to": "2025-03-01T00:00:00+08:00"
+            },
+            "text": "A102 工艺规范 A102-V1：holding_temperature 不得超过 850 degC，适用期至 2025-03-01。",
+            "source_sha256": "0db088e4e2a6b91835555c88d9473334ce813e90819173818fb694a61826d40f"
+          },
+          {
+            "document_id": "doc-A102-v2",
+            "document_version": "A102-V2",
+            "chunk_id": "doc-A102-v2-c1",
+            "title": "工艺规范 A102（A102-V2）",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "unit": "degC",
+            "clause": {
+              "clause_id": "doc-A102-v2-clause",
+              "metric": "holding_temperature",
+              "op": "<=",
+              "limit": "900",
+              "unit": "degC",
+              "entity_label": "A102",
+              "valid_from": "2025-03-01T00:00:00+08:00",
+              "valid_to": null
+            },
+            "text": "A102 工艺规范 A102-V2：holding_temperature 不得超过 900 degC，自 2025-03-01 起适用。",
+            "source_sha256": "14873464ec4c8dd94f4dc42ef8539e7425b8dd4e3818998514e4e314b5e31625"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "holding_temperature"
+      },
+      "expected_binding": {
+        "entity_id": "A102",
+        "version": "A102-V1",
+        "unit": "degC",
+        "time_scope": {
+          "start": "2024-12-28T00:00:00+08:00",
+          "end": "2024-12-31T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": true,
+      "expected_conflict": false,
+      "expected_resolution": "resolved_by_authority",
+      "expected_value": "880"
+    },
+    {
+      "case_id": "bt-a-08",
+      "trap_kind": "cross_version",
+      "question": "B201 在 2025-05-01 的保温温度上限按哪一版工艺规范？",
+      "provenance": "自建冻结陷阱（同对象跨版本）：另一个工序对象的跨版本陷阱",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "56d1c13325dd4f1d9833c6fd5dd9dce90329cdc143bb248e178e805984d0f6aa",
+        "rows": [
+          {
+            "row_id": "bt-a-08-row",
+            "entity_label": "B201",
+            "metric": "holding_temperature",
+            "value": "880",
+            "unit": "degC",
+            "applies_to_version": "B201-V1",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-05-22T13:20:00+08:00",
+            "time_basis": "production_batch"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "doc-B201-v1",
+            "document_version": "B201-V1",
+            "chunk_id": "doc-B201-v1-c1",
+            "title": "工艺规范 B201（B201-V1）",
+            "entity_label": "B201",
+            "metric": "holding_temperature",
+            "unit": "degC",
+            "clause": {
+              "clause_id": "doc-B201-v1-clause",
+              "metric": "holding_temperature",
+              "op": "<=",
+              "limit": "850",
+              "unit": "degC",
+              "entity_label": "B201",
+              "valid_from": "2024-01-01T00:00:00+08:00",
+              "valid_to": "2025-03-01T00:00:00+08:00"
+            },
+            "text": "B201 工艺规范 B201-V1：holding_temperature 不得超过 850 degC，适用期至 2025-03-01。",
+            "source_sha256": "3234d864723e153bd5a41aec2e1c80d337b2fb4d278ae79eee6d95a4086e07c6"
+          },
+          {
+            "document_id": "doc-B201-v2",
+            "document_version": "B201-V2",
+            "chunk_id": "doc-B201-v2-c1",
+            "title": "工艺规范 B201（B201-V2）",
+            "entity_label": "B201",
+            "metric": "holding_temperature",
+            "unit": "degC",
+            "clause": {
+              "clause_id": "doc-B201-v2-clause",
+              "metric": "holding_temperature",
+              "op": "<=",
+              "limit": "900",
+              "unit": "degC",
+              "entity_label": "B201",
+              "valid_from": "2025-03-01T00:00:00+08:00",
+              "valid_to": null
+            },
+            "text": "B201 工艺规范 B201-V2：holding_temperature 不得超过 900 degC，自 2025-03-01 起适用。",
+            "source_sha256": "7ace0de5898b8dc988dff3ea809e942688b2dfb9c72ac85d89a09b5603bca2c2"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "holding_temperature"
+      },
+      "expected_binding": {
+        "entity_id": "B201",
+        "version": "B201-V2",
+        "unit": "degC",
+        "time_scope": {
+          "start": "2025-05-01T00:00:00+08:00",
+          "end": "2025-06-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": true,
+      "expected_conflict": false,
+      "expected_resolution": "resolved_by_authority",
+      "expected_value": "880"
+    },
+    {
+      "case_id": "bt-a-09",
+      "trap_kind": "cross_version",
+      "question": "A205 在 2025-08 的保温温度上限按哪一版工艺规范？",
+      "provenance": "自建冻结陷阱（同对象跨版本）：声称时点没有任何登记窗口覆盖，版本适用性未知",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "f8c7afe2b58f007e3063176a73ed904fd4e41bdfeb328324ec412eefabc4c886",
+        "rows": [
+          {
+            "row_id": "bt-a-09-row",
+            "entity_label": "A205",
+            "metric": "holding_temperature",
+            "value": "870",
+            "unit": "degC",
+            "time_scope": {
+              "start": "2025-08-01T00:00:00+08:00",
+              "end": "2025-09-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-08-14T09:00:00+08:00",
+            "time_basis": "production_batch"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "doc-a205-v1",
+            "document_version": "A205-V1",
+            "chunk_id": "doc-a205-v1-c1",
+            "title": "工艺规范 A205（V1）",
+            "entity_label": "A205",
+            "metric": "holding_temperature",
+            "unit": "degC",
+            "clause": {
+              "clause_id": "doc-a205-v1-clause",
+              "metric": "holding_temperature",
+              "op": "<=",
+              "limit": "860",
+              "unit": "degC",
+              "entity_label": "A205",
+              "valid_from": "2024-01-01T00:00:00+08:00",
+              "valid_to": "2025-03-01T00:00:00+08:00"
+            },
+            "text": "A205 工艺规范 V1：保温温度不得超过 860 degC。",
+            "source_sha256": "efe63284a4ff2b3ce67985ee535f972ad1c6e6512ec5517f9a8df752ac94a6ec"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "holding_temperature"
+      },
+      "expected_binding": {
+        "entity_id": "A205",
+        "version": null,
+        "unit": "degC",
+        "time_scope": {
+          "start": "2025-08-01T00:00:00+08:00",
+          "end": "2025-09-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": false,
+      "expected_conflict": false,
+      "expected_resolution": "needs_review",
+      "expected_value": "870"
+    },
+    {
+      "case_id": "bt-a-10",
+      "trap_kind": "cross_version",
+      "question": "A102 在 2025-05 的保温温度上限按哪一版工艺规范？",
+      "provenance": "自建冻结陷阱（同对象跨版本）负向对照：声明版本与登记窗口一致，无需修复",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "710c537785f53b7363c6a18523fb1041881a9669b4cacda0dd9bb5a47f26ae77",
+        "rows": [
+          {
+            "row_id": "bt-a-10-row",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "value": "880",
+            "unit": "degC",
+            "applies_to_version": "A102-V2",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-05-06T09:00:00+08:00"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "doc-A102-v1",
+            "document_version": "A102-V1",
+            "chunk_id": "doc-A102-v1-c1",
+            "title": "工艺规范 A102（A102-V1）",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "unit": "degC",
+            "clause": {
+              "clause_id": "doc-A102-v1-clause",
+              "metric": "holding_temperature",
+              "op": "<=",
+              "limit": "850",
+              "unit": "degC",
+              "entity_label": "A102",
+              "valid_from": "2024-01-01T00:00:00+08:00",
+              "valid_to": "2025-03-01T00:00:00+08:00"
+            },
+            "text": "A102 工艺规范 A102-V1：holding_temperature 不得超过 850 degC，适用期至 2025-03-01。",
+            "source_sha256": "0db088e4e2a6b91835555c88d9473334ce813e90819173818fb694a61826d40f"
+          },
+          {
+            "document_id": "doc-A102-v2",
+            "document_version": "A102-V2",
+            "chunk_id": "doc-A102-v2-c1",
+            "title": "工艺规范 A102（A102-V2）",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "unit": "degC",
+            "clause": {
+              "clause_id": "doc-A102-v2-clause",
+              "metric": "holding_temperature",
+              "op": "<=",
+              "limit": "900",
+              "unit": "degC",
+              "entity_label": "A102",
+              "valid_from": "2025-03-01T00:00:00+08:00",
+              "valid_to": null
+            },
+            "text": "A102 工艺规范 A102-V2：holding_temperature 不得超过 900 degC，自 2025-03-01 起适用。",
+            "source_sha256": "14873464ec4c8dd94f4dc42ef8539e7425b8dd4e3818998514e4e314b5e31625"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "holding_temperature"
+      },
+      "expected_binding": {
+        "entity_id": "A102",
+        "version": "A102-V2",
+        "unit": "degC",
+        "time_scope": {
+          "start": "2025-05-01T00:00:00+08:00",
+          "end": "2025-06-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": true,
+      "expected_conflict": false,
+      "expected_resolution": "resolved_by_authority",
+      "expected_value": "880"
+    },
+    {
+      "case_id": "bt-b-01",
+      "trap_kind": "unit_mismatch",
+      "question": "A102 的 outer_diameter 在两侧是否可比/一致？",
+      "provenance": "自建冻结陷阱（单位不可归一）：英寸 vs 毫米，量纲看似相同但英寸未登记",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "dcdfc6d0d1f29aecae373caa8a45646be488d5031951539ce77d37699c39e649",
+        "rows": [
+          {
+            "row_id": "bt-b-01-row",
+            "entity_label": "A102",
+            "metric": "outer_diameter",
+            "value": "20.04",
+            "unit": "in",
+            "applies_to_version": "A102-V2",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-05-01T00:00:00+08:00",
+            "time_basis": "production_batch"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-b-01-doc",
+            "document_version": "A102-V2",
+            "chunk_id": "bt-b-01-doc-c1",
+            "title": "bt-b-01 文档",
+            "entity_label": "A102",
+            "metric": "outer_diameter",
+            "value": "508",
+            "unit": "mm",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "time_basis": "production_batch",
+            "text": "A102 outer_diameter：508 mm。",
+            "source_sha256": "4d98e7c6fa7f5b077c3f3c46390fe09ca14acd40f232cad476e31c466491efd0"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "outer_diameter"
+      },
+      "expected_binding": {
+        "entity_id": "A102",
+        "version": "A102-V2",
+        "unit": "in",
+        "time_scope": {
+          "start": "2025-05-01T00:00:00+08:00",
+          "end": "2025-06-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": false,
+      "expected_conflict": true,
+      "expected_resolution": "needs_review",
+      "expected_value": "20.04"
+    },
+    {
+      "case_id": "bt-b-02",
+      "trap_kind": "unit_mismatch",
+      "question": "A102 的 outer_diameter 在两侧是否可比/一致？",
+      "provenance": "自建冻结陷阱（单位不可归一）：毫米 vs 英寸（方向相反）",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "cb87765ef45d8caff774adf25de2ff33b8f5627bef77363e9ff099f45185d9eb",
+        "rows": [
+          {
+            "row_id": "bt-b-02-row",
+            "entity_label": "A102",
+            "metric": "outer_diameter",
+            "value": "0.79",
+            "unit": "mm",
+            "applies_to_version": "A102-V2",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-05-01T00:00:00+08:00",
+            "time_basis": "production_batch"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-b-02-doc",
+            "document_version": "A102-V2",
+            "chunk_id": "bt-b-02-doc-c1",
+            "title": "bt-b-02 文档",
+            "entity_label": "A102",
+            "metric": "outer_diameter",
+            "value": "0.79",
+            "unit": "in",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "time_basis": "production_batch",
+            "text": "A102 outer_diameter：0.79 in。",
+            "source_sha256": "3e549bb3f7766fa216ea545a4c9c7d72091d848a33d732b6abacbd093daa4086"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "outer_diameter"
+      },
+      "expected_binding": {
+        "entity_id": "A102",
+        "version": "A102-V2",
+        "unit": "mm",
+        "time_scope": {
+          "start": "2025-05-01T00:00:00+08:00",
+          "end": "2025-06-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": false,
+      "expected_conflict": true,
+      "expected_resolution": "needs_review",
+      "expected_value": "0.79"
+    },
+    {
+      "case_id": "bt-b-03",
+      "trap_kind": "unit_mismatch",
+      "question": "B201 的 quench_temperature 在两侧是否可比/一致？",
+      "provenance": "自建冻结陷阱（单位不可精确归一）：degF→degC 的 5/9 不是终止小数，登记换算必须拒绝而不是四舍五入",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "9810aab7cfaa138468be212dc17ab12a0a59c7b81c3b305b75b9e3afd8c1aa2c",
+        "rows": [
+          {
+            "row_id": "bt-b-03-row",
+            "entity_label": "B201",
+            "metric": "quench_temperature",
+            "value": "70",
+            "unit": "degF",
+            "applies_to_version": "B201-V2",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-05-01T00:00:00+08:00",
+            "time_basis": "production_batch"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-b-03-doc",
+            "document_version": "B201-V2",
+            "chunk_id": "bt-b-03-doc-c1",
+            "title": "bt-b-03 文档",
+            "entity_label": "B201",
+            "metric": "quench_temperature",
+            "value": "21.1",
+            "unit": "degC",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "time_basis": "production_batch",
+            "text": "B201 quench_temperature：21.1 degC。",
+            "source_sha256": "71d56d0fa4cc9cd1e04c33e4468b80340bf7b4cdafe965c2c50dffecb297774b"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "quench_temperature"
+      },
+      "expected_binding": {
+        "entity_id": "B201",
+        "version": "B201-V2",
+        "unit": "degF",
+        "time_scope": {
+          "start": "2025-05-01T00:00:00+08:00",
+          "end": "2025-06-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": false,
+      "expected_conflict": true,
+      "expected_resolution": "needs_review",
+      "expected_value": "70"
+    },
+    {
+      "case_id": "bt-b-04",
+      "trap_kind": "unit_mismatch",
+      "question": "B201 的 quench_temperature 在两侧是否可比/一致？",
+      "provenance": "自建冻结陷阱（单位不可精确归一）：文档侧 degF 值同样的非终止换算",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "72efa3aae25b6a3aaa3433b31ea34d4bc7a7bb74215926cb4601b782a39fe218",
+        "rows": [
+          {
+            "row_id": "bt-b-04-row",
+            "entity_label": "B201",
+            "metric": "quench_temperature",
+            "value": "850",
+            "unit": "degC",
+            "applies_to_version": "B201-V2",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-05-01T00:00:00+08:00",
+            "time_basis": "production_batch"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-b-04-doc",
+            "document_version": "B201-V2",
+            "chunk_id": "bt-b-04-doc-c1",
+            "title": "bt-b-04 文档",
+            "entity_label": "B201",
+            "metric": "quench_temperature",
+            "value": "70",
+            "unit": "degF",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "time_basis": "production_batch",
+            "text": "B201 quench_temperature：70 degF。",
+            "source_sha256": "9a46fb8692795fcc60074c22db99b40207d4ed4347dee90221e2e76720c85bb7"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "quench_temperature"
+      },
+      "expected_binding": {
+        "entity_id": "B201",
+        "version": "B201-V2",
+        "unit": "degC",
+        "time_scope": {
+          "start": "2025-05-01T00:00:00+08:00",
+          "end": "2025-06-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": false,
+      "expected_conflict": true,
+      "expected_resolution": "needs_review",
+      "expected_value": "850"
+    },
+    {
+      "case_id": "bt-b-05",
+      "trap_kind": "unit_mismatch",
+      "question": "C310 的 line_pressure 在两侧是否可比/一致？",
+      "provenance": "自建冻结陷阱（自定义单位不可归一）：AU vs LU，两侧单位都未登记",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "7ce39423b70d094159111dcaa1668b71b92aa9c0e9e43a98a295d594cfdeb8cb",
+        "rows": [
+          {
+            "row_id": "bt-b-05-row",
+            "entity_label": "C310",
+            "metric": "line_pressure",
+            "value": "12.5",
+            "unit": "AU",
+            "applies_to_version": "C310-V1",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-05-01T00:00:00+08:00",
+            "time_basis": "natural_month"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-b-05-doc",
+            "document_version": "C310-V1",
+            "chunk_id": "bt-b-05-doc-c1",
+            "title": "bt-b-05 文档",
+            "entity_label": "C310",
+            "metric": "line_pressure",
+            "value": "900",
+            "unit": "LU",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "time_basis": "natural_month",
+            "text": "C310 line_pressure：900 LU。",
+            "source_sha256": "ec72d409e8541cd1c332bfee870477f6976255d2de9b6d683a159304bec2f46e"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "line_pressure"
+      },
+      "expected_binding": {
+        "entity_id": "C310",
+        "version": "C310-V1",
+        "unit": "AU",
+        "time_scope": {
+          "start": "2025-05-01T00:00:00+08:00",
+          "end": "2025-06-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": false,
+      "expected_conflict": true,
+      "expected_resolution": "needs_review",
+      "expected_value": "12.5"
+    },
+    {
+      "case_id": "bt-b-06",
+      "trap_kind": "unit_mismatch",
+      "question": "C310 的 flow_speed 在两侧是否可比/一致？",
+      "provenance": "自建冻结陷阱（自定义单位不可归一）：mm/s vs mm/min，复合单位未登记",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "9ae1a9d0283dc07712e43ee3596651013333fb8456648da235e006389197ba5c",
+        "rows": [
+          {
+            "row_id": "bt-b-06-row",
+            "entity_label": "C310",
+            "metric": "flow_speed",
+            "value": "3.2",
+            "unit": "mm/s",
+            "applies_to_version": "C310-V1",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-05-01T00:00:00+08:00",
+            "time_basis": "natural_month"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-b-06-doc",
+            "document_version": "C310-V1",
+            "chunk_id": "bt-b-06-doc-c1",
+            "title": "bt-b-06 文档",
+            "entity_label": "C310",
+            "metric": "flow_speed",
+            "value": "192",
+            "unit": "mm/min",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "time_basis": "natural_month",
+            "text": "C310 flow_speed：192 mm/min。",
+            "source_sha256": "92c425da0ebcc0c3decd659390093c95434399b00eb1c76b2f9b2be05d28de62"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "flow_speed"
+      },
+      "expected_binding": {
+        "entity_id": "C310",
+        "version": "C310-V1",
+        "unit": "mm/s",
+        "time_scope": {
+          "start": "2025-05-01T00:00:00+08:00",
+          "end": "2025-06-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": false,
+      "expected_conflict": true,
+      "expected_resolution": "needs_review",
+      "expected_value": "3.2"
+    },
+    {
+      "case_id": "bt-b-07",
+      "trap_kind": "unit_mismatch",
+      "question": "C310 的 line_pressure 在两侧是否可比/一致？",
+      "provenance": "自建冻结陷阱（单位缺失）：库侧无单位，登记同类声称可补单位后仍与文档矛盾",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "9a39a2affc00ea577aa6c179c68fa26b4709ad278aa5759d76b928826c5191b7",
+        "rows": [
+          {
+            "row_id": "bt-b-07-row",
+            "entity_label": "C310",
+            "metric": "line_pressure",
+            "value": "0.62",
+            "applies_to_version": "C310-V1",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-05-01T00:00:00+08:00",
+            "time_basis": "natural_month"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-b-07-doc",
+            "document_version": "C310-V1",
+            "chunk_id": "bt-b-07-doc-c1",
+            "title": "bt-b-07 文档",
+            "entity_label": "C310",
+            "metric": "line_pressure",
+            "value": "0.55",
+            "unit": "MPa",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "time_basis": "natural_month",
+            "text": "C310 line_pressure：0.55 MPa。",
+            "source_sha256": "ed26fcab8cf1be250b6e922cfdee06074f368434291dcb8e8a75d315f5616859"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "line_pressure"
+      },
+      "expected_binding": {
+        "entity_id": "C310",
+        "version": "C310-V1",
+        "unit": null,
+        "time_scope": {
+          "start": "2025-05-01T00:00:00+08:00",
+          "end": "2025-06-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": false,
+      "expected_conflict": true,
+      "expected_resolution": "unresolved",
+      "expected_value": "0.62"
+    },
+    {
+      "case_id": "bt-b-08",
+      "trap_kind": "unit_mismatch",
+      "question": "A102 的 holding_temperature 在两侧是否可比/一致？",
+      "provenance": "自建冻结陷阱（可比但不等）：K vs degC 可精确换算，换算后数值不等",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "96b3a69e48dc4189cfbe267e9ade460984842e18df1e11afc3d0d6249a1779fb",
+        "rows": [
+          {
+            "row_id": "bt-b-08-row",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "value": "1123.15",
+            "unit": "K",
+            "applies_to_version": "A102-V2",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-05-01T00:00:00+08:00",
+            "time_basis": "production_batch"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-b-08-doc",
+            "document_version": "A102-V2",
+            "chunk_id": "bt-b-08-doc-c1",
+            "title": "bt-b-08 文档",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "value": "900",
+            "unit": "degC",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "time_basis": "production_batch",
+            "text": "A102 holding_temperature：900 degC。",
+            "source_sha256": "a2fe3acd1acf509a682c232ed82d48f7a893412ed9708c1f2b46efad5b88f727"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "holding_temperature"
+      },
+      "expected_binding": {
+        "entity_id": "A102",
+        "version": "A102-V2",
+        "unit": "K",
+        "time_scope": {
+          "start": "2025-05-01T00:00:00+08:00",
+          "end": "2025-06-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": false,
+      "expected_conflict": true,
+      "expected_resolution": "unresolved",
+      "expected_value": "1123.15"
+    },
+    {
+      "case_id": "bt-b-09",
+      "trap_kind": "unit_mismatch",
+      "question": "A102 的 holding_temperature 在两侧是否可比/一致？",
+      "provenance": "自建冻结陷阱（单位等价）负向对照：1123.15 K == 850 degC，不得误报冲突",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "a5b57abd0d319c9acc1fdcf53b58c6c35bd75480539a39e58e85f255dd50686c",
+        "rows": [
+          {
+            "row_id": "bt-b-09-row",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "value": "1123.15",
+            "unit": "K",
+            "applies_to_version": "A102-V2",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-05-01T00:00:00+08:00",
+            "time_basis": "production_batch"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-b-09-doc",
+            "document_version": "A102-V2",
+            "chunk_id": "bt-b-09-doc-c1",
+            "title": "bt-b-09 文档",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "value": "850",
+            "unit": "degC",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "time_basis": "production_batch",
+            "text": "A102 holding_temperature：850 degC。",
+            "source_sha256": "483d5c8e939f4212ae4db194cd3a90bfd730e04987888bb30122301668cd1853"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "holding_temperature"
+      },
+      "expected_binding": {
+        "entity_id": "A102",
+        "version": "A102-V2",
+        "unit": "K",
+        "time_scope": {
+          "start": "2025-05-01T00:00:00+08:00",
+          "end": "2025-06-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": true,
+      "expected_conflict": false,
+      "expected_resolution": "resolved_by_authority",
+      "expected_value": "1123.15"
+    },
+    {
+      "case_id": "bt-b-10",
+      "trap_kind": "unit_mismatch",
+      "question": "A102 的 outer_diameter 在两侧是否可比/一致？",
+      "provenance": "自建冻结陷阱（单位等价）负向对照：50 cm == 500 mm，不得误报冲突",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "2569a6f96b48e9161d352fa938e9e1c94fc7b3be51b1a9b977bc33482aae1f6f",
+        "rows": [
+          {
+            "row_id": "bt-b-10-row",
+            "entity_label": "A102",
+            "metric": "outer_diameter",
+            "value": "50",
+            "unit": "cm",
+            "applies_to_version": "A102-V2",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-05-01T00:00:00+08:00",
+            "time_basis": "production_batch"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-b-10-doc",
+            "document_version": "A102-V2",
+            "chunk_id": "bt-b-10-doc-c1",
+            "title": "bt-b-10 文档",
+            "entity_label": "A102",
+            "metric": "outer_diameter",
+            "value": "500",
+            "unit": "mm",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "time_basis": "production_batch",
+            "text": "A102 outer_diameter：500 mm。",
+            "source_sha256": "04a4216f90aba53790682bba12411fc9dc5d7b953f7c66d63d7d8688cdbd47d5"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "outer_diameter"
+      },
+      "expected_binding": {
+        "entity_id": "A102",
+        "version": "A102-V2",
+        "unit": "cm",
+        "time_scope": {
+          "start": "2025-05-01T00:00:00+08:00",
+          "end": "2025-06-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": true,
+      "expected_conflict": false,
+      "expected_resolution": "resolved_by_authority",
+      "expected_value": "50"
+    },
+    {
+      "case_id": "bt-c-01",
+      "trap_kind": "time_scope_mismatch",
+      "question": "A102 的 holding_temperature 在两侧时间口径下是否可比？",
+      "provenance": "自建冻结陷阱（时间口径不同）：自然月 vs 上一自然月，区间不重叠",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "42ace11e7bb927f5d1ce230892b777ed84a14da1d5c21242791c790712556624",
+        "rows": [
+          {
+            "row_id": "bt-c-01-row",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "value": "880",
+            "unit": "degC",
+            "applies_to_version": "A102-V2",
+            "time_scope": {
+              "start": "2025-03-01T00:00:00+08:00",
+              "end": "2025-04-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-03-01T00:00:00+08:00",
+            "time_basis": "natural_month"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-c-01-doc",
+            "document_version": "A102-V2",
+            "chunk_id": "bt-c-01-doc-c1",
+            "title": "bt-c-01 文档",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "value": "905",
+            "unit": "degC",
+            "time_scope": {
+              "start": "2025-02-01T00:00:00+08:00",
+              "end": "2025-03-01T00:00:00+08:00"
+            },
+            "time_basis": "natural_month",
+            "text": "A102 holding_temperature：905 degC（口径：natural_month）。",
+            "source_sha256": "89a95384867de888bd6d0c08d55786d4a129950ba58341925642bcfdf38141c8"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "holding_temperature"
+      },
+      "expected_binding": {
+        "entity_id": "A102",
+        "version": "A102-V2",
+        "unit": "degC",
+        "time_scope": {
+          "start": "2025-03-01T00:00:00+08:00",
+          "end": "2025-04-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": false,
+      "expected_conflict": true,
+      "expected_resolution": "needs_review",
+      "expected_value": "880"
+    },
+    {
+      "case_id": "bt-c-02",
+      "trap_kind": "time_scope_mismatch",
+      "question": "A102 的 holding_temperature 在两侧时间口径下是否可比？",
+      "provenance": "自建冻结陷阱（时间口径不同）：自然月 vs 季度，区间部分重叠但口径不同",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "9ceaf70a42be9be061d6734c471ea6e24c0b78c39c89abddd6b425812282b1b8",
+        "rows": [
+          {
+            "row_id": "bt-c-02-row",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "value": "880",
+            "unit": "degC",
+            "applies_to_version": "A102-V2",
+            "time_scope": {
+              "start": "2025-03-01T00:00:00+08:00",
+              "end": "2025-04-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-03-01T00:00:00+08:00",
+            "time_basis": "natural_month"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-c-02-doc",
+            "document_version": "A102-V2",
+            "chunk_id": "bt-c-02-doc-c1",
+            "title": "bt-c-02 文档",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "value": "905",
+            "unit": "degC",
+            "time_scope": {
+              "start": "2025-01-01T00:00:00+08:00",
+              "end": "2025-04-01T00:00:00+08:00"
+            },
+            "time_basis": "quarter",
+            "text": "A102 holding_temperature：905 degC（口径：quarter）。",
+            "source_sha256": "1b76509d6494f966ea9326914d58d9f849d85b138e41215118f200ecf4ee3b0b"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "holding_temperature"
+      },
+      "expected_binding": {
+        "entity_id": "A102",
+        "version": "A102-V2",
+        "unit": "degC",
+        "time_scope": {
+          "start": "2025-03-01T00:00:00+08:00",
+          "end": "2025-04-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": false,
+      "expected_conflict": true,
+      "expected_resolution": "needs_review",
+      "expected_value": "880"
+    },
+    {
+      "case_id": "bt-c-03",
+      "trap_kind": "time_scope_mismatch",
+      "question": "A103 的 holding_temperature 在两侧时间口径下是否可比？",
+      "provenance": "自建冻结陷阱（时间口径不同）：季度 vs 自然月（方向相反）",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "5f150acfaf75435d9a29dd1882463769360a1b614152f24dff048a3bff6d30a9",
+        "rows": [
+          {
+            "row_id": "bt-c-03-row",
+            "entity_label": "A103",
+            "metric": "holding_temperature",
+            "value": "1820",
+            "unit": "degC",
+            "applies_to_version": "A103-V2",
+            "time_scope": {
+              "start": "2025-01-01T00:00:00+08:00",
+              "end": "2025-04-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-01-01T00:00:00+08:00",
+            "time_basis": "quarter"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-c-03-doc",
+            "document_version": "A103-V2",
+            "chunk_id": "bt-c-03-doc-c1",
+            "title": "bt-c-03 文档",
+            "entity_label": "A103",
+            "metric": "holding_temperature",
+            "value": "600",
+            "unit": "degC",
+            "time_scope": {
+              "start": "2025-03-01T00:00:00+08:00",
+              "end": "2025-04-01T00:00:00+08:00"
+            },
+            "time_basis": "natural_month",
+            "text": "A103 holding_temperature：600 degC（口径：natural_month）。",
+            "source_sha256": "0c601eff3a2b9979acb53066dc0549e5ea88bb82efbd48a08ec9ea5a318f3241"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "holding_temperature"
+      },
+      "expected_binding": {
+        "entity_id": "A103",
+        "version": "A103-V2",
+        "unit": "degC",
+        "time_scope": {
+          "start": "2025-01-01T00:00:00+08:00",
+          "end": "2025-04-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": false,
+      "expected_conflict": true,
+      "expected_resolution": "needs_review",
+      "expected_value": "1820"
+    },
+    {
+      "case_id": "bt-c-04",
+      "trap_kind": "time_scope_mismatch",
+      "question": "B201 的 quench_temperature 在两侧时间口径下是否可比？",
+      "provenance": "自建冻结陷阱（时间口径不同）：生产批次期间 vs 自然月",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "3d7ea1bf55f0437a7aa4e6741d795a6eabfacbb253cf67d68efa3f10de3116ff",
+        "rows": [
+          {
+            "row_id": "bt-c-04-row",
+            "entity_label": "B201",
+            "metric": "quench_temperature",
+            "value": "851",
+            "unit": "degC",
+            "applies_to_version": "B201-V2",
+            "time_scope": {
+              "start": "2025-03-15T00:00:00+08:00",
+              "end": "2025-03-20T00:00:00+08:00"
+            },
+            "measured_at": "2025-03-15T00:00:00+08:00",
+            "time_basis": "production_batch"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-c-04-doc",
+            "document_version": "B201-V2",
+            "chunk_id": "bt-c-04-doc-c1",
+            "title": "bt-c-04 文档",
+            "entity_label": "B201",
+            "metric": "quench_temperature",
+            "value": "860",
+            "unit": "degC",
+            "time_scope": {
+              "start": "2025-03-01T00:00:00+08:00",
+              "end": "2025-04-01T00:00:00+08:00"
+            },
+            "time_basis": "natural_month",
+            "text": "B201 quench_temperature：860 degC（口径：natural_month）。",
+            "source_sha256": "6cd47624bc904945f419ee08b177c3159c3ed06859a596bef8b466eeb91ffb91"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "quench_temperature"
+      },
+      "expected_binding": {
+        "entity_id": "B201",
+        "version": "B201-V2",
+        "unit": "degC",
+        "time_scope": {
+          "start": "2025-03-15T00:00:00+08:00",
+          "end": "2025-03-20T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": false,
+      "expected_conflict": true,
+      "expected_resolution": "needs_review",
+      "expected_value": "851"
+    },
+    {
+      "case_id": "bt-c-05",
+      "trap_kind": "time_scope_mismatch",
+      "question": "B201 的 quench_temperature 在两侧时间口径下是否可比？",
+      "provenance": "自建冻结陷阱（时间口径不同）：生产批次期间 vs 季度，区间不重叠",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "d69999fd8eb59cd3f4a27676c3fbe49f48a3493636bba635f97bd08a5c8cb841",
+        "rows": [
+          {
+            "row_id": "bt-c-05-row",
+            "entity_label": "B201",
+            "metric": "quench_temperature",
+            "value": "851",
+            "unit": "degC",
+            "applies_to_version": "B201-V2",
+            "time_scope": {
+              "start": "2025-03-15T00:00:00+08:00",
+              "end": "2025-03-20T00:00:00+08:00"
+            },
+            "measured_at": "2025-03-15T00:00:00+08:00",
+            "time_basis": "production_batch"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-c-05-doc",
+            "document_version": "B201-V2",
+            "chunk_id": "bt-c-05-doc-c1",
+            "title": "bt-c-05 文档",
+            "entity_label": "B201",
+            "metric": "quench_temperature",
+            "value": "844",
+            "unit": "degC",
+            "time_scope": {
+              "start": "2025-01-01T00:00:00+08:00",
+              "end": "2025-04-01T00:00:00+08:00"
+            },
+            "time_basis": "quarter",
+            "text": "B201 quench_temperature：844 degC（口径：quarter）。",
+            "source_sha256": "ced7ec900b3421e36a7c34dd0d2618cfd3080d6cec0d8fb25a0593fc17c5b38f"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "quench_temperature"
+      },
+      "expected_binding": {
+        "entity_id": "B201",
+        "version": "B201-V2",
+        "unit": "degC",
+        "time_scope": {
+          "start": "2025-03-15T00:00:00+08:00",
+          "end": "2025-03-20T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": false,
+      "expected_conflict": true,
+      "expected_resolution": "needs_review",
+      "expected_value": "851"
+    },
+    {
+      "case_id": "bt-c-06",
+      "trap_kind": "time_scope_mismatch",
+      "question": "C310 的 line_pressure 在两侧时间口径下是否可比？",
+      "provenance": "自建冻结陷阱（时间口径不同）：自然月 vs 生产批次期间（方向相反）",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "95923a83812b1e47d8c1edc6695d5def2f364c8d803f249167b4697f43df9c10",
+        "rows": [
+          {
+            "row_id": "bt-c-06-row",
+            "entity_label": "C310",
+            "metric": "line_pressure",
+            "value": "0.62",
+            "unit": "MPa",
+            "applies_to_version": "C310-V1",
+            "time_scope": {
+              "start": "2025-03-01T00:00:00+08:00",
+              "end": "2025-04-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-03-01T00:00:00+08:00",
+            "time_basis": "natural_month"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-c-06-doc",
+            "document_version": "C310-V1",
+            "chunk_id": "bt-c-06-doc-c1",
+            "title": "bt-c-06 文档",
+            "entity_label": "C310",
+            "metric": "line_pressure",
+            "value": "0.58",
+            "unit": "MPa",
+            "time_scope": {
+              "start": "2025-03-06T00:00:00+08:00",
+              "end": "2025-03-12T00:00:00+08:00"
+            },
+            "time_basis": "production_batch",
+            "text": "C310 line_pressure：0.58 MPa（口径：production_batch）。",
+            "source_sha256": "c640d3507a6028aa8c95f883035a7c570f02ab360fefdc40eed136c27c5df484"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "line_pressure"
+      },
+      "expected_binding": {
+        "entity_id": "C310",
+        "version": "C310-V1",
+        "unit": "MPa",
+        "time_scope": {
+          "start": "2025-03-01T00:00:00+08:00",
+          "end": "2025-04-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": false,
+      "expected_conflict": true,
+      "expected_resolution": "needs_review",
+      "expected_value": "0.62"
+    },
+    {
+      "case_id": "bt-c-07",
+      "trap_kind": "time_scope_mismatch",
+      "question": "C310 的 line_pressure 在两侧时间口径下是否可比？",
+      "provenance": "自建冻结陷阱（时间口径不同）：同为自然月但月份不同，区间不重叠",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "a09d526e7abad44ebf54404f69cb8d23853d27b486c09b612848c54a87f0d355",
+        "rows": [
+          {
+            "row_id": "bt-c-07-row",
+            "entity_label": "C310",
+            "metric": "line_pressure",
+            "value": "0.62",
+            "unit": "MPa",
+            "applies_to_version": "C310-V1",
+            "time_scope": {
+              "start": "2025-03-01T00:00:00+08:00",
+              "end": "2025-04-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-03-01T00:00:00+08:00",
+            "time_basis": "natural_month"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-c-07-doc",
+            "document_version": "C310-V1",
+            "chunk_id": "bt-c-07-doc-c1",
+            "title": "bt-c-07 文档",
+            "entity_label": "C310",
+            "metric": "line_pressure",
+            "value": "0.71",
+            "unit": "MPa",
+            "time_scope": {
+              "start": "2025-04-01T00:00:00+08:00",
+              "end": "2025-05-01T00:00:00+08:00"
+            },
+            "time_basis": "natural_month",
+            "text": "C310 line_pressure：0.71 MPa（口径：natural_month）。",
+            "source_sha256": "46e222c473e83c0ba65385feb026f05056989a0a60a82c2c28da5bf28775213d"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "line_pressure"
+      },
+      "expected_binding": {
+        "entity_id": "C310",
+        "version": "C310-V1",
+        "unit": "MPa",
+        "time_scope": {
+          "start": "2025-03-01T00:00:00+08:00",
+          "end": "2025-04-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": false,
+      "expected_conflict": true,
+      "expected_resolution": "needs_review",
+      "expected_value": "0.62"
+    },
+    {
+      "case_id": "bt-c-08",
+      "trap_kind": "time_scope_mismatch",
+      "question": "A205 的 holding_temperature 在两侧时间口径下是否可比？",
+      "provenance": "自建冻结陷阱（时间口径不同）：库侧时间戳没有时区，无法确定口径",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "87df64903ba8a09bfd7f5ff8670d938d36322d36f65a2dce7a2082a5fed3461d",
+        "rows": [
+          {
+            "row_id": "bt-c-08-row",
+            "entity_label": "A205",
+            "metric": "holding_temperature",
+            "value": "870",
+            "unit": "degC",
+            "applies_to_version": "A205-V1",
+            "time_scope": {
+              "start": "2025-03-01",
+              "end": "2025-04-01"
+            },
+            "measured_at": "2025-03-01T00:00:00+08:00",
+            "time_basis": "natural_month"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-c-08-doc",
+            "document_version": "A205-V1",
+            "chunk_id": "bt-c-08-doc-c1",
+            "title": "bt-c-08 文档",
+            "entity_label": "A205",
+            "metric": "holding_temperature",
+            "value": "880",
+            "unit": "degC",
+            "time_scope": {
+              "start": "2025-03-01T00:00:00+08:00",
+              "end": "2025-04-01T00:00:00+08:00"
+            },
+            "time_basis": "natural_month",
+            "text": "A205 holding_temperature：880 degC（口径：natural_month）。",
+            "source_sha256": "38a014e38c2296c342bfd3817bf953a1c7ea0ad3fbf468ea0f8c5c2a6464f9d6"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "holding_temperature"
+      },
+      "expected_binding": {
+        "entity_id": "A205",
+        "version": "A205-V1",
+        "unit": "degC",
+        "time_scope": {
+          "start": "2025-03-01",
+          "end": "2025-04-01"
+        }
+      },
+      "expected_answerable": false,
+      "expected_conflict": true,
+      "expected_resolution": "needs_review",
+      "expected_value": "870"
+    },
+    {
+      "case_id": "bt-c-09",
+      "trap_kind": "time_scope_mismatch",
+      "question": "A205 的 holding_temperature 在两侧时间口径下是否可比？",
+      "provenance": "自建冻结陷阱（时间口径不同）负向对照：季度包含自然月且数值一致，不得不必要拒答",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "b4da96d1a11be4af09a2fc6314df5f80e4878688c48e93042611ba95fb14fd23",
+        "rows": [
+          {
+            "row_id": "bt-c-09-row",
+            "entity_label": "A205",
+            "metric": "holding_temperature",
+            "value": "870",
+            "unit": "degC",
+            "applies_to_version": "A205-V1",
+            "time_scope": {
+              "start": "2025-03-01T00:00:00+08:00",
+              "end": "2025-04-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-03-01T00:00:00+08:00",
+            "time_basis": "natural_month"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-c-09-doc",
+            "document_version": "A205-V1",
+            "chunk_id": "bt-c-09-doc-c1",
+            "title": "bt-c-09 文档",
+            "entity_label": "A205",
+            "metric": "holding_temperature",
+            "value": "870",
+            "unit": "degC",
+            "time_scope": {
+              "start": "2025-01-01T00:00:00+08:00",
+              "end": "2025-04-01T00:00:00+08:00"
+            },
+            "time_basis": "natural_month",
+            "text": "A205 holding_temperature：870 degC（口径：natural_month）。",
+            "source_sha256": "984f31c810bbd93ecc7319ad05fdfb44871445fd4fe5e654e941e126e47e9813"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "holding_temperature"
+      },
+      "expected_binding": {
+        "entity_id": "A205",
+        "version": "A205-V1",
+        "unit": "degC",
+        "time_scope": {
+          "start": "2025-03-01T00:00:00+08:00",
+          "end": "2025-04-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": true,
+      "expected_conflict": false,
+      "expected_resolution": "resolved_by_authority",
+      "expected_value": "870"
+    },
+    {
+      "case_id": "bt-c-10",
+      "trap_kind": "time_scope_mismatch",
+      "question": "A205 的 holding_temperature 在两侧时间口径下是否可比？",
+      "provenance": "自建冻结陷阱（时间口径不同）负向对照：同口径开区间包含且数值一致",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "357864acd4d83d6c392e03bc69d0f58d835fd980de2b0f7322c8f58c3742abc7",
+        "rows": [
+          {
+            "row_id": "bt-c-10-row",
+            "entity_label": "A205",
+            "metric": "holding_temperature",
+            "value": "870",
+            "unit": "degC",
+            "applies_to_version": "A205-V1",
+            "time_scope": {
+              "start": "2025-03-01T00:00:00+08:00",
+              "end": "2025-04-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-03-01T00:00:00+08:00",
+            "time_basis": "natural_month"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-c-10-doc",
+            "document_version": "A205-V1",
+            "chunk_id": "bt-c-10-doc-c1",
+            "title": "bt-c-10 文档",
+            "entity_label": "A205",
+            "metric": "holding_temperature",
+            "value": "870",
+            "unit": "degC",
+            "time_scope": {
+              "start": "2025-01-01T00:00:00+08:00",
+              "end": null
+            },
+            "time_basis": "natural_month",
+            "text": "A205 holding_temperature：870 degC（口径：natural_month）。",
+            "source_sha256": "f7e74141883bca8811277bea4ff6ca84c37dea9282168b5aa32e76fccc31a8d5"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "holding_temperature"
+      },
+      "expected_binding": {
+        "entity_id": "A205",
+        "version": "A205-V1",
+        "unit": "degC",
+        "time_scope": {
+          "start": "2025-03-01T00:00:00+08:00",
+          "end": "2025-04-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": true,
+      "expected_conflict": false,
+      "expected_resolution": "resolved_by_authority",
+      "expected_value": "870"
+    },
+    {
+      "case_id": "bt-d-01",
+      "trap_kind": "doc_db_opposite",
+      "question": "A102 的 holding_temperature 与质检报告是否一致？",
+      "provenance": "自建冻结陷阱（文档与库数值相反）：同对象同版本，880 vs 905 无登记权威",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "cb1408fa8807e0b1196d7d516e0f51242be25de9c11245ee23972e9ccbd96fc4",
+        "rows": [
+          {
+            "row_id": "bt-d-01-row",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "value": "880",
+            "unit": "degC",
+            "applies_to_version": "A102-V2",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-05-01T00:00:00+08:00",
+            "time_basis": "production_batch"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-d-01-doc",
+            "document_version": "A102-V2",
+            "chunk_id": "bt-d-01-doc-c1",
+            "title": "bt-d-01 质检报告",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "value": "905",
+            "unit": "degC",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "time_basis": "production_batch",
+            "text": "A102 质检报告：holding_temperature 实测 905 degC。",
+            "source_sha256": "d7cc37944c67c536b0a39c6e7ae7cec7e8f2e95cb1ee59b89cfdd4fcc3f236e6"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "holding_temperature"
+      },
+      "expected_binding": {
+        "entity_id": "A102",
+        "version": "A102-V2",
+        "unit": "degC",
+        "time_scope": {
+          "start": "2025-05-01T00:00:00+08:00",
+          "end": "2025-06-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": false,
+      "expected_conflict": true,
+      "expected_resolution": "unresolved",
+      "expected_value": "880"
+    },
+    {
+      "case_id": "bt-d-02",
+      "trap_kind": "doc_db_opposite",
+      "question": "A102 的 holding_temperature 与质检报告是否一致？",
+      "provenance": "自建冻结陷阱（文档与库数值相反）：850 vs 843 无登记权威",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "7fa823954c9b75ec89663073383382f34b5b14ba59c31bf57ef3fa2b31206f4c",
+        "rows": [
+          {
+            "row_id": "bt-d-02-row",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "value": "850",
+            "unit": "degC",
+            "applies_to_version": "A102-V2",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-05-01T00:00:00+08:00",
+            "time_basis": "production_batch"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-d-02-doc",
+            "document_version": "A102-V2",
+            "chunk_id": "bt-d-02-doc-c1",
+            "title": "bt-d-02 质检报告",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "value": "843",
+            "unit": "degC",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "time_basis": "production_batch",
+            "text": "A102 质检报告：holding_temperature 实测 843 degC。",
+            "source_sha256": "ed65fe6983be63a18685adbb6048b6d1b2ebb5200f89151745a143c1603f8743"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "holding_temperature"
+      },
+      "expected_binding": {
+        "entity_id": "A102",
+        "version": "A102-V2",
+        "unit": "degC",
+        "time_scope": {
+          "start": "2025-05-01T00:00:00+08:00",
+          "end": "2025-06-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": false,
+      "expected_conflict": true,
+      "expected_resolution": "unresolved",
+      "expected_value": "850"
+    },
+    {
+      "case_id": "bt-d-03",
+      "trap_kind": "doc_db_opposite",
+      "question": "A103 的 refund_amount 与质检报告是否一致？",
+      "provenance": "自建冻结陷阱（文档与库数值相反）：退款金额 7800 vs 7500 CNY",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "1fa73dc464633073b486be7ec81266872651abb5da77be7372bbe858b2af915b",
+        "rows": [
+          {
+            "row_id": "bt-d-03-row",
+            "entity_label": "A103",
+            "metric": "refund_amount",
+            "value": "7800",
+            "unit": "CNY",
+            "applies_to_version": "refund-policy-2025-04",
+            "time_scope": {
+              "start": "2025-04-01T00:00:00+08:00",
+              "end": "2025-05-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-04-01T00:00:00+08:00",
+            "time_basis": "natural_month"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-d-03-doc",
+            "document_version": "refund-policy-2025-04",
+            "chunk_id": "bt-d-03-doc-c1",
+            "title": "bt-d-03 质检报告",
+            "entity_label": "A103",
+            "metric": "refund_amount",
+            "value": "7500",
+            "unit": "CNY",
+            "time_scope": {
+              "start": "2025-04-01T00:00:00+08:00",
+              "end": "2025-05-01T00:00:00+08:00"
+            },
+            "time_basis": "natural_month",
+            "text": "A103 质检报告：refund_amount 实测 7500 CNY。",
+            "source_sha256": "9c767fdc8c4f5ffda9d4fbce7ce5ce82cd00280c9cd80366b422b3ceffc5207d"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "refund_amount"
+      },
+      "expected_binding": {
+        "entity_id": "A103",
+        "version": "refund-policy-2025-04",
+        "unit": "CNY",
+        "time_scope": {
+          "start": "2025-04-01T00:00:00+08:00",
+          "end": "2025-05-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": false,
+      "expected_conflict": true,
+      "expected_resolution": "unresolved",
+      "expected_value": "7800"
+    },
+    {
+      "case_id": "bt-d-04",
+      "trap_kind": "doc_db_opposite",
+      "question": "B201 的 scrap_count 与质检报告是否一致？",
+      "provenance": "自建冻结陷阱（文档与库数值相反）：报废数量 12 vs 15 件（库侧标签是未登记别名，必须按 approved 别名规范化）",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "e5e6e99b621be989ba58f41199dfe1c12900daa970986ed933944f00d8ab5e8d",
+        "rows": [
+          {
+            "row_id": "bt-d-04-row",
+            "entity_label": "B201 淬火线",
+            "metric": "scrap_count",
+            "value": "12",
+            "unit": "count",
+            "applies_to_version": "B201-V2",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-05-01T00:00:00+08:00",
+            "time_basis": "natural_month"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-d-04-doc",
+            "document_version": "B201-V2",
+            "chunk_id": "bt-d-04-doc-c1",
+            "title": "bt-d-04 质检报告",
+            "entity_label": "B201",
+            "metric": "scrap_count",
+            "value": "15",
+            "unit": "count",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "time_basis": "natural_month",
+            "text": "B201 质检报告：scrap_count 实测 15 count。",
+            "source_sha256": "75e6bcf50873d890d13136dff94aecef7ca3532edab3f411ec04fb05b28f6551"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [
+        {
+          "alias": "B201 淬火线",
+          "canonical_name": "B201"
+        }
+      ],
+      "primary": {
+        "side": "sql",
+        "metric": "scrap_count"
+      },
+      "expected_binding": {
+        "entity_id": "B201",
+        "version": "B201-V2",
+        "unit": "count",
+        "time_scope": {
+          "start": "2025-05-01T00:00:00+08:00",
+          "end": "2025-06-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": false,
+      "expected_conflict": true,
+      "expected_resolution": "unresolved",
+      "expected_value": "12"
+    },
+    {
+      "case_id": "bt-d-05",
+      "trap_kind": "doc_db_opposite",
+      "question": "C310 的 line_pressure 与质检报告是否一致？",
+      "provenance": "自建冻结陷阱（文档与库数值相反）：管线压力 0.62 vs 0.55 MPa",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "486bb3a2c69478631014be40ed2c69900f1039a931e50c8019bc6e5d8e15fb7c",
+        "rows": [
+          {
+            "row_id": "bt-d-05-row",
+            "entity_label": "C310",
+            "metric": "line_pressure",
+            "value": "0.62",
+            "unit": "MPa",
+            "applies_to_version": "C310-V1",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-05-01T00:00:00+08:00",
+            "time_basis": "production_batch"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-d-05-doc",
+            "document_version": "C310-V1",
+            "chunk_id": "bt-d-05-doc-c1",
+            "title": "bt-d-05 质检报告",
+            "entity_label": "C310",
+            "metric": "line_pressure",
+            "value": "0.55",
+            "unit": "MPa",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "time_basis": "production_batch",
+            "text": "C310 质检报告：line_pressure 实测 0.55 MPa。",
+            "source_sha256": "7f1a24df87517a14aff724014c74393c54903bcec6ff2d3ae8c8edee4f9eb873"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "line_pressure"
+      },
+      "expected_binding": {
+        "entity_id": "C310",
+        "version": "C310-V1",
+        "unit": "MPa",
+        "time_scope": {
+          "start": "2025-05-01T00:00:00+08:00",
+          "end": "2025-06-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": false,
+      "expected_conflict": true,
+      "expected_resolution": "unresolved",
+      "expected_value": "0.62"
+    },
+    {
+      "case_id": "bt-d-06",
+      "trap_kind": "doc_db_opposite",
+      "question": "C310 的 holding_time 与质检报告是否一致？",
+      "provenance": "自建冻结陷阱（文档与库数值相反）：保温时长 45 vs 60 min",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "4dfd59e79339815b8f5e2d016c0059ab721463050bfcc098c0b7e779ed6a4628",
+        "rows": [
+          {
+            "row_id": "bt-d-06-row",
+            "entity_label": "C310",
+            "metric": "holding_time",
+            "value": "45",
+            "unit": "min",
+            "applies_to_version": "C310-V1",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-05-01T00:00:00+08:00",
+            "time_basis": "production_batch"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-d-06-doc",
+            "document_version": "C310-V1",
+            "chunk_id": "bt-d-06-doc-c1",
+            "title": "bt-d-06 质检报告",
+            "entity_label": "C310",
+            "metric": "holding_time",
+            "value": "60",
+            "unit": "min",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "time_basis": "production_batch",
+            "text": "C310 质检报告：holding_time 实测 60 min。",
+            "source_sha256": "02915b6d9a73029bcca6efff000a35a80d2b33b12340f1ad55a235381d403850"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "holding_time"
+      },
+      "expected_binding": {
+        "entity_id": "C310",
+        "version": "C310-V1",
+        "unit": "min",
+        "time_scope": {
+          "start": "2025-05-01T00:00:00+08:00",
+          "end": "2025-06-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": false,
+      "expected_conflict": true,
+      "expected_resolution": "unresolved",
+      "expected_value": "45"
+    },
+    {
+      "case_id": "bt-d-07",
+      "trap_kind": "doc_db_opposite",
+      "question": "A102 的 holding_temperature 与质检报告是否一致？",
+      "provenance": "自建冻结陷阱（文档与库数值相反）+ 登记权威指向库侧：必须按登记收敛",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "9a6443ea97c194a6567179c67542306cd3f8cac58f91b3e6b6996ba4f5144684",
+        "rows": [
+          {
+            "row_id": "bt-d-07-row",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "value": "880",
+            "unit": "degC",
+            "applies_to_version": "A102-V2",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-05-01T00:00:00+08:00",
+            "time_basis": "production_batch"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-d-07-doc",
+            "document_version": "A102-V2",
+            "chunk_id": "bt-d-07-doc-c1",
+            "title": "bt-d-07 质检报告",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "value": "905",
+            "unit": "degC",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "time_basis": "production_batch",
+            "text": "A102 质检报告：holding_temperature 实测 905 degC。",
+            "source_sha256": "0f686e3920d963a31fad733c88fb308fc89a695319bba8fbf15ba6976f1a6197"
+          }
+        ]
+      },
+      "authority_rules": [
+        {
+          "rule_id": "auth-bt-d-07",
+          "payload": {
+            "version": "source-authority-v1",
+            "selected_source": "production",
+            "context": {
+              "scope": {
+                "part_id": "A102",
+                "metric": "holding_temperature"
+              }
+            },
+            "rationale": "登记口径优先级（合成 fixture）"
+          }
+        }
+      ],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "holding_temperature"
+      },
+      "expected_binding": {
+        "entity_id": "A102",
+        "version": "A102-V2",
+        "unit": "degC",
+        "time_scope": {
+          "start": "2025-05-01T00:00:00+08:00",
+          "end": "2025-06-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": true,
+      "expected_conflict": true,
+      "expected_resolution": "resolved_by_authority",
+      "expected_value": "880"
+    },
+    {
+      "case_id": "bt-d-08",
+      "trap_kind": "doc_db_opposite",
+      "question": "A102 的 holding_temperature 与质检报告是否一致？",
+      "provenance": "自建冻结陷阱（文档与库数值相反）+ 登记权威指向文档侧：收敛到报告口径与报告时间范围",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "d08f193b6f15b924016bb76d7b9d45e41ce87f363202b5bcac727ec8c262a704",
+        "rows": [
+          {
+            "row_id": "bt-d-08-row",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "value": "880",
+            "unit": "degC",
+            "applies_to_version": "A102-V2",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-05-01T00:00:00+08:00",
+            "time_basis": "production_batch"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-d-08-doc",
+            "document_version": "A102-V2",
+            "chunk_id": "bt-d-08-doc-c1",
+            "title": "bt-d-08 质检报告",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "value": "905",
+            "unit": "degC",
+            "time_scope": {
+              "start": "2025-05-10T00:00:00+08:00",
+              "end": "2025-05-11T00:00:00+08:00"
+            },
+            "time_basis": "production_batch",
+            "text": "A102 质检报告：holding_temperature 实测 905 degC。",
+            "source_sha256": "ddffa5d316669d021130b7b256c366b28b5c8fdf216d1167ba769eeb06963682"
+          }
+        ]
+      },
+      "authority_rules": [
+        {
+          "rule_id": "auth-bt-d-08",
+          "payload": {
+            "version": "source-authority-v1",
+            "selected_source": "report",
+            "context": {
+              "scope": {
+                "part_id": "A102",
+                "metric": "holding_temperature"
+              }
+            },
+            "rationale": "登记口径优先级（合成 fixture）"
+          }
+        }
+      ],
+      "aliases": [],
+      "primary": {
+        "side": "doc",
+        "metric": "holding_temperature"
+      },
+      "expected_binding": {
+        "entity_id": "A102",
+        "version": "A102-V2",
+        "unit": "degC",
+        "time_scope": {
+          "start": "2025-05-10T00:00:00+08:00",
+          "end": "2025-05-11T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": true,
+      "expected_conflict": true,
+      "expected_resolution": "resolved_by_authority",
+      "expected_value": "880"
+    },
+    {
+      "case_id": "bt-d-09",
+      "trap_kind": "doc_db_opposite",
+      "question": "A103 的 refund_amount 与质检报告是否一致？",
+      "provenance": "自建冻结陷阱（文档与库数值相反）+ 登记权威指向库侧（金额口径）",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "f19497c19798bdb98a3d7d6a0802464388e264dfb3a744fcb93d1e4a9622062a",
+        "rows": [
+          {
+            "row_id": "bt-d-09-row",
+            "entity_label": "A103",
+            "metric": "refund_amount",
+            "value": "7800",
+            "unit": "CNY",
+            "applies_to_version": "refund-policy-2025-04",
+            "time_scope": {
+              "start": "2025-04-01T00:00:00+08:00",
+              "end": "2025-05-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-04-01T00:00:00+08:00",
+            "time_basis": "natural_month"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-d-09-doc",
+            "document_version": "refund-policy-2025-04",
+            "chunk_id": "bt-d-09-doc-c1",
+            "title": "bt-d-09 质检报告",
+            "entity_label": "A103",
+            "metric": "refund_amount",
+            "value": "7500",
+            "unit": "CNY",
+            "time_scope": {
+              "start": "2025-04-01T00:00:00+08:00",
+              "end": "2025-05-01T00:00:00+08:00"
+            },
+            "time_basis": "natural_month",
+            "text": "A103 质检报告：refund_amount 实测 7500 CNY。",
+            "source_sha256": "80693914f2512b814b76074b3c21a2f119c41c3fbe962101b745afb7f7ed009b"
+          }
+        ]
+      },
+      "authority_rules": [
+        {
+          "rule_id": "auth-bt-d-09",
+          "payload": {
+            "version": "source-authority-v1",
+            "selected_source": "production",
+            "context": {
+              "scope": {
+                "part_id": "A103",
+                "metric": "refund_amount"
+              }
+            },
+            "rationale": "登记口径优先级（合成 fixture）"
+          }
+        }
+      ],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "refund_amount"
+      },
+      "expected_binding": {
+        "entity_id": "A103",
+        "version": "refund-policy-2025-04",
+        "unit": "CNY",
+        "time_scope": {
+          "start": "2025-04-01T00:00:00+08:00",
+          "end": "2025-05-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": true,
+      "expected_conflict": true,
+      "expected_resolution": "resolved_by_authority",
+      "expected_value": "7800"
+    },
+    {
+      "case_id": "bt-d-10",
+      "trap_kind": "doc_db_opposite",
+      "question": "A102 的 holding_temperature 与质检报告是否一致？",
+      "provenance": "自建冻结陷阱（文档与库数值相反）负向对照：两侧数值一致，不得误报冲突",
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-5",
+        "columns": [],
+        "sql_hash": "024747cba2a773b7c8d8f71cdba8506da10439c66ae63666de38213f1ab61e2c",
+        "rows": [
+          {
+            "row_id": "bt-d-10-row",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "value": "880",
+            "unit": "degC",
+            "applies_to_version": "A102-V2",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "measured_at": "2025-05-01T00:00:00+08:00",
+            "time_basis": "production_batch"
+          }
+        ]
+      },
+      "docs": {
+        "source_ref": "demo_kb",
+        "blocks": [
+          {
+            "document_id": "bt-d-10-doc",
+            "document_version": "A102-V2",
+            "chunk_id": "bt-d-10-doc-c1",
+            "title": "bt-d-10 质检报告",
+            "entity_label": "A102",
+            "metric": "holding_temperature",
+            "value": "880",
+            "unit": "degC",
+            "time_scope": {
+              "start": "2025-05-01T00:00:00+08:00",
+              "end": "2025-06-01T00:00:00+08:00"
+            },
+            "time_basis": "production_batch",
+            "text": "A102 质检报告：holding_temperature 实测 880 degC。",
+            "source_sha256": "8729e535b133de3af98b014d4167cceacb5cf743629d4ebd404f2a2b763f2a25"
+          }
+        ]
+      },
+      "authority_rules": [],
+      "aliases": [],
+      "primary": {
+        "side": "sql",
+        "metric": "holding_temperature"
+      },
+      "expected_binding": {
+        "entity_id": "A102",
+        "version": "A102-V2",
+        "unit": "degC",
+        "time_scope": {
+          "start": "2025-05-01T00:00:00+08:00",
+          "end": "2025-06-01T00:00:00+08:00"
+        }
+      },
+      "expected_answerable": true,
+      "expected_conflict": false,
+      "expected_resolution": "resolved_by_authority",
+      "expected_value": "880"
+    }
+  ],
+  "digest": "1fdfa89be8eee18fc166a906250639a8f01b89b5ef663c831c335fa9faf0b281"
+}
