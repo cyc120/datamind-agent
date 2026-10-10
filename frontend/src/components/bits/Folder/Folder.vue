@@ -100,7 +100,7 @@ const getPaperClasses = (index: number) => {
 // 这里把三张纸抬到相近高度，使它们都能脱离翻盖、完整露出；三张仍保持扇形分离。
 const getOpenTransform = (index: number) => {
   if (index === 0) return 'translate(-118%, -104%) rotate(-13deg)';
-  if (index === 1) return 'translate(18%, -104%) rotate(13deg)';
+  if (index === 1) return 'translate(-12%, -136%) rotate(13deg)';
   if (index === 2) return 'translate(-50%, -112%) rotate(4deg)';
   return '';
 };
