@@ -57,6 +57,8 @@ def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--no-upload-worker',action='store_true',
                         help='不启动上传队列 worker（SQL-only 部署没有上传管道）')
+    parser.add_argument('--host',default='127.0.0.1',
+                        help='绑定地址；默认仅回环。分享给他人访问时传 0.0.0.0')
     args=parser.parse_args(argv)
     directory=ROOT/'.cache/api';directory.mkdir(parents=True,exist_ok=True)
     if not args.no_upload_worker:
@@ -65,7 +67,7 @@ def main(argv=None):
     if ready():
         print('DataMind Agent 已运行：http://127.0.0.1:8000/');return
     with (directory/'server.log').open('ab') as log:
-        process=subprocess.Popen([sys.executable,'-m','uvicorn','datamind.api:app','--host','127.0.0.1','--port','8000','--no-proxy-headers'],
+        process=subprocess.Popen([sys.executable,'-m','uvicorn','datamind.api:app','--host',args.host,'--port','8000','--no-proxy-headers'],
             cwd=ROOT,stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
     (directory/'server.pid').write_text(str(process.pid)+'\n')
     for _ in range(20):

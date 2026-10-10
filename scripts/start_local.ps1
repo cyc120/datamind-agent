@@ -26,11 +26,19 @@
     pwsh -File scripts/start_local.ps1
     pwsh -File scripts/start_local.ps1 -SqlOnly
     pwsh -File scripts/start_local.ps1 -Background
+    pwsh -File scripts/start_local.ps1 -Share          # 让同网络的人用链接访问
 #>
 [CmdletBinding()]
 param(
     [switch]$SqlOnly,
-    [switch]$Background
+    [switch]$Background,
+    #: 分享给他人访问：绑定所有网卡、开放匿名问答、并把本机各网卡地址写进 origin 白名单。
+    [switch]$Share,
+    #: 覆盖绑定地址；默认 127.0.0.1，-Share 时为 0.0.0.0。
+    [string]$BindAddress,
+    #: 额外 origin（逗号分隔）。用隧道/反向代理时把对外域名填进来，例如
+    #: -AllowedOrigins 'https://demo.example.com'，否则浏览器同源检查会 403。
+    [string]$AllowedOrigins
 )
 
 $ErrorActionPreference = 'Stop'
@@ -41,6 +49,34 @@ Set-Location $Root
 
 # ── 0. 平台前提 ───────────────────────────────────────────────────────────────
 $env:PYTHONUTF8 = '1'          # 见文件头说明 1
+
+if (-not $BindAddress) { $BindAddress = if ($Share) { '0.0.0.0' } else { '127.0.0.1' } }
+
+# ── 0b. 分享模式：把对外可达的 origin 放进白名单 ──────────────────────────────
+# origin_check 用固定白名单，刻意不信任 Host 头；因此换了地址访问就必须显式列出，
+# 否则浏览器发来的 Origin 不匹配，写请求（含问答）会 403 ORIGIN_NOT_ALLOWED。
+$script:ShareUrls = @()
+if ($Share) {
+    $env:DATAMIND_PUBLIC_CHAT = '1'
+    $port = 8000
+    $origins = New-Object System.Collections.Generic.List[string]
+    foreach ($origin in @('http://127.0.0.1:8000', 'http://localhost:8000')) { $origins.Add($origin) }
+    $addresses = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+        Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' }
+    foreach ($address in $addresses) {
+        $origins.Add("http://$($address.IPAddress):$port")
+    }
+    if ($AllowedOrigins) {
+        foreach ($extra in $AllowedOrigins.Split(',')) {
+            if ($extra.Trim()) { $origins.Add($extra.Trim().TrimEnd('/')) }
+        }
+    }
+    $env:DATAMIND_ALLOWED_ORIGINS = ($origins | Select-Object -Unique) -join ','
+    foreach ($address in $addresses) {
+        $script:ShareUrls += "http://$($address.IPAddress):$port/  [$($address.InterfaceAlias)]"
+    }
+    if ($AllowedOrigins) { $script:ShareUrls += ($AllowedOrigins.Split(',') | ForEach-Object { $_.Trim() + '/' }) }
+}
 
 function Resolve-Docker {
     $cmd = Get-Command docker -ErrorAction SilentlyContinue
@@ -163,12 +199,21 @@ function Test-Api {
 
 if (Test-Api) {
     Write-Host 'DataMind Agent 已运行：http://127.0.0.1:8000/（代码更新后请重启原服务进程）'
+    if ($script:ShareUrls.Count) {
+        Write-Host '分享地址（需要重启服务才会按新绑定生效）：'
+        $script:ShareUrls | ForEach-Object { Write-Host "  $_" }
+    }
     exit 0
 }
 
-Write-Host '启动 DataMind Agent：http://127.0.0.1:8000/'
+Write-Host "启动 DataMind Agent：http://127.0.0.1:8000/  (绑定 $BindAddress)"
+if ($script:ShareUrls.Count) {
+    Write-Host '可分享给他人访问的地址：'
+    $script:ShareUrls | ForEach-Object { Write-Host "  $_" }
+    Write-Host '提示：Windows 防火墙可能拦截入站 8000；首次访问若超时，请在防火墙允许 python。'
+}
 if ($Background) {
-    Invoke-Python scripts/start_api_background.py
+    Invoke-Python scripts/start_api_background.py --host $BindAddress
 } else {
-    Invoke-Python -m uvicorn datamind.api:app --host 127.0.0.1 --port 8000
+    Invoke-Python -m uvicorn datamind.api:app --host $BindAddress --port 8000
 }

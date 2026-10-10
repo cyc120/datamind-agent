@@ -213,16 +213,35 @@ PUBLIC_READ_PREFIXES = ('/v1/documents', '/v1/runs', '/assets/')
 #: Reads that expose credentials or connection targets; a browser on another origin must
 #: not be able to read them, so they carry the same origin check as mutations do.
 SENSITIVE_READ_PREFIXES = ('/v1/model/profiles', '/v1/model/config')
+#: Anonymous writes, opt-in via DATAMIND_PUBLIC_CHAT=1, for sharing a read-only demo over a
+#: LAN address or tunnel. Without it a remote visitor reaches the page but every question
+#: fails with 401 LOGIN_REQUIRED: the loopback demo identity does not apply to them, and the
+#: repository provisions no accounts. Only the Q&A entry points are listed — everything that
+#: changes state (model config, authority rules, uploads, snapshots, approvals) keeps
+#: requiring a session, and these two stay same-origin checked below because an anonymous
+#: caller has no session to bind a CSRF token to.
+PUBLIC_WRITE_PATHS = frozenset({'/v1/chat', '/v1/chat/stream'})
 _NO_STORE_PREFIXES = ('/v1/pdf-snapshots', '/v1/pdf-knowledge', '/v1/drawings',
                       '/v1/dimensions', '/v1/files', '/v1/uploads', '/v1/plans',
                       '/v1/model/profiles', '/v1/model/config')
+
+
+def _public_chat_enabled() -> bool:
+    value = (os.environ.get('DATAMIND_PUBLIC_CHAT') or '').strip().lower()
+    return value not in {'', '0', 'false', 'no', 'off'}
+
+
+def _is_public_write(path: str) -> bool:
+    return _public_chat_enabled() and path in PUBLIC_WRITE_PATHS
 
 
 def _is_public_request(request) -> bool:
     path = request.url.path
     if path in PUBLIC_PATHS:
         return True
-    return request.method in {'GET','HEAD','OPTIONS'} and path.startswith(PUBLIC_READ_PREFIXES)
+    if request.method not in {'GET','HEAD','OPTIONS'}:
+        return _is_public_write(path)
+    return path.startswith(PUBLIC_READ_PREFIXES)
 
 
 def _no_store_path(path: str) -> bool:
@@ -268,6 +287,14 @@ async def identity_permissions(request: Request, call_next):
         except HTTPException as exc:
             return JSONResponse(status_code=exc.status_code,content={'detail':exc.detail},
                                 headers={'Cache-Control':'no-store'} if no_store else None)
+    elif not read_only and _is_public_write(path):
+        # Anonymous Q&A still has to be same-origin: there is no session here to bind a CSRF
+        # token to, so the origin allow-list is the only thing stopping another site from
+        # driving this endpoint through a visitor's browser.
+        try:
+            origin_check(request)
+        except HTTPException as exc:
+            return JSONResponse(status_code=exc.status_code,content={'detail':exc.detail})
     response=await call_next(request)
     if no_store:response.headers['Cache-Control']='no-store'
     return response
