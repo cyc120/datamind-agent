@@ -7,7 +7,6 @@ import FallingText from '../components/bits/FallingText/FallingText.vue'
 import RotatingText from '../components/bits/RotatingText/RotatingText.vue'
 import TrueFocus from '../components/bits/TrueFocus/TrueFocus.vue'
 import PixelSwap from '../components/bits/PixelSwap/PixelSwap.vue'
-import GooeyNav from '../components/bits/GooeyNav/GooeyNav.vue'
 import Folder from '../components/bits/Folder/Folder.vue'
 import FlipCard from '../components/FlipCard.vue'
 import ConstellationGraph from '../components/stargraph/ConstellationGraph.vue'
@@ -28,15 +27,16 @@ const navItems = [
 ]
 
 /**
- * 右下角那个大文件夹里飞出的三张纸。
+ * 右下角那个大文件夹里飞出的三张纸——赛题的三条核心主张。
+ * 原来是顶部粘稠导航的三项，用户要求移进文件夹并删掉导航。
  *
- * 纸上把这个 4 字特性名排成两行、每行 2 个字（见模板里的 slice），
- * 形成一个方块。这样既能写全 4 个字，又不会被纸张的可见区域截断——
- * Folder 的左右两张纸展开后大部分仍压在翻盖下，横排 4 字必然被截
- * （实测「逐条核验」只剩「逐条核」、「冲突并陈」少了「冲」）。
+ * Folder 的纸张是向左、向右、向上扇形展开的，左右两张展开后仍有部分压在
+ * 文件夹翻盖下面（翻盖 z-30、纸张 z-20，组件的原始设计）。size=3.4 时纸张
+ * 有 238–306px 宽，但『多模态数据驱动』7 个字横排在左右两张纸上仍会被翻盖截断，
+ * 故用 \\n 折成两行（CSS 用 white-space: pre-line 让其生效）。
  * 数量上限是组件写死的 maxItems = 3。
  */
-const topFeatures = ['逐条核验', '冲突并陈', '图纸可查']
+const topFeatures = ['多模态数据驱动', '可解释', '可溯源']
 
 /** 关键词条：TrueFocus 会逐个聚焦。 */
 const keywords = '可解释 可溯源 跨源核验 图文对照 冲突并陈'
@@ -106,12 +106,6 @@ const sampleEdges: EvidenceEdge[] = [
     <!-- Hero -->
     <section id="top" class="hero">
       <div class="hero-stack">
-        <!-- 粘稠导航（GooeyNav）。三项按整页居中，不跟随正文列的左对齐。 -->
-        <div class="gooey-wrap">
-          <GooeyNav :items="navItems" :initial-active-index="0" :animation-time="600"
-                    :particle-count="14" :particle-distances="[80, 10]" />
-        </div>
-
         <div class="hero-cols">
           <div class="hero-inner">
 
@@ -146,15 +140,9 @@ const sampleEdges: EvidenceEdge[] = [
           <aside class="folder-corner">
             <div class="folder-tilt">
               <Folder color="#2563eb" :size="3.4" :items="topFeatures">
-                <template #item-1>
-                  <div class="paper">{{ topFeatures[0].slice(0, 2) }}<br />{{ topFeatures[0].slice(2) }}</div>
-                </template>
-                <template #item-2>
-                  <div class="paper">{{ topFeatures[1].slice(0, 2) }}<br />{{ topFeatures[1].slice(2) }}</div>
-                </template>
-                <template #item-3>
-                  <div class="paper">{{ topFeatures[2].slice(0, 2) }}<br />{{ topFeatures[2].slice(2) }}</div>
-                </template>
+                <template #item-1><div class="paper p-left">{{ topFeatures[0] }}</div></template>
+                <template #item-2><div class="paper p-right">{{ topFeatures[1] }}</div></template>
+                <template #item-3><div class="paper">{{ topFeatures[2] }}</div></template>
               </Folder>
             </div>
           </aside>
@@ -432,7 +420,7 @@ const sampleEdges: EvidenceEdge[] = [
      左右各外扩约 42px——原来只留 30px，实测被视口右边缘切掉。 */
   /* 只向右出血：负的右边距把它推出内容区，交给 .hero 的 overflow: hidden
      在屏幕右边缘截断。下方不做出血——底部要完整可见，不能被下边界切。 */
-  margin: 0 -150px 0 0;
+  margin: 0 -56px 0 0;
 }
 /* 向左倾斜，让文件夹的出口（原本朝正上方）指向 10 点钟方向。
    钟面上 10 点位于正上方逆时针 60°，但整只文件夹连同纸张一起转会
@@ -462,31 +450,24 @@ const sampleEdges: EvidenceEdge[] = [
    大部分仍压在翻盖下（翻盖 z-30、纸张 z-20），横排 4 字必然被截，
    排成 2×2 的方块则任何角度都放得下。 */
 .folder-tilt :deep(.paper) {
-  padding: 14px 10px;
-  font-size: 16px;
+  padding: 12px 10px;
+  font-size: 14px;
   font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.3;
   letter-spacing: 0.04em;
   color: var(--color-text);
   text-align: center;
+  /* pre-line 让 \n 生效，同时不合并空格 */
+  white-space: nowrap;
 }
-/* 粘稠导航：三项整体居中（用户明确要求，不跟随 hero 的左对齐）。
-   GooeyNav 的默认配色是按「深色页面」写的：基础文字白、胶状药丸白、
-   mix-blend-mode 用 lighten。白底上必须整体反相——
-   药丸改深色、混合模式改 darken（取 min，浅底上显出深色药丸）、
-   激活项文字转白。变量定义在组件里，默认值与上游一致，这里只做覆盖。 */
-.gooey-wrap {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 20px;
-  font-size: 15px;
-
-  --gooey-item: var(--color-body);
-  --gooey-active-text: #ffffff;
-  --gooey-pill: var(--color-text);
-  --gooey-backdrop: #ffffff;
-  --gooey-blend: darken;
-  --gooey-text-shadow: none;
+/* 左右两张纸的内半边压在翻盖下面（翻盖 z-30、纸张 z-20），文字要挤向露出的
+   那一侧。这里用不对称内边距而不是 text-align——实测在这套「绝对定位 + 旋转」
+   的纸张里 text-align 不产生实际位移，内边距可靠。 */
+.folder-tilt :deep(.p-left) {
+  padding-right: 104px;
+}
+.folder-tilt :deep(.p-right) {
+  padding-left: 104px;
 }
 
 /* 巨大标题：参考 Dify 的hero——极大字号、行高收紧、字距微负。
