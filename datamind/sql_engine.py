@@ -17,6 +17,7 @@ import psycopg2
 from psycopg2 import sql as pg_sql
 
 from .catalog import Catalog
+from .frame import clarification_resolved_by_frame, frame_to_query
 from .providers import OPENAI, chat as provider_chat
 from .settings_store import active_profile, resolve_profile_values
 from .sql_guard import PolicyError, cte_reference_table_ids, guard_sql
@@ -176,14 +177,21 @@ def _json_default(value):
     raise TypeError(type(value).__name__)
 
 
+#: Clarification texts. Named constants because ``datamind.frame`` decides which of them an
+#: inherited resolution frame is allowed to answer; the strings themselves are unchanged.
+CLARIFY_WRITE_REFUSAL = "当前模块只支持查询，不能修改数据。"
+CLARIFY_REFUND_METRIC = "请确认要查询退款金额，还是退款笔数？"
+CLARIFY_TIME_RANGE = "请指定销售额的统计时间范围，例如 2025 年。"
+
+
 def clarify(question: str) -> str | None:
     q = question.replace(" ", "")
     if re.search(r"删除|修改|更新|清空|DROP|TRUNCATE|INSERT|UPDATE|DELETE", q, re.I):
-        return "当前模块只支持查询，不能修改数据。"
+        return CLARIFY_WRITE_REFUSAL
     if "退款" in q and re.search(r"退款(多少|情况|总共)", q) and not re.search(r"金额|多少(笔|单|元)|退款额", q):
-        return "请确认要查询退款金额，还是退款笔数？"
+        return CLARIFY_REFUND_METRIC
     if re.search(r"销售额.*(最高|最多|第一)|(?:最高|最多).*销售额", q) and not re.search(r"20\d{2}年|去年|今年|上个月|本月|季度|全年|至今|历史", q):
-        return "请指定销售额的统计时间范围，例如 2025 年。"
+        return CLARIFY_TIME_RANGE
     return None
 
 
@@ -771,7 +779,7 @@ def semantic_verification(source: str, question: str, findings) -> dict:
 
 
 def ask(question: str, source_id: str | None = None, *, generator=None, run_id: str | None = None,
-        history=None) -> dict:
+        history=None, frame=None) -> dict:
     """Execute a natural-language read-only question; generator injection supports offline tests.
 
     ``history`` is the optional client-supplied multi-turn transcript (see ``normalize_history``);
@@ -781,6 +789,11 @@ def ask(question: str, source_id: str | None = None, *, generator=None, run_id: 
     argument (prompt text only; never SQL) and ``turns_used`` reports how many turns were handed
     over. A history that breaks the contract yields a failed result with the stable error code
     (``HISTORY_*``) instead of being truncated.
+
+    ``frame`` is the optional pre-routing :class:`datamind.frame.ResolutionFrame`. It is only ever
+    consulted when it actually resolved something from the transcript: it may answer the
+    time-range clarification and name a single inherited source. It never enters the prompt, the
+    SQL or the parameters, so a hostile transcript cannot change what is executed.
     """
     run_id = run_id or "sql-" + uuid.uuid4().hex[:16]
     try:
@@ -794,8 +807,16 @@ def ask(question: str, source_id: str | None = None, *, generator=None, run_id: 
     if not question.strip():
         return {**answer, "error_code": "EMPTY_QUESTION"}
     clarification = clarify(question)
+    if clarification and frame is not None and clarification_resolved_by_frame(clarification, frame):
+        # The inherited frame supplied the slot the clarification asked for (e.g. the year);
+        # the read-only refusal and the metric-ambiguity question are never suppressed. With no
+        # frame the helper is not even consulted, so the default path is untouched.
+        clarification = None
     if clarification:
         return {**answer, "status": "clarification_required", "clarification": clarification}
+    if source_id is None and frame is not None and len(frame.sources) == 1 \
+            and "sources" in frame.provenance:
+        source_id = frame.sources[0]
     source = source_for(question, source_id)
     industrial_frame = None
     if source == 'demo_industrial':
@@ -809,8 +830,14 @@ def ask(question: str, source_id: str | None = None, *, generator=None, run_id: 
     meta_dsn = cfg.get("DATAMIND_META_DSN") or "host=127.0.0.1 port=5432 dbname=datamind_meta user=readonly_user password=readonly_dev"
     catalog = Catalog(meta_dsn, source)
     candidates = catalog.retrieve(question)["candidates"]
+    resolved_frame = query_frame(question, catalog, candidates)
+    if frame is not None:
+        # Explainability only: the turn's resolution is reported next to the query frame. It is
+        # never rendered into the prompt or the SQL (see the module docstring of datamind.frame).
+        resolved_frame = {**resolved_frame, "resolution": frame.to_dict(),
+                          "resolution_query": frame_to_query(question, frame)["text"]}
     answer.update({"source_id": source, "source_snapshot_id": catalog.snapshot_id,
-                   "schema_candidates": candidates, "query_frame": query_frame(question, catalog, candidates)})
+                   "schema_candidates": candidates, "query_frame": resolved_frame})
     feedback = None
     generate = generator or _call_model
     for attempt in range(3):

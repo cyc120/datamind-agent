@@ -106,9 +106,32 @@ class AgentAPITest(unittest.TestCase):
         self.assertEqual(response.json()["error_code"], "SOURCE_NOT_ALLOWED")
 
     def test_cross_source_route_is_explicitly_unavailable(self):
+        """跨源问句必须**拒答而不是猜答**：证据不成立时返回 fail-closed 的稳定码。
+
+        历史断言（旧运行时码 `ROUTE_UNSUPPORTED`）已在 WP2 退役：跨源分支改由证据图引擎
+        执行，`grep -rn ROUTE_UNSUPPORTED datamind/` 现为 0 命中。这里断言的是**新的稳定码
+        集合**与「不猜答案」语义——证据不足 / 文档绑定缺失 / 冲突未消解三种情形都算「显式
+        不可用」，且运行状态必须是 FAILED_WITH_EVIDENCE 或 ABSTAINED（拒答），不允许
+        COMPLETED（那才会把无证据的猜测当成答案）。
+
+        这是**替换**旧契约，而不是把 `ROUTE_UNSUPPORTED` 加回运行时：旧的单一码无法区分
+        「证据不足」「绑定缺失」「冲突未消解」，加回去会削弱 fail-closed 的叙事。
+
+        该请求没有带 `scope`：按 R4 契约这表示「使用默认范围」，不是「空 allow-list」，所以
+        它必须走到证据图引擎并给出**证据码**。范围码（`SOURCE_NOT_ALLOWED` /
+        `COLLECTION_NOT_ALLOWED`）只表示范围问题，不得被拿来表示证据不足——两者混用会把
+        「没给范围」误报成「越权」。
+        """
         response = self.client.post("/v1/chat", json={"question": "查询销售额前三产品并结合市场分析报告说明原因"})
-        self.runs.append(response.json()["run_id"])
-        self.assertEqual(response.json()["error_code"], "ROUTE_UNSUPPORTED")
+        body = response.json()
+        self.runs.append(body["run_id"])
+        self.assertNotIn(body["error_code"], {"SOURCE_NOT_ALLOWED", "COLLECTION_NOT_ALLOWED"},
+                         "无 scope = 默认范围：范围码只表示范围问题，不能用来表示证据不足")
+        self.assertIn(body["error_code"],
+                      {"CROSS_SOURCE_EVIDENCE_INSUFFICIENT", "DOC_BINDING_MISSING", "CONFLICT_UNRESOLVED"},
+                      "跨源分支必须返回证据图引擎的稳定错误码（旧码 ROUTE_UNSUPPORTED 已退役）")
+        self.assertIn(body["status"], {"FAILED_WITH_EVIDENCE", "ABSTAINED"},
+                      "跨源证据不成立时不得返回 COMPLETED")
 
     def test_fixed_diagnostic_uses_real_database(self):
         response = self.client.post("/v1/diagnostics/sql")

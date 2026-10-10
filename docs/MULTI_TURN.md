@@ -90,7 +90,8 @@ POST /v1/chat
   * SQL 链路先返回澄清（`NEEDS_CLARIFICATION`，未调用生成）；
   * 文档链路检索不到任何证据（`ABSTAINED`，未调用生成）；
   * 工业规则链路（`mode=industrial` / 路由到 industrial）：该链路不调用模型；
-  * 跨源联合问答（`ROUTE_UNSUPPORTED`）等未接入路径。
+  * 跨源联合问答（旧码 `ROUTE_UNSUPPORTED` **已退役**）等未接入多轮的路径；跨源失败一律走
+    `CROSS_SOURCE_EVIDENCE_INSUFFICIENT` / `DOC_BINDING_MISSING` / `CONFLICT_UNRESOLVED`。
 * 它是**条数**，不是模型调用次数：SQL 的修复重写（最多 3 次）不会让计数翻倍。
 * 生成步骤被调用但随后失败（例如 `MODEL_UPSTREAM_ERROR`）时，计数仍反映本次已交给
   生成步骤的条数；计数在调用生成步骤之前写入，保证“送到就如实计数、没送到就是 0”。

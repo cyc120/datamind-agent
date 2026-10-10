@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -12,6 +13,8 @@ import psycopg2
 from psycopg2.extras import Json
 
 from .catalog import Catalog
+from .frame import frame_to_query, is_document_question, resolve_turn
+from .knowledge import KnowledgeRetriever
 from .rag_engine import PROMPT_VERSION as RAG_PROMPT_VERSION, ask_documents
 from .sql_engine import (PROMPT_VERSION, ask, normalize_history, query_frame, settings, source_for,
                          verification_passed)
@@ -44,12 +47,20 @@ def _read_dsn() -> str:
         "host=127.0.0.1 port=5432 dbname=datamind_meta user=readonly_user password=readonly_dev")
 
 
+#: Database sources this deployment exposes. Defined once and used by *every* route guard: the
+#: round-1 security review (H1) found the SQL path and the cross-source path had drifted, and a
+#: second copy of the same list is how that drift happens. ``knowledge.COLLECTIONS`` is the
+#: equivalent single source of truth for document collections.
+DATABASE_SOURCES = ("demo_retail", "chinook", "demo_industrial")
+
+
 def _is_document_question(question: str) -> bool:
-    return any(word in question.lower() for word in ("报告", "文档", "手册", "制度", "白皮书", "pdf", "知识库", "质检",
-        "ohr-bench", "退款条件", "七天无理由", "多久到账", "退款时限", "续航", "会员权益", "有哪些权益", "计算公式", "预算", "巡检", "保修"))
+    # The word list lives in ``datamind.frame`` so the router and the resolution frame cannot
+    # drift apart; the predicate itself is unchanged.
+    return is_document_question(question)
 
 
-def route_for(question: str, mode: str = "auto") -> str:
+def route_for(question: str, mode: str = "auto", frame=None) -> str:
     if mode in {"sql", "rag", "industrial"}:
         return mode
     if '工序' in question and any(w in question for w in ('温度','批次')) and any(w in question for w in ('超限','超标','核验','报告','一致','冲突','工艺')):
@@ -58,6 +69,13 @@ def route_for(question: str, mode: str = "auto") -> str:
         if any(word in question for word in ("结合", "联合", "关联")) and any(
                 word in question for word in ("数据库", "销售额最高", "销售额前三", "销量最高", "查询订单")):
             return "cross_source"
+        return "rag"
+    if frame is not None and frame.inherited_from_turn is not None and frame.document_collections \
+            and "document_collections" in frame.provenance and not frame.metrics and not frame.entities:
+        # The current question carries no document wording and no SQL topic of its own, but this
+        # turn references a document thread inherited from the transcript ("那大件的呢？"): route
+        # there, not to SQL. A turn with a metric/entity of its own stays on the SQL route, so a
+        # topic switch back to data ("那2024年的销售额呢？") is not hijacked.
         return "rag"
     return "sql"
 
@@ -72,6 +90,28 @@ def _result_answer(result: dict) -> str:
     if "ROW_LIMIT_REACHED" in result.get("validator_findings", []):
         return "查询已达到 100 行展示上限，以下仅为返回的前 100 行。"
     return f"查询得到 {result['row_count']} 行数据，详情见结果表。"
+
+
+class _FrameRetriever:
+    """Transparent retriever proxy that swaps in the frame's resolved *retrieval* query (WP7).
+
+    Only the string handed to ``retrieve`` changes (question + inherited slot surfaces). The
+    answering model still receives the original question plus the untrusted transcript, and the
+    citations still come from real retrieved chunks. Installed only when the frame inherited
+    something, so a request without history keeps the exact previous retrieval call.
+    """
+
+    def __init__(self, inner, query: str):
+        self._inner = inner
+        self.query = query
+
+    def retrieve(self, question, **kwargs):
+        return self._inner.retrieve(self.query, **kwargs)
+
+    def __getattr__(self, name):
+        if name == "_inner":
+            raise AttributeError(name)
+        return getattr(self._inner, name)
 
 
 class DataMindAgent:
@@ -93,6 +133,16 @@ class DataMindAgent:
                  "status": status, "started_at": datetime.now(timezone.utc).isoformat(),
                  "input_summary": _plain(input_summary or {}), "output_summary": _plain(output_summary or {}),
                  "error_code": error_code, "tool_name": tool_name}
+        if self.sink:
+            # L5 (round-1 security review): the sink may complete the event on the way out
+            # (``/v1/chat/stream`` adds the clarification contract keys there). Persisting first
+            # meant a replay from ``trace_events`` lacked keys the streaming client had received.
+            # Deliver, then persist the very same payload; a failing sink is logged instead of
+            # costing the run its trace row.
+            try:
+                self.sink(event)
+            except Exception:
+                logging.exception("Event sink failed for %s/%s", self.run_id, event_type)
         with self.conn.cursor() as cur:
             cur.execute("""INSERT INTO trace_events(event_id, run_id, agent_name, event_type, status,
                        started_at, input_summary, output_summary, error_code, tool_name)
@@ -100,8 +150,6 @@ class DataMindAgent:
                         (event["event_id"], self.run_id, agent_name, event_type, status,
                          event["started_at"], Json(event["input_summary"]), Json(event["output_summary"]),
                          error_code, tool_name))
-        if self.sink:
-            self.sink(event)
         return event
 
     def _finish(self, status: str, answer: str, confidence: str, *, error_code=None,
@@ -137,6 +185,10 @@ class DataMindAgent:
                 ("retrieval", "claims", "citations", "retrieved_evidence", "attempts", "elapsed_ms", "prompt_version", "answer_coverage")})
         if result and result.get('kind') == 'industrial':
             final['industrial_result'] = _plain(result)
+        if result and result.get('kind') == 'cross_source':
+            # Additive only: the cross-source shape rides in its own key so no existing key of the
+            # SQL/RAG/industrial responses changes meaning or content.
+            final['cross_source_result'] = _plain(result)
         event_type = {"COMPLETED": "answer.completed", "ABSTAINED": "answer.abstained",
                       "FAILED_WITH_EVIDENCE": "run.failed"}.get(status, "answer.clarification")
         self._event(event_type, "orchestrator", "succeeded" if status == "COMPLETED" else "warning" if status == "ABSTAINED" else "failed",
@@ -266,7 +318,8 @@ class DataMindAgent:
 
     def run(self, question: str, *, database_sources: list[str] | None = None,
             document_collections: list[str] | None = None, document_refs: list[dict] | None = None, mode: str = "auto",
-            history: list[dict] | None = None, generator=None, rag_generator=None, retriever=None) -> dict:
+            history: list[dict] | None = None, generator=None, rag_generator=None, retriever=None,
+            cross_source_evidence: dict | None = None) -> dict:
         """Run one request. ``history`` is optional client-supplied multi-turn context.
 
         The agent keeps no session: the transcript belongs to this call only. ``scope`` is never
@@ -274,8 +327,20 @@ class DataMindAgent:
         as it did before multi-turn support existed.
         """
         history = normalize_history(history)
-        sources = database_sources if database_sources is not None else ["demo_retail", "chinook", "demo_industrial"]
-        route = "rag" if document_refs is not None and mode=="auto" else route_for(question, mode)
+        sources = database_sources if database_sources is not None else list(DATABASE_SOURCES)
+        # WP7: frame the turn *before* routing/clarification/retrieval. Only a history-bearing
+        # request consults the frame, so a request without history keeps the pre-multi-turn path
+        # (route, scope, prompt) byte for byte. The authorization boundary is not inherited: the
+        # frame's proposals are checked against this request's scope by ``scope_check``.
+        decision = (resolve_turn(question, history, mode=mode, allowed_sources=sources,
+                                 allowed_collections=document_collections) if history else None)
+        resolution_frame = decision["_frame"] if decision else None
+        if document_refs is not None and mode == "auto":
+            route = "rag"
+        elif decision is not None:
+            route = decision["route"]
+        else:
+            route = route_for(question, mode)
         tool = "industrial" if route == "industrial" else "rag" if route == "rag" else "sql"
         plan = {"plan_id": "plan-" + uuid.uuid4().hex[:12], "goal": question,
                 "route": route,
@@ -284,6 +349,9 @@ class DataMindAgent:
                 "tasks": [{"task_id": tool, "kind": tool + ".query", "depends_on": [], "status": "pending"},
                           {"task_id": "verify", "kind": "verify", "depends_on": [tool], "status": "pending"},
                           {"task_id": "answer", "kind": "answer", "depends_on": ["verify"], "status": "pending"}]}
+        if resolution_frame is not None:
+            # Persisted with the plan so the resolution is replayable from /v1/runs/{id}.
+            plan["resolution_frame"] = decision["frame"]
         if route == 'industrial':
             plan['budget']={'max_rows':1000,'sql_timeout_ms':5000,'model_calls':0}
             plan['tasks']=[{'task_id':'requirements','kind':'document.fields','depends_on':[]},
@@ -296,21 +364,47 @@ class DataMindAgent:
                         (self.run_id, question, Json(plan), Json({"prompt": RAG_PROMPT_VERSION if route == "rag" else PROMPT_VERSION})))
         self._event("run.started", "orchestrator", "succeeded", input_summary={"question_length": len(question)})
         if route == "cross_source":
-            return self._finish("FAILED_WITH_EVIDENCE", "数据库与文档的联合推理尚未接入，请分别选择数据库问数或文档问答。",
-                                "insufficient", error_code="ROUTE_UNSUPPORTED")
+            # WP2: the cross-source branch now runs the typed evidence-graph engine. It stays
+            # fail-closed — ``cross_source.run`` returns a stable error code whenever an evidence
+            # graph with complete bindings cannot be built, and never invents an answer.
+            return self._run_cross_source(question, plan, database_sources, document_collections,
+                                          cross_source_evidence)
         try:
+            if decision is not None and decision["error_code"]:
+                # An inherited scope proposal outside this request's scope: refuse (fail closed)
+                # instead of silently answering from a wider or different source.
+                message = ("当前请求范围不允许访问该数据源。"
+                           if decision["error_code"] == "SOURCE_NOT_ALLOWED"
+                           else "当前请求范围不允许访问该文档集合。")
+                return self._finish("FAILED_WITH_EVIDENCE", message, "insufficient",
+                                    error_code=decision["error_code"])
             if document_refs is not None and route != 'rag':
                 return self._finish('FAILED_WITH_EVIDENCE','指定文件范围仅用于文档问答，请选择文档模式。',
                                     'insufficient',error_code='DOCUMENT_SELECTION_MODE_INVALID')
             if route == 'industrial':
                 return self._run_industrial(question, plan, database_sources, document_collections)
             if route == "rag":
+                if decision is not None and decision["collections"] is not None \
+                        and document_collections is None:
+                    # An inherited document collection is a *proposal*; it still travels through
+                    # the retriever's own COLLECTIONS check.
+                    document_collections = decision["collections"]
+                call_retriever = retriever
+                if resolution_frame is not None and resolution_frame.inherited_from_turn is not None:
+                    query_text = frame_to_query(question, resolution_frame)["text"]
+                    if query_text != question:
+                        call_retriever = _FrameRetriever(retriever or KnowledgeRetriever(), query_text)
                 return self._run_rag(question, plan, document_collections, document_refs=document_refs,
-                                     generator=rag_generator, retriever=retriever, history=history)
-            if not sources or any(s not in {"demo_retail", "chinook", "demo_industrial"} for s in sources):
+                                     generator=rag_generator, retriever=call_retriever, history=history)
+            if not sources or any(s not in DATABASE_SOURCES for s in sources):
                 return self._finish("FAILED_WITH_EVIDENCE", "当前请求范围不允许访问该数据源。",
                                     "insufficient", error_code="SOURCE_NOT_ALLOWED")
-            source = source_for(question, sources[0] if len(sources) == 1 else None)
+            requested_source = sources[0] if len(sources) == 1 else None
+            if decision is not None and decision["scope_from_frame"]:
+                # Precedence: an *inherited* source proposal outranks the default scope, so the
+                # existing allow-list check below can refuse it when this request forbids it.
+                requested_source = decision["source"]
+            source = source_for(question, requested_source)
             if source not in sources:
                 return self._finish("FAILED_WITH_EVIDENCE", "当前请求范围不允许访问该数据源。",
                                     "insufficient", error_code="SOURCE_NOT_ALLOWED")
@@ -332,6 +426,10 @@ class DataMindAgent:
             # pre-multi-turn invocation (and prompt) unchanged.
             if history:
                 ask_kwargs["history"] = history
+            if resolution_frame is not None and resolution_frame.inherited_from_turn is not None:
+                # A frame that actually resolved a slot from the transcript is handed to the
+                # engine (clarification gate + inherited source). It never enters the prompt.
+                ask_kwargs["frame"] = resolution_frame
             result = ask(question, source, **ask_kwargs)
             if result["status"] == "clarification_required":
                 return self._finish("NEEDS_CLARIFICATION", result["clarification"], "insufficient",
@@ -379,6 +477,131 @@ class DataMindAgent:
             self._event("verification.failed", "orchestrator", "failed", error_code="INTERNAL_ERROR")
             return self._finish("FAILED_WITH_EVIDENCE", "服务执行失败，请检查运行记录。", "insufficient",
                                 error_code="INTERNAL_ERROR")
+
+    def _run_cross_source(self, question, plan, sources, collections, evidence=None):
+        """WP2: run the evidence-graph engine and persist the typed graph (best effort).
+
+        The engine is fail-closed by construction: no typed graph with complete bindings means a
+        stable error code (``CROSS_SOURCE_EVIDENCE_INSUFFICIENT`` / ``DOC_BINDING_MISSING`` /
+        ``CONFLICT_UNRESOLVED``), never a guessed answer. Only *new* response keys are added
+        (``cross_source_result``); the SQL/RAG/industrial response shapes are untouched.
+        """
+        from . import cross_source, evidence_graph, knowledge
+        # H1 (round-1 security review): an **explicitly empty** allow-list means "no source is
+        # allowed" and must be refused — never read as "any source is allowed", which let
+        # ``cross_source.live_sql_evidence`` auto-select one.
+        # R4: ``None`` is *not* an empty allow-list. It is the request that narrowed nothing, so it
+        # runs under the *default* scope (``DATABASE_SOURCES``), exactly like the SQL path's
+        # ``sources`` default, and the source is inferred from the question by ``source_for``
+        # (always a member of ``DATABASE_SOURCES``). Round 2 read the raw request value here, so a
+        # request without a ``scope`` was refused with SOURCE_NOT_ALLOWED before any evidence
+        # adapter ran. Only ``[]`` (or an unregistered name) stops at this gate.
+        if sources is not None and (not sources or any(s not in DATABASE_SOURCES for s in sources)):
+            return self._finish("FAILED_WITH_EVIDENCE", "当前请求范围不允许访问该数据源。",
+                                "insufficient", error_code="SOURCE_NOT_ALLOWED")
+        # M2: the collection whitelist had drifted from the retriever's own vocabulary
+        # (``public_kb`` / ``ohr_bench`` do not exist; ``demo_kb`` / ``ohrbench_kb`` do). One
+        # source of truth, no second list to keep in sync. The same None/[] distinction holds:
+        # ``None`` keeps the default collection set, an explicit ``[]`` is a denial (the retriever
+        # refuses it on its own; deciding here keeps the verdict on the scope gate instead of
+        # degrading into "no document evidence").
+        if collections is not None and (not collections or
+                                        any(c not in knowledge.COLLECTIONS for c in collections)):
+            return self._finish("FAILED_WITH_EVIDENCE", "当前请求范围不允许访问该文档集合。",
+                                "insufficient", error_code="COLLECTION_NOT_ALLOWED")
+        self._event("plan.created", "planner", "succeeded",
+                    output_summary={"route": "cross_source", "plan_id": plan["plan_id"],
+                                    "tasks": plan["tasks"]})
+        with self.conn.cursor() as cur:
+            cur.execute("UPDATE runs SET status='EXECUTING', versions=%s WHERE run_id=%s",
+                        (Json({"cross_source": cross_source.CROSS_SOURCE_VERSION,
+                               "graph": evidence_graph.GRAPH_VERSION,
+                               "model": settings().get("NEW_API_MODEL")}), self.run_id))
+        self._event("tool.started", "cross_source_agent", "running",
+                    tool_name="evidence_graph", input_summary={"sources": sources,
+                                                               "document_collections": collections})
+        started = time.monotonic()
+
+        def persist(graph):
+            with self.conn:
+                return evidence_graph.persist(self.conn, self.run_id, graph)
+
+        try:
+            if evidence is not None:
+                # Injected evidence (tests / offline evaluation): the real pipeline and the real
+                # persistence path run, only the two adapters are replaced — the same seam the SQL
+                # and RAG routes already expose through ``generator=`` / ``retriever=``.
+                result = cross_source.plan(
+                    question, sources, collections, sql_evidence=evidence.get('sql'),
+                    rag_evidence={'blocks': evidence.get('docs') or []},
+                    aliases=evidence.get('aliases'), authority_rules=evidence.get('authority_rules'),
+                    alias_registry_available=evidence.get('alias_registry_available', True),
+                    on_graph=persist)
+            else:
+                result = cross_source.run(question, database_sources=sources,
+                                          document_collections=collections, on_graph=persist)
+        except cross_source.CrossSourceError as exc:
+            # A refused scope (empty allow-list reaching the SQL adapter, H1) is not an internal
+            # failure: it keeps its own stable code instead of degrading into INTERNAL_ERROR.
+            self._event("verification.failed", "cross_source_agent", "failed",
+                        error_code=exc.code,
+                        output_summary={"detail": exc.detail, "route": "cross_source"})
+            return self._finish("FAILED_WITH_EVIDENCE", "当前请求范围不允许访问该数据源。",
+                                "insufficient", error_code=exc.code)
+        except Exception:
+            logging.exception("Cross-source run %s failed", self.run_id)
+            self._event("verification.failed", "cross_source_agent", "failed",
+                        error_code="INTERNAL_ERROR")
+            return self._finish("FAILED_WITH_EVIDENCE", "跨源核验执行失败，请查看运行记录。",
+                                "insufficient", error_code="INTERNAL_ERROR")
+        result["elapsed_ms"] = round((time.monotonic() - started) * 1000, 1)
+        self._record_cross_source_claims(result)
+        summary = {"graph": result.get("graph_summary"), "claims": len(result.get("claims") or []),
+                   "conflicts": len(result.get("conflicts") or []),
+                   "unresolved_conflicts": len(result.get("unresolved_conflicts") or []),
+                   "repair_attempts": result.get("repair_attempts", 0),
+                   "link_counts": result.get("link_counts"), "warnings": result.get("warnings")}
+        status = result.get("status")
+        if status == "completed":
+            self._event("verification.passed", "cross_source_agent", "succeeded",
+                        output_summary=summary)
+            return self._finish("COMPLETED", result["answer"], "medium", result=result)
+        if status == "abstained":
+            self._event("verification.failed", "cross_source_agent", "warning",
+                        error_code=result.get("error_code"), output_summary=summary)
+            return self._finish("ABSTAINED", result["answer"], "insufficient",
+                                error_code=result.get("error_code"), result=result)
+        self._event("verification.failed", "cross_source_agent", "failed",
+                    error_code=result.get("error_code"), output_summary=summary)
+        return self._finish("FAILED_WITH_EVIDENCE", result["answer"], "insufficient",
+                            error_code=result.get("error_code"), result=result)
+
+    def _record_cross_source_claims(self, result):
+        """Persist the claims of a cross-source run; the evidence nodes/edges are already stored."""
+        claims = result.get("claims") or []
+        if not claims:
+            return
+        try:
+            with self.conn.cursor() as cur:
+                for claim in claims:
+                    bound = claim.get("binding_status") == "bound" and not claim.get("binding_problems")
+                    cur.execute("""INSERT INTO claims(claim_id, run_id, text, status, evidence_ids,
+                                   confidence_level, verification) VALUES (%s,%s,%s,%s,%s,%s,%s)
+                                   ON CONFLICT (claim_id) DO NOTHING""",
+                                (claim["claim_id"], self.run_id, claim["text"],
+                                 "verified" if bound and result.get("status") == "completed" else "insufficient_evidence",
+                                 list(claim.get("evidence_node_ids") or []), "medium",
+                                 Json({"binding": claim.get("binding"),
+                                       "binding_problems": claim.get("binding_problems"),
+                                       "cross_source_version": result.get("cross_source_version"),
+                                       "graph_digest": (result.get("graph_summary") or {}).get("graph_digest"),
+                                       "full_semantic_entailment": "not_independently_verified"})))
+            self._event("evidence.attached", "cross_source_agent", "succeeded",
+                        output_summary={"claim_count": len(claims),
+                                        "graph_digest": (result.get("graph_summary") or {}).get("graph_digest")})
+        except Exception:
+            logging.exception("Cross-source claim persistence failed for %s", self.run_id)
+            result["persistence_error"] = "CLAIM_PERSISTENCE_FAILED"
 
     def _run_industrial(self, question, plan, sources, collections):
         from .industrial import run, parse_question

@@ -1,0 +1,245 @@
+{
+  "suite_version": "complexity-v1",
+  "frozen_at": "2026-10-10",
+  "baseline_commit": "e4e2ebf",
+  "api_version": "0.39.0",
+  "band_rule": "low < 25 <= medium < 50 <= high < 75 <= very_high（datamind/complexity.py:BANDS）",
+  "expectation_basis": "期望在评测前按 data/knowledge_base/manifest.json 声明的文档类型与页数/字数规模冻结，不看实际分数：声明为「扫描件（旋转+噪声+模糊）」的两份期望 high；声明为「长文档」且含 24 行跨页续表的 06 期望 medium；其余原生文本小文档期望 low。OHR-Bench 页面按冻结规则：gt_chars >= 8000 期望 medium，其余 low；JSON 文本无扫描概念，期望 ocr_enabled=false。",
+  "observed_cost_note": "实际解析耗时与失败率由 scripts/eval_complexity.py 现场测量，不在本文件里写死；本文件只冻结期望与期望策略。",
+  "documents": [
+    {
+      "doc_id": "kb-01",
+      "kind": "pdf",
+      "path": "data/knowledge_base/01_重点产品市场分析报告_2025.pdf",
+      "declared_type": "原生文本：多级目录+跨页表格",
+      "expected_band": "low",
+      "expected_policy": {"ocr_enabled": false},
+      "notes": "2 页原生文本，规模小；跨页表格已在表格维度中计数。"
+    },
+    {
+      "doc_id": "kb-02",
+      "kind": "pdf",
+      "path": "data/knowledge_base/02_渠道运营策略白皮书.pdf",
+      "declared_type": "原生文本：多级标题+列表+预算表",
+      "expected_band": "low",
+      "expected_policy": {"ocr_enabled": false},
+      "notes": "原生文本，无扫描页。"
+    },
+    {
+      "doc_id": "kb-03",
+      "kind": "pdf",
+      "path": "data/knowledge_base/03_2025年分区域经营数据简报.pdf",
+      "declared_type": "表格密集",
+      "expected_band": "low",
+      "expected_policy": {"ocr_enabled": false},
+      "notes": "表格密集但只有 2 页；期望 low 意味着「表格密度本身不足以抬档」，这是对分档校准的一次明确预期。"
+    },
+    {
+      "doc_id": "kb-04",
+      "kind": "pdf",
+      "path": "data/knowledge_base/04_售后服务与退款管理制度.pdf",
+      "declared_type": "规章制度：编号条款",
+      "expected_band": "low",
+      "expected_policy": {"ocr_enabled": false},
+      "notes": "结构规整的条款文本。"
+    },
+    {
+      "doc_id": "kb-05",
+      "kind": "pdf",
+      "path": "data/knowledge_base/05_经营指标核算与计算公式说明.pdf",
+      "declared_type": "公式：3 个 LaTeX 公式+口径边界",
+      "expected_band": "low",
+      "expected_policy": {"ocr_enabled": false},
+      "notes": "公式识别是本仓库已知最贵的解析步骤之一；文档规模小，期望 low，评分与耗时的偏离本身就是要保留的证据。"
+    },
+    {
+      "doc_id": "kb-06",
+      "kind": "pdf",
+      "path": "data/knowledge_base/06_2025年度经营分析报告.pdf",
+      "declared_type": "长文档：24 行跨页续表",
+      "expected_band": "medium",
+      "expected_policy": {"ocr_enabled": false},
+      "notes": "跨页续表是复杂度维度之一，期望它把 3 页长文档推到中档。"
+    },
+    {
+      "doc_id": "kb-07",
+      "kind": "pdf",
+      "path": "data/knowledge_base/07_门店巡检记录_2025年12月_扫描版.pdf",
+      "declared_type": "扫描件：旋转+噪声+模糊",
+      "expected_band": "high",
+      "expected_policy": {"ocr_enabled": true},
+      "notes": "无原生文本层、图片铺满页面、需 OCR。"
+    },
+    {
+      "doc_id": "kb-08",
+      "kind": "pdf",
+      "path": "data/knowledge_base/08_产品质检报告_数码品类_扫描版.pdf",
+      "declared_type": "扫描件：负角度旋转+低清",
+      "expected_band": "high",
+      "expected_policy": {"ocr_enabled": true},
+      "notes": "同 07，负角度旋转。"
+    },
+    {
+      "doc_id": "kb-09",
+      "kind": "pdf",
+      "path": "data/knowledge_base/09_无线降噪耳机Pro产品手册.pdf",
+      "declared_type": "产品手册：参数表+FAQ",
+      "expected_band": "low",
+      "expected_policy": {"ocr_enabled": false},
+      "notes": "原生文本小文档。"
+    },
+    {
+      "doc_id": "kb-10",
+      "kind": "pdf",
+      "path": "data/knowledge_base/10_零售演示库数据字典.pdf",
+      "declared_type": "数据字典（从 DB 自动生成）",
+      "expected_band": "low",
+      "expected_policy": {"ocr_enabled": false},
+      "notes": "表格多但规模小。"
+    },
+    {
+      "doc_id": "kb-11",
+      "kind": "pdf",
+      "path": "data/knowledge_base/11_客户服务话术手册.pdf",
+      "declared_type": "FAQ：问答体",
+      "expected_band": "low",
+      "expected_policy": {"ocr_enabled": false},
+      "notes": "纯文本问答。"
+    },
+    {
+      "doc_id": "kb-12",
+      "kind": "pdf",
+      "path": "data/knowledge_base/12_财务指标核算办法.pdf",
+      "declared_type": "规章制度：指标口径",
+      "expected_band": "low",
+      "expected_policy": {"ocr_enabled": false},
+      "notes": "原生文本小文档。"
+    },
+    {
+      "doc_id": "ohr-001",
+      "kind": "ohr",
+      "path": "data/ohr_bench_samples/ohr-001_academic_academic_DUDE_72a8558a002eb1c2875c38388854b4de_p17.json",
+      "declared_type": "OHR-Bench academic 单页文本",
+      "expected_band": "low",
+      "expected_policy": {"ocr_enabled": false},
+      "notes": "gt_chars=1908，低于 8000 阈值。"
+    },
+    {
+      "doc_id": "ohr-002",
+      "kind": "ohr",
+      "path": "data/ohr_bench_samples/ohr-002_academic_academic_2405.14458v1_p2.json",
+      "declared_type": "OHR-Bench academic 单页文本",
+      "expected_band": "low",
+      "expected_policy": {"ocr_enabled": false},
+      "notes": "gt_chars=4819。"
+    },
+    {
+      "doc_id": "ohr-003",
+      "kind": "ohr",
+      "path": "data/ohr_bench_samples/ohr-003_administration_administration_DUDE_0875f9cd143bcf389bd1c48dce433857_p23.json",
+      "declared_type": "OHR-Bench administration 单页文本",
+      "expected_band": "low",
+      "expected_policy": {"ocr_enabled": false},
+      "notes": "gt_chars=683。"
+    },
+    {
+      "doc_id": "ohr-004",
+      "kind": "ohr",
+      "path": "data/ohr_bench_samples/ohr-004_administration_administration_DUDE_61c8c8330f3895123e136140bda9991e_p8.json",
+      "declared_type": "OHR-Bench administration 单页文本",
+      "expected_band": "low",
+      "expected_policy": {"ocr_enabled": false},
+      "notes": "gt_chars=1042。"
+    },
+    {
+      "doc_id": "ohr-005",
+      "kind": "ohr",
+      "path": "data/ohr_bench_samples/ohr-005_finance_finance_DUDE_fc03b3768346584a3fa425c656bfe748_p0.json",
+      "declared_type": "OHR-Bench finance 单页文本",
+      "expected_band": "low",
+      "expected_policy": {"ocr_enabled": false},
+      "notes": "gt_chars=4421。"
+    },
+    {
+      "doc_id": "ohr-006",
+      "kind": "ohr",
+      "path": "data/ohr_bench_samples/ohr-006_finance_finance_DUDE_747c6792875022c83dbce7927ceff57e_p3.json",
+      "declared_type": "OHR-Bench finance 单页文本",
+      "expected_band": "low",
+      "expected_policy": {"ocr_enabled": false},
+      "notes": "gt_chars=1510。"
+    },
+    {
+      "doc_id": "ohr-007",
+      "kind": "ohr",
+      "path": "data/ohr_bench_samples/ohr-007_law_law_CnsPharmaceuticalsInc_20200326_8-K_EX-10.1_12079626_EX-10.1_Development Agreement_p4.json",
+      "declared_type": "OHR-Bench law 单页文本",
+      "expected_band": "low",
+      "expected_policy": {"ocr_enabled": false},
+      "notes": "gt_chars=3606。"
+    },
+    {
+      "doc_id": "ohr-008",
+      "kind": "ohr",
+      "path": "data/ohr_bench_samples/ohr-008_law_law_CHERRYHILLMORTGAGEINVESTMENTCORP_09_26_2013-EX-10.1-Strategic Alliance Agreement_p3.json",
+      "declared_type": "OHR-Bench law 单页文本",
+      "expected_band": "low",
+      "expected_policy": {"ocr_enabled": false},
+      "notes": "gt_chars=3821。"
+    },
+    {
+      "doc_id": "ohr-009",
+      "kind": "ohr",
+      "path": "data/ohr_bench_samples/ohr-009_manual_manual_t480_ug_en_p64.json",
+      "declared_type": "OHR-Bench manual 单页文本",
+      "expected_band": "low",
+      "expected_policy": {"ocr_enabled": false},
+      "notes": "gt_chars=2102。"
+    },
+    {
+      "doc_id": "ohr-010",
+      "kind": "ohr",
+      "path": "data/ohr_bench_samples/ohr-010_manual_manual_guojixueshengshenghuozhinanyingwen9.1_p36.json",
+      "declared_type": "OHR-Bench manual 单页文本",
+      "expected_band": "low",
+      "expected_policy": {"ocr_enabled": false},
+      "notes": "gt_chars=766。"
+    },
+    {
+      "doc_id": "ohr-011",
+      "kind": "ohr",
+      "path": "data/ohr_bench_samples/ohr-011_news_news_06_14_p0.json",
+      "declared_type": "OHR-Bench news 单页文本",
+      "expected_band": "medium",
+      "expected_policy": {"ocr_enabled": false},
+      "notes": "gt_chars=8316，超过 8000 阈值，期望 medium。"
+    },
+    {
+      "doc_id": "ohr-012",
+      "kind": "ohr",
+      "path": "data/ohr_bench_samples/ohr-012_news_news_DUDE_ce4c991a6c15eb953bb3e99be5d6c514_p4.json",
+      "declared_type": "OHR-Bench news 单页文本",
+      "expected_band": "low",
+      "expected_policy": {"ocr_enabled": false},
+      "notes": "gt_chars=6151。"
+    },
+    {
+      "doc_id": "ohr-013",
+      "kind": "ohr",
+      "path": "data/ohr_bench_samples/ohr-013_textbook_textbook_omnidocbench_docstructbench_dianzishu_zhongwenzaixian-o.O-63708140.pdf_170_p0.json",
+      "declared_type": "OHR-Bench textbook 单页文本",
+      "expected_band": "low",
+      "expected_policy": {"ocr_enabled": false},
+      "notes": "gt_chars=1153。"
+    },
+    {
+      "doc_id": "ohr-014",
+      "kind": "ohr",
+      "path": "data/ohr_bench_samples/ohr-014_textbook_textbook_DUDE_0da5da2608ed89cdddd52bd078beced8_p1.json",
+      "declared_type": "OHR-Bench textbook 单页文本",
+      "expected_band": "low",
+      "expected_policy": {"ocr_enabled": false},
+      "notes": "gt_chars=905。"
+    }
+  ]
+}

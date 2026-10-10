@@ -69,6 +69,11 @@ th{background:#f3f8f5;color:#3b5e50;position:sticky;top:0}tr:last-child td{borde
 .trace .detail{color:#6e867a;margin-top:4px;font-size:12px;word-break:break-all}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 .mini{color:#5a756a;font-size:13px;margin:6px 0}
+/* B3 澄清补槽面板：web/app.js 渲染 .clarification / .clarification-row，此前没有样式（L3） */
+.clarification{margin-top:11px;padding:12px 14px;border:1px solid #d5ebdd;border-radius:12px;background:#f6fbf8}
+.clarification .mini{margin:0;color:#38544c;font-weight:700}
+.clarification-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}
+.clarification-row button{padding:7px 12px;font-size:13px}
 .replay{display:flex;gap:8px}.replay input{min-width:0}.replay button{white-space:nowrap;background:#315e50}
 
 /* ---------- 模型接入 ---------- */

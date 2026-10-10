@@ -1,0 +1,349 @@
+{
+  "suite_version": "clarification-v1",
+  "contract_version": "clarification-slots-v1",
+  "frozen_at": "2026-10-10",
+  "baseline_commit": "e4e2ebf",
+  "api_version": "0.39.0",
+  "method": "先冻结期望后评测。六类场景：时间缺失、口径歧义（销售额 vs 订单数）、粒度歧义（按客户 vs 按订单）、跨版本歧义、对象别名歧义，以及「不该澄清」的正向对照。expected_action=answer 的用例是防「一律反问」伪修的反向对照：系统必须直接回答。expected_slot_values 是冻结的用户补充话术（离线 stub 逐字复用，不调用上游模型）。frame_expectation 用 datamind/sql_engine.py 的 query_frame 契约判定补槽是否真的落到问句帧；not_representable 表示该槽位在现有帧契约里没有字段（如实记 N/A，不改成通过）。",
+  "source_notes": {
+    "slot_vocabulary": ["time_range", "metric", "grain", "object_alias", "document_version"],
+    "alias_candidates_source": "演示库 demo_retail.products 表只读查询得到的真实产品名（无线降噪耳机 Pro / 真无线耳机 Air 等），不虚构对象。",
+    "deployed_rule": "datamind/sql_engine.py:179 clarify() —— 线上 /v1/chat 实际使用的规则；覆盖 time_range(销售额最高类) 与 metric(退款金额/笔数) 两类，不覆盖 grain/version/alias。"
+  },
+  "cases": [
+    {
+      "case_id": "cl-time-01",
+      "category": "time_missing",
+      "question": "销售额最高的品类是哪个？",
+      "expected_action": "clarify",
+      "expected_missing_slots": ["time_range"],
+      "expected_slot_values": {"time_range": "2025年"},
+      "frame_expectation": [
+        {"kind": "metrics_contains", "ids": ["demo_retail.sales_amount"]},
+        {"kind": "time_filter", "expect_from": "2025-01-01"}
+      ],
+      "must_not_ask": false,
+      "notes": "线上 clarify() 规则覆盖（销售额最高且无时间）。"
+    },
+    {
+      "case_id": "cl-time-02",
+      "category": "time_missing",
+      "question": "哪个产品的销量最高？",
+      "expected_action": "clarify",
+      "expected_missing_slots": ["time_range"],
+      "expected_slot_values": {"time_range": "2025年"},
+      "frame_expectation": [
+        {"kind": "time_filter", "expect_from": "2025-01-01"},
+        {"kind": "intent_is", "intent": "rank_entities"}
+      ],
+      "must_not_ask": false,
+      "notes": "最高 + 无时间；线上规则不覆盖（只认销售额+最高）。"
+    },
+    {
+      "case_id": "cl-time-03",
+      "category": "time_missing",
+      "question": "各地区的销售额同比表现如何？",
+      "expected_action": "clarify",
+      "expected_missing_slots": ["time_range"],
+      "expected_slot_values": {"time_range": "2025年"},
+      "frame_expectation": [
+        {"kind": "metrics_contains", "ids": ["demo_retail.sales_amount"]},
+        {"kind": "time_filter", "expect_from": "2025-01-01"}
+      ],
+      "must_not_ask": false,
+      "notes": "同比必须有基准期；无时间即缺 time_range。"
+    },
+    {
+      "case_id": "cl-time-04",
+      "category": "time_missing",
+      "question": "销售额排名前十的产品是哪些？",
+      "expected_action": "clarify",
+      "expected_missing_slots": ["time_range"],
+      "expected_slot_values": {"time_range": "2025年"},
+      "frame_expectation": [
+        {"kind": "time_filter", "expect_from": "2025-01-01"}
+      ],
+      "must_not_ask": false,
+      "notes": "排名语义需要统计窗口；线上规则不覆盖（无「最高」字样）。"
+    },
+    {
+      "case_id": "cl-metric-01",
+      "category": "metric_ambiguity",
+      "question": "退款情况怎么样？",
+      "expected_action": "clarify",
+      "expected_missing_slots": ["metric"],
+      "expected_slot_values": {"metric": "退款金额"},
+      "frame_expectation": [
+        {"kind": "metrics_contains", "ids": ["demo_retail.refund_amount"]}
+      ],
+      "must_not_ask": false,
+      "notes": "线上 clarify() 规则覆盖：退款金额 vs 退款笔数。"
+    },
+    {
+      "case_id": "cl-metric-02",
+      "category": "metric_ambiguity",
+      "question": "2025年的退款总共多少？",
+      "expected_action": "clarify",
+      "expected_missing_slots": ["metric"],
+      "expected_slot_values": {"metric": "退款金额"},
+      "frame_expectation": [
+        {"kind": "metrics_contains", "ids": ["demo_retail.refund_amount"]},
+        {"kind": "time_filter", "expect_from": "2025-01-01"}
+      ],
+      "must_not_ask": false,
+      "notes": "时间已给、口径未给；线上规则覆盖。"
+    },
+    {
+      "case_id": "cl-metric-03",
+      "category": "metric_ambiguity",
+      "question": "华东地区的销售表现怎么样？",
+      "expected_action": "clarify",
+      "expected_missing_slots": ["metric"],
+      "expected_slot_values": {"metric": "销售额"},
+      "frame_expectation": [
+        {"kind": "metrics_contains", "ids": ["demo_retail.sales_amount"]}
+      ],
+      "must_not_ask": false,
+      "notes": "「表现」可指销售额或订单数（官方口径歧义样例）；线上规则不覆盖。"
+    },
+    {
+      "case_id": "cl-metric-04",
+      "category": "metric_ambiguity",
+      "question": "退款多少？2024年",
+      "expected_action": "clarify",
+      "expected_missing_slots": ["metric"],
+      "expected_slot_values": {"metric": "退款金额"},
+      "frame_expectation": [
+        {"kind": "metrics_contains", "ids": ["demo_retail.refund_amount"]},
+        {"kind": "time_filter", "expect_from": "2024-01-01"}
+      ],
+      "must_not_ask": false,
+      "notes": "无「金额/笔数」限定词；线上规则覆盖。"
+    },
+    {
+      "case_id": "cl-grain-01",
+      "category": "grain_ambiguity",
+      "question": "2024年人均消费是多少？",
+      "expected_action": "clarify",
+      "expected_missing_slots": ["grain"],
+      "expected_slot_values": {"grain": "按客户"},
+      "frame_expectation": [
+        {"kind": "candidates_contains", "kind_id": "table", "id": "customers"}
+      ],
+      "must_not_ask": false,
+      "notes": "「人均」既可按客户也可按订单；补「按客户」后候选应出现 customers 表。"
+    },
+    {
+      "case_id": "cl-grain-02",
+      "category": "grain_ambiguity",
+      "question": "客单价是多少？",
+      "expected_action": "clarify",
+      "expected_missing_slots": ["grain"],
+      "expected_slot_values": {"grain": "按订单"},
+      "frame_expectation": [
+        {"kind": "candidates_contains", "kind_id": "table", "id": "orders"}
+      ],
+      "must_not_ask": false,
+      "notes": "单均/客单价必须指定按订单还是按客户。"
+    },
+    {
+      "case_id": "cl-grain-03",
+      "category": "grain_ambiguity",
+      "question": "2024年的平均购买金额是多少？",
+      "expected_action": "clarify",
+      "expected_missing_slots": ["grain"],
+      "expected_slot_values": {"grain": "按订单"},
+      "frame_expectation": [
+        {"kind": "time_filter", "expect_from": "2024-01-01"}
+      ],
+      "must_not_ask": false,
+      "notes": "平均类问题的分组粒度必须明确。"
+    },
+    {
+      "case_id": "cl-grain-04",
+      "category": "grain_ambiguity",
+      "question": "人均消费趋势如何？",
+      "expected_action": "clarify",
+      "expected_missing_slots": ["time_range", "grain"],
+      "expected_slot_values": {"time_range": "2025年", "grain": "按客户"},
+      "frame_expectation": [
+        {"kind": "time_filter", "expect_from": "2025-01-01"}
+      ],
+      "must_not_ask": false,
+      "notes": "多槽用例：同时缺时间与粒度，离线 stub 按一问一答需 2 轮，用于平均澄清轮次。"
+    },
+    {
+      "case_id": "cl-version-01",
+      "category": "version_ambiguity",
+      "question": "最新的退款制度规定了多久？",
+      "expected_action": "clarify",
+      "expected_missing_slots": ["document_version"],
+      "expected_slot_values": {"document_version": "当前生效版本"},
+      "frame_expectation": [
+        {"kind": "not_representable", "reason": "文档版本不是 SQL query_frame 的字段；该槽位只在澄清契约层验证。"}
+      ],
+      "must_not_ask": false,
+      "notes": "「最新」需要落到已登记版本，不能默认选一个。"
+    },
+    {
+      "case_id": "cl-version-02",
+      "category": "version_ambiguity",
+      "question": "《售后服务与退款管理制度》的历史版本有何差异？",
+      "expected_action": "clarify",
+      "expected_missing_slots": ["document_version"],
+      "expected_slot_values": {"document_version": "当前生效版本"},
+      "frame_expectation": [
+        {"kind": "not_representable", "reason": "跨版本对话不在 SQL 帧契约内。"}
+      ],
+      "must_not_ask": false,
+      "notes": "「历史版本」未指定要比较的两个版本。"
+    },
+    {
+      "case_id": "cl-version-03",
+      "category": "version_ambiguity",
+      "question": "旧版的渠道策略白皮书里预算是多少？",
+      "expected_action": "clarify",
+      "expected_missing_slots": ["document_version"],
+      "expected_slot_values": {"document_version": "上一版本"},
+      "frame_expectation": [
+        {"kind": "not_representable", "reason": "文档版本不是 SQL query_frame 的字段。"}
+      ],
+      "must_not_ask": false,
+      "notes": "「旧版」是相对词，必须指定具体版本。"
+    },
+    {
+      "case_id": "cl-alias-01",
+      "category": "object_alias_ambiguity",
+      "question": "那款旗舰耳机的销量好吗？",
+      "expected_action": "clarify",
+      "expected_missing_slots": ["object_alias"],
+      "expected_slot_values": {"object_alias": "无线降噪耳机 Pro"},
+      "frame_expectation": [
+        {"kind": "metrics_contains", "ids": ["demo_retail.units_sold"]}
+      ],
+      "must_not_ask": false,
+      "notes": "指代词「那款」没有可绑定对象。"
+    },
+    {
+      "case_id": "cl-alias-02",
+      "category": "object_alias_ambiguity",
+      "question": "旗舰耳机销量怎么样？",
+      "expected_action": "clarify",
+      "expected_missing_slots": ["object_alias"],
+      "expected_slot_values": {"object_alias": "无线降噪耳机 Pro"},
+      "frame_expectation": [
+        {"kind": "metrics_contains", "ids": ["demo_retail.units_sold"]}
+      ],
+      "must_not_ask": false,
+      "notes": "「旗舰耳机」不是已登记实体别名（entity_aliases 中只有 region/channel/customer_level）。"
+    },
+    {
+      "case_id": "cl-alias-03",
+      "category": "object_alias_ambiguity",
+      "question": "这款主推产品还有多少库存？",
+      "expected_action": "clarify",
+      "expected_missing_slots": ["object_alias"],
+      "expected_slot_values": {"object_alias": "智能手表 S6"},
+      "frame_expectation": [
+        {"kind": "not_representable", "reason": "库存不在现有零售 Catalog 的 metric 集合内，帧不落。"}
+      ],
+      "must_not_ask": false,
+      "notes": "指代词 + 非目录指标，先澄清对象；帧契约无库存指标，如实记 N/A。"
+    },
+    {
+      "case_id": "cl-answer-01",
+      "category": "must_not_ask",
+      "question": "2025年华东地区的销售额是多少？",
+      "expected_action": "answer",
+      "expected_missing_slots": [],
+      "expected_slot_values": {},
+      "frame_expectation": [
+        {"kind": "metrics_contains", "ids": ["demo_retail.sales_amount"]},
+        {"kind": "time_filter", "expect_from": "2025-01-01"}
+      ],
+      "must_not_ask": true,
+      "notes": "指标、时间、范围都齐全，必须直接回答。"
+    },
+    {
+      "case_id": "cl-answer-02",
+      "category": "must_not_ask",
+      "question": "2024年一共有多少笔订单？",
+      "expected_action": "answer",
+      "expected_missing_slots": [],
+      "expected_slot_values": {},
+      "frame_expectation": [
+        {"kind": "time_filter", "expect_from": "2024-01-01"}
+      ],
+      "must_not_ask": true,
+      "notes": "正向对照；线上规则不澄清。"
+    },
+    {
+      "case_id": "cl-answer-03",
+      "category": "must_not_ask",
+      "question": "2025年退款金额是多少？",
+      "expected_action": "answer",
+      "expected_missing_slots": [],
+      "expected_slot_values": {},
+      "frame_expectation": [
+        {"kind": "metrics_contains", "ids": ["demo_retail.refund_amount"]},
+        {"kind": "time_filter", "expect_from": "2025-01-01"}
+      ],
+      "must_not_ask": true,
+      "notes": "含「金额」已消歧，不能再问口径。"
+    },
+    {
+      "case_id": "cl-answer-04",
+      "category": "must_not_ask",
+      "question": "2024年平均每笔订单金额是多少？",
+      "expected_action": "answer",
+      "expected_missing_slots": [],
+      "expected_slot_values": {},
+      "frame_expectation": [
+        {"kind": "time_filter", "expect_from": "2024-01-01"}
+      ],
+      "must_not_ask": true,
+      "notes": "「每笔订单」已给粒度，不能再问按客户/按订单。"
+    },
+    {
+      "case_id": "cl-answer-05",
+      "category": "must_not_ask",
+      "question": "2025年销售额最高的品类是哪个？",
+      "expected_action": "answer",
+      "expected_missing_slots": [],
+      "expected_slot_values": {},
+      "frame_expectation": [
+        {"kind": "metrics_contains", "ids": ["demo_retail.sales_amount"]},
+        {"kind": "time_filter", "expect_from": "2025-01-01"}
+      ],
+      "must_not_ask": true,
+      "notes": "与 cl-time-01 成对：补上时间后必须直接回答，不得再反问。"
+    },
+    {
+      "case_id": "cl-answer-06",
+      "category": "must_not_ask",
+      "question": "无线降噪耳机 Pro 在2025年的销量是多少？",
+      "expected_action": "answer",
+      "expected_missing_slots": [],
+      "expected_slot_values": {},
+      "frame_expectation": [
+        {"kind": "metrics_contains", "ids": ["demo_retail.units_sold"]},
+        {"kind": "time_filter", "expect_from": "2025-01-01"}
+      ],
+      "must_not_ask": true,
+      "notes": "对象用真实产品全名，已消歧。"
+    },
+    {
+      "case_id": "cl-answer-07",
+      "category": "must_not_ask",
+      "question": "每个客户在2025年的平均订单金额是多少？",
+      "expected_action": "answer",
+      "expected_missing_slots": [],
+      "expected_slot_values": {},
+      "frame_expectation": [
+        {"kind": "time_filter", "expect_from": "2025-01-01"}
+      ],
+      "must_not_ask": true,
+      "notes": "「每个客户」已给粒度。"
+    }
+  ]
+}

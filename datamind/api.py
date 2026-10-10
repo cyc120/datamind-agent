@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 from psycopg2.extras import RealDictCursor
 
 from .agent import DataMindAgent, _read_dsn, _write_dsn
+from .clarification import clarification_contract_for_answer
 from .knowledge import COLLECTIONS, ROOT
 from .pdf_publications import RegistrationRequest as PdfSnapshotRegistrationRequest
 from .pdf_index import PublicationRequest as PdfKnowledgePublicationRequest
@@ -1037,12 +1038,32 @@ def probe_chat(request: ProfileRequest):
     result["configured_model"] = profile.get("model")
     return jsonable_encoder(result)
 
+def _with_clarification_contract(payload: dict, question: str) -> dict:
+    """把 ``NEEDS_CLARIFICATION`` 的规则式话术投影成结构化缺项（最小接线，只新增键）。
+
+    ``status`` / ``answer`` / ``error_code`` 的含义与取值完全不变；新增
+    ``clarification_missing_slots`` / ``clarification_candidates`` /
+    ``clarification_slot_questions`` / ``clarification_contract_version``，让前端能做
+    「一次补充后直接完成」。槽位契约只有一份实现，在生产包 ``datamind/clarification.py``
+    （评测脚本只做再导出），因此服务端不再在请求期导入评测脚本
+    （第 1 轮复查 L4）；投影本身抛错时原样返回，澄清响应绝不因为这个可选字段而失败。
+    """
+    if not isinstance(payload, dict) or payload.get("status") != "NEEDS_CLARIFICATION":
+        return payload
+    try:
+        fields = clarification_contract_for_answer(question or "", payload.get("answer") or "")
+    except Exception:
+        return payload
+    return {**payload, **fields}
+
+
 @app.post("/v1/chat")
 def chat(request: ChatRequest):
     kwargs = _chat_kwargs(request)
     agent = DataMindAgent()
     try:
-        return jsonable_encoder(agent.run(request.question, **kwargs))
+        result = agent.run(request.question, **kwargs)
+        return jsonable_encoder(_with_clarification_contract(result, request.question))
     finally:
         agent.close()
 
@@ -1067,7 +1088,15 @@ def chat_stream(request: ChatRequest):
     # trace event carries the same `turns_used` the non-streaming response would report.
     kwargs = _chat_kwargs(request)
     updates: queue.Queue = queue.Queue()
-    agent = DataMindAgent(sink=updates.put)
+
+    def sink(event: dict):
+        # 非流式响应与流式终态事件必须带同一套澄清键，否则前端走 SSE 时拿不到补充候选。
+        if isinstance(event, dict) and event.get("event_type") == "answer.clarification":
+            event["output_summary"] = _with_clarification_contract(
+                event.get("output_summary") or {}, request.question)
+        updates.put(event)
+
+    agent = DataMindAgent(sink=sink)
 
     def worker():
         try:

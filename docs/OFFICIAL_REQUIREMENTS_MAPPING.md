@@ -108,7 +108,7 @@
 
 | # | 官方评分项（分值） | 评分要求原文要点（页码） | 本仓库证据 | 可否自评 |
 |---|---|---|---|---|
-| F1 | 多源异构数据融合问数/问答（**10**，p.12） | 「正确回答至少 3 种跨源问题得 6 分，5 种以上得 8 分，复杂多跳得 10 分」 | **部分**：工业温度跨源链路（`datamind/industrial_rules.py`，工艺原文 + 只读生产 SQL 逐测量核验，`reports/industrial_rules.json` 13/13 合成集）已实现；但**通用**「数据库 + 文档」联合推理返回 `ROUTE_UNSUPPORTED`（README:74）。跨源种类数与多跳能力**无法判定** |
+| F1 | 多源异构数据融合问数/问答（**10**，p.12） | 「正确回答至少 3 种跨源问题得 6 分，5 种以上得 8 分，复杂多跳得 10 分」 | **部分**：工业温度跨源链路（`datamind/industrial_rules.py`，工艺原文 + 只读生产 SQL 逐测量核验，`reports/industrial_rules.json` 13/13 合成集）已实现；通用「数据库 + 文档」联合推理改走类型化证据图引擎（`datamind/cross_source.py`）。旧码 `ROUTE_UNSUPPORTED` **已退役**：跨源失败一律走 `CROSS_SOURCE_EVIDENCE_INSUFFICIENT` / `DOC_BINDING_MISSING` / `CONFLICT_UNRESOLVED`。跨源种类数与多跳能力**无法判定** |
 | F2 | 智能意图理解与澄清（**10**，p.12） | 「具备意图识别得 4 分，主动澄清得 7 分，澄清精准且体验好得 10 分」 | 同 B3：`clarify()`/`NEEDS_CLARIFICATION`；`reports/industrial_nl2sql.json` 模型前澄清 2/2（小样本） | 体验/精准度由评委 → 部分 |
 | F3 | 答案可解释性（**5**，p.12） | 「展示完整链路得 3 分，可视化清晰得 5 分」 | 同 E3（引用卡片/定位/关系、事件回放） | 分值由评委 |
 | F4 | NL2SQL 复杂查询准确率（含多表关联、聚合、嵌套，**10**，p.12） | 「≥70% 得 5 分，≥80% 得 7 分，≥90% 得 10 分」 | `reports/nl2sql.json` 14/14（自建集，含 4 条 JOIN/聚合）；无公开基准 | **无法判定** |

@@ -1,0 +1,270 @@
+{
+  "suite": "rag",
+  "suite_version": "rag-v1",
+  "data_version": "kb-v2",
+  "data_versions": [
+    "kb-v2"
+  ],
+  "source": "datamind_meta.evaluation_cases",
+  "created_at": "2026-10-09T14:19:22.584040+00:00",
+  "commit": "e4e2ebf",
+  "model": null,
+  "prompt_version": null,
+  "offline_freeze": true,
+  "case_count": 12,
+  "cases": [
+    {
+      "case_id": "rag-001",
+      "question": "七天无理由退款的条件是什么？",
+      "category": "原文段落",
+      "difficulty": "easy",
+      "expected_route": "rag",
+      "gold": {
+        "sql": null,
+        "claims": [
+          "自签收之日起7日内、商品未拆封且不影响二次销售"
+        ]
+      },
+      "clarification_label": "none",
+      "failure_category": null,
+      "data_version": "kb-v2",
+      "required_evidence": {
+        "doc": "04_售后服务与退款管理制度.pdf",
+        "section": "第二章 退款条件"
+      },
+      "case_digest": "4a00854432fd3676f291c8baea97e5db4593ab9b0f16daab240bf7c397d877ca"
+    },
+    {
+      "case_id": "rag-002",
+      "question": "一般商品退款多久到账？",
+      "category": "规章制度",
+      "difficulty": "easy",
+      "expected_route": "rag",
+      "gold": {
+        "sql": null,
+        "claims": [
+          "验收后3个工作日内原路退回"
+        ]
+      },
+      "clarification_label": "none",
+      "failure_category": null,
+      "data_version": "kb-v2",
+      "required_evidence": {
+        "doc": "04_售后服务与退款管理制度.pdf",
+        "section": "第三章 退款时限与金额"
+      },
+      "case_digest": "4e055ef8125085b0e44743a7333a0dd98ef108afb2a5299658092db25b104ec3"
+    },
+    {
+      "case_id": "rag-003",
+      "question": "大件家电退款时限是多久？",
+      "category": "规章制度",
+      "difficulty": "easy",
+      "expected_route": "rag",
+      "gold": {
+        "sql": null,
+        "claims": [
+          "上门取件后5个工作日内退回"
+        ]
+      },
+      "clarification_label": "none",
+      "failure_category": null,
+      "data_version": "kb-v2",
+      "required_evidence": {
+        "doc": "04_售后服务与退款管理制度.pdf",
+        "section": "第三章 退款时限与金额"
+      },
+      "case_digest": "0178397b0c69540075d195bc14d2c89913602e744e6760870b5e1d32e3794f42"
+    },
+    {
+      "case_id": "rag-004",
+      "question": "根据《2025年分区域经营数据简报》，2025年华东Q4销售额是多少（万元）？",
+      "category": "表格",
+      "difficulty": "medium",
+      "expected_route": "rag",
+      "gold": {
+        "sql": null,
+        "claims": [
+          "原文表 1 为 9.5 万元；按文档版本回答"
+        ]
+      },
+      "clarification_label": "none",
+      "failure_category": null,
+      "data_version": "kb-v2",
+      "required_evidence": {
+        "doc": "03_2025年分区域经营数据简报.pdf",
+        "section": "表 1"
+      },
+      "case_digest": "5f8408c02edfd180f91221bd1f86ad5dda4a3af91f06308d74a18b3c91c9cec1"
+    },
+    {
+      "case_id": "rag-005",
+      "question": "渠道年度预算中APP渠道占多少万元？",
+      "category": "表格",
+      "difficulty": "medium",
+      "expected_route": "rag",
+      "gold": {
+        "sql": null,
+        "claims": [
+          "APP 90万元，占30%"
+        ]
+      },
+      "clarification_label": "none",
+      "failure_category": null,
+      "data_version": "kb-v2",
+      "required_evidence": {
+        "doc": "02_渠道运营策略白皮书.pdf",
+        "section": "表 3-1"
+      },
+      "case_digest": "3adfc440e0432aeba64bed1199ded516f93d8f4bb7b31d1fc2cf2da17d2cef04"
+    },
+    {
+      "case_id": "rag-006",
+      "question": "同比增长率的计算公式是什么？",
+      "category": "公式",
+      "difficulty": "medium",
+      "expected_route": "rag",
+      "gold": {
+        "sql": null,
+        "claims": [
+          "g = (S_t - S_{t-1}) / S_{t-1} × 100%"
+        ]
+      },
+      "clarification_label": "none",
+      "failure_category": null,
+      "data_version": "kb-v2",
+      "required_evidence": {
+        "doc": "05_经营指标核算与计算公式说明.pdf",
+        "section": "3 同比增长率"
+      },
+      "case_digest": "13baf9a89eee7c4cce8b297f9d1e2a67ad3ca67615308128fc4a7ced5699f4c6"
+    },
+    {
+      "case_id": "rag-007",
+      "question": "无线降噪耳机Pro的续航时间是多少？",
+      "category": "产品手册",
+      "difficulty": "easy",
+      "expected_route": "rag",
+      "gold": {
+        "sql": null,
+        "claims": [
+          "降噪开启约38小时"
+        ]
+      },
+      "clarification_label": "none",
+      "failure_category": null,
+      "data_version": "kb-v2",
+      "required_evidence": {
+        "doc": "09_无线降噪耳机Pro产品手册.pdf",
+        "section": "2 基本参数"
+      },
+      "case_digest": "695aec613005df5b3fed68445ded343f8366ae8c09e02b88e8b6a9b29eb1a6f1"
+    },
+    {
+      "case_id": "rag-008",
+      "question": "钻石会员有哪些权益？",
+      "category": "FAQ",
+      "difficulty": "easy",
+      "expected_route": "rag",
+      "gold": {
+        "sql": null,
+        "claims": [
+          "免费上门安装、专属客服、大促提前购"
+        ]
+      },
+      "clarification_label": "none",
+      "failure_category": null,
+      "data_version": "kb-v2",
+      "required_evidence": {
+        "doc": "11_客户服务话术手册.pdf",
+        "section": "三、会员类"
+      },
+      "case_digest": "dd892eb496023f62353c8fb2888843a9cf54dd795120d592b282aef7294962fa"
+    },
+    {
+      "case_id": "rag-009",
+      "question": "12月门店巡检中哪家门店得分最低？",
+      "category": "扫描件",
+      "difficulty": "hard",
+      "expected_route": "rag",
+      "gold": {
+        "sql": null,
+        "claims": [
+          "南京新街口店 76 分"
+        ]
+      },
+      "clarification_label": "none",
+      "failure_category": null,
+      "data_version": "kb-v2",
+      "required_evidence": {
+        "doc": "07_门店巡检记录_2025年12月_扫描版.pdf",
+        "section": "二、门店得分明细"
+      },
+      "case_digest": "a8153ba234a87aadf90ef197975faf420679d5e83f12ee84f210809ebd54aaf8"
+    },
+    {
+      "case_id": "rag-010",
+      "question": "质检报告里无线降噪耳机Pro的不良率是多少？",
+      "category": "扫描件",
+      "difficulty": "hard",
+      "expected_route": "rag",
+      "gold": {
+        "sql": null,
+        "claims": [
+          "8.9%"
+        ]
+      },
+      "clarification_label": "none",
+      "failure_category": null,
+      "data_version": "kb-v2",
+      "required_evidence": {
+        "doc": "08_产品质检报告_数码品类_扫描版.pdf",
+        "section": "二、抽检结果"
+      },
+      "case_digest": "0313a27eb52b5c5f4ab212a2c4d2466b061fd6ceedd1f0f692f759e637013953"
+    },
+    {
+      "case_id": "rag-011",
+      "question": "According to OHR-Bench finance sample ohr-005, what topic and years does the document discuss?",
+      "category": "OHR-Bench英文",
+      "difficulty": "hard",
+      "expected_route": "rag",
+      "gold": {
+        "sql": null,
+        "claims": [
+          "Sales/Use Tax Analysis for the 2017-2021 Capital Program (Cash Basis)"
+        ]
+      },
+      "clarification_label": "none",
+      "failure_category": null,
+      "data_version": "kb-v2",
+      "required_evidence": {
+        "doc": "ohr-005 (finance)",
+        "section": "gt_text"
+      },
+      "case_digest": "e2795e388776c98fc646d51d844c23fa67c9de265969e17dc57cd12ac2a687ca"
+    },
+    {
+      "case_id": "rag-012",
+      "question": "公司2026年的预算总额是多少？",
+      "category": "不可得",
+      "difficulty": "easy",
+      "expected_route": "rag",
+      "gold": {
+        "sql": null,
+        "claims": [
+          "知识库无此信息，应拒答/澄清"
+        ]
+      },
+      "clarification_label": "abstain",
+      "failure_category": null,
+      "data_version": "kb-v2",
+      "required_evidence": {
+        "doc": null,
+        "section": null
+      },
+      "case_digest": "8996feafa1f42dd88be90ea9960df947f9abed0b0e91f776cfe50e85eb9afab2"
+    }
+  ],
+  "digest": "f5d42555a58310480b4892eac34fe2afab9195e8fa1dba2de7e8645e6e2e8a33"
+}

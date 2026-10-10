@@ -566,11 +566,51 @@ function runStatusLabel(status, keepRawCode) {
   if (labels[status]) { return labels[status]; }
   return status ? (keepRawCode ? String(status) : '执行失败') : '';
 }
+function clarificationPanel(out) {
+  /* B3 澄清补槽的最小接线：把结构化缺项与候选值渲染成按钮，点一次即把槽位并进问题框并重跑，
+     不需要重开对话。缺 clarification_* 新键时退化为只提示「在问题框里补充」，绝不猜测槽位。 */
+  var slots = out.clarification_missing_slots || [];
+  var candidates = out.clarification_candidates || {};
+  var questions = out.clarification_slot_questions || {};
+  var panel = document.createElement('div');
+  panel.className = 'clarification';
+  var hint = document.createElement('div');
+  hint.className = 'mini';
+  hint.textContent = slots.length
+    ? '需要补充：' + slots.map(function (slot) { return questions[slot] || slot; }).join(' ')
+    : '请补充上面缺少的信息后重试，也可以直接在问题框里补充。';
+  panel.append(hint);
+  slots.forEach(function (slot) {
+    var options = candidates[slot] || [];
+    if (!options.length) { return; }
+    var row = document.createElement('div');
+    row.className = 'clarification-row';
+    options.forEach(function (value) {
+      var button = document.createElement('button');
+      button.type = 'button'; button.className = 'secondary';
+      button.textContent = String(value);
+      button.addEventListener('click', function () { completeWithSlot(value); });
+      row.append(button);
+    });
+    panel.append(row);
+  });
+  return panel;
+}
+function completeWithSlot(value) {
+  var current = $('question').value.trim();
+  if (current.indexOf(String(value)) < 0) { $('question').value = (current + ' ' + value).trim(); }
+  run();
+}
+function showClarification(out) {
+  // showFinal 每次都会重写 #answer 文本，这里只需追加本轮面板。
+  $('answer').append(clarificationPanel(out));
+}
 function showFinal(out) {
   if (!out) { return; }
   var ok = out.status === 'COMPLETED';
   status(runStatusLabel(out.status), ok ? '' : 'fail');
   $('answer').textContent = out.answer || '未返回答案';
+  if (out.status === 'NEEDS_CLARIFICATION') { showClarification(out); }
   $('confidence').textContent = out.confidence_level ? '可信级别：' + out.confidence_level : '';
   var configIssues = ['MODEL_KEY_MISSING', 'MODEL_AUTH_FAILED', 'MODEL_BASE_URL_MISSING', 'MODEL_NAME_MISSING'];
   if (out.error_code && configIssues.indexOf(out.error_code) >= 0) {

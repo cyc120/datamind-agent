@@ -1,0 +1,242 @@
+{
+  "suite": "nl2sql",
+  "suite_version": "nl2sql-v1",
+  "data_version": "retail-v2",
+  "data_versions": [
+    "retail-v2"
+  ],
+  "source": "datamind_meta.evaluation_cases",
+  "created_at": "2026-10-09T14:19:20.874701+00:00",
+  "commit": "e4e2ebf",
+  "model": null,
+  "prompt_version": null,
+  "offline_freeze": true,
+  "case_count": 14,
+  "cases": [
+    {
+      "case_id": "nl2sql-001",
+      "question": "有多少个客户注册了大区信息？",
+      "category": "单表过滤",
+      "difficulty": "easy",
+      "expected_route": "sql",
+      "gold": {
+        "sql": "SELECT count(*) FROM customers WHERE region_id IS NOT NULL",
+        "claims": null
+      },
+      "clarification_label": "none",
+      "failure_category": null,
+      "data_version": "retail-v2",
+      "required_evidence": null,
+      "case_digest": "460280329f7028d526db68614460efaa0a7de39e9bd8377781eaf784db084f0c"
+    },
+    {
+      "case_id": "nl2sql-002",
+      "question": "家电类产品有哪些？请给出产品名称和价格。",
+      "category": "单表过滤",
+      "difficulty": "easy",
+      "expected_route": "sql",
+      "gold": {
+        "sql": "SELECT product_name, list_price FROM products WHERE category = '家电'",
+        "claims": null
+      },
+      "clarification_label": "none",
+      "failure_category": null,
+      "data_version": "retail-v2",
+      "required_evidence": null,
+      "case_digest": "19a4927fcc503ab9abac024fdfac6b79a8d0d688104b82e0229b33b365d1d584"
+    },
+    {
+      "case_id": "nl2sql-003",
+      "question": "2024年一共有多少笔订单？",
+      "category": "时间范围",
+      "difficulty": "easy",
+      "expected_route": "sql",
+      "gold": {
+        "sql": "SELECT count(*) FROM orders WHERE created_at >= '2024-01-01' AND created_at < '2025-01-01'",
+        "claims": null
+      },
+      "clarification_label": "none",
+      "failure_category": null,
+      "data_version": "retail-v2",
+      "required_evidence": null,
+      "case_digest": "d0db32e51a08b6db0feb567fb32e67cdb473317458ed57aeb43cb41a9c678ba5"
+    },
+    {
+      "case_id": "nl2sql-004",
+      "question": "已取消的订单有多少？",
+      "category": "枚举值",
+      "difficulty": "easy",
+      "expected_route": "sql",
+      "gold": {
+        "sql": "SELECT count(*) FROM orders WHERE order_status = 'cancelled'",
+        "claims": null
+      },
+      "clarification_label": "none",
+      "failure_category": null,
+      "data_version": "retail-v2",
+      "required_evidence": null,
+      "case_digest": "bf9118ba5b29f66ac4764cbedc92b26b043e1b3b6fdef0bbcea7b8fc2e1e3d8a"
+    },
+    {
+      "case_id": "nl2sql-005",
+      "question": "VIP客户有多少人？",
+      "category": "别名/黑话",
+      "difficulty": "medium",
+      "expected_route": "sql",
+      "gold": {
+        "sql": "SELECT count(*) FROM customers WHERE customer_level = '钻石'",
+        "claims": null
+      },
+      "clarification_label": "none",
+      "failure_category": null,
+      "data_version": "retail-v2",
+      "required_evidence": null,
+      "case_digest": "5333f7f250dea166c033431d0ec551c1362740b272a9e812abd8ba6239229078"
+    },
+    {
+      "case_id": "nl2sql-006",
+      "question": "华东地区的客户下了多少笔订单？",
+      "category": "JOIN 2表",
+      "difficulty": "medium",
+      "expected_route": "sql",
+      "gold": {
+        "sql": "SELECT count(*) FROM orders o JOIN customers c ON o.customer_id = c.customer_id JOIN regions r ON c.region_id = r.region_id WHERE r.region_name = '华东'",
+        "claims": null
+      },
+      "clarification_label": "none",
+      "failure_category": null,
+      "data_version": "retail-v2",
+      "required_evidence": null,
+      "case_digest": "c40373c91af47c001780c881130b4b1a02dd50fda7ed647773eaf5556884f2d6"
+    },
+    {
+      "case_id": "nl2sql-007",
+      "question": "2024年每个大区的销售额分别是多少？（口径见业务指标 sales_amount）",
+      "category": "聚合+JOIN",
+      "difficulty": "medium",
+      "expected_route": "sql",
+      "gold": {
+        "sql": "SELECT r.region_name, sum(oi.quantity * oi.unit_price * (1 - oi.discount)) AS sales_amount FROM order_items oi JOIN orders o ON oi.order_id = o.order_id JOIN customers c ON o.customer_id = c.customer_id JOIN regions r ON c.region_id = r.region_id WHERE o.order_status IN ('completed','shipped','refunded') AND o.created_at >= '2024-01-01' AND o.created_at < '2025-01-01' GROUP BY r.region_name",
+        "claims": null
+      },
+      "clarification_label": "none",
+      "failure_category": null,
+      "data_version": "retail-v2",
+      "required_evidence": null,
+      "case_digest": "a3322dced433585511ef60c8bf88cba5e874e10659541ab79df31db14a90ee77"
+    },
+    {
+      "case_id": "nl2sql-008",
+      "question": "2025年销售额最高的前三个产品是什么？请给出产品名称和销售额。",
+      "category": "排序Top-k",
+      "difficulty": "medium",
+      "expected_route": "sql",
+      "gold": {
+        "sql": "SELECT p.product_name, sum(oi.quantity * oi.unit_price * (1 - oi.discount)) AS sales_amount FROM order_items oi JOIN orders o ON oi.order_id = o.order_id JOIN products p ON oi.product_id = p.product_id WHERE o.order_status IN ('completed','shipped','refunded') AND o.created_at >= '2025-01-01' AND o.created_at < '2026-01-01' GROUP BY p.product_name ORDER BY sales_amount DESC LIMIT 3",
+        "claims": null
+      },
+      "clarification_label": "none",
+      "failure_category": null,
+      "data_version": "retail-v2",
+      "required_evidence": null,
+      "case_digest": "3deaeda90fc200eab473af921163def3ac4fc01e37640db9495cb3507e04f8b9"
+    },
+    {
+      "case_id": "nl2sql-009",
+      "question": "2025年各退款原因的退款总金额是多少？",
+      "category": "退款JOIN 3表",
+      "difficulty": "hard",
+      "expected_route": "sql",
+      "gold": {
+        "sql": "SELECT f.reason, sum(f.refund_amount) FROM refunds f WHERE f.refunded_at >= '2025-01-01' AND f.refunded_at < '2026-01-01' GROUP BY f.reason",
+        "claims": null
+      },
+      "clarification_label": "none",
+      "failure_category": null,
+      "data_version": "retail-v2",
+      "required_evidence": null,
+      "case_digest": "7b7fc83b516c93e10f053b8e8839e1ace35ec61d0664421524a795089a8c815d"
+    },
+    {
+      "case_id": "nl2sql-010",
+      "question": "2025年销售额比2024年增长了多少？请给出增长金额。",
+      "category": "同比",
+      "difficulty": "hard",
+      "expected_route": "sql",
+      "gold": {
+        "sql": "WITH y AS ( SELECT sum(oi.quantity * oi.unit_price * (1 - oi.discount)) amt, extract(year from o.created_at) yr FROM order_items oi JOIN orders o ON oi.order_id = o.order_id WHERE o.order_status IN ('completed','shipped','refunded') AND extract(year from o.created_at) IN (2024, 2025) GROUP BY 2)SELECT (SELECT amt FROM y WHERE yr=2025) - (SELECT amt FROM y WHERE yr=2024) AS yoy_diff",
+        "claims": null
+      },
+      "clarification_label": "none",
+      "failure_category": null,
+      "data_version": "retail-v2",
+      "required_evidence": null,
+      "case_digest": "5f868e3b6a5f68c09474b46805f443234944c9c2fe70a6f2b1559b0aeca4de97"
+    },
+    {
+      "case_id": "nl2sql-011",
+      "question": "Chinook库里哪个国家客户最多？请给出国家名称和客户数。",
+      "category": "跨库-Chinook",
+      "difficulty": "medium",
+      "expected_route": "sql",
+      "gold": {
+        "sql": "SELECT country, count(*) FROM customer GROUP BY country ORDER BY count(*) DESC LIMIT 1",
+        "claims": null
+      },
+      "clarification_label": "none",
+      "failure_category": null,
+      "data_version": "retail-v2",
+      "required_evidence": null,
+      "case_digest": "dbab8eaca29842272f0a2f2f47f61ebe281bfb7b137dd2a0a71f7f3013a8f8d6"
+    },
+    {
+      "case_id": "nl2sql-012",
+      "question": "Chinook里销量最高的歌手是谁？请给出歌手名称和销量。",
+      "category": "跨库-Chinook JOIN",
+      "difficulty": "hard",
+      "expected_route": "sql",
+      "gold": {
+        "sql": "SELECT ar.name, sum(il.quantity) AS sold FROM invoice_line il JOIN track t ON il.track_id = t.track_id JOIN album al ON t.album_id = al.album_id JOIN artist ar ON al.artist_id = ar.artist_id GROUP BY ar.name ORDER BY sold DESC LIMIT 1",
+        "claims": null
+      },
+      "clarification_label": "none",
+      "failure_category": null,
+      "data_version": "retail-v2",
+      "required_evidence": null,
+      "case_digest": "816b6707fa95b76bcdad79b086702d68094dfcd28df38d5524e58e985c4a4da1"
+    },
+    {
+      "case_id": "nl2sql-013",
+      "question": "销售额最高的产品是什么？",
+      "category": "澄清-时间缺失",
+      "difficulty": "clarify",
+      "expected_route": "clarify",
+      "gold": {
+        "sql": null,
+        "claims": null
+      },
+      "clarification_label": "needed",
+      "failure_category": null,
+      "data_version": "retail-v2",
+      "required_evidence": null,
+      "case_digest": "0e8fed7b99da48fde5966c142d223dae9db372d71f382f6ddc0fa31d1d56c9f9"
+    },
+    {
+      "case_id": "nl2sql-014",
+      "question": "上个月退款多少？",
+      "category": "澄清-口径歧义",
+      "difficulty": "clarify",
+      "expected_route": "clarify",
+      "gold": {
+        "sql": null,
+        "claims": null
+      },
+      "clarification_label": "needed",
+      "failure_category": null,
+      "data_version": "retail-v2",
+      "required_evidence": null,
+      "case_digest": "f43cc8411d4757f78ee165d78f0ca8d00d04cd4abb9c7417ea269f19d37dd3ba"
+    }
+  ],
+  "digest": "a73bf740e4ad4eb9bab19594b4f6209e6a96bc5c08762d7b160673a79c3da6e9"
+}
