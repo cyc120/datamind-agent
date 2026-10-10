@@ -541,12 +541,12 @@ const sampleEdges: EvidenceEdge[] = [
   margin-top: 32px;
 }
 .primary {
-  padding: 13px 26px;
+  padding: 15px 32px;
   border: none;
   border-radius: 10px;
   background: var(--color-accent);
   color: #ffffff;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s, transform 0.2s;
@@ -556,16 +556,16 @@ const sampleEdges: EvidenceEdge[] = [
   transform: translateY(-1px);
 }
 .primary.big {
-  padding: 15px 34px;
-  font-size: 16px;
+  padding: 17px 40px;
+  font-size: 18px;
 }
 .ghost {
-  padding: 13px 24px;
+  padding: 15px 30px;
   border-radius: 10px;
   border: 1px solid var(--color-line);
   color: var(--color-text);
   text-decoration: none;
-  font-size: 15px;
+  font-size: 17px;
   background: #ffffff;
   transition: border-color 0.2s, background 0.2s;
 }
