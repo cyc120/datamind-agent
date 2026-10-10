@@ -1,0 +1,2528 @@
+{
+  "suite": "cross_source_v1",
+  "suite_version": "1.0.0",
+  "frozen_at": "2026-10-10",
+  "structures": {
+    "P1": "SQL 结果驱动文档检索",
+    "P2": "文档规则驱动 SQL 筛选",
+    "P3": "跨源异常与多文档核验",
+    "P4": "复杂多跳"
+  },
+  "fixtures": {
+    "p1_category": {
+      "sql": {
+        "source_ref": "demo_retail",
+        "snapshot_id": "retail-snapshot-v3",
+        "columns": [],
+        "sql_hash": "4d99d2b0883dcff205e66d63e82fde86c8266a443844db6adc37e169605e5215",
+        "rows": [
+          {
+            "category": "家用电器",
+            "metric": "sales_amount",
+            "value": "128000.50",
+            "unit": "CNY",
+            "time_scope": {
+              "start": "2025-01-01T00:00:00+08:00",
+              "end": "2026-01-01T00:00:00+08:00"
+            }
+          }
+        ]
+      },
+      "docs": [
+        {
+          "document_id": "doc-channel-experience",
+          "document_version": "2025-04",
+          "source_sha256": "6f038bccad6c8a5c1367ec1c0eca5e99ae3a14a7bb80226c0333299e2a7957b5",
+          "chunk_id": "doc-channel-experience-c1",
+          "title": "渠道经验手册",
+          "text": "家用电器品类 2025 年渠道经验：线下门店转化率最高，建议增加门店陈列位与导购话术培训。",
+          "entity_label": "家用电器"
+        }
+      ]
+    },
+    "p1_channel": {
+      "sql": {
+        "source_ref": "demo_retail",
+        "snapshot_id": "retail-snapshot-v3",
+        "columns": [],
+        "sql_hash": "58147c26de88c1b9436560a267f15a7249cbb6b426b970e3c147465ce103b7ad",
+        "rows": [
+          {
+            "channel": "线上",
+            "metric": "sales_amount",
+            "value": "520000",
+            "unit": "CNY",
+            "time_scope": {
+              "start": "2025-01-01T00:00:00+08:00",
+              "end": "2026-01-01T00:00:00+08:00"
+            }
+          },
+          {
+            "channel": "线下",
+            "metric": "sales_amount",
+            "value": "380000",
+            "unit": "CNY",
+            "time_scope": {
+              "start": "2025-01-01T00:00:00+08:00",
+              "end": "2026-01-01T00:00:00+08:00"
+            }
+          }
+        ]
+      },
+      "docs": [
+        {
+          "document_id": "doc-channel-ops",
+          "document_version": "2025-06",
+          "source_sha256": "3ae58160d881bf1a480976c8d9c934e644228ef8f243901ace739d18da4bda76",
+          "chunk_id": "doc-channel-ops-c1",
+          "title": "渠道运营手册",
+          "text": "线上渠道 2025 年运营经验：大促期间流量成本上升，需提前锁定投放预算。",
+          "entity_label": "线上"
+        }
+      ]
+    },
+    "p1_product": {
+      "sql": {
+        "source_ref": "demo_retail",
+        "snapshot_id": "retail-snapshot-v3",
+        "columns": [],
+        "sql_hash": "ea1f38221f9f5c22c0a6656158f40ba1fef660b30a18aeca873eca0bb6be7db3",
+        "rows": [
+          {
+            "product": "星耀Pro 耳机",
+            "metric": "sales_amount",
+            "value": "98000",
+            "unit": "CNY",
+            "time_scope": {
+              "start": "2025-01-01T00:00:00+08:00",
+              "end": "2026-01-01T00:00:00+08:00"
+            }
+          }
+        ]
+      },
+      "docs": [
+        {
+          "document_id": "doc-product-manual",
+          "document_version": "2025-03",
+          "source_sha256": "e5bec3f90bccefde3a769f7d9ce7ddab5e830854bcfb07467e76e61c6fce9146",
+          "chunk_id": "doc-product-manual-c1",
+          "title": "产品手册",
+          "text": "星耀Pro 耳机 产品手册：主动降噪深度 42 dB，续航 38 小时，配件含三套硅胶耳塞。",
+          "entity_label": "星耀Pro 耳机"
+        }
+      ]
+    },
+    "p1_region": {
+      "sql": {
+        "source_ref": "demo_retail",
+        "snapshot_id": "retail-snapshot-v3",
+        "columns": [],
+        "sql_hash": "4f70556586a9e554a154ee340321079562833dfa6fb91abfae04a0582f657f03",
+        "rows": [
+          {
+            "region": "华东地区",
+            "metric": "sales_amount",
+            "value": "450000",
+            "unit": "CNY",
+            "time_scope": {
+              "start": "2025-01-01T00:00:00+08:00",
+              "end": "2026-01-01T00:00:00+08:00"
+            }
+          }
+        ]
+      },
+      "docs": [
+        {
+          "document_id": "doc-region-note",
+          "document_version": "2025-05",
+          "source_sha256": "1c1210d9b93a8279b34f0f03b0ea1ea877b806cc70c0e0e5f6e201f8f1c7672f",
+          "chunk_id": "doc-region-note-c1",
+          "title": "区域经营说明",
+          "text": "华东区域 2025 年经营说明：核心城市客单价提升，复购率高于全国均值。",
+          "entity_label": "华东"
+        }
+      ],
+      "aliases": [
+        {
+          "alias": "华东地区",
+          "canonical_name": "华东",
+          "entity_type": "region"
+        },
+        {
+          "alias": "东部",
+          "canonical_name": "华东",
+          "entity_type": "region"
+        }
+      ]
+    },
+    "p1_vip": {
+      "sql": {
+        "source_ref": "demo_retail",
+        "snapshot_id": "retail-snapshot-v3",
+        "columns": [],
+        "sql_hash": "4774fb181f9914b22c42feadeaa10b27aa49541272ea6978a471698e5ffeb059",
+        "rows": [
+          {
+            "customer_level": "VIP",
+            "metric": "member_count",
+            "value": "1200",
+            "unit": "count",
+            "time_scope": {
+              "start": "2025-01-01T00:00:00+08:00",
+              "end": "2026-01-01T00:00:00+08:00"
+            }
+          }
+        ]
+      },
+      "docs": [
+        {
+          "document_id": "doc-membership",
+          "document_version": "2025-02",
+          "source_sha256": "e4ba214cda823927a1f45d697a07545fd692da81eda3814db817e3e2cc17e440",
+          "chunk_id": "doc-membership-c1",
+          "title": "会员权益说明",
+          "text": "钻石会员权益说明：生日双倍积分、专属客服通道、每月免运费券两张。",
+          "entity_label": "钻石"
+        }
+      ],
+      "aliases": [
+        {
+          "alias": "VIP",
+          "canonical_name": "钻石",
+          "entity_type": "customer_level"
+        },
+        {
+          "alias": "黑卡",
+          "canonical_name": "钻石",
+          "entity_type": "customer_level"
+        }
+      ]
+    },
+    "p1_nolink": {
+      "sql": {
+        "source_ref": "demo_retail",
+        "snapshot_id": "retail-snapshot-v3",
+        "columns": [],
+        "sql_hash": "2889ed05bfae49de19195e49e72c1f092a373b338de3ae1b934f58e7ab83daf3",
+        "rows": [
+          {
+            "category": "洗衣机",
+            "metric": "sales_amount",
+            "value": "76000",
+            "unit": "CNY",
+            "time_scope": {
+              "start": "2025-01-01T00:00:00+08:00",
+              "end": "2026-01-01T00:00:00+08:00"
+            }
+          }
+        ]
+      },
+      "docs": [
+        {
+          "document_id": "doc-air-conditioner",
+          "document_version": "2025-04",
+          "source_sha256": "ecfd1fda2beb8f729b1086a81947eb4008bd609aa76e600892a544f3a4c05706",
+          "chunk_id": "doc-air-conditioner-c1",
+          "title": "空调品类手册",
+          "text": "空调品类手册：变频机型能效等级 APF 5.0，安装需预留检修口。",
+          "entity_label": "空调"
+        }
+      ]
+    },
+    "p2_refund_timeout": {
+      "sql": {
+        "source_ref": "demo_retail",
+        "snapshot_id": "retail-snapshot-v3",
+        "columns": [],
+        "sql_hash": "325bee1a64c41151ee2cc0f0583c55969712212ebbb040671b7780543d797a02",
+        "rows": [
+          {
+            "refund_id": "R-1",
+            "metric": "refund_age",
+            "value": "12",
+            "unit": "day",
+            "entity_label": "R-1",
+            "applies_to_version": "pol-2025",
+            "time_scope": {
+              "start": "2026-03-01T00:00:00+08:00",
+              "end": "2026-04-01T00:00:00+08:00"
+            }
+          },
+          {
+            "refund_id": "R-2",
+            "metric": "refund_age",
+            "value": "45",
+            "unit": "day",
+            "entity_label": "R-2",
+            "applies_to_version": "pol-2025",
+            "time_scope": {
+              "start": "2026-03-01T00:00:00+08:00",
+              "end": "2026-04-01T00:00:00+08:00"
+            }
+          }
+        ]
+      },
+      "docs": [
+        {
+          "document_id": "doc-refund-policy",
+          "document_version": "pol-2025",
+          "source_sha256": "c6e3ba6936d5bd89d9fa5f391832fd32d7e8b53028344f4351a8292746131eff",
+          "chunk_id": "doc-refund-policy-c1",
+          "title": "售后服务与退款管理制度",
+          "text": "退款时限：自申请之日起 30 天内未完成退款视为超时，需升级处理。",
+          "valid_from": "2025-01-01T00:00:00+08:00",
+          "valid_to": "2027-01-01T00:00:00+08:00",
+          "clause": {
+            "clause_id": "CL-REFUND-AGE",
+            "metric": "refund_age",
+            "op": ">",
+            "limit": "30",
+            "unit": "day",
+            "valid_from": "2025-01-01T00:00:00+08:00",
+            "valid_to": "2027-01-01T00:00:00+08:00"
+          }
+        }
+      ]
+    },
+    "p2_refund_amount": {
+      "sql": {
+        "source_ref": "demo_retail",
+        "snapshot_id": "retail-snapshot-v3",
+        "columns": [],
+        "sql_hash": "7e57c6aae297b45e7c05502f24f356ba038e854002aa71c9e7b0f34601e57186",
+        "rows": [
+          {
+            "refund_id": "R-1",
+            "metric": "refund_amount",
+            "value": "3200",
+            "unit": "CNY",
+            "entity_label": "R-1",
+            "applies_to_version": "pol-2025",
+            "time_scope": {
+              "start": "2026-03-01T00:00:00+08:00",
+              "end": "2026-04-01T00:00:00+08:00"
+            }
+          },
+          {
+            "refund_id": "R-2",
+            "metric": "refund_amount",
+            "value": "7800",
+            "unit": "CNY",
+            "entity_label": "R-2",
+            "applies_to_version": "pol-2025",
+            "time_scope": {
+              "start": "2026-03-01T00:00:00+08:00",
+              "end": "2026-04-01T00:00:00+08:00"
+            }
+          },
+          {
+            "refund_id": "R-3",
+            "metric": "refund_amount",
+            "value": "1500",
+            "unit": "CNY",
+            "entity_label": "R-3",
+            "applies_to_version": "pol-2025",
+            "time_scope": {
+              "start": "2026-03-01T00:00:00+08:00",
+              "end": "2026-04-01T00:00:00+08:00"
+            }
+          }
+        ]
+      },
+      "docs": [
+        {
+          "document_id": "doc-refund-limit",
+          "document_version": "pol-2025",
+          "source_sha256": "5db5e64fc371949c654521e95b57d6ef60c2be0b101fa681a307cbb03be76904",
+          "chunk_id": "doc-refund-limit-c1",
+          "title": "退款额度管理规定",
+          "text": "单笔退款金额不得超过 5000 元，超过部分需人工复核。",
+          "valid_from": "2025-01-01T00:00:00+08:00",
+          "valid_to": "2027-01-01T00:00:00+08:00",
+          "clause": {
+            "clause_id": "CL-REFUND-AMOUNT",
+            "metric": "refund_amount",
+            "op": ">",
+            "limit": "5000",
+            "unit": "CNY",
+            "valid_from": "2025-01-01T00:00:00+08:00",
+            "valid_to": "2027-01-01T00:00:00+08:00"
+          }
+        }
+      ]
+    },
+    "p2_temperature": {
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-7",
+        "columns": [],
+        "sql_hash": "fca7c273662334387783beca8401a518c4f64d20af01896c6c574b50bdfb12a3",
+        "rows": [
+          {
+            "batch_id": "B011",
+            "metric": "holding_temperature",
+            "value": "1123.15",
+            "unit": "K",
+            "entity_label": "B011",
+            "applies_to_version": "A102-V2",
+            "time_scope": {
+              "start": "2026-09-01T00:00:00+08:00",
+              "end": "2026-10-01T00:00:00+08:00"
+            }
+          },
+          {
+            "batch_id": "B012",
+            "metric": "holding_temperature",
+            "value": "1145",
+            "unit": "K",
+            "entity_label": "B012",
+            "applies_to_version": "A102-V2",
+            "time_scope": {
+              "start": "2026-09-01T00:00:00+08:00",
+              "end": "2026-10-01T00:00:00+08:00"
+            }
+          }
+        ]
+      },
+      "docs": [
+        {
+          "document_id": "doc-process-spec",
+          "document_version": "A102-V2",
+          "source_sha256": "dd81715e083d129f0470992fc02fe5c855c94d31b183d86746952c1eab05c98c",
+          "chunk_id": "doc-process-spec-c1",
+          "title": "A102 工艺规范",
+          "text": "A102 工序 30 保温温度不得超过 860 摄氏度，超限即判不合格。",
+          "valid_from": "2026-01-01T00:00:00+08:00",
+          "valid_to": "2027-01-01T00:00:00+08:00",
+          "clause": {
+            "clause_id": "CL-A102-30-TEMP",
+            "metric": "holding_temperature",
+            "op": ">",
+            "limit": "860",
+            "unit": "degC",
+            "valid_from": "2026-01-01T00:00:00+08:00",
+            "valid_to": "2027-01-01T00:00:00+08:00"
+          }
+        }
+      ]
+    },
+    "p2_qc_window": {
+      "sql": {
+        "source_ref": "demo_retail",
+        "snapshot_id": "retail-snapshot-v3",
+        "columns": [],
+        "sql_hash": "29684fe59691f7faa14372b6057b7702970fe94404df06a5a2f21bafa196049e",
+        "rows": [
+          {
+            "refund_id": "Q-1",
+            "metric": "qc_recheck_age",
+            "value": "24",
+            "unit": "h",
+            "entity_label": "Q-1",
+            "applies_to_version": "qc-2025",
+            "time_scope": {
+              "start": "2026-03-01T00:00:00+08:00",
+              "end": "2026-04-01T00:00:00+08:00"
+            }
+          },
+          {
+            "refund_id": "Q-2",
+            "metric": "qc_recheck_age",
+            "value": "3",
+            "unit": "day",
+            "entity_label": "Q-2",
+            "applies_to_version": "qc-2025",
+            "time_scope": {
+              "start": "2026-03-01T00:00:00+08:00",
+              "end": "2026-04-01T00:00:00+08:00"
+            }
+          }
+        ]
+      },
+      "docs": [
+        {
+          "document_id": "doc-qc-window",
+          "document_version": "qc-2025",
+          "source_sha256": "27af07a765142f3571c0ee18251704b9ff23e9ff2ac935fc51d46de69a0a7f08",
+          "chunk_id": "doc-qc-window-c1",
+          "title": "质检复核时限规定",
+          "text": "质检复核时限规定：复核申请须在 48 小时内完成，超时视为超期。",
+          "valid_from": "2025-01-01T00:00:00+08:00",
+          "valid_to": "2027-01-01T00:00:00+08:00",
+          "clause": {
+            "clause_id": "CL-QC-WINDOW",
+            "metric": "qc_recheck_age",
+            "op": ">",
+            "limit": "48",
+            "unit": "h",
+            "valid_from": "2025-01-01T00:00:00+08:00",
+            "valid_to": "2027-01-01T00:00:00+08:00"
+          }
+        }
+      ]
+    },
+    "p2_old_policy": {
+      "sql": {
+        "source_ref": "demo_retail",
+        "snapshot_id": "retail-snapshot-v3",
+        "columns": [],
+        "sql_hash": "325bee1a64c41151ee2cc0f0583c55969712212ebbb040671b7780543d797a02",
+        "rows": [
+          {
+            "refund_id": "R-1",
+            "metric": "refund_age",
+            "value": "12",
+            "unit": "day",
+            "entity_label": "R-1",
+            "applies_to_version": "pol-2025",
+            "time_scope": {
+              "start": "2026-03-01T00:00:00+08:00",
+              "end": "2026-04-01T00:00:00+08:00"
+            }
+          },
+          {
+            "refund_id": "R-2",
+            "metric": "refund_age",
+            "value": "45",
+            "unit": "day",
+            "entity_label": "R-2",
+            "applies_to_version": "pol-2025",
+            "time_scope": {
+              "start": "2026-03-01T00:00:00+08:00",
+              "end": "2026-04-01T00:00:00+08:00"
+            }
+          }
+        ]
+      },
+      "docs": [
+        {
+          "document_id": "doc-refund-policy-2024",
+          "document_version": "pol-2024",
+          "source_sha256": "d81291d3362d388ee3fa350d1aa1861ceafcd2a145a447da66d0d24096bcea5d",
+          "chunk_id": "doc-refund-policy-2024-c1",
+          "title": "售后服务与退款管理制度（2024 版）",
+          "text": "退款时限：自申请之日起 30 天内未完成退款视为超时。",
+          "valid_from": "2024-01-01T00:00:00+08:00",
+          "valid_to": "2025-01-01T00:00:00+08:00",
+          "clause": {
+            "clause_id": "CL-REFUND-AGE-2024",
+            "metric": "refund_age",
+            "op": ">",
+            "limit": "30",
+            "unit": "day",
+            "valid_from": "2024-01-01T00:00:00+08:00",
+            "valid_to": "2025-01-01T00:00:00+08:00"
+          }
+        }
+      ]
+    },
+    "p3_temp_conflict": {
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-7",
+        "columns": [],
+        "sql_hash": "03a59f0430fd8f0ed7aec031f1838998de54880762941462d2e03785a2b00f29",
+        "rows": [
+          {
+            "measurement_id": "M002-1",
+            "part_id": "A102",
+            "operation_no": "30",
+            "metric": "holding_temperature",
+            "value": "1123.15",
+            "unit": "K",
+            "measured_at": "2026-09-06T10:00:00+08:00",
+            "applies_to_version": "A102-V2",
+            "entity_label": "A102",
+            "time_scope": {
+              "start": "2026-09-01T00:00:00+08:00",
+              "end": "2026-10-01T00:00:00+08:00"
+            }
+          }
+        ]
+      },
+      "docs": [
+        {
+          "document_id": "doc-process-spec-a102",
+          "document_version": "A102-V2",
+          "source_sha256": "1532331aedd843bd0edd2d0f5cded8978938b4d37c9db6d50753377d1ad13034",
+          "chunk_id": "doc-process-spec-a102-c1",
+          "title": "A102 工艺规范",
+          "text": "A102 工序 30 保温温度不得超过 860 摄氏度；超限批次不得放行。",
+          "valid_from": "2026-01-01T00:00:00+08:00",
+          "valid_to": "2027-01-01T00:00:00+08:00",
+          "clause": {
+            "clause_id": "CL-A102-30-TEMP",
+            "metric": "holding_temperature",
+            "op": ">",
+            "limit": "860",
+            "unit": "degC",
+            "valid_from": "2026-01-01T00:00:00+08:00",
+            "valid_to": "2027-01-01T00:00:00+08:00"
+          }
+        },
+        {
+          "document_id": "doc-qc-report-a102",
+          "document_version": "QC-2026-09",
+          "source_sha256": "50f2648079ee507e7e48e4b2a1b41aef7c52270ffe4e211e8603005d85afb6fc",
+          "chunk_id": "doc-qc-report-a102-c1",
+          "title": "A102 质检报告",
+          "text": "A102 工序 30 实测保温温度 845 摄氏度，判合格。",
+          "entity_label": "A102",
+          "applies_to_version": "A102-V2",
+          "metric": "holding_temperature",
+          "value": "845",
+          "unit": "degC",
+          "time_scope": {
+            "start": "2026-09-06T00:00:00+08:00",
+            "end": "2026-09-07T00:00:00+08:00"
+          }
+        }
+      ]
+    },
+    "p3_refund_conflict": {
+      "sql": {
+        "source_ref": "demo_retail",
+        "snapshot_id": "retail-snapshot-v3",
+        "columns": [],
+        "sql_hash": "c3963bc6c9245320eb671d552e073ec8521f2a5b7966727440d45a836ce63c5e",
+        "rows": [
+          {
+            "refund_id": "R-9",
+            "metric": "refund_amount",
+            "value": "7800",
+            "unit": "CNY",
+            "entity_label": "R-9",
+            "applies_to_version": "pol-2025",
+            "time_scope": {
+              "start": "2026-03-01T00:00:00+08:00",
+              "end": "2026-04-01T00:00:00+08:00"
+            }
+          }
+        ]
+      },
+      "docs": [
+        {
+          "document_id": "doc-refund-report",
+          "document_version": "QC-2026-03",
+          "source_sha256": "443cdfec81c7dee82e34e49ee25f4384362a7aa03380fe2aeebac46c4519fe21",
+          "chunk_id": "doc-refund-report-c1",
+          "title": "退款对账报告",
+          "text": "退款单 R-9 的退款金额为 7500 元。",
+          "entity_label": "R-9",
+          "applies_to_version": "pol-2025",
+          "metric": "refund_amount",
+          "value": "7500",
+          "unit": "CNY",
+          "time_scope": {
+            "start": "2026-03-01T00:00:00+08:00",
+            "end": "2026-04-01T00:00:00+08:00"
+          }
+        }
+      ]
+    },
+    "p3_unit_agreement": {
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-7",
+        "columns": [],
+        "sql_hash": "03a59f0430fd8f0ed7aec031f1838998de54880762941462d2e03785a2b00f29",
+        "rows": [
+          {
+            "measurement_id": "M002-1",
+            "part_id": "A102",
+            "operation_no": "30",
+            "metric": "holding_temperature",
+            "value": "1123.15",
+            "unit": "K",
+            "measured_at": "2026-09-06T10:00:00+08:00",
+            "applies_to_version": "A102-V2",
+            "entity_label": "A102",
+            "time_scope": {
+              "start": "2026-09-01T00:00:00+08:00",
+              "end": "2026-10-01T00:00:00+08:00"
+            }
+          }
+        ]
+      },
+      "docs": [
+        {
+          "document_id": "doc-qc-agree",
+          "document_version": "QC-2026-09",
+          "source_sha256": "a7d1b11f642a0b62eccb9136a94e035e7a9756ebbe5c6406d517a9ec693353a8",
+          "chunk_id": "doc-qc-agree-c1",
+          "title": "A102 质检报告",
+          "text": "A102 工序 30 实测保温温度 850 摄氏度。",
+          "entity_label": "A102",
+          "applies_to_version": "A102-V2",
+          "metric": "holding_temperature",
+          "value": "850",
+          "unit": "degC",
+          "time_scope": {
+            "start": "2026-09-06T00:00:00+08:00",
+            "end": "2026-09-07T00:00:00+08:00"
+          }
+        }
+      ]
+    },
+    "p3_version_mismatch": {
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-7",
+        "columns": [],
+        "sql_hash": "03a59f0430fd8f0ed7aec031f1838998de54880762941462d2e03785a2b00f29",
+        "rows": [
+          {
+            "measurement_id": "M002-1",
+            "part_id": "A102",
+            "operation_no": "30",
+            "metric": "holding_temperature",
+            "value": "1123.15",
+            "unit": "K",
+            "measured_at": "2026-09-06T10:00:00+08:00",
+            "applies_to_version": "A102-V2",
+            "entity_label": "A102",
+            "time_scope": {
+              "start": "2026-09-01T00:00:00+08:00",
+              "end": "2026-10-01T00:00:00+08:00"
+            }
+          }
+        ]
+      },
+      "docs": [
+        {
+          "document_id": "doc-qc-old",
+          "document_version": "QC-2025-09",
+          "source_sha256": "ad3fab77c1b8b8460d1d8eedb0bf254fe2135c3d350c6363883eaf76b3580026",
+          "chunk_id": "doc-qc-old-c1",
+          "title": "A102 质检报告（旧版）",
+          "text": "A102 工序 30 实测保温温度 850 摄氏度，依据旧版工艺。",
+          "entity_label": "A102",
+          "applies_to_version": "A102-V1",
+          "metric": "holding_temperature",
+          "value": "850",
+          "unit": "degC",
+          "time_scope": {
+            "start": "2026-09-06T00:00:00+08:00",
+            "end": "2026-09-07T00:00:00+08:00"
+          }
+        }
+      ]
+    },
+    "p3_authority": {
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-7",
+        "columns": [],
+        "sql_hash": "03a59f0430fd8f0ed7aec031f1838998de54880762941462d2e03785a2b00f29",
+        "rows": [
+          {
+            "measurement_id": "M002-1",
+            "part_id": "A102",
+            "operation_no": "30",
+            "metric": "holding_temperature",
+            "value": "1123.15",
+            "unit": "K",
+            "measured_at": "2026-09-06T10:00:00+08:00",
+            "applies_to_version": "A102-V2",
+            "entity_label": "A102",
+            "time_scope": {
+              "start": "2026-09-01T00:00:00+08:00",
+              "end": "2026-10-01T00:00:00+08:00"
+            }
+          }
+        ]
+      },
+      "docs": [
+        {
+          "document_id": "doc-process-spec-a102",
+          "document_version": "A102-V2",
+          "source_sha256": "1532331aedd843bd0edd2d0f5cded8978938b4d37c9db6d50753377d1ad13034",
+          "chunk_id": "doc-process-spec-a102-c1",
+          "title": "A102 工艺规范",
+          "text": "A102 工序 30 保温温度不得超过 860 摄氏度；超限批次不得放行。",
+          "valid_from": "2026-01-01T00:00:00+08:00",
+          "valid_to": "2027-01-01T00:00:00+08:00",
+          "clause": {
+            "clause_id": "CL-A102-30-TEMP",
+            "metric": "holding_temperature",
+            "op": ">",
+            "limit": "860",
+            "unit": "degC",
+            "valid_from": "2026-01-01T00:00:00+08:00",
+            "valid_to": "2027-01-01T00:00:00+08:00"
+          }
+        },
+        {
+          "document_id": "doc-qc-report-a102",
+          "document_version": "QC-2026-09",
+          "source_sha256": "50f2648079ee507e7e48e4b2a1b41aef7c52270ffe4e211e8603005d85afb6fc",
+          "chunk_id": "doc-qc-report-a102-c1",
+          "title": "A102 质检报告",
+          "text": "A102 工序 30 实测保温温度 845 摄氏度，判合格。",
+          "entity_label": "A102",
+          "applies_to_version": "A102-V2",
+          "metric": "holding_temperature",
+          "value": "845",
+          "unit": "degC",
+          "time_scope": {
+            "start": "2026-09-06T00:00:00+08:00",
+            "end": "2026-09-07T00:00:00+08:00"
+          }
+        }
+      ],
+      "authority_rules": [
+        {
+          "rule_id": "auth-p3-01",
+          "payload": {
+            "version": "source-authority-v1",
+            "selected_source": "production",
+            "valid_from": "2026-09-01T00:00:00+08:00",
+            "valid_to": "2026-10-01T00:00:00+08:00",
+            "context": {
+              "scope": {
+                "part_id": "A102",
+                "metric": "holding_temperature",
+                "method": "core"
+              }
+            },
+            "rationale": "生产实测口径优先于质检报告口径"
+          }
+        }
+      ]
+    },
+    "f_p4_01": {
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-7",
+        "columns": [],
+        "sql_hash": "30ea008476b7444246e27101db7e559b19b802ca2f9420f4059c2270df6bd931",
+        "rows": [
+          {
+            "measurement_id": "M-B011-1",
+            "batch_id": "B011",
+            "operation_no": "30",
+            "metric": "holding_temperature",
+            "value": "1123.15",
+            "unit": "K",
+            "entity_label": "B011",
+            "applies_to_version": "A102-V2",
+            "time_scope": {
+              "start": "2026-09-01T00:00:00+08:00",
+              "end": "2026-10-01T00:00:00+08:00"
+            }
+          }
+        ]
+      },
+      "docs": [
+        {
+          "document_id": "doc-spec-a102-b011",
+          "document_version": "A102-V2",
+          "source_sha256": "985efc584d308e755b6f87f14afb5b41ae94bc9dbe113fda05ce8b9dce5eb0b5",
+          "chunk_id": "doc-spec-a102-b011-c1",
+          "title": "A102 工艺规范",
+          "text": "A102 工序 30 保温温度不得超过 860 摄氏度。",
+          "valid_from": "2026-01-01T00:00:00+08:00",
+          "valid_to": "2027-01-01T00:00:00+08:00",
+          "clause": {
+            "clause_id": "CL-A102-30-TEMP",
+            "metric": "holding_temperature",
+            "op": ">",
+            "limit": "860",
+            "unit": "degC",
+            "valid_from": "2026-01-01T00:00:00+08:00",
+            "valid_to": "2027-01-01T00:00:00+08:00"
+          }
+        },
+        {
+          "document_id": "doc-work-instruction",
+          "document_version": "WI-30-2026",
+          "source_sha256": "7e2786c7262447040e43eb9db4563adf81f2ae42cddc7149de9c4dda508a660f",
+          "chunk_id": "doc-work-instruction-c1",
+          "title": "作业指导书",
+          "text": "B011 批次保温工序作业指导：升温速率控制在 5 摄氏度每分钟以内，保温段记录必须留存。",
+          "entity_label": "B011",
+          "applies_to_version": "A102-V2"
+        }
+      ]
+    },
+    "f_p4_02": {
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-7",
+        "columns": [],
+        "sql_hash": "6c8a1ec636a4bbf7e7d9f83328dda82f5c11f379218a2ba4d9be72d912ec8d9a",
+        "rows": [
+          {
+            "refund_id": "R-21",
+            "metric": "refund_age",
+            "value": "45",
+            "unit": "day",
+            "entity_label": "R-21",
+            "applies_to_version": "pol-2025",
+            "time_scope": {
+              "start": "2026-03-01T00:00:00+08:00",
+              "end": "2026-04-01T00:00:00+08:00"
+            }
+          },
+          {
+            "refund_id": "R-22",
+            "metric": "refund_age",
+            "value": "12",
+            "unit": "day",
+            "entity_label": "R-22",
+            "applies_to_version": "pol-2025",
+            "time_scope": {
+              "start": "2026-03-01T00:00:00+08:00",
+              "end": "2026-04-01T00:00:00+08:00"
+            }
+          }
+        ]
+      },
+      "docs": [
+        {
+          "document_id": "doc-refund-policy",
+          "document_version": "pol-2025",
+          "source_sha256": "d81291d3362d388ee3fa350d1aa1861ceafcd2a145a447da66d0d24096bcea5d",
+          "chunk_id": "doc-refund-policy-c1",
+          "title": "售后服务与退款管理制度",
+          "text": "退款时限：自申请之日起 30 天内未完成退款视为超时。",
+          "valid_from": "2025-01-01T00:00:00+08:00",
+          "valid_to": "2027-01-01T00:00:00+08:00",
+          "clause": {
+            "clause_id": "CL-REFUND-AGE",
+            "metric": "refund_age",
+            "op": ">",
+            "limit": "30",
+            "unit": "day",
+            "valid_from": "2025-01-01T00:00:00+08:00",
+            "valid_to": "2027-01-01T00:00:00+08:00"
+          }
+        },
+        {
+          "document_id": "doc-refund-escalation",
+          "document_version": "ESC-2026",
+          "source_sha256": "5e8ac4c1b2cf3dfedb49f6405dd6136e135e313d582db3e5ccc70a74c2f88fcf",
+          "chunk_id": "doc-refund-escalation-c1",
+          "title": "退款超时处理说明",
+          "text": "R-21 退款单超时后由二级客服跟进，说明材料要求 24 小时内回访。",
+          "entity_label": "R-21",
+          "applies_to_version": "pol-2025"
+        }
+      ]
+    },
+    "f_p4_03": {
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-7",
+        "columns": [],
+        "sql_hash": "3b6cdcab3e968a4f209c6af118e6c08bb069a36f8b6e62d7abeb0479c33a8954",
+        "rows": [
+          {
+            "refund_id": "Q-7",
+            "metric": "qc_recheck_age",
+            "value": "3",
+            "unit": "day",
+            "entity_label": "Q-7",
+            "applies_to_version": "qc-2025",
+            "time_scope": {
+              "start": "2026-03-01T00:00:00+08:00",
+              "end": "2026-04-01T00:00:00+08:00"
+            }
+          }
+        ]
+      },
+      "docs": [
+        {
+          "document_id": "doc-qc-window",
+          "document_version": "qc-2025",
+          "source_sha256": "27af07a765142f3571c0ee18251704b9ff23e9ff2ac935fc51d46de69a0a7f08",
+          "chunk_id": "doc-qc-window-c1",
+          "title": "质检复核时限规定",
+          "text": "质检复核时限规定：复核申请须在 48 小时内完成，超时视为超期。",
+          "valid_from": "2025-01-01T00:00:00+08:00",
+          "valid_to": "2027-01-01T00:00:00+08:00",
+          "clause": {
+            "clause_id": "CL-QC-WINDOW",
+            "metric": "qc_recheck_age",
+            "op": ">",
+            "limit": "48",
+            "unit": "h",
+            "valid_from": "2025-01-01T00:00:00+08:00",
+            "valid_to": "2027-01-01T00:00:00+08:00"
+          }
+        },
+        {
+          "document_id": "doc-qc-note",
+          "document_version": "QCN-2026",
+          "source_sha256": "c2615d650847a85ad1db9057878e689c5e637bab3dfe2b48896dc9cbbbdf3ba7",
+          "chunk_id": "doc-qc-note-c1",
+          "title": "质检复核说明材料",
+          "text": "Q-7 复核单超期后需在说明材料中记录超期原因与责任人。",
+          "entity_label": "Q-7",
+          "applies_to_version": "qc-2025"
+        }
+      ]
+    },
+    "f_p4_04": {
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-7",
+        "columns": [],
+        "sql_hash": "706a9e59acd175bfc9f604e3a9cf3152381a486a32ec6d4ca2ea08b933587682",
+        "rows": [
+          {
+            "measurement_id": "M-B021-1",
+            "batch_id": "B021",
+            "operation_no": "30",
+            "metric": "holding_temperature",
+            "value": "1145",
+            "unit": "K",
+            "entity_label": "B021",
+            "applies_to_version": "A102-V2",
+            "time_scope": {
+              "start": "2026-09-01T00:00:00+08:00",
+              "end": "2026-10-01T00:00:00+08:00"
+            }
+          }
+        ]
+      },
+      "docs": [
+        {
+          "document_id": "doc-spec-a102-b021",
+          "document_version": "A102-V2",
+          "source_sha256": "985efc584d308e755b6f87f14afb5b41ae94bc9dbe113fda05ce8b9dce5eb0b5",
+          "chunk_id": "doc-spec-a102-b021-c1",
+          "title": "A102 工艺规范",
+          "text": "A102 工序 30 保温温度不得超过 860 摄氏度。",
+          "valid_from": "2026-01-01T00:00:00+08:00",
+          "valid_to": "2027-01-01T00:00:00+08:00",
+          "clause": {
+            "clause_id": "CL-A102-30-TEMP",
+            "metric": "holding_temperature",
+            "op": ">",
+            "limit": "860",
+            "unit": "degC",
+            "valid_from": "2026-01-01T00:00:00+08:00",
+            "valid_to": "2027-01-01T00:00:00+08:00"
+          }
+        },
+        {
+          "document_id": "doc-batch-note",
+          "document_version": "BN-021",
+          "source_sha256": "8510c6d96f2ec1e6e2f37c37f8f9a6d41cbe7f8b65bf4d7218b0d4e2161f607b",
+          "chunk_id": "doc-batch-note-c1",
+          "title": "批次异常说明材料",
+          "text": "B021 批次温度超限后的说明材料：已暂停放行并安排复测。",
+          "entity_label": "B021",
+          "applies_to_version": "A102-V2"
+        }
+      ]
+    },
+    "f_p4_05": {
+      "sql": {
+        "source_ref": "demo_industrial",
+        "snapshot_id": "ind-snapshot-7",
+        "columns": [],
+        "sql_hash": "8ce3c688cc8cb3a8853a04b5862f9459eb05fc48bdf6f313b2bcd97b3d6c50c4",
+        "rows": [
+          {
+            "measurement_id": "M-B031-1",
+            "batch_id": "B031",
+            "operation_no": "30",
+            "metric": "holding_temperature",
+            "value": "1145",
+            "unit": "K",
+            "entity_label": "B031",
+            "applies_to_version": "A102-V2",
+            "time_scope": {
+              "start": "2026-09-01T00:00:00+08:00",
+              "end": "2026-10-01T00:00:00+08:00"
+            }
+          }
+        ]
+      },
+      "docs": [
+        {
+          "document_id": "doc-spec-old",
+          "document_version": "A102-V1",
+          "source_sha256": "387b101851615b09d7fed6e90ec62fdb5be29fe5d8f0661e4b844d74c874880f",
+          "chunk_id": "doc-spec-old-c1",
+          "title": "A102 工艺规范（旧版）",
+          "text": "A102 工序 30 保温温度不得超过 870 摄氏度。",
+          "valid_from": "2024-01-01T00:00:00+08:00",
+          "valid_to": "2025-01-01T00:00:00+08:00",
+          "clause": {
+            "clause_id": "CL-A102-30-TEMP-V1",
+            "metric": "holding_temperature",
+            "op": ">",
+            "limit": "870",
+            "unit": "degC",
+            "valid_from": "2024-01-01T00:00:00+08:00",
+            "valid_to": "2025-01-01T00:00:00+08:00"
+          }
+        },
+        {
+          "document_id": "doc-batch-note-b031",
+          "document_version": "BN-031",
+          "source_sha256": "039bfdaea0db6ee9593fe72cc92b737d3c4d35f5d82b685824597ee429cd57c2",
+          "chunk_id": "doc-batch-note-b031-c1",
+          "title": "批次异常说明材料",
+          "text": "B031 批次温度超限后的说明材料：等待工艺确认。",
+          "entity_label": "B031",
+          "applies_to_version": "A102-V2"
+        }
+      ]
+    }
+  },
+  "cases": [
+    {
+      "case_id": "cs-p1-01",
+      "structure": "P1",
+      "question": "结合数据库，2025年销售额最高的品类是哪个？该品类的渠道经验手册怎么说？",
+      "fixtures": [
+        "p1_category"
+      ],
+      "expected_failure_mode": null,
+      "expected_evidence_kinds": [
+        "sql_row",
+        "doc_block"
+      ],
+      "expected_binding_fields": [
+        "entity_id",
+        "entity_label",
+        "version",
+        "unit",
+        "time_scope",
+        "source_ref",
+        "source_sha256"
+      ],
+      "expected_answer_checks": [
+        {
+          "path": "status",
+          "op": "eq",
+          "value": "completed"
+        },
+        {
+          "path": "error_code",
+          "op": "eq",
+          "value": null
+        },
+        {
+          "path": "intent.structure",
+          "op": "eq",
+          "value": "P1"
+        },
+        {
+          "path": "claims[0].metric",
+          "op": "eq",
+          "value": "sales_amount"
+        },
+        {
+          "path": "claims[0].value",
+          "op": "eq",
+          "value": "128000.50"
+        },
+        {
+          "path": "claims[0].unit",
+          "op": "eq",
+          "value": "CNY"
+        },
+        {
+          "path": "claims",
+          "op": "all_bindings_complete"
+        },
+        {
+          "path": "claims",
+          "op": "all_claims_have_evidence"
+        },
+        {
+          "path": "graph_summary",
+          "op": "graph_kinds_include",
+          "value": [
+            "sql_row",
+            "doc_block"
+          ]
+        },
+        {
+          "path": "graph_summary",
+          "op": "graph_edges_include",
+          "value": [
+            "entity_match"
+          ]
+        },
+        {
+          "path": "graph_problems",
+          "op": "graph_valid"
+        }
+      ],
+      "live_expected": {
+        "contract": "answer",
+        "requires": [
+          "status=completed",
+          "seven_field_binding_on_every_claim",
+          ">=1 document node linked to the data side",
+          "answer carries value+unit+linked document",
+          ">=1 typed edge"
+        ]
+      }
+    },
+    {
+      "case_id": "cs-p1-02",
+      "structure": "P1",
+      "question": "结合数据库，2025年销售额最高的渠道是哪个？该渠道的运营经验手册怎么说？",
+      "fixtures": [
+        "p1_channel"
+      ],
+      "expected_failure_mode": null,
+      "expected_evidence_kinds": [
+        "sql_row",
+        "doc_block"
+      ],
+      "expected_binding_fields": [
+        "entity_id",
+        "entity_label",
+        "version",
+        "unit",
+        "time_scope",
+        "source_ref",
+        "source_sha256"
+      ],
+      "expected_answer_checks": [
+        {
+          "path": "status",
+          "op": "eq",
+          "value": "completed"
+        },
+        {
+          "path": "claims",
+          "op": "len_eq",
+          "value": 2
+        },
+        {
+          "path": "claims",
+          "op": "all_bindings_complete"
+        },
+        {
+          "path": "claims",
+          "op": "all_claims_have_evidence"
+        },
+        {
+          "path": "claims",
+          "op": "claim_fields_nonempty",
+          "value": [
+            "entity_label",
+            "version",
+            "unit",
+            "time_scope",
+            "source_ref",
+            "source_sha256"
+          ]
+        },
+        {
+          "path": "graph_summary",
+          "op": "graph_kinds_include",
+          "value": [
+            "sql_row",
+            "doc_block"
+          ]
+        },
+        {
+          "path": "graph_problems",
+          "op": "graph_valid"
+        }
+      ],
+      "live_expected": {
+        "contract": "answer",
+        "requires": [
+          "status=completed",
+          "seven_field_binding_on_every_claim",
+          ">=1 document node linked to the data side",
+          "answer carries value+unit+linked document",
+          ">=1 typed edge"
+        ]
+      }
+    },
+    {
+      "case_id": "cs-p1-03",
+      "structure": "P1",
+      "question": "结合数据库，2025年销售额最高的商品是哪个？该商品的产品手册怎么说？",
+      "fixtures": [
+        "p1_product"
+      ],
+      "expected_failure_mode": null,
+      "expected_evidence_kinds": [
+        "sql_row",
+        "doc_block"
+      ],
+      "expected_binding_fields": [
+        "entity_id",
+        "entity_label",
+        "version",
+        "unit",
+        "time_scope",
+        "source_ref",
+        "source_sha256"
+      ],
+      "expected_answer_checks": [
+        {
+          "path": "status",
+          "op": "eq",
+          "value": "completed"
+        },
+        {
+          "path": "claims[0].entity_label",
+          "op": "eq",
+          "value": "星耀Pro 耳机"
+        },
+        {
+          "path": "claims",
+          "op": "all_bindings_complete"
+        },
+        {
+          "path": "claims",
+          "op": "all_claims_have_evidence"
+        },
+        {
+          "path": "graph_summary",
+          "op": "graph_edges_include",
+          "value": [
+            "entity_match"
+          ]
+        },
+        {
+          "path": "graph_problems",
+          "op": "graph_valid"
+        }
+      ],
+      "live_expected": {
+        "contract": "answer",
+        "requires": [
+          "status=completed",
+          "seven_field_binding_on_every_claim",
+          ">=1 document node linked to the data side",
+          "answer carries value+unit+linked document",
+          ">=1 typed edge"
+        ]
+      }
+    },
+    {
+      "case_id": "cs-p1-04",
+      "structure": "P1",
+      "question": "结合数据库，2025年销售额最高的区域是哪个？该区域的经营说明手册怎么说？",
+      "fixtures": [
+        "p1_region"
+      ],
+      "expected_failure_mode": null,
+      "expected_evidence_kinds": [
+        "sql_row",
+        "doc_block"
+      ],
+      "expected_binding_fields": [
+        "entity_id",
+        "entity_label",
+        "version",
+        "unit",
+        "time_scope",
+        "source_ref",
+        "source_sha256"
+      ],
+      "expected_answer_checks": [
+        {
+          "path": "status",
+          "op": "eq",
+          "value": "completed"
+        },
+        {
+          "path": "claims[0].entity_id",
+          "op": "eq",
+          "value": "华东"
+        },
+        {
+          "path": "claims[0].entity_match_kind",
+          "op": "eq",
+          "value": "approved_entity_alias"
+        },
+        {
+          "path": "claims",
+          "op": "all_bindings_complete"
+        },
+        {
+          "path": "graph_summary",
+          "op": "graph_edges_include",
+          "value": [
+            "entity_match"
+          ]
+        },
+        {
+          "path": "graph_problems",
+          "op": "graph_valid"
+        }
+      ],
+      "live_expected": {
+        "contract": "answer",
+        "requires": [
+          "status=completed",
+          "seven_field_binding_on_every_claim",
+          ">=1 document node linked to the data side",
+          "answer carries value+unit+linked document",
+          ">=1 typed edge"
+        ]
+      }
+    },
+    {
+      "case_id": "cs-p1-05",
+      "structure": "P1",
+      "question": "结合数据库，2025年会员数最多的等级是哪个？该等级的会员权益说明怎么说？",
+      "fixtures": [
+        "p1_vip"
+      ],
+      "expected_failure_mode": null,
+      "expected_evidence_kinds": [
+        "sql_row",
+        "doc_block"
+      ],
+      "expected_binding_fields": [
+        "entity_id",
+        "entity_label",
+        "version",
+        "unit",
+        "time_scope",
+        "source_ref",
+        "source_sha256"
+      ],
+      "expected_answer_checks": [
+        {
+          "path": "status",
+          "op": "eq",
+          "value": "completed"
+        },
+        {
+          "path": "claims[0].entity_id",
+          "op": "eq",
+          "value": "钻石"
+        },
+        {
+          "path": "claims",
+          "op": "all_bindings_complete"
+        },
+        {
+          "path": "graph_summary",
+          "op": "graph_edges_include",
+          "value": [
+            "entity_match"
+          ]
+        },
+        {
+          "path": "graph_problems",
+          "op": "graph_valid"
+        }
+      ],
+      "live_expected": {
+        "contract": "answer",
+        "requires": [
+          "status=completed",
+          "seven_field_binding_on_every_claim",
+          ">=1 document node linked to the data side",
+          "answer carries value+unit+linked document",
+          ">=1 typed edge"
+        ]
+      }
+    },
+    {
+      "case_id": "cs-p1-06",
+      "structure": "P1",
+      "question": "结合数据库，2025年销售额最高的品类是哪个？该品类的品类手册怎么说？",
+      "fixtures": [
+        "p1_nolink"
+      ],
+      "expected_failure_mode": "DOC_BINDING_MISSING",
+      "expected_evidence_kinds": [
+        "sql_row",
+        "doc_block"
+      ],
+      "expected_binding_fields": [
+        "entity_id",
+        "entity_label",
+        "version",
+        "unit",
+        "time_scope",
+        "source_ref",
+        "source_sha256"
+      ],
+      "expected_answer_checks": [
+        {
+          "path": "status",
+          "op": "eq",
+          "value": "failed"
+        },
+        {
+          "path": "error_code",
+          "op": "eq",
+          "value": "DOC_BINDING_MISSING"
+        },
+        {
+          "path": "failure_detail",
+          "op": "contains",
+          "value": "NO_DOC_EVIDENCE_LINKED"
+        },
+        {
+          "path": "claims[0].value",
+          "op": "eq",
+          "value": "76000"
+        },
+        {
+          "path": "claims",
+          "op": "all_bindings_complete"
+        }
+      ],
+      "live_expected": {
+        "contract": "answer",
+        "requires": [
+          "status=completed",
+          "seven_field_binding_on_every_claim",
+          ">=1 document node linked to the data side",
+          "answer carries value+unit+linked document",
+          ">=1 typed edge"
+        ]
+      }
+    },
+    {
+      "case_id": "cs-p2-01",
+      "structure": "P2",
+      "question": "结合数据库的退款单记录，根据《售后服务与退款管理制度》的退款时限，找出超过该时限仍未完成的退款单。",
+      "fixtures": [
+        "p2_refund_timeout"
+      ],
+      "expected_failure_mode": null,
+      "expected_evidence_kinds": [
+        "sql_row",
+        "spec_clause",
+        "doc_block"
+      ],
+      "expected_binding_fields": [
+        "entity_id",
+        "entity_label",
+        "version",
+        "unit",
+        "time_scope",
+        "source_ref",
+        "source_sha256"
+      ],
+      "expected_answer_checks": [
+        {
+          "path": "status",
+          "op": "eq",
+          "value": "completed"
+        },
+        {
+          "path": "intent.structure",
+          "op": "eq",
+          "value": "P2"
+        },
+        {
+          "path": "claims",
+          "op": "len_eq",
+          "value": 2
+        },
+        {
+          "path": "claims",
+          "op": "all_bindings_complete"
+        },
+        {
+          "path": "threshold_checks",
+          "op": "len_eq",
+          "value": 2
+        },
+        {
+          "path": "threshold_checks",
+          "op": "threshold_violations_eq",
+          "value": 1
+        },
+        {
+          "path": "graph_summary",
+          "op": "graph_edges_include",
+          "value": [
+            "version_scope",
+            "unit_equivalent",
+            "time_overlap",
+            "supports"
+          ]
+        },
+        {
+          "path": "graph_problems",
+          "op": "graph_valid"
+        }
+      ],
+      "live_expected": {
+        "contract": "fail_closed",
+        "reason": "该结构在当前演示数据/上游能力下无法给出真实跨源答案；契约要求“必须 fail-closed 且带稳定错误码”，拒答不计入通过率。",
+        "blocker": "文档规则驱动 SQL 筛选在真实链路上有两处独立缺口：①上游 NL2SQL 对“根据《制度》的时限/阈值找出超过的记录”这类问题直接返回 clarification_required（5/5 例，模型自己要求澄清，未生成 SQL）；②demo_kb 的 169 个公开切片中只有 1 个能被 _CLAUSE_RE 抽出 metric+op+limit+unit（11_客户服务话术手册“超过 48 小时”，且该条款不对应任何可查询指标），退款/额度/温度/复核四类制度原文均为叙述式（“N 个工作日内”），无可绑定条款；③refunds 表没有“是否完成”列，cs-p2-01 的“仍未完成”在现有数据上不可判定。",
+        "observed_live": {
+          "error_code": "CROSS_SOURCE_EVIDENCE_INSUFFICIENT",
+          "failure_detail": "SQL_EVIDENCE_EMPTY",
+          "upstream": "clarification_required"
+        }
+      }
+    },
+    {
+      "case_id": "cs-p2-02",
+      "structure": "P2",
+      "question": "结合数据库的退款记录，依据《退款额度管理规定》的额度阈值，找出超过该阈值的退款单。",
+      "fixtures": [
+        "p2_refund_amount"
+      ],
+      "expected_failure_mode": null,
+      "expected_evidence_kinds": [
+        "sql_row",
+        "spec_clause",
+        "doc_block"
+      ],
+      "expected_binding_fields": [
+        "entity_id",
+        "entity_label",
+        "version",
+        "unit",
+        "time_scope",
+        "source_ref",
+        "source_sha256"
+      ],
+      "expected_answer_checks": [
+        {
+          "path": "status",
+          "op": "eq",
+          "value": "completed"
+        },
+        {
+          "path": "threshold_checks",
+          "op": "threshold_violations_eq",
+          "value": 1
+        },
+        {
+          "path": "threshold_checks",
+          "op": "len_eq",
+          "value": 3
+        },
+        {
+          "path": "claims",
+          "op": "all_bindings_complete"
+        },
+        {
+          "path": "graph_summary",
+          "op": "graph_kinds_include",
+          "value": [
+            "sql_row",
+            "spec_clause",
+            "doc_block"
+          ]
+        },
+        {
+          "path": "graph_problems",
+          "op": "graph_valid"
+        }
+      ],
+      "live_expected": {
+        "contract": "fail_closed",
+        "reason": "该结构在当前演示数据/上游能力下无法给出真实跨源答案；契约要求“必须 fail-closed 且带稳定错误码”，拒答不计入通过率。",
+        "blocker": "文档规则驱动 SQL 筛选在真实链路上有两处独立缺口：①上游 NL2SQL 对“根据《制度》的时限/阈值找出超过的记录”这类问题直接返回 clarification_required（5/5 例，模型自己要求澄清，未生成 SQL）；②demo_kb 的 169 个公开切片中只有 1 个能被 _CLAUSE_RE 抽出 metric+op+limit+unit（11_客户服务话术手册“超过 48 小时”，且该条款不对应任何可查询指标），退款/额度/温度/复核四类制度原文均为叙述式（“N 个工作日内”），无可绑定条款；③refunds 表没有“是否完成”列，cs-p2-01 的“仍未完成”在现有数据上不可判定。",
+        "observed_live": {
+          "error_code": "CROSS_SOURCE_EVIDENCE_INSUFFICIENT",
+          "failure_detail": "SQL_EVIDENCE_EMPTY",
+          "upstream": "clarification_required"
+        }
+      }
+    },
+    {
+      "case_id": "cs-p2-03",
+      "structure": "P2",
+      "question": "结合数据库的批次实测温度，根据《A102 工艺规范》的温度阈值，找出超过该阈值的批次。",
+      "fixtures": [
+        "p2_temperature"
+      ],
+      "expected_failure_mode": null,
+      "expected_evidence_kinds": [
+        "measurement",
+        "spec_clause",
+        "doc_block"
+      ],
+      "expected_binding_fields": [
+        "entity_id",
+        "entity_label",
+        "version",
+        "unit",
+        "time_scope",
+        "source_ref",
+        "source_sha256"
+      ],
+      "expected_answer_checks": [
+        {
+          "path": "status",
+          "op": "eq",
+          "value": "completed"
+        },
+        {
+          "path": "threshold_checks",
+          "op": "threshold_violations_eq",
+          "value": 1
+        },
+        {
+          "path": "threshold_checks",
+          "op": "len_eq",
+          "value": 2
+        },
+        {
+          "path": "graph_summary",
+          "op": "graph_edges_include",
+          "value": [
+            "unit_equivalent",
+            "version_scope"
+          ]
+        },
+        {
+          "path": "claims",
+          "op": "all_bindings_complete"
+        },
+        {
+          "path": "graph_problems",
+          "op": "graph_valid"
+        }
+      ],
+      "live_expected": {
+        "contract": "fail_closed",
+        "reason": "该结构在当前演示数据/上游能力下无法给出真实跨源答案；契约要求“必须 fail-closed 且带稳定错误码”，拒答不计入通过率。",
+        "blocker": "文档规则驱动 SQL 筛选在真实链路上有两处独立缺口：①上游 NL2SQL 对“根据《制度》的时限/阈值找出超过的记录”这类问题直接返回 clarification_required（5/5 例，模型自己要求澄清，未生成 SQL）；②demo_kb 的 169 个公开切片中只有 1 个能被 _CLAUSE_RE 抽出 metric+op+limit+unit（11_客户服务话术手册“超过 48 小时”，且该条款不对应任何可查询指标），退款/额度/温度/复核四类制度原文均为叙述式（“N 个工作日内”），无可绑定条款；③refunds 表没有“是否完成”列，cs-p2-01 的“仍未完成”在现有数据上不可判定。",
+        "observed_live": {
+          "error_code": "CROSS_SOURCE_EVIDENCE_INSUFFICIENT",
+          "failure_detail": "SQL_EVIDENCE_EMPTY",
+          "upstream": "clarification_required"
+        }
+      }
+    },
+    {
+      "case_id": "cs-p2-04",
+      "structure": "P2",
+      "question": "结合数据库的复核记录，依据《质检复核时限规定》的时限阈值，找出超过该时限的记录。",
+      "fixtures": [
+        "p2_qc_window"
+      ],
+      "expected_failure_mode": null,
+      "expected_evidence_kinds": [
+        "sql_row",
+        "spec_clause",
+        "doc_block"
+      ],
+      "expected_binding_fields": [
+        "entity_id",
+        "entity_label",
+        "version",
+        "unit",
+        "time_scope",
+        "source_ref",
+        "source_sha256"
+      ],
+      "expected_answer_checks": [
+        {
+          "path": "status",
+          "op": "eq",
+          "value": "completed"
+        },
+        {
+          "path": "threshold_checks",
+          "op": "threshold_violations_eq",
+          "value": 1
+        },
+        {
+          "path": "threshold_checks[0].normalized_unit",
+          "op": "eq",
+          "value": "s"
+        },
+        {
+          "path": "claims",
+          "op": "all_bindings_complete"
+        },
+        {
+          "path": "graph_problems",
+          "op": "graph_valid"
+        }
+      ],
+      "live_expected": {
+        "contract": "fail_closed",
+        "reason": "该结构在当前演示数据/上游能力下无法给出真实跨源答案；契约要求“必须 fail-closed 且带稳定错误码”，拒答不计入通过率。",
+        "blocker": "文档规则驱动 SQL 筛选在真实链路上有两处独立缺口：①上游 NL2SQL 对“根据《制度》的时限/阈值找出超过的记录”这类问题直接返回 clarification_required（5/5 例，模型自己要求澄清，未生成 SQL）；②demo_kb 的 169 个公开切片中只有 1 个能被 _CLAUSE_RE 抽出 metric+op+limit+unit（11_客户服务话术手册“超过 48 小时”，且该条款不对应任何可查询指标），退款/额度/温度/复核四类制度原文均为叙述式（“N 个工作日内”），无可绑定条款；③refunds 表没有“是否完成”列，cs-p2-01 的“仍未完成”在现有数据上不可判定。",
+        "observed_live": {
+          "error_code": "CROSS_SOURCE_EVIDENCE_INSUFFICIENT",
+          "failure_detail": "SQL_EVIDENCE_EMPTY",
+          "upstream": "clarification_required"
+        }
+      }
+    },
+    {
+      "case_id": "cs-p2-05",
+      "structure": "P2",
+      "question": "结合数据库的退款单记录，根据旧版《售后服务与退款管理制度》的退款时限，找出超过该时限仍未完成的退款单。",
+      "fixtures": [
+        "p2_old_policy"
+      ],
+      "expected_failure_mode": "DOC_BINDING_MISSING",
+      "expected_evidence_kinds": [
+        "sql_row",
+        "spec_clause",
+        "doc_block"
+      ],
+      "expected_binding_fields": [
+        "entity_id",
+        "entity_label",
+        "version",
+        "unit",
+        "time_scope",
+        "source_ref",
+        "source_sha256"
+      ],
+      "expected_answer_checks": [
+        {
+          "path": "status",
+          "op": "eq",
+          "value": "failed"
+        },
+        {
+          "path": "error_code",
+          "op": "eq",
+          "value": "DOC_BINDING_MISSING"
+        },
+        {
+          "path": "failure_detail",
+          "op": "contains",
+          "value": "VERSION_NOT_APPLICABLE"
+        },
+        {
+          "path": "repair_ledger",
+          "op": "len_eq",
+          "value": 1
+        },
+        {
+          "path": "repair_applied",
+          "op": "eq",
+          "value": false
+        },
+        {
+          "path": "threshold_checks",
+          "op": "len_eq",
+          "value": 0
+        }
+      ],
+      "live_expected": {
+        "contract": "fail_closed",
+        "reason": "该结构在当前演示数据/上游能力下无法给出真实跨源答案；契约要求“必须 fail-closed 且带稳定错误码”，拒答不计入通过率。",
+        "blocker": "文档规则驱动 SQL 筛选在真实链路上有两处独立缺口：①上游 NL2SQL 对“根据《制度》的时限/阈值找出超过的记录”这类问题直接返回 clarification_required（5/5 例，模型自己要求澄清，未生成 SQL）；②demo_kb 的 169 个公开切片中只有 1 个能被 _CLAUSE_RE 抽出 metric+op+limit+unit（11_客户服务话术手册“超过 48 小时”，且该条款不对应任何可查询指标），退款/额度/温度/复核四类制度原文均为叙述式（“N 个工作日内”），无可绑定条款；③refunds 表没有“是否完成”列，cs-p2-01 的“仍未完成”在现有数据上不可判定。",
+        "observed_live": {
+          "error_code": "CROSS_SOURCE_EVIDENCE_INSUFFICIENT",
+          "failure_detail": "SQL_EVIDENCE_EMPTY",
+          "upstream": "clarification_required"
+        }
+      }
+    },
+    {
+      "case_id": "cs-p3-01",
+      "structure": "P3",
+      "question": "结合数据库的实测温度，A102工序30的实测温度与工艺规范的偏差是否超限，与质检报告是否一致？",
+      "fixtures": [
+        "p3_temp_conflict"
+      ],
+      "expected_failure_mode": "CONFLICT_UNRESOLVED",
+      "expected_evidence_kinds": [
+        "measurement",
+        "spec_clause",
+        "doc_block"
+      ],
+      "expected_binding_fields": [
+        "entity_id",
+        "entity_label",
+        "version",
+        "unit",
+        "time_scope",
+        "source_ref",
+        "source_sha256"
+      ],
+      "expected_answer_checks": [
+        {
+          "path": "status",
+          "op": "eq",
+          "value": "abstained"
+        },
+        {
+          "path": "error_code",
+          "op": "eq",
+          "value": "CONFLICT_UNRESOLVED"
+        },
+        {
+          "path": "intent.structure",
+          "op": "eq",
+          "value": "P3"
+        },
+        {
+          "path": "conflicts",
+          "op": "len_eq",
+          "value": 1
+        },
+        {
+          "path": "conflicts",
+          "op": "conflicts_retain_both"
+        },
+        {
+          "path": "conflicts[0].conflict_type",
+          "op": "eq",
+          "value": "value_conflict"
+        },
+        {
+          "path": "unresolved_conflicts",
+          "op": "len_eq",
+          "value": 1
+        },
+        {
+          "path": "graph_summary",
+          "op": "graph_edges_include",
+          "value": [
+            "conflicts",
+            "version_scope",
+            "unit_equivalent"
+          ]
+        },
+        {
+          "path": "graph_problems",
+          "op": "graph_valid"
+        }
+      ],
+      "live_expected": {
+        "contract": "fail_closed",
+        "reason": "该结构在当前演示数据/上游能力下无法给出真实跨源答案；契约要求“必须 fail-closed 且带稳定错误码”，拒答不计入通过率。",
+        "blocker": "跨源冲突要求文档侧存在可绑定的“数值声称”（doc_block.value）；demo_kb 只有叙述性 PDF 切片，live 适配器不造 value（不伪造），因此永远无法形成“同实体+同指标+同版本”的竞争声称；P3 的工业问句（demo_industrial）在真实链路上先被工业问题帧要求澄清，连 SQL 行都拿不到。",
+        "observed_live": {
+          "error_code": "CROSS_SOURCE_EVIDENCE_INSUFFICIENT",
+          "failure_detail": "SQL_EVIDENCE_EMPTY",
+          "upstream": "clarification_required"
+        }
+      }
+    },
+    {
+      "case_id": "cs-p3-02",
+      "structure": "P3",
+      "question": "结合数据库的退款金额，退款单 R-9 的金额与对账报告是否一致？",
+      "fixtures": [
+        "p3_refund_conflict"
+      ],
+      "expected_failure_mode": "CONFLICT_UNRESOLVED",
+      "expected_evidence_kinds": [
+        "sql_row",
+        "doc_block"
+      ],
+      "expected_binding_fields": [
+        "entity_id",
+        "entity_label",
+        "version",
+        "unit",
+        "time_scope",
+        "source_ref",
+        "source_sha256"
+      ],
+      "expected_answer_checks": [
+        {
+          "path": "status",
+          "op": "eq",
+          "value": "abstained"
+        },
+        {
+          "path": "error_code",
+          "op": "eq",
+          "value": "CONFLICT_UNRESOLVED"
+        },
+        {
+          "path": "conflicts",
+          "op": "len_eq",
+          "value": 1
+        },
+        {
+          "path": "conflicts",
+          "op": "conflicts_retain_both"
+        },
+        {
+          "path": "conflicts[0].left.value",
+          "op": "eq",
+          "value": "7800"
+        },
+        {
+          "path": "conflicts[0].right.value",
+          "op": "eq",
+          "value": "7500"
+        },
+        {
+          "path": "unresolved_conflicts",
+          "op": "len_eq",
+          "value": 1
+        }
+      ],
+      "live_expected": {
+        "contract": "fail_closed",
+        "reason": "该结构在当前演示数据/上游能力下无法给出真实跨源答案；契约要求“必须 fail-closed 且带稳定错误码”，拒答不计入通过率。",
+        "blocker": "跨源冲突要求文档侧存在可绑定的“数值声称”（doc_block.value）；demo_kb 只有叙述性 PDF 切片，live 适配器不造 value（不伪造），因此永远无法形成“同实体+同指标+同版本”的竞争声称；P3 的工业问句（demo_industrial）在真实链路上先被工业问题帧要求澄清，连 SQL 行都拿不到。",
+        "observed_live": {
+          "error_code": "CROSS_SOURCE_EVIDENCE_INSUFFICIENT",
+          "failure_detail": "SQL_EVIDENCE_EMPTY",
+          "upstream": "clarification_required"
+        }
+      }
+    },
+    {
+      "case_id": "cs-p3-03",
+      "structure": "P3",
+      "question": "结合数据库的实测温度，A102工序30的实测温度与质检报告是否一致？",
+      "fixtures": [
+        "p3_unit_agreement"
+      ],
+      "expected_failure_mode": null,
+      "expected_evidence_kinds": [
+        "measurement",
+        "doc_block"
+      ],
+      "expected_binding_fields": [
+        "entity_id",
+        "entity_label",
+        "version",
+        "unit",
+        "time_scope",
+        "source_ref",
+        "source_sha256"
+      ],
+      "expected_answer_checks": [
+        {
+          "path": "status",
+          "op": "eq",
+          "value": "completed"
+        },
+        {
+          "path": "error_code",
+          "op": "eq",
+          "value": null
+        },
+        {
+          "path": "conflicts",
+          "op": "len_eq",
+          "value": 0
+        },
+        {
+          "path": "claims",
+          "op": "len_eq",
+          "value": 2
+        },
+        {
+          "path": "claims",
+          "op": "all_bindings_complete"
+        },
+        {
+          "path": "graph_summary",
+          "op": "graph_edges_include",
+          "value": [
+            "unit_equivalent",
+            "entity_match"
+          ]
+        },
+        {
+          "path": "graph_problems",
+          "op": "graph_valid"
+        }
+      ],
+      "live_expected": {
+        "contract": "fail_closed",
+        "reason": "该结构在当前演示数据/上游能力下无法给出真实跨源答案；契约要求“必须 fail-closed 且带稳定错误码”，拒答不计入通过率。",
+        "blocker": "跨源冲突要求文档侧存在可绑定的“数值声称”（doc_block.value）；demo_kb 只有叙述性 PDF 切片，live 适配器不造 value（不伪造），因此永远无法形成“同实体+同指标+同版本”的竞争声称；P3 的工业问句（demo_industrial）在真实链路上先被工业问题帧要求澄清，连 SQL 行都拿不到。",
+        "observed_live": {
+          "error_code": "CROSS_SOURCE_EVIDENCE_INSUFFICIENT",
+          "failure_detail": "SQL_EVIDENCE_EMPTY",
+          "upstream": "clarification_required"
+        }
+      }
+    },
+    {
+      "case_id": "cs-p3-04",
+      "structure": "P3",
+      "question": "结合数据库的实测温度，A102工序30的实测温度与质检报告是否一致？",
+      "fixtures": [
+        "p3_version_mismatch"
+      ],
+      "expected_failure_mode": "DOC_BINDING_MISSING",
+      "expected_evidence_kinds": [
+        "measurement",
+        "doc_block"
+      ],
+      "expected_binding_fields": [
+        "entity_id",
+        "entity_label",
+        "version",
+        "unit",
+        "time_scope",
+        "source_ref",
+        "source_sha256"
+      ],
+      "expected_answer_checks": [
+        {
+          "path": "status",
+          "op": "eq",
+          "value": "failed"
+        },
+        {
+          "path": "error_code",
+          "op": "eq",
+          "value": "DOC_BINDING_MISSING"
+        },
+        {
+          "path": "failure_detail",
+          "op": "contains",
+          "value": "VERSION_MISMATCH"
+        },
+        {
+          "path": "repair_ledger",
+          "op": "len_eq",
+          "value": 1
+        },
+        {
+          "path": "repair_applied",
+          "op": "eq",
+          "value": false
+        },
+        {
+          "path": "conflicts",
+          "op": "len_eq",
+          "value": 0
+        }
+      ],
+      "live_expected": {
+        "contract": "fail_closed",
+        "reason": "该结构在当前演示数据/上游能力下无法给出真实跨源答案；契约要求“必须 fail-closed 且带稳定错误码”，拒答不计入通过率。",
+        "blocker": "跨源冲突要求文档侧存在可绑定的“数值声称”（doc_block.value）；demo_kb 只有叙述性 PDF 切片，live 适配器不造 value（不伪造），因此永远无法形成“同实体+同指标+同版本”的竞争声称；P3 的工业问句（demo_industrial）在真实链路上先被工业问题帧要求澄清，连 SQL 行都拿不到。",
+        "observed_live": {
+          "error_code": "CROSS_SOURCE_EVIDENCE_INSUFFICIENT",
+          "failure_detail": "SQL_EVIDENCE_EMPTY",
+          "upstream": "clarification_required"
+        }
+      }
+    },
+    {
+      "case_id": "cs-p3-05",
+      "structure": "P3",
+      "question": "结合数据库的实测温度，A102工序30的实测温度与质检报告是否一致？若冲突按已登记规则裁定。",
+      "fixtures": [
+        "p3_authority"
+      ],
+      "expected_failure_mode": null,
+      "expected_evidence_kinds": [
+        "measurement",
+        "spec_clause",
+        "doc_block"
+      ],
+      "expected_binding_fields": [
+        "entity_id",
+        "entity_label",
+        "version",
+        "unit",
+        "time_scope",
+        "source_ref",
+        "source_sha256"
+      ],
+      "expected_answer_checks": [
+        {
+          "path": "status",
+          "op": "eq",
+          "value": "completed"
+        },
+        {
+          "path": "error_code",
+          "op": "eq",
+          "value": null
+        },
+        {
+          "path": "conflicts",
+          "op": "len_eq",
+          "value": 1
+        },
+        {
+          "path": "conflicts",
+          "op": "conflicts_resolved_by_authority"
+        },
+        {
+          "path": "conflicts[0].authority_rule_id",
+          "op": "eq",
+          "value": "auth-p3-01"
+        },
+        {
+          "path": "conflicts",
+          "op": "conflicts_retain_both"
+        },
+        {
+          "path": "unresolved_conflicts",
+          "op": "len_eq",
+          "value": 0
+        },
+        {
+          "path": "graph_summary",
+          "op": "graph_edges_include",
+          "value": [
+            "conflicts"
+          ]
+        }
+      ],
+      "live_expected": {
+        "contract": "fail_closed",
+        "reason": "该结构在当前演示数据/上游能力下无法给出真实跨源答案；契约要求“必须 fail-closed 且带稳定错误码”，拒答不计入通过率。",
+        "blocker": "跨源冲突要求文档侧存在可绑定的“数值声称”（doc_block.value）；demo_kb 只有叙述性 PDF 切片，live 适配器不造 value（不伪造），因此永远无法形成“同实体+同指标+同版本”的竞争声称；P3 的工业问句（demo_industrial）在真实链路上先被工业问题帧要求澄清，连 SQL 行都拿不到。",
+        "observed_live": {
+          "error_code": "CROSS_SOURCE_EVIDENCE_INSUFFICIENT",
+          "failure_detail": "SQL_EVIDENCE_EMPTY",
+          "upstream": "clarification_required"
+        }
+      }
+    },
+    {
+      "case_id": "cs-p4-01",
+      "structure": "P4",
+      "question": "结合数据库的批次温度异常，追溯 B011 批次的规范条款与作业指导书说明材料，说明该批次温度是否超限。",
+      "fixtures": [
+        "f_p4_01"
+      ],
+      "expected_failure_mode": null,
+      "expected_evidence_kinds": [
+        "measurement",
+        "spec_clause",
+        "doc_block"
+      ],
+      "expected_binding_fields": [
+        "entity_id",
+        "entity_label",
+        "version",
+        "unit",
+        "time_scope",
+        "source_ref",
+        "source_sha256"
+      ],
+      "expected_answer_checks": [
+        {
+          "path": "status",
+          "op": "eq",
+          "value": "completed"
+        },
+        {
+          "path": "intent.structure",
+          "op": "eq",
+          "value": "P4"
+        },
+        {
+          "path": "threshold_checks",
+          "op": "threshold_violations_eq",
+          "value": 0
+        },
+        {
+          "path": "claims",
+          "op": "all_bindings_complete"
+        },
+        {
+          "path": "graph_summary",
+          "op": "graph_kinds_include",
+          "value": [
+            "measurement",
+            "spec_clause",
+            "doc_block"
+          ]
+        },
+        {
+          "path": "graph_summary",
+          "op": "graph_edges_include",
+          "value": [
+            "entity_match",
+            "version_scope",
+            "unit_equivalent",
+            "supports",
+            "time_overlap"
+          ]
+        },
+        {
+          "path": "evidence_graph",
+          "op": "edge_kinds_min",
+          "value": 5
+        },
+        {
+          "path": "graph_problems",
+          "op": "graph_valid"
+        }
+      ],
+      "live_expected": {
+        "contract": "fail_closed",
+        "reason": "该结构在当前演示数据/上游能力下无法给出真实跨源答案；契约要求“必须 fail-closed 且带稳定错误码”，拒答不计入通过率。",
+        "blocker": "多跳需要真实规范条款（spec_clause）：同 P2②，公开知识库没有可抽取且能绑定到数据侧的条款；工业演示文档 industrial_demo 在 chunks 表中 0 行（无切片），文档侧证据为空；且工业问句先被问题帧要求澄清。",
+        "observed_live": {
+          "error_code": "CROSS_SOURCE_EVIDENCE_INSUFFICIENT",
+          "failure_detail": "SQL_EVIDENCE_EMPTY",
+          "upstream": "clarification_required"
+        }
+      }
+    },
+    {
+      "case_id": "cs-p4-02",
+      "structure": "P4",
+      "question": "结合数据库的退款超时异常，追溯 R-21 的规范条款与退款超时处理说明材料，说明是否超时。",
+      "fixtures": [
+        "f_p4_02"
+      ],
+      "expected_failure_mode": null,
+      "expected_evidence_kinds": [
+        "measurement",
+        "spec_clause",
+        "doc_block"
+      ],
+      "expected_binding_fields": [
+        "entity_id",
+        "entity_label",
+        "version",
+        "unit",
+        "time_scope",
+        "source_ref",
+        "source_sha256"
+      ],
+      "expected_answer_checks": [
+        {
+          "path": "status",
+          "op": "eq",
+          "value": "completed"
+        },
+        {
+          "path": "claims",
+          "op": "len_eq",
+          "value": 2
+        },
+        {
+          "path": "threshold_checks",
+          "op": "threshold_violations_eq",
+          "value": 1
+        },
+        {
+          "path": "claims",
+          "op": "all_bindings_complete"
+        },
+        {
+          "path": "graph_summary",
+          "op": "graph_edges_include",
+          "value": [
+            "supports",
+            "version_scope",
+            "entity_match"
+          ]
+        },
+        {
+          "path": "graph_problems",
+          "op": "graph_valid"
+        }
+      ],
+      "live_expected": {
+        "contract": "fail_closed",
+        "reason": "该结构在当前演示数据/上游能力下无法给出真实跨源答案；契约要求“必须 fail-closed 且带稳定错误码”，拒答不计入通过率。",
+        "blocker": "多跳需要真实规范条款（spec_clause）：同 P2②，公开知识库没有可抽取且能绑定到数据侧的条款；工业演示文档 industrial_demo 在 chunks 表中 0 行（无切片），文档侧证据为空；且工业问句先被问题帧要求澄清。",
+        "observed_live": {
+          "error_code": "CROSS_SOURCE_EVIDENCE_INSUFFICIENT",
+          "failure_detail": "SQL_EVIDENCE_EMPTY",
+          "upstream": "clarification_required"
+        }
+      }
+    },
+    {
+      "case_id": "cs-p4-03",
+      "structure": "P4",
+      "question": "结合数据库的复核超期异常，追溯 Q-7 的规范条款与质检复核说明材料，说明是否超期。",
+      "fixtures": [
+        "f_p4_03"
+      ],
+      "expected_failure_mode": null,
+      "expected_evidence_kinds": [
+        "measurement",
+        "spec_clause",
+        "doc_block"
+      ],
+      "expected_binding_fields": [
+        "entity_id",
+        "entity_label",
+        "version",
+        "unit",
+        "time_scope",
+        "source_ref",
+        "source_sha256"
+      ],
+      "expected_answer_checks": [
+        {
+          "path": "status",
+          "op": "eq",
+          "value": "completed"
+        },
+        {
+          "path": "threshold_checks",
+          "op": "threshold_violations_eq",
+          "value": 1
+        },
+        {
+          "path": "threshold_checks[0].normalized_unit",
+          "op": "eq",
+          "value": "s"
+        },
+        {
+          "path": "claims",
+          "op": "all_bindings_complete"
+        },
+        {
+          "path": "evidence_graph",
+          "op": "edge_kinds_min",
+          "value": 4
+        },
+        {
+          "path": "graph_problems",
+          "op": "graph_valid"
+        }
+      ],
+      "live_expected": {
+        "contract": "fail_closed",
+        "reason": "该结构在当前演示数据/上游能力下无法给出真实跨源答案；契约要求“必须 fail-closed 且带稳定错误码”，拒答不计入通过率。",
+        "blocker": "多跳需要真实规范条款（spec_clause）：同 P2②，公开知识库没有可抽取且能绑定到数据侧的条款；工业演示文档 industrial_demo 在 chunks 表中 0 行（无切片），文档侧证据为空；且工业问句先被问题帧要求澄清。",
+        "observed_live": {
+          "error_code": "CROSS_SOURCE_EVIDENCE_INSUFFICIENT",
+          "failure_detail": "SQL_EVIDENCE_EMPTY",
+          "upstream": "clarification_required"
+        }
+      }
+    },
+    {
+      "case_id": "cs-p4-04",
+      "structure": "P4",
+      "question": "结合数据库的批次温度异常，追溯 B021 的规范条款与批次说明材料，说明是否超限。",
+      "fixtures": [
+        "f_p4_04"
+      ],
+      "expected_failure_mode": null,
+      "expected_evidence_kinds": [
+        "measurement",
+        "spec_clause",
+        "doc_block"
+      ],
+      "expected_binding_fields": [
+        "entity_id",
+        "entity_label",
+        "version",
+        "unit",
+        "time_scope",
+        "source_ref",
+        "source_sha256"
+      ],
+      "expected_answer_checks": [
+        {
+          "path": "status",
+          "op": "eq",
+          "value": "completed"
+        },
+        {
+          "path": "threshold_checks",
+          "op": "threshold_violations_eq",
+          "value": 1
+        },
+        {
+          "path": "claims[0].value",
+          "op": "eq",
+          "value": "1145"
+        },
+        {
+          "path": "claims",
+          "op": "all_bindings_complete"
+        },
+        {
+          "path": "graph_summary",
+          "op": "graph_edges_include",
+          "value": [
+            "version_scope",
+            "unit_equivalent",
+            "supports"
+          ]
+        },
+        {
+          "path": "graph_problems",
+          "op": "graph_valid"
+        }
+      ],
+      "live_expected": {
+        "contract": "fail_closed",
+        "reason": "该结构在当前演示数据/上游能力下无法给出真实跨源答案；契约要求“必须 fail-closed 且带稳定错误码”，拒答不计入通过率。",
+        "blocker": "多跳需要真实规范条款（spec_clause）：同 P2②，公开知识库没有可抽取且能绑定到数据侧的条款；工业演示文档 industrial_demo 在 chunks 表中 0 行（无切片），文档侧证据为空；且工业问句先被问题帧要求澄清。",
+        "observed_live": {
+          "error_code": "CROSS_SOURCE_EVIDENCE_INSUFFICIENT",
+          "failure_detail": "SQL_EVIDENCE_EMPTY",
+          "upstream": "clarification_required"
+        }
+      }
+    },
+    {
+      "case_id": "cs-p4-05",
+      "structure": "P4",
+      "question": "结合数据库的批次温度异常，追溯 B031 的规范条款与说明材料，说明是否超限。",
+      "fixtures": [
+        "f_p4_05"
+      ],
+      "expected_failure_mode": "DOC_BINDING_MISSING",
+      "expected_evidence_kinds": [
+        "measurement",
+        "spec_clause",
+        "doc_block"
+      ],
+      "expected_binding_fields": [
+        "entity_id",
+        "entity_label",
+        "version",
+        "unit",
+        "time_scope",
+        "source_ref",
+        "source_sha256"
+      ],
+      "expected_answer_checks": [
+        {
+          "path": "status",
+          "op": "eq",
+          "value": "failed"
+        },
+        {
+          "path": "error_code",
+          "op": "eq",
+          "value": "DOC_BINDING_MISSING"
+        },
+        {
+          "path": "failure_detail",
+          "op": "contains",
+          "value": "VERSION_NOT_APPLICABLE"
+        },
+        {
+          "path": "threshold_checks",
+          "op": "len_eq",
+          "value": 0
+        },
+        {
+          "path": "repair_ledger",
+          "op": "len_eq",
+          "value": 1
+        },
+        {
+          "path": "repair_applied",
+          "op": "eq",
+          "value": false
+        }
+      ],
+      "live_expected": {
+        "contract": "fail_closed",
+        "reason": "该结构在当前演示数据/上游能力下无法给出真实跨源答案；契约要求“必须 fail-closed 且带稳定错误码”，拒答不计入通过率。",
+        "blocker": "多跳需要真实规范条款（spec_clause）：同 P2②，公开知识库没有可抽取且能绑定到数据侧的条款；工业演示文档 industrial_demo 在 chunks 表中 0 行（无切片），文档侧证据为空；且工业问句先被问题帧要求澄清。",
+        "observed_live": {
+          "error_code": "CROSS_SOURCE_EVIDENCE_INSUFFICIENT",
+          "failure_detail": "SQL_EVIDENCE_EMPTY",
+          "upstream": "clarification_required"
+        }
+      }
+    }
+  ]
+}

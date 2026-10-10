@@ -1,0 +1,2719 @@
+{
+ "suite": "cross_source_norm_v1",
+ "suite_version": "1.2.0",
+ "frozen_at": "2026-10-10",
+ "purpose": "在没有可绑定条款的公开知识库之外，用一份真实、可核验、可冻结的规范语料，把跨源 P2（文档规则驱动 SQL 筛选）/ P3（跨源冲突核验）/ P4（复杂多跳）三种结构在演示库真实数据上做成有证据的问答。",
+ "corpus": {
+  "dir": "data/knowledge_sources",
+  "manifest": "data/knowledge_sources/manifest.json",
+  "builder": "data/knowledge_sources/build_norm_corpus.py",
+  "corpus_version": "norm-corpus-v1",
+  "real_sources": [
+   "demo_retail.public(orders/order_items/products/customers/refunds/regions)",
+   "datamind_meta.demo_industrial(parts/measurement_observations/production_batches/process_revisions)",
+   "data/industrial_demo/industrial_demo_v1.pdf（质检核验记录的原文来源）"
+  ],
+  "label_discipline": "所有 expected_* 标签在评测前冻结；scripts/eval_cross_source_norm.py --check 会用真实只读 SQL 与真实语料重算并逐项比对，标签被放宽即失败。"
+ },
+ "structures": [
+  "P2",
+  "P3",
+  "P4"
+ ],
+ "binding_fields": [
+  "entity_id",
+  "entity_label",
+  "version",
+  "unit",
+  "time_scope",
+  "source_ref",
+  "source_sha256"
+ ],
+ "cases": [
+  {
+   "case_id": "norm-p2-01",
+   "structure": "P2",
+   "question": "2025 年全渠道退款中，处理时长超过规范上限的退款单有多少笔？",
+   "sql_template": "retail_refund_delay",
+   "sql_params": {
+    "window_start": "2025-01-01T00:00:00+08:00",
+    "window_end": "2026-01-01T00:00:00+08:00"
+   },
+   "doc_selection": {
+    "document_ids": [
+     "DM-KF-2026-001_售后时效规范"
+    ],
+    "must_tokens": [
+     "DM-KF-2026-001-6.1"
+    ]
+   },
+   "expected_status": "completed",
+   "expected_question_metrics": [
+    "时长"
+   ],
+   "expected_clause_ids": [
+    "DM-KF-2026-001-6.1"
+   ],
+   "expected_binding_fields": [
+    "entity_id",
+    "entity_label",
+    "version",
+    "unit",
+    "time_scope",
+    "source_ref",
+    "source_sha256"
+   ],
+   "expected_sql_filter": {
+    "table": "refunds⋈order_items⋈orders",
+    "column": "refunded_at - paid_at",
+    "metric": "时长",
+    "unit": "天",
+    "op": "超过",
+    "limit": "7",
+    "direction": "greater_than",
+    "engine_op": ">"
+   },
+   "expected_answer_checks": [
+    {
+     "check": "status",
+     "equals": "completed"
+    },
+    {
+     "check": "error_code",
+     "equals": null
+    },
+    {
+     "check": "sql_rows",
+     "count": 151
+    },
+    {
+     "check": "clause_bound",
+     "clause_id": "DM-KF-2026-001-6.1",
+     "fields": [
+      "entity_id",
+      "entity_label",
+      "version",
+      "unit",
+      "time_scope",
+      "source_ref",
+      "source_sha256"
+     ]
+    },
+    {
+     "check": "threshold_checks",
+     "clause_id": "DM-KF-2026-001-6.1",
+     "count": 151
+    },
+    {
+     "check": "threshold_violations",
+     "clause_id": "DM-KF-2026-001-6.1",
+     "count": 123
+    },
+    {
+     "check": "doc_linked",
+     "min": 1
+    },
+    {
+     "check": "binding_contract",
+     "source_kind": "sql"
+    },
+    {
+     "check": "answer_contains",
+     "all_of": [
+      "售后服务时效规范",
+      "DM-KF-2026-001",
+      "时长 > 7天",
+      "123 条"
+     ]
+    },
+    {
+     "check": "conflict",
+     "present": false
+    }
+   ],
+   "expected_conflict": {
+    "present": false
+   },
+   "expected_hops": null,
+   "expectation_note": "阈值 7 天写入文档并为 2025 年 151 笔退款逐一判定；123 笔超限由引擎 threshold_checks 判定，SQL 不内联阈值。"
+  },
+  {
+   "case_id": "norm-p2-02",
+   "structure": "P2",
+   "question": "各渠道的销售金额中，哪些低于考核办法规定的下限？",
+   "sql_template": "retail_channel_sales",
+   "sql_params": {
+    "window_start": "2023-01-01T00:00:00+08:00",
+    "window_end": "2026-02-01T00:00:00+08:00"
+   },
+   "doc_selection": {
+    "document_ids": [
+     "DM-CH-2026-004_渠道业绩考核办法"
+    ],
+    "must_tokens": [
+     "DM-CH-2026-004-4.1"
+    ]
+   },
+   "expected_status": "completed",
+   "expected_question_metrics": [
+    "金额"
+   ],
+   "expected_clause_ids": [
+    "DM-CH-2026-004-4.1"
+   ],
+   "expected_binding_fields": [
+    "entity_id",
+    "entity_label",
+    "version",
+    "unit",
+    "time_scope",
+    "source_ref",
+    "source_sha256"
+   ],
+   "expected_sql_filter": {
+    "table": "orders⋈order_items",
+    "column": "SUM(quantity*unit_price*(1-discount))",
+    "metric": "金额",
+    "unit": "元",
+    "op": "不得低于",
+    "limit": "2000000",
+    "direction": "less_than",
+    "engine_op": "<"
+   },
+   "expected_answer_checks": [
+    {
+     "check": "status",
+     "equals": "completed"
+    },
+    {
+     "check": "error_code",
+     "equals": null
+    },
+    {
+     "check": "sql_rows",
+     "count": 3
+    },
+    {
+     "check": "clause_bound",
+     "clause_id": "DM-CH-2026-004-4.1",
+     "fields": [
+      "entity_id",
+      "entity_label",
+      "version",
+      "unit",
+      "time_scope",
+      "source_ref",
+      "source_sha256"
+     ]
+    },
+    {
+     "check": "threshold_checks",
+     "clause_id": "DM-CH-2026-004-4.1",
+     "count": 3
+    },
+    {
+     "check": "threshold_violations",
+     "clause_id": "DM-CH-2026-004-4.1",
+     "count": 2
+    },
+    {
+     "check": "doc_linked",
+     "min": 1
+    },
+    {
+     "check": "binding_contract",
+     "source_kind": "sql"
+    },
+    {
+     "check": "answer_contains",
+     "all_of": [
+      "渠道业绩考核办法",
+      "金额 < 2000000元",
+      "2 条"
+     ]
+    },
+    {
+     "check": "conflict",
+     "present": false
+    }
+   ],
+   "expected_conflict": {
+    "present": false
+   },
+   "expected_hops": null,
+   "expectation_note": "真实完成订单口径：online 2455249.34 / app 1795303.76 / offline 1098695.40，app 与 offline 未达 2000000 元。"
+  },
+  {
+   "case_id": "norm-p2-03",
+   "structure": "P2",
+   "question": "找出 2025 年销售金额低于考核办法下限的渠道。",
+   "sql_template": "retail_channel_sales",
+   "sql_params": {
+    "window_start": "2025-01-01T00:00:00+08:00",
+    "window_end": "2026-01-01T00:00:00+08:00"
+   },
+   "doc_selection": {
+    "document_ids": [
+     "DM-CH-2026-004_渠道业绩考核办法"
+    ],
+    "must_tokens": [
+     "DM-CH-2026-004-4.1"
+    ]
+   },
+   "expected_status": "completed",
+   "expected_question_metrics": [
+    "金额"
+   ],
+   "expected_clause_ids": [
+    "DM-CH-2026-004-4.1"
+   ],
+   "expected_binding_fields": [
+    "entity_id",
+    "entity_label",
+    "version",
+    "unit",
+    "time_scope",
+    "source_ref",
+    "source_sha256"
+   ],
+   "expected_sql_filter": {
+    "table": "orders⋈order_items",
+    "column": "SUM(quantity*unit_price*(1-discount))",
+    "metric": "金额",
+    "unit": "元",
+    "op": "不得低于",
+    "limit": "2000000",
+    "direction": "less_than",
+    "engine_op": "<"
+   },
+   "expected_answer_checks": [
+    {
+     "check": "status",
+     "equals": "completed"
+    },
+    {
+     "check": "error_code",
+     "equals": null
+    },
+    {
+     "check": "sql_rows",
+     "count": 3
+    },
+    {
+     "check": "threshold_checks",
+     "clause_id": "DM-CH-2026-004-4.1",
+     "count": 3
+    },
+    {
+     "check": "threshold_violations",
+     "clause_id": "DM-CH-2026-004-4.1",
+     "count": 3
+    },
+    {
+     "check": "doc_linked",
+     "min": 1
+    },
+    {
+     "check": "answer_contains",
+     "all_of": [
+      "2000000元",
+      "3 条"
+     ]
+    },
+    {
+     "check": "conflict",
+     "present": false
+    }
+   ],
+   "expected_conflict": {
+    "present": false
+   },
+   "expected_hops": null,
+   "expectation_note": "同一条款换时间口径即可复用为另一个可复算案例：2025 年完成订单口径 online 909996.11 / app 602116.38 / offline 278893.26，三条渠道都未达年度 2000000 元下限（与 norm-p2-02 的三年口径 2 条形成对照）。"
+  },
+  {
+   "case_id": "norm-p2-04",
+   "structure": "P2",
+   "question": "找出累计消费金额低于钻石等级门槛的会员等级。",
+   "sql_template": "retail_member_spend",
+   "sql_params": {
+    "window_start": "2023-01-01T00:00:00+08:00",
+    "window_end": "2026-02-01T00:00:00+08:00"
+   },
+   "doc_selection": {
+    "document_ids": [
+     "DM-VIP-2026-002_会员等级权益标准"
+    ],
+    "must_tokens": [
+     "DM-VIP-2026-002-3.2"
+    ]
+   },
+   "expected_status": "completed",
+   "expected_question_metrics": [
+    "金额"
+   ],
+   "expected_clause_ids": [
+    "DM-VIP-2026-002-3.2"
+   ],
+   "expected_binding_fields": [
+    "entity_id",
+    "entity_label",
+    "version",
+    "unit",
+    "time_scope",
+    "source_ref",
+    "source_sha256"
+   ],
+   "expected_sql_filter": {
+    "table": "customers⋈orders⋈order_items",
+    "column": "SUM(quantity*unit_price*(1-discount))",
+    "metric": "金额",
+    "unit": "元",
+    "op": "不得低于",
+    "limit": "800000",
+    "direction": "less_than",
+    "engine_op": "<"
+   },
+   "expected_answer_checks": [
+    {
+     "check": "status",
+     "equals": "completed"
+    },
+    {
+     "check": "sql_rows",
+     "count": 4
+    },
+    {
+     "check": "clause_bound",
+     "clause_id": "DM-VIP-2026-002-3.2",
+     "fields": [
+      "entity_id",
+      "entity_label",
+      "version",
+      "unit",
+      "time_scope",
+      "source_ref",
+      "source_sha256"
+     ]
+    },
+    {
+     "check": "threshold_checks",
+     "clause_id": "DM-VIP-2026-002-3.2",
+     "count": 4
+    },
+    {
+     "check": "threshold_violations",
+     "clause_id": "DM-VIP-2026-002-3.2",
+     "count": 1
+    },
+    {
+     "check": "doc_linked",
+     "min": 1
+    },
+    {
+     "check": "answer_contains",
+     "all_of": [
+      "800000元",
+      "1 条"
+     ]
+    },
+    {
+     "check": "conflict",
+     "present": false
+    }
+   ],
+   "expected_conflict": {
+    "present": false
+   },
+   "expected_hops": null,
+   "expectation_note": "钻石等级累计 755855.50 元，未达自身门槛 800000 元；其对象门控由 must_tokens 限定，引擎层面仍未做对象级门控（见诚实边界）。"
+  },
+  {
+   "case_id": "norm-p2-05",
+   "structure": "P2",
+   "question": "找出累计消费金额低于金卡等级门槛的会员等级。",
+   "sql_template": "retail_member_spend",
+   "sql_params": {
+    "window_start": "2023-01-01T00:00:00+08:00",
+    "window_end": "2026-02-01T00:00:00+08:00"
+   },
+   "doc_selection": {
+    "document_ids": [
+     "DM-VIP-2026-002_会员等级权益标准"
+    ],
+    "must_tokens": [
+     "DM-VIP-2026-002-3.1"
+    ]
+   },
+   "expected_status": "completed",
+   "expected_question_metrics": [
+    "金额"
+   ],
+   "expected_clause_ids": [
+    "DM-VIP-2026-002-3.1"
+   ],
+   "expected_binding_fields": [
+    "entity_id",
+    "entity_label",
+    "version",
+    "unit",
+    "time_scope",
+    "source_ref",
+    "source_sha256"
+   ],
+   "expected_sql_filter": {
+    "table": "customers⋈orders⋈order_items",
+    "column": "SUM(quantity*unit_price*(1-discount))",
+    "metric": "金额",
+    "unit": "元",
+    "op": "不得低于",
+    "limit": "900000",
+    "direction": "less_than",
+    "engine_op": "<"
+   },
+   "expected_answer_checks": [
+    {
+     "check": "status",
+     "equals": "completed"
+    },
+    {
+     "check": "sql_rows",
+     "count": 4
+    },
+    {
+     "check": "threshold_checks",
+     "clause_id": "DM-VIP-2026-002-3.1",
+     "count": 4
+    },
+    {
+     "check": "threshold_violations",
+     "clause_id": "DM-VIP-2026-002-3.1",
+     "count": 2
+    },
+    {
+     "check": "doc_linked",
+     "min": 1
+    },
+    {
+     "check": "answer_contains",
+     "all_of": [
+      "900000元",
+      "2 条"
+     ]
+    },
+    {
+     "check": "conflict",
+     "present": false
+    }
+   ],
+   "expected_conflict": {
+    "present": false
+   },
+   "expected_hops": null,
+   "expectation_note": "金卡 835011.36、钻石 755855.50 未达 900000 元。"
+  },
+  {
+   "case_id": "norm-p2-06",
+   "structure": "P2",
+   "question": "找出毛利比例低于定价规范下限的商品品类。",
+   "sql_template": "retail_category_margin",
+   "sql_params": {
+    "window_start": "2023-01-01T00:00:00+08:00"
+   },
+   "doc_selection": {
+    "document_ids": [
+     "DM-PR-2026-007_商品定价与毛利规范"
+    ],
+    "must_tokens": [
+     "DM-PR-2026-007-5.1"
+    ]
+   },
+   "expected_status": "completed",
+   "expected_question_metrics": [
+    "比例"
+   ],
+   "expected_clause_ids": [
+    "DM-PR-2026-007-5.1"
+   ],
+   "expected_binding_fields": [
+    "entity_id",
+    "entity_label",
+    "version",
+    "unit",
+    "time_scope",
+    "source_ref",
+    "source_sha256"
+   ],
+   "expected_sql_filter": {
+    "table": "products",
+    "column": "MIN((list_price-cost_price)/list_price)*100",
+    "metric": "比例",
+    "unit": "%",
+    "op": "低于",
+    "limit": "30",
+    "direction": "less_than",
+    "engine_op": "<"
+   },
+   "expected_answer_checks": [
+    {
+     "check": "status",
+     "equals": "completed"
+    },
+    {
+     "check": "sql_rows",
+     "count": 4
+    },
+    {
+     "check": "clause_bound",
+     "clause_id": "DM-PR-2026-007-5.1",
+     "fields": [
+      "entity_id",
+      "entity_label",
+      "version",
+      "unit",
+      "time_scope",
+      "source_ref",
+      "source_sha256"
+     ]
+    },
+    {
+     "check": "threshold_checks",
+     "clause_id": "DM-PR-2026-007-5.1",
+     "count": 4
+    },
+    {
+     "check": "threshold_violations",
+     "clause_id": "DM-PR-2026-007-5.1",
+     "count": 1
+    },
+    {
+     "check": "doc_linked",
+     "min": 1
+    },
+    {
+     "check": "answer_contains",
+     "all_of": [
+      "比例 < 30%",
+      "1 条"
+     ]
+    },
+    {
+     "check": "conflict",
+     "present": false
+    }
+   ],
+   "expected_conflict": {
+    "present": false
+   },
+   "expected_hops": null,
+   "expectation_note": "家电品类最低毛利率 27.2507% 低于 30%。"
+  },
+  {
+   "case_id": "norm-p2-07",
+   "structure": "P2",
+   "question": "找出定价金额低于报备下限的单品。",
+   "sql_template": "retail_product_price",
+   "sql_params": {
+    "window_start": "2023-01-01T00:00:00+08:00"
+   },
+   "doc_selection": {
+    "document_ids": [
+     "DM-PR-2026-007_商品定价与毛利规范"
+    ],
+    "must_tokens": [
+     "DM-PR-2026-007-5.2"
+    ]
+   },
+   "expected_status": "completed",
+   "expected_question_metrics": [
+    "金额"
+   ],
+   "expected_clause_ids": [
+    "DM-PR-2026-007-5.2"
+   ],
+   "expected_binding_fields": [
+    "entity_id",
+    "entity_label",
+    "version",
+    "unit",
+    "time_scope",
+    "source_ref",
+    "source_sha256"
+   ],
+   "expected_sql_filter": {
+    "table": "products",
+    "column": "list_price",
+    "metric": "金额",
+    "unit": "元",
+    "op": "低于",
+    "limit": "100",
+    "direction": "less_than",
+    "engine_op": "<"
+   },
+   "expected_answer_checks": [
+    {
+     "check": "status",
+     "equals": "completed"
+    },
+    {
+     "check": "sql_rows",
+     "count": 20
+    },
+    {
+     "check": "threshold_checks",
+     "clause_id": "DM-PR-2026-007-5.2",
+     "count": 20
+    },
+    {
+     "check": "threshold_violations",
+     "clause_id": "DM-PR-2026-007-5.2",
+     "count": 3
+    },
+    {
+     "check": "doc_linked",
+     "min": 1
+    },
+    {
+     "check": "answer_contains",
+     "all_of": [
+      "100元",
+      "3 条"
+     ]
+    },
+    {
+     "check": "conflict",
+     "present": false
+    }
+   ],
+   "expected_conflict": {
+    "present": false
+   },
+   "expected_hops": null,
+   "expectation_note": "20 款在售商品里 3 款定价低于 100 元。"
+  },
+  {
+   "case_id": "norm-p2-08",
+   "structure": "P2",
+   "question": "找出线下门店 2025 年 12 月单笔商品数量超过管控上限的订单。",
+   "sql_template": "retail_order_quantity",
+   "sql_params": {
+    "channel": "offline",
+    "window_start": "2025-12-01T00:00:00+08:00",
+    "window_end": "2026-01-01T00:00:00+08:00"
+   },
+   "doc_selection": {
+    "document_ids": [
+     "DM-WH-2026-009_订单数量管控规范"
+    ],
+    "must_tokens": [
+     "DM-WH-2026-009-2.1"
+    ]
+   },
+   "expected_status": "completed",
+   "expected_question_metrics": [
+    "数量"
+   ],
+   "expected_clause_ids": [
+    "DM-WH-2026-009-2.1"
+   ],
+   "expected_binding_fields": [
+    "entity_id",
+    "entity_label",
+    "version",
+    "unit",
+    "time_scope",
+    "source_ref",
+    "source_sha256"
+   ],
+   "expected_sql_filter": {
+    "table": "orders⋈order_items",
+    "column": "SUM(quantity) per order_id",
+    "metric": "数量",
+    "unit": "件",
+    "op": "超过",
+    "limit": "2",
+    "direction": "greater_than",
+    "engine_op": ">"
+   },
+   "expected_answer_checks": [
+    {
+     "check": "status",
+     "equals": "completed"
+    },
+    {
+     "check": "sql_rows",
+     "count": 33
+    },
+    {
+     "check": "threshold_checks",
+     "clause_id": "DM-WH-2026-009-2.1",
+     "count": 33
+    },
+    {
+     "check": "threshold_violations",
+     "clause_id": "DM-WH-2026-009-2.1",
+     "count": 25
+    },
+    {
+     "check": "doc_linked",
+     "min": 1
+    },
+    {
+     "check": "answer_contains",
+     "all_of": [
+      "数量 > 2件",
+      "25 条"
+     ]
+    },
+    {
+     "check": "conflict",
+     "present": false
+    }
+   ],
+   "expected_conflict": {
+    "present": false
+   },
+   "expected_hops": null,
+   "expectation_note": "线下门店 2025 年 12 月 33 笔订单中 25 笔的商品件数（按订单 SUM(quantity)）超过 2 件；口径是「单笔订单件数」，不是「单条明细行件数」。"
+  },
+  {
+   "case_id": "norm-p2-09",
+   "structure": "P2",
+   "question": "A102 零件的保温温度测量中，哪些超过 V2 版工艺规范的上限？",
+   "sql_template": "industrial_temp",
+   "sql_params": {
+    "part_id": "A102",
+    "window_start": "2026-08-01T00:00:00+08:00",
+    "window_end": "2027-01-01T00:00:00+08:00",
+    "normalized": true
+   },
+   "doc_selection": {
+    "document_ids": [
+     "GY-A102-V2_工艺温度规范"
+    ],
+    "must_tokens": [
+     "GY-A102-V2-4.1"
+    ]
+   },
+   "expected_status": "completed",
+   "expected_question_metrics": [
+    "温度"
+   ],
+   "expected_clause_ids": [
+    "GY-A102-V2-4.1"
+   ],
+   "expected_binding_fields": [
+    "entity_id",
+    "entity_label",
+    "version",
+    "unit",
+    "time_scope",
+    "source_ref",
+    "source_sha256"
+   ],
+   "expected_sql_filter": {
+    "table": "measurement_observations⋈production_batches",
+    "column": "temperature_c",
+    "metric": "温度",
+    "unit": "degC",
+    "op": "超过",
+    "limit": "850",
+    "direction": "greater_than",
+    "engine_op": ">"
+   },
+   "expected_answer_checks": [
+    {
+     "check": "status",
+     "equals": "completed"
+    },
+    {
+     "check": "sql_rows",
+     "count": 10
+    },
+    {
+     "check": "clause_bound",
+     "clause_id": "GY-A102-V2-4.1",
+     "fields": [
+      "entity_id",
+      "entity_label",
+      "version",
+      "unit",
+      "time_scope",
+      "source_ref",
+      "source_sha256"
+     ]
+    },
+    {
+     "check": "threshold_checks",
+     "clause_id": "GY-A102-V2-4.1",
+     "count": 10
+    },
+    {
+     "check": "threshold_violations",
+     "clause_id": "GY-A102-V2-4.1",
+     "count": 3
+    },
+    {
+     "check": "doc_linked",
+     "min": 1
+    },
+    {
+     "check": "binding_contract",
+     "source_kind": "sql"
+    },
+    {
+     "check": "answer_contains",
+     "all_of": [
+      "工艺温度规范",
+      "温度 > 850degC",
+      "3 条"
+     ]
+    },
+    {
+     "check": "conflict",
+     "present": false
+    }
+   ],
+   "expected_conflict": {
+    "present": false
+   },
+   "expected_hops": null,
+   "expectation_note": "A102 有 11 条测量，其中 M005-1 的 sensorX 无法被库归一（temperature_c 为空）被排除并在报告中登记；其余 10 条里 870/870/860 三条超 850 degC。"
+  },
+  {
+   "case_id": "norm-p2-10",
+   "structure": "P2",
+   "question": "找出 A102 零件保温温度超过 V2 版规范上限的测量记录有多少条？",
+   "sql_template": "industrial_temp",
+   "sql_params": {
+    "part_id": "A102",
+    "window_start": "2026-08-01T00:00:00+08:00",
+    "window_end": "2027-01-01T00:00:00+08:00",
+    "normalized": true,
+    "pushdown": true
+   },
+   "doc_selection": {
+    "document_ids": [
+     "GY-A102-V2_工艺温度规范"
+    ],
+    "must_tokens": [
+     "GY-A102-V2-4.1"
+    ]
+   },
+   "expected_status": "completed",
+   "expected_question_metrics": [
+    "温度"
+   ],
+   "expected_clause_ids": [
+    "GY-A102-V2-4.1"
+   ],
+   "expected_binding_fields": [
+    "entity_id",
+    "entity_label",
+    "version",
+    "unit",
+    "time_scope",
+    "source_ref",
+    "source_sha256"
+   ],
+   "expected_sql_filter": {
+    "table": "measurement_observations⋈production_batches",
+    "column": "temperature_c (WHERE 内联条款阈值)",
+    "metric": "温度",
+    "unit": "degC",
+    "op": "超过",
+    "limit": "850",
+    "direction": "greater_than",
+    "engine_op": ">"
+   },
+   "expected_answer_checks": [
+    {
+     "check": "status",
+     "equals": "completed"
+    },
+    {
+     "check": "sql_rows",
+     "count": 3
+    },
+    {
+     "check": "threshold_checks",
+     "clause_id": "GY-A102-V2-4.1",
+     "count": 3
+    },
+    {
+     "check": "threshold_violations",
+     "clause_id": "GY-A102-V2-4.1",
+     "count": 3
+    },
+    {
+     "check": "doc_linked",
+     "min": 1
+    },
+    {
+     "check": "answer_contains",
+     "all_of": [
+      "3 条"
+     ]
+    },
+    {
+     "check": "conflict",
+     "present": false
+    }
+   ],
+   "expected_conflict": {
+    "present": false
+   },
+   "expected_hops": null,
+   "expectation_note": "把条款阈值直接编译进 WHERE，证明「文档规则驱动 SQL 筛选」的字面路径；行数 3 与阈值比较结果一致。"
+  },
+  {
+   "case_id": "norm-p2-11",
+   "structure": "P2",
+   "question": "按 V1 版工艺规范筛选 2026 年 8 月的 A102 保温温度测量，找出超过上限的记录。",
+   "sql_template": "industrial_temp",
+   "sql_params": {
+    "part_id": "A102",
+    "window_start": "2026-08-01T00:00:00+08:00",
+    "window_end": "2026-09-01T00:00:00+08:00",
+    "normalized": true
+   },
+   "doc_selection": {
+    "document_ids": [
+     "GY-A102-V1_工艺温度规范"
+    ],
+    "must_tokens": [
+     "GY-A102-V1-4.1"
+    ]
+   },
+   "expected_status": "completed",
+   "expected_question_metrics": [
+    "温度"
+   ],
+   "expected_clause_ids": [
+    "GY-A102-V1-4.1"
+   ],
+   "expected_binding_fields": [
+    "entity_id",
+    "entity_label",
+    "version",
+    "unit",
+    "time_scope",
+    "source_ref",
+    "source_sha256"
+   ],
+   "expected_sql_filter": {
+    "table": "measurement_observations⋈production_batches",
+    "column": "temperature_c",
+    "metric": "温度",
+    "unit": "degC",
+    "op": "超过",
+    "limit": "860",
+    "direction": "greater_than",
+    "engine_op": ">"
+   },
+   "expected_answer_checks": [
+    {
+     "check": "status",
+     "equals": "completed"
+    },
+    {
+     "check": "sql_rows",
+     "count": 1
+    },
+    {
+     "check": "threshold_checks",
+     "clause_id": "GY-A102-V1-4.1",
+     "count": 1
+    },
+    {
+     "check": "threshold_violations",
+     "clause_id": "GY-A102-V1-4.1",
+     "count": 0
+    },
+    {
+     "check": "doc_linked",
+     "min": 1
+    },
+    {
+     "check": "answer_contains",
+     "all_of": [
+      "0 条"
+     ]
+    },
+    {
+     "check": "conflict",
+     "present": false
+    }
+   ],
+   "expected_conflict": {
+    "present": false
+   },
+   "expected_hops": null,
+   "expectation_note": "V1 有效期覆盖 2026-08-31 的 M003-1（835 degC），按条款生效窗口链接，0 条超限：证明版本/有效期门在 P2 上生效。"
+  },
+  {
+   "case_id": "norm-p2-12",
+   "structure": "P2",
+   "question": "A103 零件的保温温度测量中，哪些超过华氏标注版规范的上限？",
+   "sql_template": "industrial_temp",
+   "sql_params": {
+    "part_id": "A103",
+    "window_start": "2026-08-01T00:00:00+08:00",
+    "window_end": "2027-01-01T00:00:00+08:00",
+    "normalized": false
+   },
+   "doc_selection": {
+    "document_ids": [
+     "GY-A103_工艺温度规范_华氏版"
+    ],
+    "must_tokens": [
+     "GY-A103-F-4.1"
+    ]
+   },
+   "expected_status": "completed",
+   "expected_question_metrics": [
+    "温度"
+   ],
+   "expected_clause_ids": [
+    "GY-A103-F-4.1"
+   ],
+   "expected_binding_fields": [
+    "entity_id",
+    "entity_label",
+    "version",
+    "unit",
+    "time_scope",
+    "source_ref",
+    "source_sha256"
+   ],
+   "expected_sql_filter": {
+    "table": "measurement_observations⋈production_batches",
+    "column": "value",
+    "metric": "温度",
+    "unit": "degF",
+    "op": "超过",
+    "limit": "1544",
+    "direction": "greater_than",
+    "engine_op": ">"
+   },
+   "expected_answer_checks": [
+    {
+     "check": "status",
+     "equals": "completed"
+    },
+    {
+     "check": "sql_rows",
+     "count": 1
+    },
+    {
+     "check": "threshold_checks",
+     "clause_id": "GY-A103-F-4.1",
+     "count": 1
+    },
+    {
+     "check": "threshold_violations",
+     "clause_id": "GY-A103-F-4.1",
+     "count": 1
+    },
+    {
+     "check": "edges_present",
+     "edge_types": [
+      "unit_equivalent"
+     ],
+     "min": 1
+    },
+    {
+     "check": "doc_linked",
+     "min": 1
+    },
+    {
+     "check": "answer_contains",
+     "all_of": [
+      "1544degF",
+      "1 条"
+     ]
+    },
+    {
+     "check": "conflict",
+     "present": false
+    }
+   ],
+   "expected_conflict": {
+    "present": false
+   },
+   "expected_hops": null,
+   "expectation_note": "1544 degF 精确等于 840 degC，实测 850 degC 超限；单位换算走登记表且可复算。"
+  },
+  {
+   "case_id": "norm-p3-01",
+   "structure": "P3",
+   "question": "核验 A102 保温温度质检报告 Q001-1 的实测值与库内测量 M001-1 是否一致。",
+   "sql_template": "industrial_by_ids",
+   "sql_params": {
+    "measurement_ids": [
+     "M001-1"
+    ],
+    "window_start": "2026-09-01T00:00:00+08:00",
+    "window_end": "2026-10-01T00:00:00+08:00"
+   },
+   "doc_selection": {
+    "document_ids": [
+     "ZJ-A102_质检核验记录"
+    ],
+    "must_tokens": [
+     "ZJ-Q001-1"
+    ]
+   },
+   "expected_status": "abstained",
+   "expected_question_metrics": [
+    "温度"
+   ],
+   "expected_clause_ids": [
+    "ZJ-Q001-1"
+   ],
+   "expected_binding_fields": [
+    "entity_id",
+    "entity_label",
+    "version",
+    "unit",
+    "time_scope",
+    "source_ref",
+    "source_sha256"
+   ],
+   "expected_sql_filter": null,
+   "expected_answer_checks": [
+    {
+     "check": "status",
+     "equals": "abstained"
+    },
+    {
+     "check": "error_code",
+     "equals": "CONFLICT_UNRESOLVED"
+    },
+    {
+     "check": "sql_rows",
+     "count": 1
+    },
+    {
+     "check": "conflict",
+     "present": true,
+     "conflict_type": "value_conflict",
+     "entity_id": "A102",
+     "metric": "温度",
+     "version": "A102-V2",
+     "values": [
+      "850",
+      "870"
+     ]
+    },
+    {
+     "check": "binding_contract",
+     "source_kind": "doc"
+    },
+    {
+     "check": "answer_contains",
+     "all_of": [
+      "CONFLICT_UNRESOLVED",
+      "850",
+      "870",
+      "value_conflict"
+     ]
+    }
+   ],
+   "expected_conflict": {
+    "present": true,
+    "conflict_type": "value_conflict",
+    "entity_id": "A102",
+    "metric": "温度",
+    "version": "A102-V2",
+    "values": [
+     "850",
+     "870"
+    ]
+   },
+   "expected_hops": null,
+   "expectation_note": "仓库既有 industrial_demo_v1.pdf 的 Q001-1 原文实测值 850 与同库 M001-1 的 870 本来就矛盾，语料为原文转录，未制造该冲突；未登记权威规则 → 呈报双方原值后拒绝裁定。"
+  },
+  {
+   "case_id": "norm-p3-02",
+   "structure": "P3",
+   "question": "核验 A102 保温温度质检报告 Q002-1 的实测值与库内测量 M002-1 是否一致。",
+   "sql_template": "industrial_by_ids",
+   "sql_params": {
+    "measurement_ids": [
+     "M002-1"
+    ],
+    "window_start": "2026-09-01T00:00:00+08:00",
+    "window_end": "2026-10-01T00:00:00+08:00"
+   },
+   "doc_selection": {
+    "document_ids": [
+     "ZJ-A102_质检核验记录"
+    ],
+    "must_tokens": [
+     "ZJ-Q002-1"
+    ]
+   },
+   "expected_status": "completed",
+   "expected_question_metrics": [
+    "温度"
+   ],
+   "expected_clause_ids": [
+    "ZJ-Q002-1"
+   ],
+   "expected_binding_fields": [
+    "entity_id",
+    "entity_label",
+    "version",
+    "unit",
+    "time_scope",
+    "source_ref",
+    "source_sha256"
+   ],
+   "expected_sql_filter": null,
+   "expected_answer_checks": [
+    {
+     "check": "status",
+     "equals": "completed"
+    },
+    {
+     "check": "error_code",
+     "equals": null
+    },
+    {
+     "check": "sql_rows",
+     "count": 1
+    },
+    {
+     "check": "conflict",
+     "present": false
+    },
+    {
+     "check": "binding_contract",
+     "source_kind": "doc"
+    },
+    {
+     "check": "answer_contains",
+     "all_of": [
+      "跨源核验完成",
+      "2 条数值声称"
+     ]
+    }
+   ],
+   "expected_conflict": {
+    "present": false
+   },
+   "expected_hops": null,
+   "expectation_note": "文档 850 degC 与库内 1123.15 K（=850.00 degC）在登记换算下等价，不构成冲突。"
+  },
+  {
+   "case_id": "norm-p3-03",
+   "structure": "P3",
+   "question": "核验 A102 保温温度质检报告 Q003-1 的实测值与库内测量 M003-1 是否一致。",
+   "sql_template": "industrial_by_ids",
+   "sql_params": {
+    "measurement_ids": [
+     "M003-1"
+    ],
+    "window_start": "2026-08-01T00:00:00+08:00",
+    "window_end": "2026-10-01T00:00:00+08:00"
+   },
+   "doc_selection": {
+    "document_ids": [
+     "ZJ-A102_质检核验记录"
+    ],
+    "must_tokens": [
+     "ZJ-Q003-1"
+    ]
+   },
+   "expected_status": "completed",
+   "expected_question_metrics": [
+    "温度"
+   ],
+   "expected_clause_ids": [
+    "ZJ-Q003-1"
+   ],
+   "expected_binding_fields": [
+    "entity_id",
+    "entity_label",
+    "version",
+    "unit",
+    "time_scope",
+    "source_ref",
+    "source_sha256"
+   ],
+   "expected_sql_filter": null,
+   "expected_answer_checks": [
+    {
+     "check": "status",
+     "equals": "completed"
+    },
+    {
+     "check": "sql_rows",
+     "count": 1
+    },
+    {
+     "check": "conflict",
+     "present": false
+    },
+    {
+     "check": "answer_contains",
+     "all_of": [
+      "跨源核验完成"
+     ]
+    }
+   ],
+   "expected_conflict": {
+    "present": false
+   },
+   "expected_hops": null,
+   "expectation_note": "835 degC 两侧一致。"
+  },
+  {
+   "case_id": "norm-p3-04",
+   "structure": "P3",
+   "question": "核验 A102 保温温度质检报告 Q011-1 的实测值与库内测量 M011-1 是否一致。",
+   "sql_template": "industrial_by_ids",
+   "sql_params": {
+    "measurement_ids": [
+     "M011-1"
+    ],
+    "window_start": "2026-09-01T00:00:00+08:00",
+    "window_end": "2026-10-01T00:00:00+08:00"
+   },
+   "doc_selection": {
+    "document_ids": [
+     "ZJ-A102_质检核验记录"
+    ],
+    "must_tokens": [
+     "ZJ-Q011-1"
+    ]
+   },
+   "expected_status": "completed",
+   "expected_question_metrics": [
+    "温度"
+   ],
+   "expected_clause_ids": [
+    "ZJ-Q011-1"
+   ],
+   "expected_binding_fields": [
+    "entity_id",
+    "entity_label",
+    "version",
+    "unit",
+    "time_scope",
+    "source_ref",
+    "source_sha256"
+   ],
+   "expected_sql_filter": null,
+   "expected_answer_checks": [
+    {
+     "check": "status",
+     "equals": "completed"
+    },
+    {
+     "check": "sql_rows",
+     "count": 1
+    },
+    {
+     "check": "conflict",
+     "present": false
+    },
+    {
+     "check": "answer_contains",
+     "all_of": [
+      "跨源核验完成"
+     ]
+    }
+   ],
+   "expected_conflict": {
+    "present": false
+   },
+   "expected_hops": null,
+   "expectation_note": "860 degC 两侧一致。"
+  },
+  {
+   "case_id": "norm-p3-05",
+   "structure": "P3",
+   "question": "核验 A102 保温温度质检报告 Q005-1 的实测值与库内测量 M005-1 是否一致。",
+   "sql_template": "industrial_by_ids",
+   "sql_params": {
+    "measurement_ids": [
+     "M005-1"
+    ],
+    "window_start": "2026-09-01T00:00:00+08:00",
+    "window_end": "2026-10-01T00:00:00+08:00"
+   },
+   "doc_selection": {
+    "document_ids": [
+     "ZJ-A102_质检核验记录"
+    ],
+    "must_tokens": [
+     "ZJ-Q005-1"
+    ]
+   },
+   "expected_status": "completed",
+   "expected_question_metrics": [
+    "温度"
+   ],
+   "expected_clause_ids": [
+    "ZJ-Q005-1"
+   ],
+   "expected_binding_fields": [
+    "entity_id",
+    "entity_label",
+    "version",
+    "unit",
+    "time_scope",
+    "source_ref",
+    "source_sha256"
+   ],
+   "expected_sql_filter": null,
+   "expected_answer_checks": [
+    {
+     "check": "status",
+     "equals": "completed"
+    },
+    {
+     "check": "sql_rows",
+     "count": 1
+    },
+    {
+     "check": "conflict",
+     "present": false
+    },
+    {
+     "check": "binding_contract",
+     "source_kind": "doc"
+    },
+    {
+     "check": "answer_contains",
+     "all_of": [
+      "跨源核验完成"
+     ]
+    }
+   ],
+   "expected_conflict": {
+    "present": false
+   },
+   "expected_hops": null,
+   "expectation_note": "库内 M005-1 单位 sensorX 未登记：先按 SQL_CLAIM_BINDING_INCOMPLETE 拒答，再由同指标兄弟声称（文档 degC）做一次受控单位修复并记账，第二遍两侧同为 850 degC 故无冲突。该案例记录的是「修复 + 记账」而非「冲突」。"
+  },
+  {
+   "case_id": "norm-p3-06",
+   "structure": "P3",
+   "question": "核验 A102 保温温度质检报告 Q008-1 的实测值与库内测量 M008-1 是否一致。",
+   "sql_template": "industrial_by_ids",
+   "sql_params": {
+    "measurement_ids": [
+     "M008-1"
+    ],
+    "window_start": "2026-09-01T00:00:00+08:00",
+    "window_end": "2026-10-01T00:00:00+08:00"
+   },
+   "doc_selection": {
+    "document_ids": [
+     "ZJ-A102_质检核验记录"
+    ],
+    "must_tokens": [
+     "ZJ-Q008-1"
+    ]
+   },
+   "expected_status": "failed",
+   "expected_question_metrics": [
+    "温度"
+   ],
+   "expected_clause_ids": [
+    "ZJ-Q008-1"
+   ],
+   "expected_binding_fields": [
+    "entity_id",
+    "entity_label",
+    "version",
+    "unit",
+    "time_scope",
+    "source_ref",
+    "source_sha256"
+   ],
+   "expected_sql_filter": null,
+   "expected_answer_checks": [
+    {
+     "check": "status",
+     "equals": "failed"
+    },
+    {
+     "check": "error_code",
+     "equals": "DOC_BINDING_MISSING"
+    },
+    {
+     "check": "failure_detail_contains",
+     "value": "NO_DOC_EVIDENCE_LINKED"
+    },
+    {
+     "check": "sql_rows",
+     "count": 1
+    },
+    {
+     "check": "conflict",
+     "present": false
+    }
+   ],
+   "expected_conflict": {
+    "present": false
+   },
+   "expected_hops": null,
+   "expectation_note": "原文记录 Q008-1 写的是 A102，库内同测量编号 M008-1 属于 A103：跨源链接无法建立而拒绝结论，属设计内失败。"
+  },
+  {
+   "case_id": "norm-p3-07",
+   "structure": "P3",
+   "question": "核验 A102 保温温度质检报告 Q012-1 的实测值与库内测量 M012-1 是否一致。",
+   "sql_template": "industrial_by_ids",
+   "sql_params": {
+    "measurement_ids": [
+     "M012-1"
+    ],
+    "window_start": "2026-09-01T00:00:00+08:00",
+    "window_end": "2026-10-01T00:00:00+08:00"
+   },
+   "doc_selection": {
+    "document_ids": [
+     "ZJ-A102_质检核验记录"
+    ],
+    "must_tokens": [
+     "ZJ-Q012-1"
+    ]
+   },
+   "expected_status": "failed",
+   "expected_question_metrics": [
+    "温度"
+   ],
+   "expected_clause_ids": [
+    "ZJ-Q012-1"
+   ],
+   "expected_binding_fields": [
+    "entity_id",
+    "entity_label",
+    "version",
+    "unit",
+    "time_scope",
+    "source_ref",
+    "source_sha256"
+   ],
+   "expected_sql_filter": null,
+   "expected_answer_checks": [
+    {
+     "check": "status",
+     "equals": "failed"
+    },
+    {
+     "check": "error_code",
+     "equals": "DOC_BINDING_MISSING"
+    },
+    {
+     "check": "failure_detail_contains",
+     "value": "VERSION_MISMATCH"
+    },
+    {
+     "check": "sql_rows",
+     "count": 1
+    },
+    {
+     "check": "conflict",
+     "present": false
+    }
+   ],
+   "expected_conflict": {
+    "present": false
+   },
+   "expected_hops": null,
+   "expectation_note": "M012-1 所在批次 B012 在 process_revisions 里没有登记版次（recorded_revision 为空），文档声称的版次无法与数据侧对齐 → VERSION_MISMATCH 拒绝，属设计内失败。"
+  },
+  {
+   "case_id": "norm-p3-08",
+   "structure": "P3",
+   "question": "核验 A102 保温温度质检报告 Q004-1 与 Q006-1 的实测值与库内测量是否一致。",
+   "sql_template": "industrial_by_ids",
+   "sql_params": {
+    "measurement_ids": [
+     "M004-1",
+     "M006-1"
+    ],
+    "window_start": "2026-09-01T00:00:00+08:00",
+    "window_end": "2026-10-01T00:00:00+08:00"
+   },
+   "doc_selection": {
+    "document_ids": [
+     "ZJ-A102_质检核验记录"
+    ],
+    "any_tokens": [
+     "ZJ-Q004-1",
+     "ZJ-Q006-1"
+    ]
+   },
+   "expected_status": "completed",
+   "expected_question_metrics": [
+    "温度"
+   ],
+   "expected_clause_ids": [
+    "ZJ-Q004-1",
+    "ZJ-Q006-1"
+   ],
+   "expected_binding_fields": [
+    "entity_id",
+    "entity_label",
+    "version",
+    "unit",
+    "time_scope",
+    "source_ref",
+    "source_sha256"
+   ],
+   "expected_sql_filter": null,
+   "expected_answer_checks": [
+    {
+     "check": "status",
+     "equals": "completed"
+    },
+    {
+     "check": "sql_rows",
+     "count": 2
+    },
+    {
+     "check": "conflict",
+     "present": false
+    },
+    {
+     "check": "binding_contract",
+     "source_kind": "doc"
+    },
+    {
+     "check": "answer_contains",
+     "all_of": [
+      "跨源核验完成",
+      "4 条数值声称"
+     ]
+    }
+   ],
+   "expected_conflict": {
+    "present": false
+   },
+   "expected_hops": null,
+   "expectation_note": "两条记录两侧都是 850 degC，逐条核验后全部一致。"
+  },
+  {
+   "case_id": "norm-p3-09",
+   "structure": "P3",
+   "question": "核验 A102 保温温度质检报告 Q006-2 与 Q011-1 的实测值与库内测量是否一致。",
+   "sql_template": "industrial_by_ids",
+   "sql_params": {
+    "measurement_ids": [
+     "M006-2",
+     "M011-1"
+    ],
+    "window_start": "2026-09-01T00:00:00+08:00",
+    "window_end": "2026-10-01T00:00:00+08:00"
+   },
+   "doc_selection": {
+    "document_ids": [
+     "ZJ-A102_质检核验记录"
+    ],
+    "any_tokens": [
+     "ZJ-Q006-2",
+     "ZJ-Q011-1"
+    ]
+   },
+   "expected_status": "completed",
+   "expected_question_metrics": [
+    "温度"
+   ],
+   "expected_clause_ids": [
+    "ZJ-Q006-2",
+    "ZJ-Q011-1"
+   ],
+   "expected_binding_fields": [
+    "entity_id",
+    "entity_label",
+    "version",
+    "unit",
+    "time_scope",
+    "source_ref",
+    "source_sha256"
+   ],
+   "expected_sql_filter": null,
+   "expected_answer_checks": [
+    {
+     "check": "status",
+     "equals": "completed"
+    },
+    {
+     "check": "error_code",
+     "equals": null
+    },
+    {
+     "check": "sql_rows",
+     "count": 2
+    },
+    {
+     "check": "conflict",
+     "present": false
+    },
+    {
+     "check": "binding_contract",
+     "source_kind": "doc"
+    }
+   ],
+   "expected_conflict": {
+    "present": false,
+    "conflict_type": null,
+    "entity_id": null,
+    "metric": null,
+    "version": null,
+    "values": []
+   },
+   "expected_hops": null,
+   "expectation_note": "两个测量（M006-2=870、M011-1=860）各自与文档一致。修复前引擎冲突键为 entity+metric+version（不含记录作用域），跨记录配对产生 2 条假 value_conflict；round-4 缺陷 B 修复后，只有两侧都命名且记录不同的声称才拆开配对，本案例因此为 completed 且无冲突。该案例仍保留可复现的粒度边界，而不是把它藏起来。"
+  },
+  {
+   "case_id": "norm-p4-01",
+   "structure": "P4",
+   "question": "A102 零件保温温度超过 V2 版规范的测量记录，对应哪些系统条款与说明材料？请逐跳给出证据。",
+   "sql_template": "industrial_temp",
+   "sql_params": {
+    "part_id": "A102",
+    "window_start": "2026-09-01T00:00:00+08:00",
+    "window_end": "2026-10-01T00:00:00+08:00",
+    "normalized": true
+   },
+   "doc_selection": {
+    "document_ids": [
+     "GY-A102-V2_工艺温度规范",
+     "SM-GY-2026-001_工艺温度判定说明材料"
+    ],
+    "any_tokens": [
+     "GY-A102-V2-4.1",
+     "SM-GY-2026-001-1.1"
+    ]
+   },
+   "expected_status": "completed",
+   "expected_question_metrics": [
+    "温度"
+   ],
+   "expected_clause_ids": [
+    "GY-A102-V2-4.1"
+   ],
+   "expected_binding_fields": [
+    "entity_id",
+    "entity_label",
+    "version",
+    "unit",
+    "time_scope",
+    "source_ref",
+    "source_sha256"
+   ],
+   "expected_sql_filter": {
+    "table": "measurement_observations⋈production_batches",
+    "column": "temperature_c",
+    "metric": "温度",
+    "unit": "degC",
+    "op": "超过",
+    "limit": "850",
+    "direction": "greater_than",
+    "engine_op": ">"
+   },
+   "expected_answer_checks": [
+    {
+     "check": "status",
+     "equals": "completed"
+    },
+    {
+     "check": "sql_rows",
+     "count": 9
+    },
+    {
+     "check": "clause_bound",
+     "clause_id": "GY-A102-V2-4.1",
+     "fields": [
+      "entity_id",
+      "entity_label",
+      "version",
+      "unit",
+      "time_scope",
+      "source_ref",
+      "source_sha256"
+     ]
+    },
+    {
+     "check": "threshold_violations",
+     "clause_id": "GY-A102-V2-4.1",
+     "count": 3
+    },
+    {
+     "check": "doc_linked",
+     "min": 2
+    },
+    {
+     "check": "hops",
+     "min_edges": 3,
+     "node_types": [
+      "sql_row",
+      "spec_clause",
+      "doc_block"
+     ],
+     "edge_types": [
+      "version_scope",
+      "supports"
+     ]
+    },
+    {
+     "check": "answer_contains",
+     "all_of": [
+      "多跳跨源链路",
+      "温度 > 850degC"
+     ]
+    },
+    {
+     "check": "conflict",
+     "present": false
+    }
+   ],
+   "expected_conflict": {
+    "present": false
+   },
+   "expected_hops": {
+    "min_edges": 3,
+    "node_types": [
+     "sql_row",
+     "spec_clause",
+     "doc_block"
+    ],
+    "description": "测量行 →（版次 A102-V2 相等）规范条款 →（supports）规范原文块；说明材料按实体 A102 与测量行 entity_match 相连。",
+    "edge_types": [
+     "version_scope",
+     "supports"
+    ],
+    "edge_order": "无向链路，只要求这些证据边出现在链路上，不要求出现顺序"
+   },
+   "expectation_note": "9 条 2026-09 的 A102 测量，3 条超 850 degC；链路为 测量行 --version_scope--> 条款 --supports--> 规范块，另有 说明材料 的 entity_match 边。 P4 答案正文按证据图给出节点 id 与条款的 指标/方向/阈值/单位，不含条款编号本身；条款编号在 clause_bindings 与 evidence_graph 中核对。"
+  },
+  {
+   "case_id": "norm-p4-02",
+   "structure": "P4",
+   "question": "A102 零件 2026 年 9 月 17 日附近的保温温度测量，涉及哪些版次的系统条款与说明材料？",
+   "sql_template": "industrial_temp",
+   "sql_params": {
+    "part_id": "A102",
+    "window_start": "2026-09-15T00:00:00+08:00",
+    "window_end": "2026-09-20T00:00:00+08:00",
+    "normalized": true
+   },
+   "doc_selection": {
+    "document_ids": [
+     "GY-A102-V2_工艺温度规范",
+     "GY-A102-V3_工艺温度规范",
+     "SM-GY-2026-001_工艺温度判定说明材料"
+    ],
+    "any_tokens": [
+     "GY-A102-V2-4.1",
+     "GY-A102-V3-4.1",
+     "SM-GY-2026-001-1.1"
+    ]
+   },
+   "expected_status": "completed",
+   "expected_question_metrics": [
+    "温度"
+   ],
+   "expected_clause_ids": [
+    "GY-A102-V2-4.1",
+    "GY-A102-V3-4.1"
+   ],
+   "expected_binding_fields": [
+    "entity_id",
+    "entity_label",
+    "version",
+    "unit",
+    "time_scope",
+    "source_ref",
+    "source_sha256"
+   ],
+   "expected_sql_filter": {
+    "table": "measurement_observations⋈production_batches",
+    "column": "temperature_c",
+    "metric": "温度",
+    "unit": "degC",
+    "op": "超过",
+    "limit": "850",
+    "direction": "greater_than",
+    "engine_op": ">"
+   },
+   "expected_answer_checks": [
+    {
+     "check": "status",
+     "equals": "completed"
+    },
+    {
+     "check": "sql_rows",
+     "count": 1
+    },
+    {
+     "check": "clause_bound",
+     "clause_id": "GY-A102-V2-4.1",
+     "fields": [
+      "entity_id",
+      "entity_label",
+      "version",
+      "unit",
+      "time_scope",
+      "source_ref",
+      "source_sha256"
+     ]
+    },
+    {
+     "check": "clause_bound",
+     "clause_id": "GY-A102-V3-4.1",
+     "fields": [
+      "entity_id",
+      "entity_label",
+      "version",
+      "unit",
+      "time_scope",
+      "source_ref",
+      "source_sha256"
+     ]
+    },
+    {
+     "check": "threshold_checks",
+     "clause_id": "GY-A102-V2-4.1",
+     "count": 1
+    },
+    {
+     "check": "threshold_checks",
+     "clause_id": "GY-A102-V3-4.1",
+     "count": 1
+    },
+    {
+     "check": "doc_linked",
+     "min": 2
+    },
+    {
+     "check": "hops",
+     "min_edges": 3,
+     "node_types": [
+      "sql_row",
+      "spec_clause",
+      "doc_block"
+     ],
+     "edge_types": [
+      "version_scope",
+      "supports"
+     ]
+    },
+    {
+     "check": "answer_contains",
+     "all_of": [
+      "多跳跨源链路",
+      "温度 > 850degC",
+      "温度 > 855degC"
+     ]
+    },
+    {
+     "check": "conflict",
+     "present": false
+    }
+   ],
+   "expected_conflict": {
+    "present": false
+   },
+   "expected_hops": {
+    "min_edges": 3,
+    "node_types": [
+     "sql_row",
+     "spec_clause",
+     "doc_block"
+    ],
+    "description": "B004 记录版次 A102-V2（与 V2 条款版次相等）而生效窗口落在 A102-V3（2026-09-15..09-20），两个条款都按各自门链接到同一测量行。",
+    "edge_types": [
+     "version_scope",
+     "supports"
+    ],
+    "edge_order": "无向链路，只要求这些证据边出现在链路上，不要求出现顺序"
+   },
+   "expectation_note": "同一测量行同时被「记录版次 A102-V2」与「时间生效版次 A102-V3」两条条款链接：这是真实存在的版次口径差异，引擎按版本相等与有效期两条门分别留痕，不擅自替用户裁定。 P4 答案正文按证据图给出节点 id 与条款的 指标/方向/阈值/单位，不含条款编号本身；条款编号在 clause_bindings 与 evidence_graph 中核对。"
+  },
+  {
+   "case_id": "norm-p4-03",
+   "structure": "P4",
+   "question": "A103 零件保温温度超过华氏标注规范的测量记录，链路经过哪些条款与说明材料？",
+   "sql_template": "industrial_temp",
+   "sql_params": {
+    "part_id": "A103",
+    "window_start": "2026-08-01T00:00:00+08:00",
+    "window_end": "2027-01-01T00:00:00+08:00",
+    "normalized": false
+   },
+   "doc_selection": {
+    "document_ids": [
+     "GY-A103_工艺温度规范_华氏版",
+     "SM-GY-2026-001_工艺温度判定说明材料"
+    ],
+    "any_tokens": [
+     "GY-A103-F-4.1",
+     "SM-GY-2026-001-1.1"
+    ]
+   },
+   "expected_status": "completed",
+   "expected_question_metrics": [
+    "温度"
+   ],
+   "expected_clause_ids": [
+    "GY-A103-F-4.1"
+   ],
+   "expected_binding_fields": [
+    "entity_id",
+    "entity_label",
+    "version",
+    "unit",
+    "time_scope",
+    "source_ref",
+    "source_sha256"
+   ],
+   "expected_sql_filter": {
+    "table": "measurement_observations⋈production_batches",
+    "column": "value",
+    "metric": "温度",
+    "unit": "degF",
+    "op": "超过",
+    "limit": "1544",
+    "direction": "greater_than",
+    "engine_op": ">"
+   },
+   "expected_answer_checks": [
+    {
+     "check": "status",
+     "equals": "completed"
+    },
+    {
+     "check": "sql_rows",
+     "count": 1
+    },
+    {
+     "check": "threshold_violations",
+     "clause_id": "GY-A103-F-4.1",
+     "count": 1
+    },
+    {
+     "check": "edges_present",
+     "edge_types": [
+      "unit_equivalent"
+     ],
+     "min": 1
+    },
+    {
+     "check": "hops",
+     "min_edges": 3,
+     "node_types": [
+      "sql_row",
+      "spec_clause",
+      "doc_block"
+     ],
+     "edge_types": [
+      "version_scope",
+      "supports"
+     ]
+    },
+    {
+     "check": "answer_contains",
+     "all_of": [
+      "多跳跨源链路",
+      "温度 > 1544degF"
+     ]
+    },
+    {
+     "check": "conflict",
+     "present": false
+    }
+   ],
+   "expected_conflict": {
+    "present": false
+   },
+   "expected_hops": {
+    "min_edges": 3,
+    "node_types": [
+     "sql_row",
+     "spec_clause",
+     "doc_block"
+    ],
+    "description": "多跳链路为 测量行 --version_scope--> 华氏条款 --supports--> 规范原文块，说明材料按实体 A103 与测量行 entity_match 相连；华氏/摄氏的单位等价单独由 edges_present 断言（unit_equivalent ≥ 1）。",
+    "edge_types": [
+     "version_scope",
+     "supports"
+    ],
+    "edge_order": "无向链路，只要求这些证据边出现在链路上，不要求出现顺序"
+   },
+   "expectation_note": "1544 degF = 840 degC，实测 850 degC 超限；单位等价边单独断言，多跳链路由 version_scope 与 supports 组成。"
+  },
+  {
+   "case_id": "norm-p4-04",
+   "structure": "P4",
+   "question": "A102 草稿版条款是否适用于 2026 年 9 月的保温温度测量？请逐跳给出证据。",
+   "sql_template": "industrial_temp",
+   "sql_params": {
+    "part_id": "A102",
+    "window_start": "2026-09-01T00:00:00+08:00",
+    "window_end": "2026-10-01T00:00:00+08:00",
+    "normalized": true
+   },
+   "doc_selection": {
+    "document_ids": [
+     "GY-A102-DRAFT_工艺温度规范",
+     "SM-GY-2026-001_工艺温度判定说明材料"
+    ],
+    "any_tokens": [
+     "GY-A102-DRAFT-4.1",
+     "SM-GY-2026-001-1.1"
+    ]
+   },
+   "expected_status": "completed",
+   "expected_question_metrics": [
+    "温度"
+   ],
+   "expected_clause_ids": [
+    "GY-A102-DRAFT-4.1"
+   ],
+   "expected_binding_fields": [
+    "entity_id",
+    "entity_label",
+    "version",
+    "unit",
+    "time_scope",
+    "source_ref",
+    "source_sha256"
+   ],
+   "expected_sql_filter": {
+    "table": "measurement_observations⋈production_batches",
+    "column": "temperature_c",
+    "metric": "温度",
+    "unit": "degC",
+    "op": "超过",
+    "limit": "900",
+    "direction": "greater_than",
+    "engine_op": ">"
+   },
+   "expected_answer_checks": [
+    {
+     "check": "status",
+     "equals": "completed"
+    },
+    {
+     "check": "error_code",
+     "equals": null
+    },
+    {
+     "check": "sql_rows",
+     "count": 9
+    },
+    {
+     "check": "clause_bound",
+     "clause_id": "GY-A102-DRAFT-4.1",
+     "fields": [
+      "entity_id",
+      "entity_label",
+      "version",
+      "unit",
+      "time_scope",
+      "source_ref",
+      "source_sha256"
+     ]
+    },
+    {
+     "check": "edges_between_absent",
+     "clause_id": "GY-A102-DRAFT-4.1",
+     "edge_types": [
+      "version_scope"
+     ],
+     "to_source_kind": "sql"
+    },
+    {
+     "check": "threshold_checks",
+     "clause_id": "GY-A102-DRAFT-4.1",
+     "count": 9
+    },
+    {
+     "check": "threshold_violations",
+     "clause_id": "GY-A102-DRAFT-4.1",
+     "count": 0
+    },
+    {
+     "check": "doc_linked",
+     "min": 1
+    },
+    {
+     "check": "conflict",
+     "present": false
+    }
+   ],
+   "expected_conflict": {
+    "present": false
+   },
+   "expected_hops": null,
+   "expectation_note": "实测行为（第 4 轮修订）：草稿条款与数据行没有 version_scope 边（版次 A102-DRAFT ≠ A102-V2，生效日期 2027-01-01 也不覆盖测量时点），但文档块仍因为实体 A102 逐字命中而经 entity_match 通过链接门；9 条数据行全部进入 threshold_checks（0 条超限）。此前因 evidence_graph.edge_between 对对称边只做单向键查找只统计到 2/9，该缺陷已在第 4 轮修复，冻结期望值随之更正为 9/9（修订前后数字见 labels_revision）。",
+   "expected_recompute_divergence": {
+    "status": "resolved",
+    "engine_defect": "datamind/evidence_graph.py:edge_between 对 SYMMETRIC_EDGE_TYPES 只做单向键查找（add_edge 已把 src>dst 规范化），threshold_checks 以 entity_match 为判据时在部分数据行上取不到边。",
+    "before": {
+     "engine_threshold_checks": 2,
+     "independent_threshold_checks": 9,
+     "engine_threshold_violations": 0,
+     "independent_threshold_violations": 0
+    },
+    "after": {
+     "engine_threshold_checks": 9,
+     "independent_threshold_checks": 9,
+     "engine_threshold_violations": 0,
+     "independent_threshold_violations": 0
+    },
+    "note": "引擎缺陷已修（对称边双向查找），冻结的「引擎实测值」更正为独立重算值 9/9：engine_threshold_checks == independent_threshold_checks，不再声明分歧。修订前后两组数字保留在本字段与 labels_revision 中。"
+   }
+  },
+  {
+   "case_id": "norm-p4-05",
+   "structure": "P4",
+   "question": "A102 零件 2026 年 9 月的保温温度测量，是否适用 V1 版工艺条款？请逐跳给出证据。",
+   "sql_template": "industrial_temp",
+   "sql_params": {
+    "part_id": "A102",
+    "window_start": "2026-09-01T00:00:00+08:00",
+    "window_end": "2026-10-01T00:00:00+08:00",
+    "normalized": true
+   },
+   "doc_selection": {
+    "document_ids": [
+     "GY-A102-V1_工艺温度规范",
+     "SM-GY-2026-001_工艺温度判定说明材料"
+    ],
+    "any_tokens": [
+     "GY-A102-V1-4.1",
+     "SM-GY-2026-001-1.1"
+    ]
+   },
+   "expected_status": "completed",
+   "expected_question_metrics": [
+    "温度"
+   ],
+   "expected_clause_ids": [
+    "GY-A102-V1-4.1"
+   ],
+   "expected_binding_fields": [
+    "entity_id",
+    "entity_label",
+    "version",
+    "unit",
+    "time_scope",
+    "source_ref",
+    "source_sha256"
+   ],
+   "expected_sql_filter": {
+    "table": "measurement_observations⋈production_batches",
+    "column": "temperature_c",
+    "metric": "温度",
+    "unit": "degC",
+    "op": "超过",
+    "limit": "860",
+    "direction": "greater_than",
+    "engine_op": ">"
+   },
+   "expected_answer_checks": [
+    {
+     "check": "status",
+     "equals": "completed"
+    },
+    {
+     "check": "error_code",
+     "equals": null
+    },
+    {
+     "check": "sql_rows",
+     "count": 9
+    },
+    {
+     "check": "clause_bound",
+     "clause_id": "GY-A102-V1-4.1",
+     "fields": [
+      "entity_id",
+      "entity_label",
+      "version",
+      "unit",
+      "time_scope",
+      "source_ref",
+      "source_sha256"
+     ]
+    },
+    {
+     "check": "edges_between_absent",
+     "clause_id": "GY-A102-V1-4.1",
+     "edge_types": [
+      "version_scope"
+     ],
+     "to_source_kind": "sql"
+    },
+    {
+     "check": "threshold_checks",
+     "clause_id": "GY-A102-V1-4.1",
+     "count": 9
+    },
+    {
+     "check": "threshold_violations",
+     "clause_id": "GY-A102-V1-4.1",
+     "count": 2
+    },
+    {
+     "check": "doc_linked",
+     "min": 1
+    },
+    {
+     "check": "conflict",
+     "present": false
+    }
+   ],
+   "expected_conflict": {
+    "present": false
+   },
+   "expected_hops": null,
+   "expectation_note": "V1 有效期 2026-08-01..2026-09-01 与 2026-09 的测量（最早 M001-1=09-05）既无版次相等也无窗口重叠 → 条款本身不适用；文档块仍以实体 A102 的 entity_match 进入判定。实测行为（第 4 轮修订）：9 条数据行全部进入 threshold_checks，其中 2 条超 850 degC。此前因 evidence_graph.edge_between 对对称边只做单向键查找只统计到 2/9、0 条超限，该缺陷已在第 4 轮修复，冻结期望值随之更正为 9/9、2 条超限（修订前后数字见 labels_revision）。真正的不适用拒绝见 norm-p4-07。",
+   "expected_recompute_divergence": {
+    "status": "resolved",
+    "engine_defect": "datamind/evidence_graph.py:edge_between 对 SYMMETRIC_EDGE_TYPES 只做单向键查找（add_edge 已把 src>dst 规范化），threshold_checks 以 entity_match 为判据时在部分数据行上取不到边。",
+    "before": {
+     "engine_threshold_checks": 2,
+     "independent_threshold_checks": 9,
+     "engine_threshold_violations": 0,
+     "independent_threshold_violations": 2
+    },
+    "after": {
+     "engine_threshold_checks": 9,
+     "independent_threshold_checks": 9,
+     "engine_threshold_violations": 2,
+     "independent_threshold_violations": 2
+    },
+    "note": "引擎缺陷已修（对称边双向查找），冻结的「引擎实测值」更正为独立重算值 9/9：engine_threshold_checks == independent_threshold_checks，不再声明分歧。修订前后两组数字保留在本字段与 labels_revision 中。"
+   }
+  },
+  {
+   "case_id": "norm-p4-06",
+   "structure": "P4",
+   "question": "A103 零件保温温度预警线的华氏条款与说明材料，如何与库内测量逐跳对应？",
+   "sql_template": "industrial_temp",
+   "sql_params": {
+    "part_id": "A103",
+    "window_start": "2026-08-01T00:00:00+08:00",
+    "window_end": "2027-01-01T00:00:00+08:00",
+    "normalized": false
+   },
+   "doc_selection": {
+    "document_ids": [
+     "GY-A103_工艺温度规范_华氏版",
+     "SM-GY-2026-001_工艺温度判定说明材料"
+    ],
+    "any_tokens": [
+     "GY-A103-F-4.2",
+     "SM-GY-2026-001-1.1"
+    ]
+   },
+   "expected_status": "completed",
+   "expected_question_metrics": [
+    "温度"
+   ],
+   "expected_clause_ids": [
+    "GY-A103-F-4.2"
+   ],
+   "expected_binding_fields": [
+    "entity_id",
+    "entity_label",
+    "version",
+    "unit",
+    "time_scope",
+    "source_ref",
+    "source_sha256"
+   ],
+   "expected_sql_filter": {
+    "table": "measurement_observations⋈production_batches",
+    "column": "value",
+    "metric": "温度",
+    "unit": "degF",
+    "op": "超过",
+    "limit": "1545",
+    "direction": "greater_than",
+    "engine_op": ">"
+   },
+   "expected_answer_checks": [
+    {
+     "check": "status",
+     "equals": "completed"
+    },
+    {
+     "check": "sql_rows",
+     "count": 1
+    },
+    {
+     "check": "threshold_needs_review",
+     "clause_id": "GY-A103-F-4.2",
+     "reason": "UNIT_NOT_COMPARABLE",
+     "min": 1
+    },
+    {
+     "check": "hops",
+     "min_edges": 3,
+     "node_types": [
+      "sql_row",
+      "spec_clause",
+      "doc_block"
+     ],
+     "edge_types": [
+      "version_scope",
+      "supports"
+     ]
+    },
+    {
+     "check": "answer_contains",
+     "all_of": [
+      "多跳跨源链路",
+      "温度 > 1545degF"
+     ]
+    },
+    {
+     "check": "conflict",
+     "present": false
+    }
+   ],
+   "expected_conflict": {
+    "present": false
+   },
+   "expected_hops": {
+    "min_edges": 3,
+    "node_types": [
+     "sql_row",
+     "spec_clause",
+     "doc_block"
+    ],
+    "description": "链路完整，但阈值比较被单位拦下（1545 degF 的摄氏值不是终止小数），判定状态为 needs_review 而不是四舍五入的超限结论。",
+    "edge_types": [
+     "version_scope",
+     "supports"
+    ],
+    "edge_order": "无向链路，只要求这些证据边出现在链路上，不要求出现顺序"
+   },
+   "expectation_note": "1545 degF 换算 (1545-32)*5/9 不是终止小数，引擎拒绝近似 → UNIT_NOT_COMPARABLE，链路仍然完整可解释。 P4 答案正文按证据图给出节点 id 与条款的 指标/方向/阈值/单位，不含条款编号本身；条款编号在 clause_bindings 与 evidence_graph 中核对。"
+  },
+  {
+   "case_id": "norm-p4-07",
+   "structure": "P4",
+   "question": "A102 零件 2026 年 9 月的保温温度测量，是否适用 A103 的未生效版条款？请逐跳给出证据。",
+   "sql_template": "industrial_temp",
+   "sql_params": {
+    "part_id": "A102",
+    "window_start": "2026-09-01T00:00:00+08:00",
+    "window_end": "2026-10-01T00:00:00+08:00",
+    "normalized": true
+   },
+   "doc_selection": {
+    "document_ids": [
+     "GY-A103-V2_工艺温度规范_未生效"
+    ],
+    "must_tokens": [
+     "GY-A103-V2-4.1"
+    ]
+   },
+   "expected_status": "failed",
+   "expected_question_metrics": [
+    "温度"
+   ],
+   "expected_clause_ids": [
+    "GY-A103-V2-4.1"
+   ],
+   "expected_binding_fields": [
+    "entity_id",
+    "entity_label",
+    "version",
+    "unit",
+    "time_scope",
+    "source_ref",
+    "source_sha256"
+   ],
+   "expected_sql_filter": {
+    "table": "measurement_observations⋈production_batches",
+    "column": "temperature_c",
+    "metric": "温度",
+    "unit": "degC",
+    "op": "超过",
+    "limit": "840",
+    "direction": "greater_than",
+    "engine_op": ">"
+   },
+   "expected_answer_checks": [
+    {
+     "check": "status",
+     "equals": "failed"
+    },
+    {
+     "check": "error_code",
+     "equals": "DOC_BINDING_MISSING"
+    },
+    {
+     "check": "failure_detail_contains",
+     "value": "VERSION_NOT_APPLICABLE"
+    },
+    {
+     "check": "sql_rows",
+     "count": 9
+    },
+    {
+     "check": "conflict",
+     "present": false
+    }
+   ],
+   "expected_conflict": {
+    "present": false
+   },
+   "expected_hops": null,
+   "expectation_note": "A103 未生效条款（2030-01-01 起生效）对 A102 行既没有版次相等也没有有效期覆盖，实体 A103 也不出现在 A102 行里 → 相关条款无法链接到数据侧，按 DOC_BINDING_MISSING/VERSION_NOT_APPLICABLE 拒绝。本案例只选该条款文档：若把 A102/A103 都提到的说明材料一并选入，说明材料会成为条款到数据行的间接通路，拒绝就不会发生（这一点已在其它 P4 案例中体现）。"
+  }
+ ],
+ "labels_revision": {
+  "revised_at": "2026-10-10",
+  "baseline_commit": "e4e2ebf",
+  "policy": "引擎缺陷修复后，冻结标签必须更正为修复后的真实值；修订记录同时保留修订前后两组数字。这不是放宽标签：修订后的标签只接受引擎实测值与独立重算一致的结果，任何一侧漂移仍会让 --check 失败。",
+  "revisions": [
+   {
+    "case_ids": [
+     "norm-p4-04",
+     "norm-p4-05"
+    ],
+    "fields": [
+     "expected_recompute_divergence",
+     "threshold_checks.count",
+     "threshold_violations.count",
+     "expectation_note"
+    ],
+    "defect": "datamind/evidence_graph.py:edge_between 对 SYMMETRIC_EDGE_TYPES 只做单向键查找（add_edge 已把 src>dst 规范化），threshold_checks 以 entity_match 为判据时在部分数据行上取不到边。",
+    "before": {
+     "norm-p4-04": {
+      "engine_threshold_checks": 2,
+      "independent_threshold_checks": 9,
+      "engine_threshold_violations": 0,
+      "independent_threshold_violations": 0
+     },
+     "norm-p4-05": {
+      "engine_threshold_checks": 2,
+      "independent_threshold_checks": 9,
+      "engine_threshold_violations": 0,
+      "independent_threshold_violations": 2
+     }
+    },
+    "after": {
+     "norm-p4-04": {
+      "engine_threshold_checks": 9,
+      "independent_threshold_checks": 9,
+      "engine_threshold_violations": 0,
+      "independent_threshold_violations": 0
+     },
+     "norm-p4-05": {
+      "engine_threshold_checks": 9,
+      "independent_threshold_checks": 9,
+      "engine_threshold_violations": 2,
+      "independent_threshold_violations": 2
+     }
+    },
+    "fix": "edge_between 对对称边同时按 (src,dst) 与 (dst,src) 查找；非对称边（supports/version_scope）语义不变。",
+    "evidence": [
+     "reports/cross_source_norm_live.json",
+     "tmp/cross_source_norm_live.before.json",
+     "reports/cards/r4_engine_defects.md"
+    ]
+   },
+   {
+    "case_ids": [
+     "norm-p3-09"
+    ],
+    "reason": "引擎缺陷 B（冲突键不含记录作用域）已修，独立复算 recompute() 同步带上 measurement_id 后与本案例标签一致；期望值由缺陷期行为更正为修复后的真实值，不是放宽标签。",
+    "before": {
+     "expected_status": "abstained",
+     "expected_answer_checks": [
+      {
+       "check": "status",
+       "equals": "abstained"
+      },
+      {
+       "check": "error_code",
+       "equals": "CONFLICT_UNRESOLVED"
+      },
+      {
+       "check": "sql_rows",
+       "count": 2
+      },
+      {
+       "check": "conflict",
+       "present": true,
+       "conflict_type": "value_conflict",
+       "entity_id": "A102",
+       "metric": "温度",
+       "version": "A102-V2",
+       "values": [
+        "860",
+        "870"
+       ]
+      },
+      {
+       "check": "binding_contract",
+       "source_kind": "doc"
+      }
+     ],
+     "expected_conflict": {
+      "present": true,
+      "conflict_type": "value_conflict",
+      "entity_id": "A102",
+      "metric": "温度",
+      "version": "A102-V2",
+      "values": [
+       "860",
+       "870"
+      ]
+     },
+     "expectation_note": "两个测量（M006-2=870、M011-1=860）各自与文档一致，但引擎的冲突键是 entity+metric+version（不含 measurement_id），因此跨记录配对也进入同一桶并被判为value_conflict。该案例把这个粒度边界冻结成可复现的事实，而不是把它藏起来。"
+    },
+    "after": {
+     "expected_status": "completed",
+     "expected_conflict": {
+      "present": false
+     },
+     "expected_answer_checks": [
+      {
+       "check": "status",
+       "equals": "failed"
+      },
+      {
+       "check": "error_code",
+       "equals": "DOC_BINDING_MISSING"
+      },
+      {
+       "check": "failure_detail_contains",
+       "value": "VERSION_NOT_APPLICABLE"
+      },
+      {
+       "check": "sql_rows",
+       "count": 9
+      },
+      {
+       "check": "conflict",
+       "present": false
+      }
+     ]
+    },
+    "evidence": [
+     "reports/cross_source_norm_live.json",
+     "reports/cards/r4_engine_defects.md",
+     "scripts/eval_cross_source_norm.py::recompute/_record_scopes_agree"
+    ]
+   }
+  ],
+  "deferred": []
+ }
+}
