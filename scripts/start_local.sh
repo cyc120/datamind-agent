@@ -106,7 +106,9 @@ if [[ "$background" == 1 ]]; then
     background_args=(--no-upload-worker)
   fi
   # 后台模式由 start_api_background.py 分离启动 API 与 worker（本脚本退出后仍在运行）。
-  exec .venv/bin/python scripts/start_api_background.py "${background_args[@]}"
+  # macOS 自带 bash 3.2 在 `set -u` 下展开**空数组**会报 unbound variable，所以用
+  # `${arr[@]+"${arr[@]}"}` 形式：数组为空时不展开，非空时正常传参。
+  exec .venv/bin/python scripts/start_api_background.py ${background_args[@]+"${background_args[@]}"}
 fi
 
 if [[ "$rag_enabled" == 1 ]]; then

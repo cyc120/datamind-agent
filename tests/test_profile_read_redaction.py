@@ -7,23 +7,16 @@
   * 保存合并语义：敏感头缺失 / 值为空 = 保持已存值不变，显式非空新值 = 替换，
     非敏感头保持旧的覆盖语义；proxy 提交脱敏视图或空值都不会清掉 userinfo；
   * 「浏览器只能看到脱敏视图」的往返（read → 原样回传 → save）不会抹掉真实凭据；
-  * ``web/app.js`` 的「留空表示保持不变」提交逻辑（结构化断言）+ ``node --check``。
 
-全部用例不连数据库、不访问网络：DB 访问被内存桩替换，前端只做静态断言。
+全部用例不连数据库、不访问网络：DB 访问被内存桩替换。
 """
 import json
-import shutil
-import subprocess
 import unittest
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from datamind import api as api_module
 from datamind import settings_store
 from datamind.settings_store import CLEAR_SENTINEL, PROFILES_KEY
-
-ROOT = Path(__file__).resolve().parents[1]
-APP_JS = ROOT / "web" / "app.js"
 
 SECRET_KEY = "sk-live-read-side-0123456789"
 AUTH_VALUE = "Bearer " + SECRET_KEY
@@ -232,74 +225,6 @@ class SaveMergeSemanticsTest(unittest.TestCase):
         text = json.dumps(settings_store.public_profile(self.store.item()), ensure_ascii=False)
         self.assertNotIn(AUTH_VALUE, text)
         self.assertEqual(self.headers()["Authorization"], AUTH_VALUE)
-
-
-class FrontendCommitSemanticsTest(unittest.TestCase):
-    """web/app.js：留空表示保持不变，改动才回传。"""
-
-    @classmethod
-    def setUpClass(cls):
-        cls.source = APP_JS.read_text(encoding="utf-8")
-
-    def _function_body(self, name):
-        marker = "function " + name + "("
-        start = self.source.index(marker)
-        brace = self.source.index("{", start)
-        depth = 0
-        for index in range(brace, len(self.source)):
-            char = self.source[index]
-            if char == "{":
-                depth += 1
-            elif char == "}":
-                depth -= 1
-                if depth == 0:
-                    return self.source[brace:index + 1]
-        self.fail("未找到函数 " + name)
-
-    def test_blank_means_keep_hint_is_present(self):
-        self.assertIn("留空表示保持不变", self.source)
-
-    def test_form_renders_sensitive_header_key_inputs(self):
-        body = self._function_body("renderSecretHeaders")
-        self.assertIn("header_keys", self.source)
-        self.assertIn("data-header-name", body)
-        self.assertIn("input.placeholder = KEEP_HINT", body)   # 空输入框 + 留空提示
-        self.assertNotIn("input.value =", body, "敏感头输入框不能预填任何值")
-        # 提交侧读取同一批输入框
-        self.assertIn("data-header-name", self._function_body("collectHeaders"))
-
-    def test_form_payload_does_not_resend_blank_secrets(self):
-        body = self._function_body("formPayload")
-        self.assertIn("collectHeaders()", body)
-        self.assertIn("proxyFieldValue()", body)
-        self.assertNotIn("proxy: $('proxy').value.trim()", self.source,
-                         "proxy 不能再无条件回传（会覆盖库里的 userinfo）")
-        self.assertNotIn("payload.headers = JSON.parse", body,
-                         "headers 必须经 collectHeaders 合并后再提交")
-
-    def test_blank_sensitive_header_is_skipped_client_side(self):
-        body = self._function_body("collectHeaders")
-        self.assertIn("if (!value) { return; }", body)
-        self.assertIn("if (!edited && !typed) { return null; }", body)
-
-    def test_proxy_uses_displayed_value_to_detect_changes(self):
-        body = self._function_body("proxyFieldValue")
-        self.assertIn("STATE.proxyDisplayed", body)
-        self.assertIn("return null", body)
-        self.assertIn("CLEAR_TOKEN", self.source)
-
-    def test_replacing_a_credentialed_proxy_warns(self):
-        body = self._function_body("proxyDropsCredentials")
-        self.assertIn("proxyHasCredentials", body)
-        self.assertIn("proxyDropsCredentials(payload)", self._function_body("saveProfile"))
-
-    def test_app_js_is_syntactically_valid(self):
-        node = shutil.which("node")
-        if not node:
-            self.skipTest("node 不可用，跳过语法检查")
-        result = subprocess.run([node, "--check", str(APP_JS)],
-                                capture_output=True, text=True)
-        self.assertEqual(result.returncode, 0, result.stderr)
 
 
 if __name__ == "__main__":

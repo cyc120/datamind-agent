@@ -1,5 +1,7 @@
 # 审计缺陷修复记录（F01–F12 与 R1）
 
+**前端版本说明（2026-10-10）**：本文旧版 `web/app.js`、`web/multifile.js` 的修复与 UI 测试属于历史记录；这些文件已退役删除，不能作为新版 Vue 页面已实现相同行为的证明。后端修复保留，旧源码可从 Git 历史查阅；迁移计划见 [前端评估](FRONTEND_NEXT_STEPS_20261010.md)。
+
 修复依据：[project_audit_20261008_2d9ab18_review.md](../reports/project_audit_20261008_2d9ab18_review.md)（复审基线 `2d9ab18`，API 0.30.0），按复审 §7 给出的排期与验收标准执行。
 逐条机器可读记录见 [reports/audit_fix_verification.json](../reports/audit_fix_verification.json)。
 

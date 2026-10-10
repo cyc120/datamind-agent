@@ -33,7 +33,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from datamind import frame as frame_mod  # noqa: E402
 from datamind.frame import (DOCUMENT_TERMS, METRIC_SURFACES, REGION_TERMS, RETAIL_TERMS,  # noqa: E402
                             CHINOOK_TERMS, INDUSTRIAL_TERMS, OHRBENCH_TERMS, resolve_turn)
 

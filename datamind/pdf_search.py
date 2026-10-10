@@ -16,7 +16,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
-from . import pdf_index as publications, pdf_publications as snapshots, pdf_vectors as vectors
+from . import pdf_index as publications, pdf_vectors as vectors
 
 MAX_PUBLICATIONS = 4
 MAX_CANDIDATES = 512

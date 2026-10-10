@@ -28,7 +28,7 @@ CAPABILITY = ('pydantic', 'starlette', 'fastembed', 'numpy', 'pillow', 'opencv-p
               'onnxruntime', 'rapidocr', 'ezdxf', 'python-docx', 'python-pptx', 'openpyxl')
 # Authoring/sampling only. The first tuple is checked to be absent from the lock; the
 # second lists the only files allowed to import them (offline material generation).
-AUTHORING_ONLY = ('reportlab', 'matplotlib', 'img2pdf', 'pyarrow')
+AUTHORING_ONLY = ('reportlab', 'matplotlib', 'pyarrow')
 AUTHORING_IMPORTERS = {
     'ingestion/generate_demo_docs.py',
     'ingestion/sample_ohrbench.py',

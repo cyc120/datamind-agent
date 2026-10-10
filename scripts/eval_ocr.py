@@ -1,7 +1,6 @@
 """Frozen original-pixel OCR rows and formula transcription checks (small demo set)."""
 import argparse
 from datetime import datetime, timezone
-import hashlib
 import json
 from pathlib import Path
 import re

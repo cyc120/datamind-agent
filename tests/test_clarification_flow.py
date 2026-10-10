@@ -279,28 +279,5 @@ class ChatClarificationContractTest(unittest.TestCase):
         self.assertNotIn("clarification_missing_slots", payload)
 
 
-class FrontendSeamTest(unittest.TestCase):
-    """前端那一半：没有 JS 测试运行器，所以只钉住「API 真的会发的键名」与接线是否还在。"""
-
-    def setUp(self):
-        self.source = (ROOT / "web" / "app.js").read_text(encoding="utf-8")
-
-    def test_the_ui_reads_exactly_the_keys_the_api_contract_emits(self):
-        for key in ("clarification_missing_slots", "clarification_candidates",
-                    "clarification_slot_questions"):
-            self.assertIn(key, self.source, key)
-            # 键名必须与契约实现同源，避免前端读一个后端永远不发的名字。
-            self.assertIn(key, clarification_contract("销售额最高的品类是哪个？"))
-
-    def test_clarification_responses_are_routed_to_the_slot_panel(self):
-        self.assertIn("out.status === 'NEEDS_CLARIFICATION'", self.source)
-        self.assertIn("showClarification(out)", self.source)
-
-    def test_one_click_supplement_reuses_the_question_box_and_reruns(self):
-        self.assertIn("function completeWithSlot", self.source)
-        self.assertIn("$('question').value = (current + ' ' + value).trim();", self.source)
-        self.assertIn("run();", self.source)
-
-
 if __name__ == "__main__":
     unittest.main()

@@ -5,7 +5,7 @@
 核实方式（全部为只读/实测）：
 
 - 仓库内**无**权重：`git ls-files | grep -iE '\.(onnx|bin|safetensors|gguf|pt|pth|h5|ckpt|weights)$'` 无命中；`.gitignore:11-15` 忽略 `.venv/`、`.venv-formula/`、`.cache/`。
-- 体积与 SHA256：`shasum -a 256 <file>` 与 `stat -f%z` / `du -sh`，测量时间 2026-10-08。
+- 体积与 SHA256：`shasum -a 256 <file>` 与 `stat -f%z` / `du -sh`，原始测量时间 2026-10-08；2026-10-10 已清理两份未采用的试验权重，历史哈希保留在下表后的清理记录中。
 - 用途与获取方式：读代码（`ingestion/formula.py`、`ingestion/formula_worker.py`、`ingestion/tables.py`、`ingestion/ocr.py`、`datamind/knowledge.py`、`datamind/pdf_vectors.py`、`scripts/setup_*.py`）与只读 `grep`。
 
 ---
@@ -15,9 +15,7 @@
 | 路径 | 体积（字节） | SHA256 | 用途 | 获取方式 | 需要它的可复现路径 |
 |---|---|---|---|---|---|
 | `.cache/formula_models/pp_formulanet_plus_m.onnx` | 593,915,961（566.4 MiB） | `71b6d389cf7b857e45252a4b98cfced1a3ffca7bf24d9497d02d052a41d9493b` | 公式识别（PP-FormulaNet_plus-M，ONNX） | `scripts/setup_formula.py`：从 ModelScope `RapidAI/RapidDoc` v1.0.0 下载，脚本内置 SHA256 校验；另建 `.venv-formula`（Python 3.10–3.12）装 `rapid-doc==0.9.10` | 公式适配器（`ingestion/formula.py` + `ingestion/formula_worker.py`）；`start_local.sh` 缺失时只提示不阻断；隔离回归中的公式契约/预算测试 |
-| `.cache/formula_models/pp_formulanet_plus_s.onnx` | 233,421,946（222.6 MiB） | `30998d10c94ccff1ad8981df0c71048cb1f3eec7b1e515b809767f1f72aebe3b` | **未核实**：仓库代码与文档中均无引用（非任何 setup 脚本下载项） | 未核实 | 无（推断为公式模型试验下载，无法证实） |
 | `.cache/ocr_models/ch_PP-OCRv5_rec_server.onnx` | 84,577,022（80.7 MiB） | `e09385400eaaaef34ceff54aeb7c4f0f1fe014c27fa8b9905d4709b65746562a` | 扫描页深色表头识别（表头恢复） | `scripts/setup_ocr_models.py`：ModelScope `RapidAI/RapidOCR` v3.9.2 `onnx/PP-OCRv5/rec/`，SHA 同时硬编码于 `ingestion/tables.py:14` | `ingestion/tables.py`（表头恢复）；缺失时表头保留为解析缺口、正文 OCR 继续 |
-| `.cache/ocr_models/PP-OCRv6_rec_medium.onnx` | 76,629,984（73.1 MiB） | `eef444829dbbe18d7fea59a3f6eb75647518d2b3a9568d27c92e42940204894b` | **未采用（试验留档）**：V1.2 §18.14 记载 medium 试验未可靠识别质检关键表头，未采用 | 未核实（无 setup 脚本下载它） | 无；证据保留在 `reports/header_medium_trial.json` |
 | `.cache/fastembed/models--Qdrant--bge-small-zh-v1.5/blobs/1294ea4b6331115a353d81f96b85e8c8d7fdcc284453d5b2fab5b016230aad38`（快照内为 `model_optimized.onnx`） | 94,781,076（90.4 MiB） | `1294ea4b6331115a353d81f96b85e8c8d7fdcc284453d5b2fab5b016230aad38` | 中文文本嵌入 `BAAI/bge-small-zh-v1.5`（fastembed 的 ONNX 量化版） | FastEmbed **运行时自动下载**（fastembed 内部使用 Hugging Face 仓库 `Qdrant/bge-small-zh-v1.5`）；缓存目录由 `datamind/knowledge.py:101`、`ingestion/ingest.py:44`、`datamind/pdf_vectors.py:183` 指定为 `.cache/fastembed`（可用 `DATAMIND_PDF_EMBED_CACHE` 覆盖）。**仓库内没有 SHA 锁定**；但 HF `trees/*.json` 记录的 `lfs_sha256` 与实测 SHA256 完全一致（独立交叉核对） | RAG 检索、`ingestion/ingest.py` 向量摄取、`datamind/pdf_vectors.py` 私有 PDF 嵌入、`scripts/verify.py`；缺缓存时向量路径降级/失败并给出稳定错误码 |
 
 同一 fastembed 快照的辅助文件（跟随 `model_optimized.onnx` 一同下载，均很小）：
@@ -30,7 +28,14 @@
 | `special_tokens_map.json` | 125 | `b6d346be366a7d1d48332dbc9fdf3bf8960b5d879522b7799ddba59e76237ee3` |
 
 > 注：HF `trees` 元数据还列出 `vocab.txt`（109,540 字节），但本机快照目录中**不存在**该文件（未被下载）；不影响当前 ONNX 推理路径。fastembed 缓存目录总量实测 `du -sh .cache/fastembed` = **91M**。
-> 分目录总量：`.cache/formula_models` **789M**、`.cache/ocr_models` **154M**、`.cache/fastembed` **91M**。
+> 清理后的分目录总量（2026-10-10）：`.cache/formula_models` **566M**、`.cache/ocr_models` **81M**、`.cache/fastembed` **91M**。
+
+已清理的历史试验权重（2026-10-10，共 295.7 MiB）：
+
+| 文件 | 历史字节数 / SHA256 | 清理依据与保留证据 |
+|---|---|---|
+| `pp_formulanet_plus_s.onnx` | 233,421,946 / `30998d10c94ccff1ad8981df0c71048cb1f3eec7b1e515b809767f1f72aebe3b` | 运行代码和 setup 脚本均未使用；公式功能继续使用 M 模型，历史公式报告保留 |
+| `PP-OCRv6_rec_medium.onnx` | 76,629,984 / `eef444829dbbe18d7fea59a3f6eb75647518d2b3a9568d27c92e42940204894b` | V1.2 §18.14 记录为未采用；失败结果保留在 `reports/header_medium_trial.json`，正文与表头的运行模型保留 |
 
 ---
 
@@ -76,6 +81,6 @@
 
 ## 5. 未核实项（如实列出）
 
-- `pp_formulanet_plus_s.onnx`、`PP-OCRv6_rec_medium.onnx` 的**来源与是否仍被任何外部实验使用**：仓库代码/文档无引用（medium 有 V1.2 §18.14 的「未采用」记载），无法核实其下载 URL 与用途。
+- 已清理的 `pp_formulanet_plus_s.onnx`、`PP-OCRv6_rec_medium.onnx` 的原始下载 URL 未核实；历史体积与哈希已留档，不将它们列为运行所需权重。
 - `rapid-doc` / `rapid_latex_ocr` 自带权重在公式 worker 内的**实际调用链**：本仓库只显式加载 `.cache/formula_models/pp_formulanet_plus_m.onnx`，其余资产的调用路径未逐一核实。
 - BGE 的**许可证**：未核实，本清单只记录名称与哈希。

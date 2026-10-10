@@ -535,16 +535,7 @@ class L5EventPersistenceParityTest(_RunCleanup):
                          '改前顺序下落库事件缺少澄清键（这就是被修掉的行为）')
 
 
-# ---------------------------------------------------------------- L3 / H2（静态）
-
-class L3ClarificationStyleTest(unittest.TestCase):
-    def test_the_clarification_panel_classes_have_styles(self):
-        source = (ROOT / 'web' / 'app.js').read_text(encoding='utf-8')
-        style = (ROOT / 'web' / 'style.css').read_text(encoding='utf-8')
-        for token in ("'clarification'", "'clarification-row'"):
-            self.assertIn(token, source, f'app.js 仍在渲染 {token}')
-        self.assertIn('.clarification{', style)
-        self.assertIn('.clarification-row{', style)
+# ---------------------------------------------------------------- H2（静态）
 
 
 class H2RetiredCodeDocumentationTest(unittest.TestCase):

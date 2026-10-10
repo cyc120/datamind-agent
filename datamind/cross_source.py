@@ -35,7 +35,7 @@ from zoneinfo import ZoneInfo
 
 from . import binding as binding_mod
 from . import evidence_graph as graph_mod
-from .evidence_graph import EvidenceGraph, GraphError, detect_conflicts, unresolved
+from .evidence_graph import EvidenceGraph, detect_conflicts, unresolved
 
 CROSS_SOURCE_VERSION = 'cross-source-v1'
 

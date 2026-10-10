@@ -72,7 +72,6 @@ xlsxwriter==3.2.9
 # 未实测的版本号就是编造。
 #   reportlab  – ingestion/generate_demo_docs.py、scripts/build_industrial_*.py
 #   matplotlib – ingestion/generate_demo_docs.py（渲染公式图片）
-#   img2pdf    – ingestion/generate_demo_docs.py（图片合成 PDF）
 #   pyarrow    – ingestion/sample_ohrbench.py（读取 OHR-Bench parquet 样本）
 # 状态：未安装（可选）。需要时按 requirements.txt 安装。
 # ---------------------------------------------------------------------------

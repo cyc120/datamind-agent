@@ -38,6 +38,7 @@ DEFAULT_OUT = ROOT / "output" / "datamind_agent_delivery.zip"
 # 绝不进入交付包的目录/文件名（防污染）
 EXCLUDE_DIRS = {
     ".git", ".venv", ".venv-formula", ".cache", "__pycache__", "node_modules",
+    "dist", "dist-ssr", ".vite",
     ".pytest_cache", ".mypy_cache", ".ruff_cache", "tmp", "output", "交付/_build",
     ".repo-state", ".uploads",
 }
@@ -56,7 +57,7 @@ def is_excluded(rel: str) -> bool:
     parts = rel.split("/")
     for i in range(len(parts)):
         prefix = "/".join(parts[: i + 1])
-        if prefix in EXCLUDE_DIRS:
+        if parts[i] in EXCLUDE_DIRS or prefix in EXCLUDE_DIRS:
             return True
     for pref in EXCLUDE_PREFIX:
         if rel.startswith(pref):
@@ -117,7 +118,7 @@ def collect() -> dict:
             "id": "source_code",
             "requirement": "完整项目源代码（含清晰的目录结构说明和 README 文件）",
             "status": "satisfied",
-            "paths": ["datamind/", "ingestion/", "web/", "scripts/", "tests/", "deploy/",
+            "paths": ["datamind/", "ingestion/", "frontend/", "web/", "scripts/", "tests/", "deploy/",
                       "README.md", "PROGRESS.md", "requirements.txt"],
             "note": "README.md 含目录树与快速开始；PROGRESS.md 为唯一权威状态块。",
         },
@@ -190,7 +191,7 @@ def collect() -> dict:
             if isinstance(p, str) and (ROOT / p).exists() and not p.endswith("/"):
                 included.add(p)
     # 目录式 source_code 条目展开为实际文件（受排除规则约束）
-    for pref in ("datamind/", "ingestion/", "web/", "scripts/", "tests/", "deploy/", "db/", "docs/"):
+    for pref in ("datamind/", "ingestion/", "frontend/", "web/", "scripts/", "tests/", "deploy/", "db/", "docs/"):
         for f in files:
             if f.startswith(pref):
                 included.add(f)

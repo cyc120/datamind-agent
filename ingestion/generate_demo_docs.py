@@ -10,13 +10,11 @@ generate_demo_docs.py — 生成 ≥10 份中文演示知识库 PDF
 """
 import io
 import json
-import math
 import random
 import psycopg2
 from datetime import datetime
 from pathlib import Path
 
-import img2pdf
 import pymupdf
 from PIL import Image, ImageFilter
 from reportlab.lib import colors
@@ -25,10 +23,9 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import (BaseDocTemplate, Frame, HRFlowable, Image as RLImage,
+from reportlab.platypus import (BaseDocTemplate, Frame, Image as RLImage,
                                 PageTemplate, Paragraph, Spacer, Table, TableStyle)
 
-from matplotlib import mathtext
 import matplotlib.pyplot as plt
 
 ROOT = Path(__file__).resolve().parents[1]
