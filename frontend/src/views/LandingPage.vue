@@ -145,7 +145,7 @@ const sampleEdges: EvidenceEdge[] = [
           <!-- 右下角：一个大文件夹，向左倾斜使出口朝 10 点钟方向；点开飞出三张纸 -->
           <aside class="folder-corner">
             <div class="folder-tilt">
-              <Folder color="#2563eb" :size="2.7" :items="topFeatures">
+              <Folder color="#2563eb" :size="3.4" :items="topFeatures">
                 <template #item-1>
                   <div class="paper">{{ topFeatures[0].slice(0, 2) }}<br />{{ topFeatures[0].slice(2) }}</div>
                 </template>
@@ -157,7 +157,6 @@ const sampleEdges: EvidenceEdge[] = [
                 </template>
               </Folder>
             </div>
-            <span class="folder-hint">点开看三条最硬的特性</span>
           </aside>
         </div>
       </div>
@@ -392,9 +391,10 @@ const sampleEdges: EvidenceEdge[] = [
 /* ── Hero ── */
 .hero {
   position: relative;
-  max-width: 1360px;
-  margin: 0 auto;
-  padding: 148px 40px 26px;
+  /* 整宽 + overflow: hidden：文件夹要向右下溢出、被页面边缘切掉，
+     裁切必须发生在视口边缘而不是 1360px 的内容边界上。 */
+  overflow: hidden;
+  padding: 148px 0 0;
   display: flex;
   justify-content: flex-start;
 }
@@ -402,6 +402,9 @@ const sampleEdges: EvidenceEdge[] = [
    内层仍是黄金分割两栏：左 61.8% 正文，右 38.2% 放特点文件夹。 */
 .hero-stack {
   width: 100%;
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 0 40px 70px;
 }
 .hero-cols {
   display: grid;
@@ -427,7 +430,9 @@ const sampleEdges: EvidenceEdge[] = [
   /* 旋转不改变布局盒、视觉会外扩，右侧必须留够余量：
      size=3 的文件夹是 300×240，转 38° 后外接矩形约 384×374，
      左右各外扩约 42px——原来只留 30px，实测被视口右边缘切掉。 */
-  padding: 0 78px 26px 0;
+  /* 负外边距把它推出内容区，交给 .hero 的 overflow: hidden 截断，
+     形成「右下角被切掉」的效果 */
+  margin: 0 -104px -140px 0;
 }
 /* 向左倾斜，让文件夹的出口（原本朝正上方）指向 10 点钟方向。
    钟面上 10 点位于正上方逆时针 60°，但整只文件夹连同纸张一起转会
@@ -437,19 +442,12 @@ const sampleEdges: EvidenceEdge[] = [
   /* Folder 内部用 transform: scale(size) 放大，而 transform 不改变布局占位——
      它的布局盒仍是 100×80，视觉却有 300×240，导致下面的说明被压住
      （实测只露出「逐条」两个字）。这里按缩放后的真实尺寸撑开容器。 */
-  width: 270px;
-  height: 216px;
+  width: 340px;
+  height: 272px;
   display: grid;
   place-items: center;
   transform: rotate(-26deg);
   transform-origin: 50% 55%;
-}
-.folder-hint {
-  /* 旋转后视觉还会向下外扩约 67px，留够间距 */
-  margin-top: 84px;
-  font-size: 12.5px;
-  color: var(--color-body);
-  white-space: nowrap;
 }
 
 /* Folder 组件不给纸张设任何排版，slot 内容默认贴左上，这里接管。
