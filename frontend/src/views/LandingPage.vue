@@ -101,13 +101,12 @@ const sampleEdges: EvidenceEdge[] = [
           </div>
         </div>
 
-        <!-- 小字介绍 -->
+        <!-- 小字介绍：整段连续，不人为断行 -->
         <p class="sub">
           DataMind Agent —— 面向数据库与知识库的
           <RotatingText :texts="rotating" class="rotator overflow-hidden" :rotation-interval="2200"
                         :transition="{ type: 'spring', damping: 26, stiffness: 320 }" />
-          智能体。<br />
-          每一句答案，都能回溯到它的 SQL、检索片段与原始数据。
+          智能体。每一句答案，都能回溯到它的 SQL、检索片段与原始数据。
         </p>
 
         <div class="hero-cta">
@@ -346,7 +345,7 @@ const sampleEdges: EvidenceEdge[] = [
 /* ── Hero ── */
 .hero {
   position: relative;
-  max-width: 1280px;
+  max-width: 1360px;
   margin: 0 auto;
   padding: 148px 40px 26px;
   display: flex;
@@ -356,7 +355,7 @@ const sampleEdges: EvidenceEdge[] = [
    居中的版式四平八稳但呆板，非对称的留白更有设计感。 */
 .hero-inner {
   width: 61.8%;
-  max-width: 880px;
+  max-width: 900px;
   text-align: left;
 }
 .pill {
@@ -370,10 +369,12 @@ const sampleEdges: EvidenceEdge[] = [
   letter-spacing: 0.02em;
 }
 
-/* 巨大标题：参考 Dify 的hero——极大字号、行高收紧、字距微负 */
+/* 巨大标题：参考 Dify 的hero——极大字号、行高收紧、字距微负。
+   字号上限 7rem 是按列宽反推的安全值：7 个字 × 112px ≈ 757px，列宽 840px 留有余量。
+   再大就会让 BlurText 内部逐字换行，把标题拆散。 */
 .hero-title {
   margin: 22px 0 26px;
-  font-size: clamp(2.4rem, 6.1vw, 5.6rem);
+  font-size: clamp(3rem, 7.8vw, 7rem);
   font-weight: 800;
   line-height: 1.08;
   letter-spacing: -0.035em;
@@ -408,9 +409,19 @@ const sampleEdges: EvidenceEdge[] = [
   font-size: clamp(0.98rem, 1.25vw, 1.2rem);
   line-height: 1.85;
 }
+/* 轮换词胶囊。
+   RotatingText 的根与「分片层」都带 flex-wrap，列一窄就会把单词逐个字符换行
+   （实测在窄列里出现「文/档/问/答」竖排）。这里强制不换行。
+   选择器 .rotator[data-v-x] span 的特异性高于 Tailwind 的 .flex-wrap，
+   所以不需要 !important。 */
+.rotator,
+.rotator :deep(span) {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
 .rotator {
   display: inline-flex;
-  vertical-align: bottom;
+  vertical-align: baseline;
   margin: 0 4px;
   padding: 1px 10px;
   border-radius: 8px;
@@ -460,7 +471,7 @@ const sampleEdges: EvidenceEdge[] = [
 
 /* ── 关键词条 ── */
 .keyword-strip {
-  max-width: 1280px;
+  max-width: 1360px;
   margin: 0 auto;
   padding: 34px 40px 6px;
   display: flex;
@@ -481,13 +492,13 @@ const sampleEdges: EvidenceEdge[] = [
    让它在左侧区域内居中，而不是飘在整页正中。 */
 .warp-band {
   padding: 4px 40px 0;
-  max-width: 1280px;
+  max-width: 1360px;
   margin: 0 auto;
   min-height: 118px;
 }
 .warp-band > * {
   width: 61.8%;
-  max-width: 880px;
+  max-width: 900px;
 }
 /* 画布本身留白较多，紧跟其后的区块收紧上边距，避免出现一大段空档 */
 .warp-band + .section {
@@ -497,7 +508,7 @@ const sampleEdges: EvidenceEdge[] = [
 /* ── 通用区块 ── */
 .section {
   padding: 92px 40px;
-  max-width: 1280px;
+  max-width: 1360px;
   margin: 0 auto;
 }
 .section.soft {
@@ -506,7 +517,7 @@ const sampleEdges: EvidenceEdge[] = [
   padding: 92px 40px;
 }
 .section.soft > * {
-  max-width: 1280px;
+  max-width: 1360px;
   margin-left: auto;
   margin-right: auto;
 }
