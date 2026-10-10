@@ -26,14 +26,23 @@
 .PARAMETER Stop
     停止由本脚本启动的 API 与隧道。
 
+.PARAMETER Protocol
+    隧道传输协议：auto（默认，让 cloudflared 自选，通常 QUIC 更稳）、quic、http2。
+    某些网络封 UDP 7844，此时 QUIC 建不起来，需要显式 -Protocol http2。
+
 .EXAMPLE
     pwsh -File scripts/share_public.ps1
+    pwsh -File scripts/share_public.ps1 -Protocol http2
     pwsh -File scripts/share_public.ps1 -Stop
 #>
 [CmdletBinding()]
 param(
     [int]$Port = 8000,
-    [switch]$Stop
+    [ValidateSet('auto', 'quic', 'http2')]
+    [string]$Protocol = 'auto',
+    [switch]$Stop,
+    #: 只检查链接是否还活着，不做任何改动。
+    [switch]$Status
 )
 
 $ErrorActionPreference = 'Stop'
@@ -63,6 +72,30 @@ if ($Stop) {
     if (Test-Path $PidFile) { Remove-Item $PidFile -Force }
     Write-Host "已停止 $stopped 个进程（API / 隧道）"
     exit 0
+}
+
+if ($Status) {
+    # 隧道会静默挂死：cloudflared 进程还在，但它到 Cloudflare 边缘的流已经断了，
+    # 访客看到的是 Error 1033 / HTTP 530。所以进程存活不足以说明链接可用，
+    # 必须真的请求一次公网地址。
+    $alive = @(Get-ShareProcesses)
+    Write-Host "进程：$(if ($alive) { "$($alive.Count) 个存活 (PID $($alive -join ', '))" } else { '无' })"
+    $apiOk = $false
+    try { $apiOk = (Invoke-RestMethod "http://127.0.0.1:$Port/health" -TimeoutSec 3).status -eq 'ok' } catch { }
+    Write-Host "本机 API：$(if ($apiOk) { '就绪' } else { '无响应' })"
+    $url = $null
+    if (Test-Path $TunnelLog) {
+        $match = Select-String -Path $TunnelLog -Pattern 'https://[a-z0-9-]+\.trycloudflare\.com' -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+        if ($match) { $url = [regex]::Match($match.Line, 'https://[a-z0-9-]+\.trycloudflare\.com').Value }
+    }
+    if (-not $url) { Write-Host '公网地址：未知（尚无隧道日志）'; exit 1 }
+    Write-Host "公网地址：$url/"
+    $live = $false
+    try { $live = (Invoke-RestMethod "$url/health" -TimeoutSec 10).status -eq 'ok' } catch { }
+    if ($live) { Write-Host '公网可达：是 ✓'; exit 0 }
+    Write-Host '公网可达：否 ✗（链接已失效，重新跑一次本脚本会换一个新地址）'
+    exit 1
 }
 
 if (-not (Test-Path $Cloudflared)) {
@@ -111,8 +144,9 @@ function Start-Detached([string]$File, [string[]]$Arguments) {
 }
 
 if (Test-Path $TunnelLog) { Remove-Item $TunnelLog -Force }
-$tunnel = Start-Detached $Cloudflared @('tunnel', '--url', $lanBase, '--protocol', 'http2',
-                                        '--no-autoupdate', '--logfile', $TunnelLog)
+$tunnelArgs = @('tunnel', '--url', $lanBase, '--no-autoupdate', '--logfile', $TunnelLog)
+if ($Protocol -ne 'auto') { $tunnelArgs += @('--protocol', $Protocol) }
+$tunnel = Start-Detached $Cloudflared $tunnelArgs
 Write-Host '等待隧道分配域名…'
 $publicUrl = $null
 foreach ($try in 1..40) {
