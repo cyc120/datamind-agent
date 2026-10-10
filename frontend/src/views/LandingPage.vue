@@ -421,6 +421,11 @@ const sampleEdges: EvidenceEdge[] = [
   /* 只向右出血：负的右边距把它推出内容区，交给 .hero 的 overflow: hidden
      在屏幕右边缘截断。下方不做出血——底部要完整可见，不能被下边界切。 */
   margin: 0;
+  /* 整体再往下挪一点。用 relative + top 而不是负外边距：负外边距会把它推到
+     .hero 的 overflow: hidden 之外、被下边界切掉（用户明确不要被下边遮住）。
+     .hero-stack 底部有 70px 内边距，44px 不会越界。 */
+  position: relative;
+  top: 44px;
 }
 /* 向左倾斜，让文件夹的出口（原本朝正上方）指向 10 点钟方向。
    钟面上 10 点位于正上方逆时针 60°，但整只文件夹连同纸张一起转会
