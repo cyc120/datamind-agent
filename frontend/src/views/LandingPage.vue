@@ -16,6 +16,16 @@ import type { EvidenceNode, EvidenceEdge } from '../api/types'
 const router = useRouter()
 useReveal()
 
+/**
+ * 区块滚动。
+ * 本应用路由是 hash 模式（地址栏的 # 就是路由本身），所以不能用 <a href="#xxx">
+ * 做页内锚点——那会被路由当成路径解析、跳到不存在的路由后白屏
+ * （队友实测点「原理」后进入 #/principle 空白页）。改为直接滚动，不碰地址栏。
+ */
+function scrollTo(id: string) {
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
 /** Hero 副标题里轮换的能力词。 */
 const rotating = ['精准问数', '文档问答', '跨源核验']
 
@@ -95,10 +105,10 @@ const sampleEdges: EvidenceEdge[] = [
         <strong>DataMind Agent</strong>
       </div>
       <nav class="links">
-        <a href="#principle">原理</a>
-        <a href="#features">能力</a>
-        <a href="#starmap">星图</a>
-        <a href="#how">流程</a>
+        <a href="#principle" @click.prevent="scrollTo('principle')">原理</a>
+        <a href="#features" @click.prevent="scrollTo('features')">能力</a>
+        <a href="#starmap" @click.prevent="scrollTo('starmap')">星图</a>
+        <a href="#how" @click.prevent="scrollTo('how')">流程</a>
       </nav>
       <button class="cta" @click="router.push('/app')">进入体验</button>
     </header>
@@ -132,7 +142,7 @@ const sampleEdges: EvidenceEdge[] = [
 
         <div class="hero-cta">
           <button class="primary" @click="router.push('/app')">点击即试 →</button>
-          <a class="ghost" href="#principle">了解原理</a>
+          <a class="ghost" href="#principle" @click.prevent="scrollTo('principle')">了解原理</a>
         </div>
           </div>
 
@@ -199,7 +209,7 @@ const sampleEdges: EvidenceEdge[] = [
             传统大模型问答像一张不透明的底片；DataMind 把它显影成一幅星图：SQL、检索、核验、冲突，
             每一步都摆上台面，每一条证据都可点击、可回溯。
           </p>
-          <a class="link" href="#starmap">看看星图长什么样 ↓</a>
+          <a class="link" href="#starmap" @click.prevent="scrollTo('starmap')">看看星图长什么样 ↓</a>
         </div>
       </div>
     </section>
