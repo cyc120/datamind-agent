@@ -7,6 +7,7 @@ import FallingText from '../components/bits/FallingText/FallingText.vue'
 import RotatingText from '../components/bits/RotatingText/RotatingText.vue'
 import TrueFocus from '../components/bits/TrueFocus/TrueFocus.vue'
 import PixelSwap from '../components/bits/PixelSwap/PixelSwap.vue'
+import GooeyNav from '../components/bits/GooeyNav/GooeyNav.vue'
 import FlipCard from '../components/FlipCard.vue'
 import ConstellationGraph from '../components/stargraph/ConstellationGraph.vue'
 import { useReveal } from '../composables/useReveal'
@@ -17,6 +18,13 @@ useReveal()
 
 /** Hero 副标题里轮换的能力词。 */
 const rotating = ['精准问数', '文档问答', '跨源核验']
+
+/** 顶部粘稠导航的三项（纯展示，不跳转，替代原来的静态标签）。 */
+const navItems = [
+  { label: '多模态数据驱动' },
+  { label: '可解释' },
+  { label: '可溯源' },
+]
 
 /** 关键词条：TrueFocus 会逐个聚焦。 */
 const keywords = '可解释 可溯源 跨源核验 图文对照 冲突并陈'
@@ -85,8 +93,14 @@ const sampleEdges: EvidenceEdge[] = [
 
     <!-- Hero -->
     <section id="top" class="hero">
-      <div class="hero-inner">
-        <div class="pill">多模态数据驱动 · 可解释 · 可溯源</div>
+      <div class="hero-stack">
+        <!-- 粘稠导航（GooeyNav）。三项按整页居中，不跟随正文列的左对齐。 -->
+        <div class="gooey-wrap">
+          <GooeyNav :items="navItems" :initial-active-index="0" :animation-time="600"
+                    :particle-count="14" :particle-distances="[80, 10]" />
+        </div>
+
+        <div class="hero-inner">
 
         <!-- 巨大标题：分片渲染是为了让关键词单独着色（曲速文本是 WebGL 画布，
              整行只能一个颜色，做不出这种局部强调），入场用逐字模糊。 -->
@@ -112,6 +126,7 @@ const sampleEdges: EvidenceEdge[] = [
         <div class="hero-cta">
           <button class="primary" @click="router.push('/app')">点击即试 →</button>
           <a class="ghost" href="#principle">了解原理</a>
+        </div>
         </div>
       </div>
     </section>
@@ -351,6 +366,11 @@ const sampleEdges: EvidenceEdge[] = [
   display: flex;
   justify-content: flex-start;
 }
+/* 外层铺满整个 hero 内容宽度，让粘稠导航可以相对整页居中；
+   内层仍是黄金分割列 + 左对齐 */
+.hero-stack {
+  width: 100%;
+}
 /* 左对齐 + 黄金分割：内容列占 61.8%，右侧 38.2% 留白。
    居中的版式四平八稳但呆板，非对称的留白更有设计感。 */
 .hero-inner {
@@ -358,15 +378,23 @@ const sampleEdges: EvidenceEdge[] = [
   max-width: 900px;
   text-align: left;
 }
-.pill {
-  display: inline-block;
-  padding: 6px 14px;
-  border-radius: 999px;
-  border: 1px solid var(--color-line);
-  background: var(--color-ink);
-  color: var(--color-body);
-  font-size: 12.5px;
-  letter-spacing: 0.02em;
+/* 粘稠导航：三项整体居中（用户明确要求，不跟随 hero 的左对齐）。
+   GooeyNav 的默认配色是按「深色页面」写的：基础文字白、胶状药丸白、
+   mix-blend-mode 用 lighten。白底上必须整体反相——
+   药丸改深色、混合模式改 darken（取 min，浅底上显出深色药丸）、
+   激活项文字转白。变量定义在组件里，默认值与上游一致，这里只做覆盖。 */
+.gooey-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+  font-size: 15px;
+
+  --gooey-item: var(--color-body);
+  --gooey-active-text: #ffffff;
+  --gooey-pill: var(--color-text);
+  --gooey-backdrop: #ffffff;
+  --gooey-blend: darken;
+  --gooey-text-shadow: none;
 }
 
 /* 巨大标题：参考 Dify 的hero——极大字号、行高收紧、字距微负。
