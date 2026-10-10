@@ -425,11 +425,6 @@ def longest_chain(result):
     return best
 
 
-def _has_subsequence(sequence, wanted):
-    iterator = iter(sequence)
-    return all(any(item == target for item in iterator) for target in wanted)
-
-
 def run_check(check, result, context):
     kind = check['check']
     if kind == 'status':

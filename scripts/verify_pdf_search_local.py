@@ -32,7 +32,7 @@ class RealPrivateSearchSmoke(unittest.TestCase):
         from fastapi.testclient import TestClient
         from datamind.agent import _write_dsn
         from datamind.api import app
-        from datamind import pdf_index as index, pdf_publications as registry, pdf_vectors as vectors
+        from datamind import pdf_index as index, pdf_publications as registry
         from ingestion.pdf_prepare import prepare_pdf
         from auth_fixtures import login, cleanup
 

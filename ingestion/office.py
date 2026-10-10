@@ -19,8 +19,6 @@ import hashlib
 from itertools import zip_longest
 from pathlib import Path
 
-from fastapi import HTTPException
-
 from datamind import parse_contract
 
 # v2: block ids are digests, DOCX follows body order, XLSX formula gaps are declared.

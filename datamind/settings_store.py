@@ -15,7 +15,7 @@ from urllib.parse import urlsplit, urlunsplit
 import psycopg2
 from psycopg2.extras import Json, RealDictCursor
 
-from .providers import (ANTHROPIC, DEFAULT_MAX_TOKENS, OPENAI, PROTOCOLS,
+from .providers import (ANTHROPIC, OPENAI, PROTOCOLS,
                         normalize_base_url as _normalize_base_url)
 
 SETTING_KEY = "model.gateway"          # 兼容旧版单配置

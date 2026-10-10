@@ -1,4 +1,4 @@
-# DataMind Agent — Python 依赖（Python 3.13）
+# DataMind Agent — Python 依赖（主应用验收环境：Python 3.14）
 # 安装: .venv/bin/python -m pip install -r requirements.txt
 # 需要严格复现隔离回归环境时用 requirements.lock（逐项固定版本）。
 
@@ -21,5 +21,4 @@ numpy
 # ingestion/generate_demo_docs.py 与 ingestion/sample_ohrbench.py。
 reportlab>=4.0
 matplotlib>=3.8
-img2pdf>=0.5
 pyarrow>=17.0
