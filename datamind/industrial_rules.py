@@ -1,15 +1,19 @@
-"""Deterministic temperature/version rules. This module has no model or gold input."""
-from datetime import datetime
+"""Deterministic temperature/version rules. This module has no model or gold input.
+
+The four core semantics — unit verification, version applicability, source agreement and
+inclusive range compliance — live in :mod:`datamind.binding`; this module keeps the industrial
+vocabulary (``compliance`` / ``agreement`` field names, issue kinds and reason codes) and calls
+that module. Behaviour, error codes and the emitted structure are unchanged.
+"""
+from datetime import datetime  # noqa: F401  (re-exported for existing callers)
 from decimal import Decimal, InvalidOperation
+
+from .binding import (inclusive_range_status, normalize_unit, range_expression, source_agreement,
+                      timestamp, version_applies)
 
 RULE_VERSION = 'industrial-rules-v1'
 
-
-def timestamp(text):
-    value = datetime.fromisoformat(text)
-    if value.tzinfo is None:
-        raise ValueError('TIMEZONE_REQUIRED')
-    return value
+__all__ = ['RULE_VERSION', 'timestamp', 'temperature', 'evaluate']
 
 
 def temperature(value, unit):
@@ -19,11 +23,12 @@ def temperature(value, unit):
         raise ValueError('INVALID_TEMPERATURE') from None
     if not number.is_finite():
         raise ValueError('INVALID_TEMPERATURE')
-    if unit == 'K':
-        number -= Decimal('273.15')
-    elif unit != 'degC':
+    if unit not in ('K', 'degC'):
         raise ValueError('UNKNOWN_UNIT')
-    return number
+    converted = normalize_unit(number, unit, 'degC')
+    if converted is None:
+        raise ValueError('UNKNOWN_UNIT')
+    return converted
 
 
 def evaluate(row, requirements, reports):
@@ -45,8 +50,7 @@ def evaluate(row, requirements, reports):
         if fact['approval_status'] != 'approved':
             continue
         try:
-            valid = timestamp(fact['valid_from']) <= timestamp(row['produced_at']) and (
-                fact['valid_to'] is None or timestamp(row['produced_at']) < timestamp(fact['valid_to']))
+            valid = version_applies(row['produced_at'], fact['valid_from'], fact['valid_to'])
         except (ValueError, TypeError):
             problems.append({'kind':'version','status':'needs_review','reason':'VALIDITY_UNKNOWN','fact_ids':[fact['fact_id']]})
             continue
@@ -70,9 +74,9 @@ def evaluate(row, requirements, reports):
             problems.append({'kind':'requirement_context','status':'needs_review','reason':'UNIT_RANGE_OR_METHOD_UNRESOLVED'})
         else:
             low, high = Decimal(bounds['min']), Decimal(bounds['max'])
-            result['compliance'] = 'within_range' if low <= production <= high else 'out_of_range'
+            result['compliance'] = inclusive_range_status(production, low, high)
             result['rules'].append({'rule_id':'inclusive_temperature_range','rule_version':RULE_VERSION,
-                                    'expression':f'{low} <= {production} <= {high}', 'passed': result['compliance']=='within_range'})
+                                    'expression':range_expression(low, production, high), 'passed': result['compliance']=='within_range'})
     matched = [f for f in reports if f.get('report_id') == row.get('report_id') and f.get('measurement_id') == row['measurement_id']]
     if len(matched) != 1:
         problems.append({'kind':'report_gap','status':'insufficient_evidence','reason':'REPORT_MISSING_OR_AMBIGUOUS'})
@@ -96,15 +100,19 @@ def evaluate(row, requirements, reports):
         report_value = temperature(report['raw_value'], report['raw_unit'])
     except ValueError:
         report_value = None
-    if production is None or report_value is None:
+    # The cross-source '来源一致' semantics (unit normalisation, exact decimal equality and the
+    # rule that a differing value stays unresolved without a registered authority) come from
+    # datamind.binding; the field names and issue kinds below are unchanged.
+    verdict = source_agreement(row['value'], row['unit'], report['raw_value'], report['raw_unit'])
+    if production is None or report_value is None or verdict['status'] == 'needs_review':
         result['agreement'] = 'needs_review'
         problems.append({'kind':'unit_or_value','status':'needs_review','reason':'VALUES_NOT_COMPARABLE'})
-    elif production != report_value:
+    elif verdict['status'] == 'unresolved':
         result['agreement'] = 'unresolved'
-        problems.append({'kind':'value_conflict','status':'unresolved','reason':'NO_REGISTERED_AUTHORITY_RULE',
+        problems.append({'kind':'value_conflict','status':'unresolved','reason':verdict['reason'],
                          'left_value':format(production,'f'),'right_value':format(report_value,'f')})
     else:
-        result['agreement'] = 'resolved_equivalent' if row['unit'] != report['raw_unit'] else 'consistent'
+        result['agreement'] = verdict['status']
         result['rules'].append({'rule_id':'same_measurement_decimal_equality','rule_version':RULE_VERSION,
                                 'left_value':format(production,'f'),'right_value':format(report_value,'f'),
                                 'conversion':'degC = K - 273.15' if row['unit'] != report['raw_unit'] else 'identity'})
