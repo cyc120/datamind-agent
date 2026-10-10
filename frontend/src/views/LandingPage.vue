@@ -8,6 +8,7 @@ import RotatingText from '../components/bits/RotatingText/RotatingText.vue'
 import TrueFocus from '../components/bits/TrueFocus/TrueFocus.vue'
 import PixelSwap from '../components/bits/PixelSwap/PixelSwap.vue'
 import GooeyNav from '../components/bits/GooeyNav/GooeyNav.vue'
+import Folder from '../components/bits/Folder/Folder.vue'
 import FlipCard from '../components/FlipCard.vue'
 import ConstellationGraph from '../components/stargraph/ConstellationGraph.vue'
 import { useReveal } from '../composables/useReveal'
@@ -24,6 +25,46 @@ const navItems = [
   { label: '多模态数据驱动' },
   { label: '可解释' },
   { label: '可溯源' },
+]
+
+/**
+ * 右侧的文件夹区：每条特点一个文件夹，点开露出 3 条证据。
+ * Folder 组件最多只渲染 3 张纸（maxItems = 3），纸张宽度是文件夹的 70/80/90%，
+ * 实测 size=0.85 时约 60–77px，字号 9.5px 下只能容纳 5 个汉字——写长了会被
+ * overflow-hidden 裁掉（第一版写 6 个字，「数字回查原文」就显示成了「字回查原文」）。
+ * 所以每条都控制在 5 字以内。
+ */
+const folders = [
+  {
+    title: '逐条核验',
+    color: '#2563eb',
+    papers: ['回查原文', '逐项比对', '超范围单列'],
+  },
+  {
+    title: '冲突并陈',
+    color: '#7c3aed',
+    papers: ['不擅自取舍', '双方原值', '分开存放'],
+  },
+  {
+    title: '图纸可查',
+    color: '#0891b2',
+    papers: ['解析图纸', '尺寸逐条', '不改原图'],
+  },
+  {
+    title: '有据拒答',
+    color: '#e11d48',
+    papers: ['缺项检测', '缺什么先问', '越权即拦'],
+  },
+  {
+    title: '规则兜底',
+    color: '#16a34a',
+    papers: ['规则解析', '不交给模型', '复杂度可算'],
+  },
+  {
+    title: '结果可复现',
+    color: '#d97706',
+    papers: ['指纹锁定', '静默改即拒', '陷阱集回归'],
+  },
 ]
 
 /** 关键词条：TrueFocus 会逐个聚焦。 */
@@ -100,7 +141,8 @@ const sampleEdges: EvidenceEdge[] = [
                     :particle-count="14" :particle-distances="[80, 10]" />
         </div>
 
-        <div class="hero-inner">
+        <div class="hero-cols">
+          <div class="hero-inner">
 
         <!-- 巨大标题：分片渲染是为了让关键词单独着色（曲速文本是 WebGL 画布，
              整行只能一个颜色，做不出这种局部强调），入场用逐字模糊。 -->
@@ -127,6 +169,24 @@ const sampleEdges: EvidenceEdge[] = [
           <button class="primary" @click="router.push('/app')">点击即试 →</button>
           <a class="ghost" href="#principle">了解原理</a>
         </div>
+          </div>
+
+          <!-- 右侧：特点文件夹。Folder 点开后会飞出最多 3 张纸。 -->
+          <aside class="folder-field" aria-label="核心特点">
+            <div
+              v-for="(f, i) in folders"
+              :key="f.title"
+              class="folder-item"
+              :style="{ animationDelay: (i * 0.5).toFixed(2) + 's' }"
+            >
+              <Folder :color="f.color" :size="1.25" :items="f.papers">
+                <template #item-1>{{ f.papers[0] }}</template>
+                <template #item-2>{{ f.papers[1] }}</template>
+                <template #item-3>{{ f.papers[2] }}</template>
+              </Folder>
+              <span class="folder-title">{{ f.title }}</span>
+            </div>
+          </aside>
         </div>
       </div>
     </section>
@@ -367,16 +427,75 @@ const sampleEdges: EvidenceEdge[] = [
   justify-content: flex-start;
 }
 /* 外层铺满整个 hero 内容宽度，让粘稠导航可以相对整页居中；
-   内层仍是黄金分割列 + 左对齐 */
+   内层仍是黄金分割两栏：左 61.8% 正文，右 38.2% 放特点文件夹。 */
 .hero-stack {
   width: 100%;
 }
-/* 左对齐 + 黄金分割：内容列占 61.8%，右侧 38.2% 留白。
-   居中的版式四平八稳但呆板，非对称的留白更有设计感。 */
+.hero-cols {
+  display: grid;
+  grid-template-columns: 61.8% 38.2%;
+  gap: 28px;
+  /* 文件夹区贴底，落在右下角 */
+  align-items: end;
+}
+/* 左栏正文：左对齐，非对称留白更有设计感 */
 .hero-inner {
-  width: 61.8%;
-  max-width: 900px;
+  width: 100%;
   text-align: left;
+}
+
+/* ── 右侧特点文件夹 ── */
+.folder-field {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* 行距按「纸张飞出距离」反推：点开后三张纸分别向上飞约 70–100px，
+     第一版用 34px 导致纸张压住上一行的文件夹、文字被盖掉。 */
+  gap: 104px 8px;
+  justify-items: center;
+  padding-bottom: 4px;
+}
+.folder-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Folder 用 transform: scale() 放大，而 transform 不改变布局占位，
+     size=1.25 时视觉上会向下多出约 10px 盖住标题，所以间距要留够。 */
+  gap: 26px;
+  /* 轻微上下浮动，让右侧不至于死板；每条错开相位 */
+  animation: folder-float 5.2s ease-in-out infinite;
+}
+/* Folder 的纸张只有 85–112px 宽，字号必须压小，且要自己设排版——
+   组件本身不给纸张设任何排版，文字默认贴左上，会被 overflow 裁掉。 */
+.folder-item :deep(div),
+.folder-item :deep(span) {
+  font-size: 9.5px;
+  line-height: 1.2;
+  text-align: center;
+}
+/* 纸张是绝对定位铺满的，给容器加 grid 不会影响它们的定位，
+   但能控制纸张内部文字的排版。
+   要点是顶对齐而非居中：组件里翻盖是 z-30、纸张是 z-20，左右两张纸的下半截
+   本来就被翻盖挡住（原设计就是「插在文件夹里、露出上半截」），文字居中会有半个字
+   埋在下面，顶对齐才能落进露出的那一截。 */
+.folder-item :deep(div) {
+  display: grid;
+  align-items: start;
+  justify-items: center;
+  padding-top: 5px;
+}
+.folder-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+@keyframes folder-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-9px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .folder-item { animation: none; }
 }
 /* 粘稠导航：三项整体居中（用户明确要求，不跟随 hero 的左对齐）。
    GooeyNav 的默认配色是按「深色页面」写的：基础文字白、胶状药丸白、
