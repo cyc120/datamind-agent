@@ -93,10 +93,15 @@ const getPaperClasses = (index: number) => {
   } ${sizeClasses}`.trim();
 };
 
+// ── 本地修改（非上游代码）────────────────────────────────────────────────────
+// 上游把左右两张纸只抬到 -70%，而正上方那张抬到 -100%；翻盖是不动的（z-30，
+// 纸张 z-20），所以左右两张纸展开后有一大截仍压在翻盖下、纸上的字被截断
+// （实测「逐条核验」只剩「逐条核」、「冲突并陈」少了「冲」）。
+// 这里把三张纸抬到相近高度，使它们都能脱离翻盖、完整露出；三张仍保持扇形分离。
 const getOpenTransform = (index: number) => {
-  if (index === 0) return 'translate(-120%, -70%) rotate(-15deg)';
-  if (index === 1) return 'translate(10%, -70%) rotate(15deg)';
-  if (index === 2) return 'translate(-50%, -100%) rotate(5deg)';
+  if (index === 0) return 'translate(-118%, -104%) rotate(-13deg)';
+  if (index === 1) return 'translate(18%, -104%) rotate(13deg)';
+  if (index === 2) return 'translate(-50%, -112%) rotate(4deg)';
   return '';
 };
 

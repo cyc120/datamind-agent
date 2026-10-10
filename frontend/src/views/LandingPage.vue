@@ -28,44 +28,16 @@ const navItems = [
 ]
 
 /**
- * 右侧的文件夹区：每条特点一个文件夹，点开露出 3 条证据。
- * Folder 组件最多只渲染 3 张纸（maxItems = 3），纸张宽度是文件夹的 70/80/90%，
- * 实测 size=0.85 时约 60–77px，字号 9.5px 下只能容纳 5 个汉字——写长了会被
- * overflow-hidden 裁掉（第一版写 6 个字，「数字回查原文」就显示成了「字回查原文」）。
- * 所以每条都控制在 5 字以内。
+ * 右下角那个大文件夹里飞出的三张纸。
+ *
+ * 纸上只写 2 个字：Folder 的三张纸是向左、向右、向上扇形展开的，左右两张展开后
+ * 大部分仍压在文件夹翻盖下面（翻盖 z-30、纸张 z-20，这是组件的原始设计），
+ * 只有正上方那张完整露出。实测 4 字标题在左右两张纸上必然被截（「逐条核验」只剩
+ * 「逐条核」、「冲突并陈」少了「冲」），改用 2 字后任何角度都放得下。
+ * 完整名称放在文件夹下方的说明里。数量上限是组件写死的 maxItems = 3。
  */
-const folders = [
-  {
-    title: '逐条核验',
-    color: '#2563eb',
-    papers: ['回查原文', '逐项比对', '超范围单列'],
-  },
-  {
-    title: '冲突并陈',
-    color: '#7c3aed',
-    papers: ['不擅自取舍', '双方原值', '分开存放'],
-  },
-  {
-    title: '图纸可查',
-    color: '#0891b2',
-    papers: ['解析图纸', '尺寸逐条', '不改原图'],
-  },
-  {
-    title: '有据拒答',
-    color: '#e11d48',
-    papers: ['缺项检测', '缺什么先问', '越权即拦'],
-  },
-  {
-    title: '规则兜底',
-    color: '#16a34a',
-    papers: ['规则解析', '不交给模型', '复杂度可算'],
-  },
-  {
-    title: '结果可复现',
-    color: '#d97706',
-    papers: ['指纹锁定', '静默改即拒', '陷阱集回归'],
-  },
-]
+const topFeatures = ['核验', '冲突', '图纸']
+const topFeatureFull = '逐条核验 · 冲突并陈 · 图纸可查'
 
 /** 关键词条：TrueFocus 会逐个聚焦。 */
 const keywords = '可解释 可溯源 跨源核验 图文对照 冲突并陈'
@@ -171,21 +143,16 @@ const sampleEdges: EvidenceEdge[] = [
         </div>
           </div>
 
-          <!-- 右侧：特点文件夹。Folder 点开后会飞出最多 3 张纸。 -->
-          <aside class="folder-field" aria-label="核心特点">
-            <div
-              v-for="(f, i) in folders"
-              :key="f.title"
-              class="folder-item"
-              :style="{ animationDelay: (i * 0.5).toFixed(2) + 's' }"
-            >
-              <Folder :color="f.color" :size="1.25" :items="f.papers">
-                <template #item-1>{{ f.papers[0] }}</template>
-                <template #item-2>{{ f.papers[1] }}</template>
-                <template #item-3>{{ f.papers[2] }}</template>
+          <!-- 右下角：一个大文件夹，向左倾斜使出口朝 10 点钟方向；点开飞出三张纸 -->
+          <aside class="folder-corner">
+            <div class="folder-tilt">
+              <Folder color="#2563eb" :size="2.3" :items="topFeatures.map(f => f)">
+                <template #item-1><div class="paper">{{ topFeatures[0] }}</div></template>
+                <template #item-2><div class="paper">{{ topFeatures[1] }}</div></template>
+                <template #item-3><div class="paper">{{ topFeatures[2] }}</div></template>
               </Folder>
-              <span class="folder-title">{{ f.title }}</span>
             </div>
+            <span class="folder-hint">{{ topFeatureFull }}</span>
           </aside>
         </div>
       </div>
@@ -444,58 +411,60 @@ const sampleEdges: EvidenceEdge[] = [
   text-align: left;
 }
 
-/* ── 右侧特点文件夹 ── */
-.folder-field {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  /* 行距按「纸张飞出距离」反推：点开后三张纸分别向上飞约 70–100px，
-     第一版用 34px 导致纸张压住上一行的文件夹、文字被盖掉。 */
-  gap: 104px 8px;
-  justify-items: center;
-  padding-bottom: 4px;
-}
-.folder-item {
+/* ── 右下角的大文件夹 ── */
+.folder-corner {
+  grid-column: 2;
+  align-self: end;
+  justify-self: end;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  /* Folder 用 transform: scale() 放大，而 transform 不改变布局占位，
-     size=1.25 时视觉上会向下多出约 10px 盖住标题，所以间距要留够。 */
-  gap: 26px;
-  /* 轻微上下浮动，让右侧不至于死板；每条错开相位 */
-  animation: folder-float 5.2s ease-in-out infinite;
+  align-items: flex-end;
+  /* 旋转不改变布局盒、视觉会外扩，右侧必须留够余量：
+     size=2.3 的文件夹是 230×184，转 38° 后外接矩形约 294×287，
+     左右各外扩约 32px——原来只留 30px，实测被视口右边缘切掉。 */
+  padding: 0 72px 30px 0;
 }
-/* Folder 的纸张只有 85–112px 宽，字号必须压小，且要自己设排版——
-   组件本身不给纸张设任何排版，文字默认贴左上，会被 overflow 裁掉。 */
-.folder-item :deep(div),
-.folder-item :deep(span) {
-  font-size: 9.5px;
-  line-height: 1.2;
-  text-align: center;
-}
-/* 纸张是绝对定位铺满的，给容器加 grid 不会影响它们的定位，
-   但能控制纸张内部文字的排版。
-   要点是顶对齐而非居中：组件里翻盖是 z-30、纸张是 z-20，左右两张纸的下半截
-   本来就被翻盖挡住（原设计就是「插在文件夹里、露出上半截」），文字居中会有半个字
-   埋在下面，顶对齐才能落进露出的那一截。 */
-.folder-item :deep(div) {
+/* 向左倾斜，让文件夹的出口（原本朝正上方）指向 10 点钟方向。
+   钟面上 10 点位于正上方逆时针 60°，但整只文件夹连同纸张一起转会
+   让纸上的字也倒 60°、基本读不了；实测 -38° 时出口落在 10–11 点之间，
+   倾斜感明确而文字仍可读。要严格对准 10 点，把这里改成 -60deg 即可。 */
+.folder-tilt {
+  /* Folder 内部用 transform: scale(2.3) 放大，而 transform 不改变布局占位——
+     它的布局盒仍是 100×80，视觉却有 230×184，导致下面的说明被压住
+     （实测只露出「逐条」两个字）。这里按缩放后的真实尺寸撑开容器。 */
+  width: 230px;
+  height: 184px;
   display: grid;
-  align-items: start;
-  justify-items: center;
-  padding-top: 5px;
+  place-items: center;
+  transform: rotate(-38deg);
+  transform-origin: 50% 55%;
 }
-.folder-title {
+.folder-hint {
+  /* 旋转后视觉还会向下外扩约 50px，留够间距 */
+  margin-top: 64px;
   font-size: 12.5px;
-  font-weight: 600;
-  color: var(--color-text);
-  letter-spacing: 0.01em;
+  color: var(--color-body);
   white-space: nowrap;
 }
-@keyframes folder-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-9px); }
+
+/* Folder 组件不给纸张设任何排版，slot 内容默认贴左上，这里接管。
+   纸张点开后彼此重叠、可见面积比看上去小，所以纸上只放 4 字的特性名，
+   放「标题 + 说明」实测说明会被截断。 */
+.folder-tilt :deep(div) {
+  font-size: 13px;
+  line-height: 1.3;
 }
-@media (prefers-reduced-motion: reduce) {
-  .folder-item { animation: none; }
+/* :deep 是必需的——.paper 经 slot 渲染进子组件内部，拿不到本组件的 scope 属性。
+   纸上只放 2 个字，居中即可，不需要为「露出的那一侧」做偏移：
+   左右两张纸展开后大部分仍压在翻盖下（翻盖 z-30、纸张 z-20），
+   4 字标题必然被截，2 字则任何角度都放得下。 */
+.folder-tilt :deep(.paper) {
+  padding: 12px 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+  white-space: nowrap;
+  text-align: center;
 }
 /* 粘稠导航：三项整体居中（用户明确要求，不跟随 hero 的左对齐）。
    GooeyNav 的默认配色是按「深色页面」写的：基础文字白、胶状药丸白、
