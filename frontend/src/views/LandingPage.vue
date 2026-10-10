@@ -30,14 +30,13 @@ const navItems = [
 /**
  * 右下角那个大文件夹里飞出的三张纸。
  *
- * 纸上只写 2 个字：Folder 的三张纸是向左、向右、向上扇形展开的，左右两张展开后
- * 大部分仍压在文件夹翻盖下面（翻盖 z-30、纸张 z-20，这是组件的原始设计），
- * 只有正上方那张完整露出。实测 4 字标题在左右两张纸上必然被截（「逐条核验」只剩
- * 「逐条核」、「冲突并陈」少了「冲」），改用 2 字后任何角度都放得下。
- * 完整名称放在文件夹下方的说明里。数量上限是组件写死的 maxItems = 3。
+ * 纸上把这个 4 字特性名排成两行、每行 2 个字（见模板里的 slice），
+ * 形成一个方块。这样既能写全 4 个字，又不会被纸张的可见区域截断——
+ * Folder 的左右两张纸展开后大部分仍压在翻盖下，横排 4 字必然被截
+ * （实测「逐条核验」只剩「逐条核」、「冲突并陈」少了「冲」）。
+ * 数量上限是组件写死的 maxItems = 3。
  */
-const topFeatures = ['核验', '冲突', '图纸']
-const topFeatureFull = '逐条核验 · 冲突并陈 · 图纸可查'
+const topFeatures = ['逐条核验', '冲突并陈', '图纸可查']
 
 /** 关键词条：TrueFocus 会逐个聚焦。 */
 const keywords = '可解释 可溯源 跨源核验 图文对照 冲突并陈'
@@ -146,13 +145,19 @@ const sampleEdges: EvidenceEdge[] = [
           <!-- 右下角：一个大文件夹，向左倾斜使出口朝 10 点钟方向；点开飞出三张纸 -->
           <aside class="folder-corner">
             <div class="folder-tilt">
-              <Folder color="#2563eb" :size="2.3" :items="topFeatures.map(f => f)">
-                <template #item-1><div class="paper">{{ topFeatures[0] }}</div></template>
-                <template #item-2><div class="paper">{{ topFeatures[1] }}</div></template>
-                <template #item-3><div class="paper">{{ topFeatures[2] }}</div></template>
+              <Folder color="#2563eb" :size="2.7" :items="topFeatures">
+                <template #item-1>
+                  <div class="paper">{{ topFeatures[0].slice(0, 2) }}<br />{{ topFeatures[0].slice(2) }}</div>
+                </template>
+                <template #item-2>
+                  <div class="paper">{{ topFeatures[1].slice(0, 2) }}<br />{{ topFeatures[1].slice(2) }}</div>
+                </template>
+                <template #item-3>
+                  <div class="paper">{{ topFeatures[2].slice(0, 2) }}<br />{{ topFeatures[2].slice(2) }}</div>
+                </template>
               </Folder>
             </div>
-            <span class="folder-hint">{{ topFeatureFull }}</span>
+            <span class="folder-hint">点开看三条最硬的特性</span>
           </aside>
         </div>
       </div>
@@ -420,28 +425,28 @@ const sampleEdges: EvidenceEdge[] = [
   flex-direction: column;
   align-items: flex-end;
   /* 旋转不改变布局盒、视觉会外扩，右侧必须留够余量：
-     size=2.3 的文件夹是 230×184，转 38° 后外接矩形约 294×287，
-     左右各外扩约 32px——原来只留 30px，实测被视口右边缘切掉。 */
-  padding: 0 72px 30px 0;
+     size=3 的文件夹是 300×240，转 38° 后外接矩形约 384×374，
+     左右各外扩约 42px——原来只留 30px，实测被视口右边缘切掉。 */
+  padding: 0 78px 26px 0;
 }
 /* 向左倾斜，让文件夹的出口（原本朝正上方）指向 10 点钟方向。
    钟面上 10 点位于正上方逆时针 60°，但整只文件夹连同纸张一起转会
    让纸上的字也倒 60°、基本读不了；实测 -38° 时出口落在 10–11 点之间，
    倾斜感明确而文字仍可读。要严格对准 10 点，把这里改成 -60deg 即可。 */
 .folder-tilt {
-  /* Folder 内部用 transform: scale(2.3) 放大，而 transform 不改变布局占位——
-     它的布局盒仍是 100×80，视觉却有 230×184，导致下面的说明被压住
+  /* Folder 内部用 transform: scale(size) 放大，而 transform 不改变布局占位——
+     它的布局盒仍是 100×80，视觉却有 300×240，导致下面的说明被压住
      （实测只露出「逐条」两个字）。这里按缩放后的真实尺寸撑开容器。 */
-  width: 230px;
-  height: 184px;
+  width: 270px;
+  height: 216px;
   display: grid;
   place-items: center;
-  transform: rotate(-38deg);
+  transform: rotate(-26deg);
   transform-origin: 50% 55%;
 }
 .folder-hint {
-  /* 旋转后视觉还会向下外扩约 50px，留够间距 */
-  margin-top: 64px;
+  /* 旋转后视觉还会向下外扩约 67px，留够间距 */
+  margin-top: 84px;
   font-size: 12.5px;
   color: var(--color-body);
   white-space: nowrap;
@@ -455,15 +460,16 @@ const sampleEdges: EvidenceEdge[] = [
   line-height: 1.3;
 }
 /* :deep 是必需的——.paper 经 slot 渲染进子组件内部，拿不到本组件的 scope 属性。
-   纸上只放 2 个字，居中即可，不需要为「露出的那一侧」做偏移：
-   左右两张纸展开后大部分仍压在翻盖下（翻盖 z-30、纸张 z-20），
-   4 字标题必然被截，2 字则任何角度都放得下。 */
+   每个特性名排成两行、每行 2 个字，形成一个方块：Folder 的左右两张纸展开后
+   大部分仍压在翻盖下（翻盖 z-30、纸张 z-20），横排 4 字必然被截，
+   排成 2×2 的方块则任何角度都放得下。 */
 .folder-tilt :deep(.paper) {
-  padding: 12px 10px;
-  font-size: 14px;
+  padding: 14px 10px;
+  font-size: 16px;
   font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0.04em;
   color: var(--color-text);
-  white-space: nowrap;
   text-align: center;
 }
 /* 粘稠导航：三项整体居中（用户明确要求，不跟随 hero 的左对齐）。
