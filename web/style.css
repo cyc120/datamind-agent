@@ -94,6 +94,8 @@ th{background:#f3f8f5;color:#3b5e50;position:sticky;top:0}tr:last-child td{borde
 .notice.bad{background:#fdf0eb;border-color:#f4d6c9;color:#8f3b21}
 .notice.info{background:#f2f6f9;border-color:#dbe6ee;color:#2f5165}
 .notice.hidden{display:none}
+/* 保存时缺失的必填字段：短暂高亮，配合 requireField 的聚焦与滚动定位。 */
+input.field-missing,select.field-missing{border-color:#c2503a;background:#fdf6f3;box-shadow:0 0 0 3px rgba(194,80,58,.14)}
 .model-list{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
 .model-pick{background:#eef4f8;border:1px solid #d8e5ee;color:#2b5468;font-size:12px;padding:6px 10px;border-radius:8px;cursor:pointer}
 .model-pick:hover{background:#e0ebf3}

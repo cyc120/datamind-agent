@@ -1,0 +1,115 @@
+@import "tailwindcss";
+
+/* ============ 设计令牌 ============ */
+@theme {
+  --font-sans: "Inter", "PingFang SC", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+
+  --color-void: #05070d;
+  --color-ink: #0a0e18;
+  --color-panel: #0e1422;
+  --color-line: rgba(148, 163, 184, 0.14);
+
+  --color-accent: #38bdf8;
+  --color-accent-2: #818cf8;
+  --color-glow: #22d3ee;
+  --color-star: #e0f2fe;
+}
+
+/* ============ 基础 ============ */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-void);
+  color: #e5e9f0;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: rgba(56, 189, 248, 0.28);
+  color: #f0fbff;
+}
+
+/* 细滚动条 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.22);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.4);
+}
+
+/* ============ 关键帧 ============ */
+@keyframes twinkle {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+
+@keyframes floaty {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes glowpulse {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(56, 189, 248, 0.5)); }
+  50% { filter: drop-shadow(0 0 12px rgba(56, 189, 248, 0.9)); }
+}
+
+@keyframes fadeup {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+/* ============ 工具类 ============ */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--color-line);
+  backdrop-filter: blur(14px);
+}
+
+.glow-text {
+  text-shadow: 0 0 24px rgba(56, 189, 248, 0.45);
+}
+
+.gradient-text {
+  background: linear-gradient(120deg, #7dd3fc 0%, #a5b4fc 50%, #c4b5fd 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.star-dot {
+  animation: twinkle 3.4s ease-in-out infinite;
+}
+
+.breathe {
+  animation: breathe 3s ease-in-out infinite;
+}

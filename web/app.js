@@ -1454,11 +1454,31 @@ function probePayload() {
   var payload = formPayload();
   return payload;
 }
+// 保存被拒时必须把视线带到出错的字段，而不只是写一句提示：提示与按钮曾经隔着整张表单，
+// 用户点完「保存」得不到任何可见反馈。滚动到字段也顺带让紧邻按钮的提示进入视野。
+function requireField(value, fieldId, message) {
+  if (value) { return true; }
+  notice('bad', message);
+  var field = $(fieldId);
+  if (field) {
+    field.classList.add('field-missing');
+    field.focus();
+    field.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    setTimeout(function () { field.classList.remove('field-missing'); }, 2400);
+  }
+  return false;
+}
 async function saveProfile(activate) {
   var payload;
   try { payload = formPayload(); }
   catch (err) { notice('bad', err.message); return; }
-  if (!payload.name) { notice('bad', '请先填写配置名称。'); return; }
+  if (!requireField(payload.name, 'profileName', '请先填写配置名称。')) { return; }
+  // 模型名不是可选项：留空时服务端会静默回落到 deepseek-chat，而它与项目调优使用的
+  // deepseek-flash 生成的 SQL 形式不同（前者倾向写 CTE），失败时只表现为
+  // SQL_POLICY_BLOCKED，极难归因。这里改成显式拒绝。
+  if (!requireField(payload.model, 'modelName',
+                    '请填写模型名。留空会回落到默认模型，与项目调优使用的模型行为不一致；'
+                    + '可先点「拉取模型列表」再选一个。')) { return; }
   if (proxyDropsCredentials(payload) &&
       !window.confirm('该配置的代理地址里保存着账号口令（浏览器看不到）；用不含凭据的新地址保存会丢弃原凭据。确认继续？')) {
     return;

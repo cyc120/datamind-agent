@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>DataMind Agent · 问数与文档问答</title>
-  <link rel="stylesheet" href="/assets/style.css?v=0.42.0">
-  <script src="/assets/app.js?v=0.42.0" defer></script>
-  <script src="/assets/multifile.js?v=0.42.0" defer></script>
+  <link rel="stylesheet" href="/assets/style.css?v=0.42.1">
+  <script src="/assets/app.js?v=0.42.1" defer></script>
+  <script src="/assets/multifile.js?v=0.42.1" defer></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -246,7 +246,6 @@
             <button class="ghost" id="importProfiles">导入</button>
             <input type="file" id="importFile" accept="application/json,.json" hidden>
           </div>
-          <div class="notice hidden" id="modelNotice"></div>
           <div class="model-list" id="modelPicks"></div>
         </section>
 
@@ -308,6 +307,9 @@
               <input id="extraHeaders" placeholder='{"X-Api-Version": "2024-01-01"}' autocomplete="off">
             </div>
           </div>
+          <!-- 保存/探测的提示必须紧跟按钮：原先它在表单顶部，而按钮在几十行之下，
+               用户点了「保存」看到的是"没有任何反应"。 -->
+          <div class="notice hidden" id="modelNotice"></div>
           <div class="actions" style="margin-top:16px">
             <button id="saveProfile">保存</button>
             <button class="secondary" id="saveActivate">保存并启用</button>

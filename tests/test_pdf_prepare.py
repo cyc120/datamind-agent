@@ -33,6 +33,27 @@ def _error_child(operation, source, storage, request, queue):
         queue.put("unexpected_success")
 
 
+def _symlinks_usable(directory: Path) -> bool:
+    """Whether this process may create a symlink at all.
+
+    Windows refuses `os.symlink` without Developer Mode or elevation (WinError
+    1314), so the symlink-race tests cannot build their fixture there. The POSIX
+    branch of `pdf_prepare` still enforces them atomically; on Windows that
+    guarantee is documented as replaced by a best-effort check.
+    """
+    probe = directory / ".symlink-probe"
+    try:
+        probe.symlink_to(directory / ".symlink-target", target_is_directory=True)
+    except (OSError, NotImplementedError):
+        return False
+    finally:
+        try:
+            probe.unlink()
+        except OSError:
+            pass
+    return True
+
+
 class PdfPreparationTest(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
@@ -41,6 +62,11 @@ class PdfPreparationTest(unittest.TestCase):
         self.base = Path(self.temporary.name).resolve()
         self.storage = self.base / "prepared"
         self.source = self.make_pdf("source.pdf")
+        self.symlinks_usable = _symlinks_usable(self.base)
+
+    def require_symlinks(self):
+        if not self.symlinks_usable:
+            self.skipTest("this platform cannot create symlinks without elevation")
 
     def make_pdf(self, name, *, pages=1, width=300, height=220, text=None,
                  encryption=False, user_password="synthetic-user", rows=None, font_size=8, lineheight=None):
@@ -351,6 +377,7 @@ class PdfPreparationTest(unittest.TestCase):
         self.assert_error("PDF_MANIFEST_INVALID", prepared.verify_prepared, self.storage, "job-demo", "authority")
 
     def test_storage_source_artifact_symlinks_and_traversal_are_rejected(self):
+        self.require_symlinks()
         linked_source = self.base / "linked-source.pdf"
         linked_source.symlink_to(self.source)
         self.assert_error("PDF_SOURCE_PATH_INVALID", self.prepare, linked_source)
@@ -373,6 +400,7 @@ class PdfPreparationTest(unittest.TestCase):
             self.assert_error("PDF_ATTEMPT_ID_INVALID", prepared.verify_prepared, self.storage, job, token)
 
     def test_managed_directory_symlink_is_rejected_without_external_write(self):
+        self.require_symlinks()
         outside = self.base / "outside"
         outside.mkdir()
         self.storage.mkdir()
@@ -485,6 +513,7 @@ class PdfPreparationTest(unittest.TestCase):
             self.assertTrue(doc.metadata["encryption"])
         self.assert_error("PDF_ENCRYPTED", self.prepare, source)
 
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "POSIX FIFOs do not exist on this platform")
     def test_source_and_artifact_fifos_fail_without_blocking(self):
         source_fifo = self.base / "source-fifo.pdf"
         os.mkfifo(source_fifo)
@@ -532,14 +561,17 @@ class PdfPreparationTest(unittest.TestCase):
                 self.assert_error("PDF_BUNDLE_INVALID", prepared.verify_prepared, self.storage, "job-demo", token)
 
     def test_interrupted_atomic_seal_keeps_attempt_incomplete_and_never_overwrites(self):
-        real_link = os.link
+        # Patch the module's own link primitive rather than `os.link`: on Windows
+        # `_link_at` joins the handle into a full path before calling `os.link`, so
+        # matching on the bare source name would silently stop intercepting.
+        real_link_at = prepared._link_at
 
-        def linking(source, target, **options):
-            if source == ".complete.json":
+        def linking(src_handle, dst_handle, name, dst_name=None):
+            if name == ".complete.json":
                 raise OSError("synthetic seal interruption")
-            return real_link(source, target, **options)
+            return real_link_at(src_handle, dst_handle, name, dst_name)
 
-        with patch.object(prepared.os, "link", side_effect=linking):
+        with patch.object(prepared, "_link_at", side_effect=linking):
             self.assert_error("PDF_SEAL_FAILED", self.prepare)
         attempt = self.storage / "attempts/job-demo/attempt-1"
         self.assertFalse((attempt / ".complete.json").exists())

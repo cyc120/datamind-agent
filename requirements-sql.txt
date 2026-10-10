@@ -3,3 +3,7 @@ sqlglot>=27,<30
 fastapi>=0.115,<1
 uvicorn>=0.30,<1
 httpx>=0.27,<1
+# Windows ships no IANA time zone database, so zoneinfo.ZoneInfo("Asia/Shanghai")
+# raises ZoneInfoNotFoundError in sql_engine/agent. POSIX reads the system database
+# and ignores this marker.
+tzdata>=2024.1; sys_platform == "win32"

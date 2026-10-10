@@ -205,6 +205,55 @@ class ColumnScopeTest(unittest.TestCase):
         # `name` exists only as an output alias, never as a base column.
         self.blocked("SELECT name FROM customers LIMIT 1", "COLUMN_NOT_ALLOWED")
 
+    # ── CTE output columns referenced from the consuming scope ────────────────
+    # Regression: a correct answer shaped as one CTE plus an outer SELECT was refused with
+    # COLUMN_NOT_ALLOWED, because an unqualified outer column was only ever resolved against
+    # real table sources. `sales_amount` is an aggregate alias with no base column, so it was
+    # rejected; `product_name` passed only because `products.product_name` happens to exist.
+    # This is the mirror image of R01 (a real table must not inherit a same-named CTE's
+    # exemption) and is checked with the same per-scope discipline.
+
+    def test_cte_aggregate_output_is_not_a_false_positive(self):
+        self.allowed(
+            "WITH product_sales AS (SELECT p.product_id, p.product_name, "
+            "SUM(oi.quantity * oi.unit_price * (1 - oi.discount)) AS sales_amount "
+            "FROM orders o JOIN order_items oi ON oi.order_id = o.order_id "
+            "JOIN products p ON p.product_id = oi.product_id "
+            "GROUP BY p.product_id, p.product_name) "
+            "SELECT product_name, sales_amount FROM product_sales "
+            "ORDER BY sales_amount DESC LIMIT 3")
+
+    def test_cte_output_referenced_in_the_projection_list_passes(self):
+        self.allowed("WITH c AS (SELECT customer_id, city FROM customers) "
+                     "SELECT customer_id, city FROM c LIMIT 5")
+
+    def test_an_unknown_name_is_not_licenced_by_the_cte_allowance(self):
+        # Neither a base column nor an output of the CTE in scope.
+        self.blocked("WITH c AS (SELECT customer_id FROM customers) "
+                     "SELECT absent_column_xyz FROM c LIMIT 5", "COLUMN_NOT_ALLOWED")
+
+    def test_a_restricted_column_cannot_be_smuggled_through_a_cte_output(self):
+        # The CTE's own scope rejects `phone`; publishing it must not launder it.
+        self.blocked("WITH c AS (SELECT phone FROM customers) SELECT phone FROM c LIMIT 5",
+                     "RESTRICTED_COLUMN")
+
+    def test_a_derived_table_output_gets_no_cte_allowance(self):
+        # Derived tables stay unverifiable, exactly as before: only CTEs publish names that
+        # were validated in their own scope.
+        self.blocked("SELECT only_here FROM (SELECT customer_id AS only_here FROM customers) x LIMIT 5",
+                     "COLUMN_NOT_ALLOWED")
+
+    def test_a_cte_output_does_not_exempt_a_base_column_in_a_mixed_scope(self):
+        # A real table is present, so `phone` resolves against it and stays restricted.
+        self.blocked("WITH c AS (SELECT customer_id FROM customers) "
+                     "SELECT phone FROM c JOIN customers ON customers.customer_id = c.customer_id LIMIT 5",
+                     "RESTRICTED_COLUMN")
+
+    def test_the_r01_shape_stays_blocked_next_to_the_cte_allowance(self):
+        # R01: a schema-qualified real table must not inherit a same-named CTE's exemption.
+        self.blocked("WITH customers AS (SELECT customer_id FROM customers) "
+                     "SELECT phone FROM public.customers LIMIT 5", "RESTRICTED_COLUMN")
+
 
 SALES_QUESTION = "2024年销售额是多少？"
 SALES_WHERE = ("FROM order_items oi JOIN orders o ON oi.order_id=o.order_id "

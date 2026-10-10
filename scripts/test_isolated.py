@@ -67,7 +67,9 @@ def main():
         with psycopg2.connect(_write_dsn()) as conn,conn.cursor() as cur:
             cur.execute('SELECT document_id,object_uri FROM document_assets')
             for document_id,uri in cur.fetchall():
-                _,marker,suffix=(uri or '').partition('/data/')
+                # Stored object_uri keeps the checkout's native separator; normalise so the
+                # '/data/' split also matches a Windows path (D:\...\data\knowledge_base\x.pdf).
+                _,marker,suffix=(uri or '').replace('\\','/').partition('/data/')
                 source=(ROOT/'data'/suffix).resolve() if marker else None
                 if not source or not source.is_relative_to(ROOT/'data') or not source.is_file():
                     raise RuntimeError('Clone source unavailable: '+document_id)

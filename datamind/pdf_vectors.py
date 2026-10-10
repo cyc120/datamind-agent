@@ -29,6 +29,12 @@ from ingestion import pdf_prepare as prepared
 from . import pdf_publications as snapshots
 
 
+# Windows defines neither flag; the intent here is "do not follow a symlink and do
+# not block in open()", and only the fstat/readback comparison below is load
+# bearing. POSIX keeps both flags, so the guarantee there is unchanged.
+_NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
+_NONBLOCK = getattr(os, "O_NONBLOCK", 0)
+
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = 'pdf-vector-plan-v1'
 VECTOR_DIM = 512
@@ -154,7 +160,7 @@ def _model_hashes(root, directory):
             path = (directory / name).resolve(strict=True)
             if not path.is_relative_to(root):
                 raise ValueError()
-            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+            fd = os.open(path, os.O_RDONLY | _NOFOLLOW | _NONBLOCK)
             try:
                 before = os.fstat(fd)
                 maximum = 256 * 1024 * 1024 if name.endswith('.onnx') else 8 * 1024 * 1024

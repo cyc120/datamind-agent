@@ -1,10 +1,30 @@
 """Bounded, native-text PDF preparation. Nothing is indexed or published here.
 
-Cooperating workers use POSIX advisory file locks (macOS/Linux). A private
+Cooperating workers take an advisory lock on a file under `locks/`. A private
 temporary directory holds all products; create-if-absent hard links copy them
 into an attempt, and an atomic completion-marker link seals the attempt last.
 Incomplete or altered attempts are never repaired or overwritten. The storage
 root is a trusted local filesystem, not a signed provenance or authority store.
+
+Two platform paths, one contract. On POSIX every path is walked component by
+component through directory descriptors with `O_NOFOLLOW`, so no component is
+ever resolved through a symlink and every later operation is relative to that
+descriptor. Windows has no `dir_fd`, no `O_NOFOLLOW` and no `fcntl`, so handles
+there are absolute paths and the same operations are performed by full path.
+That port drops two guarantees and keeps the rest:
+
+  * the symlink race defence becomes a best-effort check (`_assert_no_link_walk`
+    rejects a symlinked component before use) instead of an atomic `O_NOFOLLOW`
+    open. A concurrent attacker who swaps a component for a symlink between the
+    check and the use can still redirect the operation. POSIX keeps the atomic
+    guarantee; on Windows the storage root must therefore be a directory no
+    untrusted party can write to, which the documented deployment already
+    requires.
+  * `os.fsync` on a directory is unavailable, so `_sync_dir` is a no-op and
+    durability of the directory entry relies on the filesystem itself.
+
+The lock is `fcntl.flock` on POSIX and `msvcrt.locking` on Windows; both are
+advisory and released when the descriptor closes.
 
 These admission limits are not a hard native-library CPU/memory sandbox. An
 isolated worker process with a deadline is required before accepting production
@@ -13,7 +33,6 @@ input. OCR, table reconstruction and formula recognition are deliberately absent
 from __future__ import annotations
 
 from contextlib import contextmanager
-import fcntl
 from functools import wraps
 import hashlib
 import json
@@ -25,12 +44,19 @@ import shutil
 import stat
 import struct
 import threading
+import time
 from types import MappingProxyType
 from typing import Annotated, Final
 import uuid
 
 import pymupdf
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
+_POSIX = os.name == "posix"
+if _POSIX:
+    import fcntl
+else:  # Windows: advisory locking and byte-range locking are the only option.
+    import msvcrt
 
 
 PARSER_VERSION: Final = f"pdf-native-v1-pymupdf-{pymupdf.VersionBind}"
@@ -78,6 +104,111 @@ _ATTEMPT_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 _SHA = re.compile(r"^[a-f0-9]{64}$")
 _NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
 _DIRECTORY = getattr(os, "O_DIRECTORY", 0)
+# Windows defines neither flag. O_NONBLOCK only guards against blocking in open()
+# on a FIFO; Windows has no FIFOs reachable through os.open on a regular path, and
+# the fstat-before-read ordering below is what actually enforces the size gate.
+_NONBLOCK = getattr(os, "O_NONBLOCK", 0)
+
+
+# ── platform primitives ───────────────────────────────────────────────────────
+# A "handle" names an open directory. On POSIX it is an int file descriptor and
+# every operation below is relative to it; on Windows it is an absolute path and
+# the operation is performed on the joined path. Callers never branch: they only
+# ever pass a handle back into these functions.
+
+def _assert_no_link_walk(path: Path):
+    """Windows-only best-effort stand-in for `O_NOFOLLOW` on every component."""
+    if _POSIX:
+        return
+    parts = Path(os.path.abspath(os.fspath(path))).parts
+    current = Path(parts[0])
+    for part in parts[1:]:
+        current = current / part
+        if os.path.islink(current):
+            raise PdfPrepareError("PDF_STORAGE_PATH_INVALID")
+
+
+def _open_at(handle, name: str, flags: int, mode: int = 0o600) -> int:
+    """Open `name` inside `handle`. Returns a real file descriptor on both platforms."""
+    if _POSIX:
+        return os.open(name, flags, mode, dir_fd=handle)
+    path = os.path.join(handle, name)
+    # Windows cannot express O_NOFOLLOW; check before opening instead.
+    if os.path.islink(path):
+        raise PdfPrepareError("PDF_STORAGE_PATH_INVALID")
+    return os.open(path, flags & ~(_NOFOLLOW | _DIRECTORY), mode)
+
+
+def _mkdir_at(handle, name: str, mode: int = 0o700):
+    if _POSIX:
+        return os.mkdir(name, mode, dir_fd=handle)
+    return os.mkdir(os.path.join(handle, name), mode)
+
+
+def _stat_at(handle, name: str):
+    if _POSIX:
+        return os.stat(name, dir_fd=handle, follow_symlinks=False)
+    return os.lstat(os.path.join(handle, name))
+
+
+def _unlink_at(handle, name: str):
+    if _POSIX:
+        return os.unlink(name, dir_fd=handle)
+    return os.unlink(os.path.join(handle, name))
+
+
+def _link_at(src_handle, dst_handle, name: str, dst_name: str | None = None):
+    """Create-if-absent hard link; never follows a symlink at either end."""
+    if _POSIX:
+        return os.link(name, dst_name or name, src_dir_fd=src_handle,
+                       dst_dir_fd=dst_handle, follow_symlinks=False)
+    source = os.path.join(src_handle, name)
+    target = os.path.join(dst_handle, dst_name or name)
+    if os.path.islink(source) or os.path.islink(target):
+        raise PdfPrepareError("PDF_STORAGE_PATH_INVALID")
+    return os.link(source, target)
+
+
+def _rmtree_at(handle, name: str):
+    if _POSIX:
+        return shutil.rmtree(name, dir_fd=handle)
+    return shutil.rmtree(os.path.join(handle, name))
+
+
+def _sync_dir(handle):
+    """Persist a directory entry. Windows cannot fsync a directory; POSIX does."""
+    if _POSIX:
+        os.fsync(handle)
+
+
+def _fchmod(fd: int, mode: int):
+    if _POSIX:
+        os.fchmod(fd, mode)
+
+
+def _flock(fd: int, *, shared: bool):
+    """Advisory whole-file lock, blocking until acquired.
+
+    `msvcrt.locking` locks a byte range and needs the range to exist, so the
+    lock file is created with one byte (`_lock` opens it for read-write and the
+    range is locked from offset 0 for 1 byte). `LK_LOCK` retries once per second
+    for ~10 seconds then raises; the retry loop below keeps the POSIX blocking
+    semantics instead of surfacing that spurious timeout.
+    """
+    if _POSIX:
+        fcntl.flock(fd, fcntl.LOCK_SH if shared else fcntl.LOCK_EX)
+        return
+    mode = msvcrt.LK_RLCK if shared else msvcrt.LK_LOCK
+    os.lseek(fd, 0, os.SEEK_SET)
+    if os.fstat(fd).st_size == 0:
+        os.write(fd, b"\0")
+        os.lseek(fd, 0, os.SEEK_SET)
+    while True:
+        try:
+            msvcrt.locking(fd, mode, 1)
+            return
+        except OSError:
+            time.sleep(0.05)
 
 
 class PdfPrepareError(ValueError):
@@ -134,6 +265,20 @@ def _open_directory(path: Path, *, create: bool = False, code="PDF_STORAGE_PATH_
     if ".." in Path(path).parts:
         raise PdfPrepareError(code)
     path = Path(os.path.abspath(os.fspath(path)))
+    if not _POSIX:
+        # Windows: no dir_fd. Validate the whole chain up front, then hand the
+        # absolute path back as the handle (see the module docstring for the
+        # symlink guarantee this gives up).
+        try:
+            if create:
+                os.makedirs(path, exist_ok=True)
+            _assert_no_link_walk(path)
+            if not os.path.isdir(path):
+                raise PdfPrepareError(code)
+        except OSError as exc:
+            raise PdfPrepareError(code) from exc
+        yield os.fspath(path)
+        return
     fd = os.open("/", os.O_RDONLY | _DIRECTORY)
     try:
         for part in path.parts[1:]:
@@ -153,9 +298,23 @@ def _open_directory(path: Path, *, create: bool = False, code="PDF_STORAGE_PATH_
 
 
 @contextmanager
-def _directory(parent: int, name: str, *, create=False):
+def _directory(parent, name: str, *, create=False):
     if not name or name in (".", "..") or "/" in name or "\\" in name:
         raise PdfPrepareError("PDF_STORAGE_PATH_INVALID")
+    if not _POSIX:
+        path = os.path.join(parent, name)
+        try:
+            if create:
+                try:
+                    os.mkdir(path, 0o700)
+                except FileExistsError:
+                    pass
+            if os.path.islink(path) or not os.path.isdir(path):
+                raise PdfPrepareError("PDF_STORAGE_PATH_INVALID")
+        except OSError as exc:
+            raise PdfPrepareError("PDF_STORAGE_PATH_INVALID") from exc
+        yield path
+        return
     fd = None
     try:
         if create:
@@ -172,13 +331,13 @@ def _directory(parent: int, name: str, *, create=False):
             os.close(fd)
 
 
-def _read_file(parent: int, name: str, limit: int, *, missing="PDF_ARTIFACT_MISSING",
+def _read_file(parent, name: str, limit: int, *, missing="PDF_ARTIFACT_MISSING",
                invalid="PDF_ARTIFACT_INVALID", too_large="PDF_ARTIFACT_TOO_LARGE") -> bytes:
     fd = None
     try:
         # fstat must be reached before consuming input; a FIFO with no writer
         # would otherwise block in open() before the regular-file gate.
-        fd = os.open(name, os.O_RDONLY | _NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
+        fd = _open_at(parent, name, os.O_RDONLY | _NOFOLLOW | _NONBLOCK)
         info = os.fstat(fd)
         if not stat.S_ISREG(info.st_mode):
             raise PdfPrepareError(invalid)
@@ -214,7 +373,7 @@ def _read_source(source: Path) -> bytes:
 
 
 @contextmanager
-def _lock(root_fd: int, name: str, *, shared=False):
+def _lock(root_fd, name: str, *, shared=False):
     with _directory(root_fd, "locks", create=True) as locks:
         fd = None
         try:
@@ -222,13 +381,13 @@ def _lock(root_fd: int, name: str, *, shared=False):
             # particular, concurrent macOS O_CREAT|O_NOFOLLOW opens can report
             # ENOENT while another process creates the same directory entry.
             try:
-                fd = os.open(name + ".lock", os.O_RDWR | os.O_CREAT | os.O_EXCL | _NOFOLLOW,
-                             0o600, dir_fd=locks)
+                fd = _open_at(locks, name + ".lock",
+                              os.O_RDWR | os.O_CREAT | os.O_EXCL | _NOFOLLOW, 0o600)
             except FileExistsError:
-                fd = os.open(name + ".lock", os.O_RDWR | _NOFOLLOW, dir_fd=locks)
+                fd = _open_at(locks, name + ".lock", os.O_RDWR | _NOFOLLOW, 0o600)
             if not stat.S_ISREG(os.fstat(fd).st_mode):
                 raise PdfPrepareError("PDF_STORAGE_PATH_INVALID")
-            fcntl.flock(fd, fcntl.LOCK_SH if shared else fcntl.LOCK_EX)
+            _flock(fd, shared=shared)
             yield
         except OSError as exc:
             raise PdfPrepareError("PDF_STORAGE_PATH_INVALID") from exc
@@ -255,19 +414,19 @@ def _boundary(function):
     return bounded
 
 
-def _write_file(parent: int, name: str, data: bytes):
-    fd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | _NOFOLLOW, 0o600, dir_fd=parent)
+def _write_file(parent, name: str, data: bytes):
+    fd = _open_at(parent, name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | _NOFOLLOW, 0o600)
     try:
         with os.fdopen(fd, "wb", closefd=False) as stream:
             stream.write(data)
             stream.flush()
             os.fsync(fd)
-        os.fchmod(fd, 0o400)
+        _fchmod(fd, 0o400)
     finally:
         os.close(fd)
 
 
-def _publish_source(root: int, data: bytes, sha: str):
+def _publish_source(root, data: bytes, sha: str):
     with _lock(root, "source-" + sha), _directory(root, "sources", create=True) as sources:
         name = sha + ".pdf"
         try:
@@ -282,11 +441,11 @@ def _publish_source(root: int, data: bytes, sha: str):
         temporary = ".source-" + uuid.uuid4().hex
         try:
             _write_file(sources, temporary, data)
-            os.link(temporary, name, src_dir_fd=sources, dst_dir_fd=sources, follow_symlinks=False)
-            os.fsync(sources)
+            _link_at(sources, sources, temporary, name)
+            _sync_dir(sources)
         finally:
             try:
-                os.unlink(temporary, dir_fd=sources)
+                _unlink_at(sources, temporary)
             except FileNotFoundError:
                 pass
 
@@ -662,23 +821,23 @@ def _verify(root: int, job_id: str, attempt_token: str) -> dict:
     return {**manifest, **BOUNDARIES, "manifest_sha256": complete["manifest_sha256"], "verified": True}
 
 
-def _seal(temp: int, pages: int, job: int, attempt_token: str):
+def _seal(temp, pages, job, attempt_token: str):
     """Link immutable products without overwriting, then publish one marker."""
     try:
-        os.mkdir(attempt_token, 0o700, dir_fd=job)
+        _mkdir_at(job, attempt_token, 0o700)
         with _directory(job, attempt_token) as attempt, _directory(attempt, "pages", create=True) as output_pages:
             for name in os.listdir(pages):
-                os.link(name, name, src_dir_fd=pages, dst_dir_fd=output_pages, follow_symlinks=False)
+                _link_at(pages, output_pages, name)
             for name in ("bundle.json", "manifest.json"):
-                os.link(name, name, src_dir_fd=temp, dst_dir_fd=attempt, follow_symlinks=False)
-            os.fsync(output_pages)
-            os.fsync(attempt)
+                _link_at(temp, attempt, name)
+            _sync_dir(output_pages)
+            _sync_dir(attempt)
             try:
-                os.link(".complete.json", ".complete.json", src_dir_fd=temp, dst_dir_fd=attempt, follow_symlinks=False)
+                _link_at(temp, attempt, ".complete.json")
             except OSError as exc:
                 raise PdfPrepareError("PDF_SEAL_FAILED") from exc
-            os.fsync(attempt)
-            os.fsync(job)
+            _sync_dir(attempt)
+            _sync_dir(job)
     except OSError as exc:
         raise PdfPrepareError("PDF_SEAL_FAILED") from exc
 
@@ -710,7 +869,7 @@ def prepare_pdf(source: Path, storage_root: Path, request: dict) -> dict:
     with _open_directory(storage_root, create=True) as root, _lock(root, _attempt_lock_name(validated.job_id, validated.attempt_token)):
         with _directory(root, "attempts", create=True) as attempts, _directory(attempts, validated.job_id, create=True) as job:
             try:
-                os.stat(validated.attempt_token, dir_fd=job, follow_symlinks=False)
+                _stat_at(job, validated.attempt_token)
             except FileNotFoundError:
                 pass
             else:
@@ -732,7 +891,7 @@ def prepare_pdf(source: Path, storage_root: Path, request: dict) -> dict:
                 _publish_source(root, data, validated.source_sha256)
                 temporary = ".prepare-" + uuid.uuid4().hex
                 with _directory(root, "temporary", create=True) as temporaries:
-                    os.mkdir(temporary, 0o700, dir_fd=temporaries)
+                    _mkdir_at(temporaries, temporary, 0o700)
                     try:
                         with _directory(temporaries, temporary) as temp, _directory(temp, "pages", create=True) as pages:
                             artifacts = [{"path": bundle["source_path"], "sha256": validated.source_sha256,
@@ -778,8 +937,8 @@ def prepare_pdf(source: Path, storage_root: Path, request: dict) -> dict:
                             # Every destination is create-if-absent. The completion marker is linked last.
                             _seal(temp, pages, job, validated.attempt_token)
                     finally:
-                        # Safe fd-relative deletion of our randomly named private temporary subtree.
-                        shutil.rmtree(temporary, dir_fd=temporaries)
+                        # Safe handle-relative deletion of our randomly named private temporary subtree.
+                        _rmtree_at(temporaries, temporary)
             return _verify(root, validated.job_id, validated.attempt_token)
 
 

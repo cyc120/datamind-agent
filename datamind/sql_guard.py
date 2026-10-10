@@ -61,6 +61,33 @@ def _scope_projection_names(scope) -> set[str]:
     return names
 
 
+def _cte_projection_names(scope) -> set[str]:
+    """Output names the CTEs of *this* scope contribute to it.
+
+    Deliberately the mirror image of `cte_reference_table_ids`, and deliberately built the
+    same way: read from the CTE's own `Scope` object in `scope.sources`, never from a global
+    set of CTE names. R01 removed the name-based shortcut because a same-named *real* table
+    could inherit a CTE's exemption; this function closes the opposite gap without
+    reintroducing one, because it only ever answers "can an unqualified column here be
+    naming a CTE output?" and only after the real-table sources have been tried and failed.
+
+    Every name returned here was already checked in the CTE's own scope, where a base column
+    must clear the allowlist and the sensitivity gate — so accepting a consumer reference to
+    one cannot launder a restricted column. Before this, such a reference fell back to
+    `base_tables` alone: an aggregate alias (`sales_amount`) was refused outright, and a name
+    that happened to also be a base column (`product_name`) was accepted, which is a
+    coincidence rather than resolution.
+    """
+    names: set[str] = set()
+    for source in scope.sources.values():
+        if isinstance(source, Scope) and getattr(source, "is_cte", False):
+            expression = source.expression
+            if isinstance(expression, (exp.Select, exp.Union)):
+                names.update(name for name in
+                             (projection.alias_or_name for projection in expression.selects) if name)
+    return names
+
+
 def cte_reference_table_ids(tree) -> set[int]:
     """``id()`` of the ``exp.Table`` nodes that really reference a CTE.
 
@@ -102,6 +129,7 @@ def _check_columns(tree, catalog: Catalog, base_tables: list) -> None:
         unverifiable = {alias for alias, source in scope.sources.items()
                         if isinstance(source, Scope) and getattr(source, "is_cte", False)}
         local_aliases = set(scope.expression.selects and _scope_projection_names(scope) or set())
+        cte_outputs = _cte_projection_names(scope)
         for column in scope.columns:
             if isinstance(column.this, exp.Star):
                 raise PolicyError("SELECT_STAR")
@@ -118,6 +146,11 @@ def _check_columns(tree, catalog: Catalog, base_tables: list) -> None:
             matches = [catalog.columns[(name, column.name)] for name in possible
                        if (name, column.name) in catalog.columns]
             if not matches:
+                # Real-table sources were tried and failed, so an unqualified column may be
+                # naming a CTE output. Checked after the real tables so a base column can
+                # never be exempted by a same-named CTE output (the R01 bypass shape).
+                if not column.table and column.name in cte_outputs:
+                    continue
                 if _in_sort_clause(column) and column.name in local_aliases:
                     continue
                 raise PolicyError("COLUMN_NOT_ALLOWED")
