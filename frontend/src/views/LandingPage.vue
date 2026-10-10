@@ -88,14 +88,20 @@ const sampleEdges: EvidenceEdge[] = [
       <div class="hero-inner">
         <div class="pill">多模态数据驱动 · 可解释 · 可溯源</div>
 
-        <!-- 曲速文本：大标题 -->
-        <div class="warp-slot">
-          <WarpText text="把黑箱拆成星图" color="#0b1220" :font-size="'clamp(2.6rem, 8vw, 6.5rem)'"
-                    :font-weight="800" :letter-spacing="'-0.045em'" :speed="0.5" :warp-strength="0.06" />
+        <!-- 巨大标题：分片渲染是为了让关键词单独着色（曲速文本是 WebGL 画布，
+             整行只能一个颜色，做不出这种局部强调），入场用逐字模糊。 -->
+        <h1 class="sr-only">多模态数据驱动的可解释精准问数智能体</h1>
+        <div class="hero-title" aria-hidden="true">
+          <div class="title-line">
+            <BlurText text="多模态数据驱动" :delay="55" animate-by="letters" class="title-piece" />
+          </div>
+          <div class="title-line">
+            <BlurText text="可解释" :delay="55" animate-by="letters" class="title-piece accent" />
+            <BlurText text="精准问数" :delay="55" animate-by="letters" class="title-piece" />
+          </div>
         </div>
-        <h1 class="sr-only">把 AI 的黑箱，拆成一张看得见的星图</h1>
 
-        <!-- 轮换文本：关键词 -->
+        <!-- 小字介绍 -->
         <p class="sub">
           DataMind Agent —— 面向数据库与知识库的
           <RotatingText :texts="rotating" class="rotator overflow-hidden" :rotation-interval="2200"
@@ -111,11 +117,17 @@ const sampleEdges: EvidenceEdge[] = [
       </div>
     </section>
 
-    <!-- 关键词条：真正的专注 -->
+    <!-- 关键词条：真正的专注 + 曲速展示带 -->
     <section class="keyword-strip">
       <TrueFocus :sentence="keywords" :blur-amount="4" border-color="#2563eb"
                   glow-color="rgba(37, 99, 235, 0.35)" :animation-duration="0.45"
                   :pause-between-animations="0.9" />
+    </section>
+
+    <section class="warp-band">
+      <WarpText text="看得见的推理" color="#0b1220" :font-size="'clamp(1.7rem, 4.6vw, 3.4rem)'"
+                :font-weight="800" :letter-spacing="'-0.04em'" :speed="0.45"
+                :warp-strength="0.05" :pointer-influence="0.35" />
     </section>
 
     <!-- 原理：翻牌卡 + 折叠文字 -->
@@ -334,14 +346,18 @@ const sampleEdges: EvidenceEdge[] = [
 /* ── Hero ── */
 .hero {
   position: relative;
-  padding: 150px 24px 40px;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 148px 40px 26px;
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
 }
+/* 左对齐 + 黄金分割：内容列占 61.8%，右侧 38.2% 留白。
+   居中的版式四平八稳但呆板，非对称的留白更有设计感。 */
 .hero-inner {
-  width: 100%;
-  max-width: 1040px;
-  text-align: center;
+  width: 61.8%;
+  max-width: 880px;
+  text-align: left;
 }
 .pill {
   display: inline-block;
@@ -353,24 +369,50 @@ const sampleEdges: EvidenceEdge[] = [
   font-size: 12.5px;
   letter-spacing: 0.02em;
 }
-/* 曲速文本是 WebGL 画布：必须给它一个有高度的容器 */
-.warp-slot {
-  margin: 18px auto 6px;
-  min-height: 260px;
-  width: 100%;
+
+/* 巨大标题：参考 Dify 的hero——极大字号、行高收紧、字距微负 */
+.hero-title {
+  margin: 22px 0 26px;
+  font-size: clamp(2.4rem, 6.1vw, 5.6rem);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+  color: var(--color-text);
 }
+.title-line {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-items: baseline;
+}
+/* BlurText 的根元素是 p.flex.flex-wrap：这里让它按行内块参与标题排版 */
+.title-piece {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+}
+.title-piece.accent {
+  color: var(--color-accent);
+}
+
 .sub {
-  margin: 0 auto;
-  max-width: 720px;
+  margin: 0;
+  max-width: 640px;
   color: var(--color-body);
-  font-size: 16px;
-  line-height: 1.9;
+  font-size: clamp(0.98rem, 1.25vw, 1.2rem);
+  line-height: 1.85;
 }
 .rotator {
   display: inline-flex;
   vertical-align: bottom;
   margin: 0 4px;
-  padding: 2px 10px;
+  padding: 1px 10px;
   border-radius: 8px;
   background: rgba(37, 99, 235, 0.08);
   color: var(--color-accent);
@@ -379,8 +421,8 @@ const sampleEdges: EvidenceEdge[] = [
 .hero-cta {
   display: flex;
   gap: 12px;
-  justify-content: center;
-  margin-top: 30px;
+  justify-content: flex-start;
+  margin-top: 32px;
 }
 .primary {
   padding: 13px 26px;
@@ -418,9 +460,11 @@ const sampleEdges: EvidenceEdge[] = [
 
 /* ── 关键词条 ── */
 .keyword-strip {
-  padding: 26px 24px 10px;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 34px 40px 6px;
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
 }
 /* TrueFocus 把每个词写死成 Tailwind 的 text-7xl（72px），直接用在页面上会撑破一行。
    这里覆盖成受控字号；选择器特异性高于工具类，无需 !important。 */
@@ -431,24 +475,46 @@ const sampleEdges: EvidenceEdge[] = [
   color: var(--color-text);
 }
 
+/* 曲速展示带：WarpText 是 WebGL 画布，必须给它一个有高度的容器。
+   注意组件自带 min-h-55（220px），所以这里的 min-height 只是兜底。
+   另外它把文字画在画布正中、没有对齐参数，所以这里把画布收进同一条黄金分割列，
+   让它在左侧区域内居中，而不是飘在整页正中。 */
+.warp-band {
+  padding: 4px 40px 0;
+  max-width: 1280px;
+  margin: 0 auto;
+  min-height: 118px;
+}
+.warp-band > * {
+  width: 61.8%;
+  max-width: 880px;
+}
+/* 画布本身留白较多，紧跟其后的区块收紧上边距，避免出现一大段空档 */
+.warp-band + .section {
+  padding-top: 54px;
+}
+
 /* ── 通用区块 ── */
 .section {
-  padding: 92px 24px;
-  max-width: 1120px;
+  padding: 92px 40px;
+  max-width: 1280px;
   margin: 0 auto;
 }
 .section.soft {
   max-width: none;
   background: var(--color-ink);
-  padding: 92px 24px;
+  padding: 92px 40px;
 }
 .section.soft > * {
-  max-width: 1120px;
+  max-width: 1280px;
   margin-left: auto;
   margin-right: auto;
 }
+/* 区块标题同样左对齐：只有 hero 左对齐、其余居中会显得两套版式打架。
+   文字列仍按黄金分割收窄，保持右侧留白。 */
 .sec-head {
-  text-align: center;
+  text-align: left;
+  max-width: 720px;
   margin-bottom: 44px;
 }
 .eyebrow {
@@ -459,7 +525,7 @@ const sampleEdges: EvidenceEdge[] = [
   margin-bottom: 12px;
 }
 .sec-note {
-  margin: 14px auto 0;
+  margin: 14px 0 0;
   max-width: 620px;
   color: var(--color-body);
   font-size: 15px;
@@ -467,7 +533,7 @@ const sampleEdges: EvidenceEdge[] = [
 }
 /* BlurText 根元素是 <p>，这里把它当标题用 */
 .blur-heading {
-  justify-content: center;
+  justify-content: flex-start;
   margin: 0;
   font-size: clamp(1.8rem, 4vw, 3rem);
   font-weight: 800;
@@ -567,9 +633,9 @@ const sampleEdges: EvidenceEdge[] = [
 .starmap {
   border-radius: 16px;
   padding: 18px;
-  /* 图只有 7 个节点，铺满 1120px 会显得空；收窄到合适宽度让它读起来是「一幅图」 */
-  max-width: 680px;
-  margin: 0 auto;
+  /* 与下方落差文字块同宽，避免右边缘参差 */
+  max-width: 760px;
+  margin: 0;
   display: flex;
   justify-content: center;
   overflow: hidden;
@@ -577,7 +643,7 @@ const sampleEdges: EvidenceEdge[] = [
 /* 落差文字需要父容器给定高度 */
 .falling-slot {
   height: 190px;
-  margin: 20px auto 0;
+  margin: 20px 0 0;
   max-width: 760px;
   border-radius: 14px;
   border: 1px dashed var(--color-line);
@@ -589,7 +655,7 @@ const sampleEdges: EvidenceEdge[] = [
   display: flex;
   flex-wrap: wrap;
   gap: 8px 20px;
-  justify-content: center;
+  justify-content: flex-start;
   margin-top: 20px;
   color: var(--color-body);
   font-size: 13px;
@@ -700,8 +766,26 @@ const sampleEdges: EvidenceEdge[] = [
   .links {
     display: none;
   }
-  .warp-slot {
-    min-height: 190px;
+  /* 窄屏下黄金分割列太窄，正文改回整宽 */
+  .hero {
+    padding: 120px 20px 20px;
+  }
+  .hero-inner {
+    width: 100%;
+    max-width: none;
+  }
+  .section,
+  .section.soft {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  .keyword-strip,
+  .warp-band {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  .foot {
+    padding: 22px 20px;
   }
 }
 </style>
