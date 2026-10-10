@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import VerificationTable from '../industrial/VerificationTable.vue'
 import type { ChatMessage, Citation, TraceEvent } from '../../api/types'
 
 const props = defineProps<{
@@ -243,6 +244,12 @@ onBeforeUnmount(() => window.removeEventListener('resize', markOverflow))
 
                 <!-- 答案正文 -->
                 <div v-if="m.content" class="answer">{{ m.content }}</div>
+
+                <!-- 工业核验表：industrial_result.rows 才是「核验表」的正源 -->
+                <VerificationTable
+                  v-if="m.industrialResult && m.industrialResult.rows && m.industrialResult.rows.length"
+                  :result="m.industrialResult"
+                />
 
                 <!-- 结果表 -->
                 <div v-if="m.sqlResult && m.sqlResult.columns" class="result-table">

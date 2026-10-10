@@ -106,6 +106,8 @@ async function send(payload: { question: string; mode: string }) {
     assistant.error = final.error_code ?? undefined
     if (final.sql_result) assistant.sqlResult = final.sql_result
     if (final.rag_result?.citations) assistant.citations = final.rag_result.citations
+    // 工业核验：摘要里的「详见核验表」指的就是这个结果，必须落到消息上才会渲染
+    if (final.industrial_result) assistant.industrialResult = final.industrial_result
     assistant.status = final.status === 'FAILED_WITH_EVIDENCE' ? 'error' : 'done'
 
     // 拉取证据图，点亮右侧星链

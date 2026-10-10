@@ -90,6 +90,110 @@ export interface RagResult {
   [key: string]: any
 }
 
+/* ── 工业跨源核验（mode: 'industrial' → output_summary.industrial_result）──
+   下面每个字段名都对着 127.0.0.1:8000 的真实响应核过一遍：
+   2026-09 A102 工序 30 那次运行的 10 行 rows / 17 条 facts 都在。 */
+
+/** rows[].issues[]：冲突双方原值都保留在这里，前端两方都要显示 */
+export interface IndustrialIssue {
+  /** value_conflict / version_overlap / unit_or_value / report_gap / measurement_context … */
+  kind: string
+  /** unresolved / needs_review / insufficient_evidence / resolved_by_authority … */
+  status: string
+  /** NO_REGISTERED_AUTHORITY_RULE / UNKNOWN_UNIT / REPORT_MISSING_OR_AMBIGUOUS … */
+  reason?: string
+  /** 冲突双方原值。有值时必须并陈，不允许只显示一侧 */
+  left_value?: string | number | null
+  right_value?: string | number | null
+  fact_ids?: string[]
+  authority_rule_ids?: string[]
+  [key: string]: any
+}
+
+/** rows[].rules[]：本行实际套用的规则（rule_id 可查，版本可复现） */
+export interface IndustrialRule {
+  rule_id: string
+  rule_version?: string
+  /** inclusive_temperature_range 等判据会带结论 */
+  passed?: boolean
+  expression?: string
+  conversion?: string
+  left_value?: string | number | null
+  right_value?: string | number | null
+  event_id?: string
+  [key: string]: any
+}
+
+/** 核验表的一行 = 一条 measurement 的跨源核验结论 */
+export interface IndustrialRow {
+  batch_id: string
+  part_id: string
+  produced_at: string
+  recorded_revision: string | null
+  applicable_revision: string | null
+  measurement_id: string
+  operation_no: string
+  metric: string
+  /** 数据库实测值与其原始单位 */
+  value: string | number
+  unit: string
+  /** 归一值可能为 null（UNKNOWN_UNIT 那类未消解的情况） */
+  normalized_value: string | number | null
+  normalized_unit: string | null
+  measured_at: string
+  method: string
+  quality_id: string | null
+  report_id: string | null
+  quality_method: string | null
+  /** 质检报告侧的原值，用来和 value 对照 */
+  report_value?: string | number | null
+  report_unit?: string | null
+  report_fact_id?: string | null
+  requirement_fact_id?: string | null
+  compliance: string
+  agreement: string
+  issues: IndustrialIssue[]
+  rules: IndustrialRule[]
+  [key: string]: any
+}
+
+export interface IndustrialSummary {
+  batch_count: number
+  measurement_count: number
+  /** 超限 measurement_id */
+  out_of_range: string[]
+  /** 存在来源冲突（agreement === 'unresolved'）的 measurement_id */
+  conflicts: string[]
+  /** 已被已登记权威规则裁决的 measurement_id */
+  authority_resolved: string[]
+  /** 需人工复核的 measurement_id */
+  needs_review: string[]
+}
+
+export interface IndustrialResult {
+  kind: string
+  status: string
+  answer: string
+  /** { part_id, operation_no, start, end, month, metric } */
+  scope?: Record<string, any>
+  rule_version?: string
+  authority_version?: string
+  /** { dataset_version, seed_sha256, pdf_sha256, provenance } */
+  dataset?: Record<string, any>
+  summary?: IndustrialSummary
+  rows?: IndustrialRow[]
+  facts?: any[]
+  sql_rows?: any[]
+  sql?: string
+  bound_params?: any[]
+  sql_hash?: string
+  source_snapshot_id?: string
+  elapsed_ms?: number
+  model_used?: boolean
+  partial?: boolean
+  [key: string]: any
+}
+
 export interface FinalResult {
   run_id: string
   status: RunStatus
@@ -98,7 +202,7 @@ export interface FinalResult {
   error_code?: string | null
   sql_result?: SqlResult
   rag_result?: RagResult
-  industrial_result?: any
+  industrial_result?: IndustrialResult
 }
 
 export type NodeType =
@@ -156,6 +260,8 @@ export interface ChatMessage {
   thinking?: TraceEvent[]
   sqlResult?: SqlResult
   citations?: Citation[]
+  /** 工业核验结果：核验表的数据源，渲染在答案正文下方 */
+  industrialResult?: IndustrialResult
   runStatus?: RunStatus
   confidence?: string
   error?: string
