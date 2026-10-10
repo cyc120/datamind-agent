@@ -152,32 +152,32 @@ function rows() {
 .type {
   font-size: 12px;
   font-weight: 600;
-  color: #7dd3fc;
+  color: var(--color-accent);
   letter-spacing: 0.04em;
 }
 .ref {
   font-size: 11px;
-  color: #64748b;
+  color: var(--color-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .text {
-  font-size: 13.5px;
+  font-size: 13px;
   line-height: 1.7;
-  color: #dbe4f0;
+  color: var(--color-text);
   white-space: pre-wrap;
   word-break: break-word;
 }
 .code {
-  background: rgba(2, 6, 16, 0.6);
-  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: var(--color-ink);
+  border: 1px solid var(--color-line);
   border-radius: 10px;
   padding: 10px 12px;
-  font-size: 12px;
+  font-size: 11.5px;
   line-height: 1.6;
-  color: #a5f3fc;
+  color: var(--color-text);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   overflow-x: auto;
   white-space: pre-wrap;
@@ -185,16 +185,16 @@ function rows() {
 }
 .kv {
   display: grid;
-  grid-template-columns: 96px 1fr;
-  gap: 6px 12px;
+  grid-template-columns: 88px 1fr;
+  gap: 6px 10px;
   margin: 10px 0;
   font-size: 12.5px;
 }
 .kv dt {
-  color: #64748b;
+  color: var(--color-muted);
 }
 .kv dd {
-  color: #dbe4f0;
+  color: var(--color-text);
   margin: 0;
   word-break: break-word;
 }
@@ -205,7 +205,7 @@ function rows() {
 .tablewrap {
   overflow-x: auto;
   margin: 8px 0;
-  border: 1px solid rgba(148, 163, 184, 0.16);
+  border: 1px solid var(--color-line);
   border-radius: 10px;
 }
 table {
@@ -217,22 +217,22 @@ th,
 td {
   padding: 6px 10px;
   text-align: left;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  border-bottom: 1px solid var(--color-line);
   white-space: nowrap;
 }
 th {
-  color: #94a3b8;
+  color: var(--color-muted);
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--color-ink);
 }
 td {
-  color: #dbe4f0;
+  color: var(--color-text);
 }
 tr:last-child td {
   border-bottom: none;
 }
 .link {
-  color: #7dd3fc;
+  color: var(--color-accent);
   font-size: 12.5px;
   text-decoration: none;
 }
@@ -241,19 +241,19 @@ tr:last-child td {
 }
 .empty {
   text-align: center;
-  padding: 40px 16px;
-  color: #64748b;
+  padding: 34px 12px;
+  color: var(--color-muted);
   font-size: 13px;
   line-height: 1.7;
 }
 .empty .dot {
-  font-size: 22px;
-  color: #7dd3fc;
+  font-size: 20px;
+  color: var(--color-accent);
   display: inline-block;
   margin-bottom: 10px;
 }
 .muted {
-  color: #64748b;
+  color: var(--color-muted);
   font-size: 12.5px;
 }
 </style>

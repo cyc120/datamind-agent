@@ -9,8 +9,14 @@ const props = withDefaults(
     interactive?: boolean
     width?: number
     height?: number
+    /**
+     * 最外圈半径系数。默认 0.62 是落地页那类横向大画布调好的值（不要改默认值）。
+     * 主界面右侧的证据面板只有 340px 宽，0.62 会把孤立证据点甩出 viewBox 被裁掉，
+     * 那里显式传更小的系数。
+     */
+    radiusScale?: number
   }>(),
-  { interactive: true, width: 660, height: 540 },
+  { interactive: true, width: 660, height: 540, radiusScale: 0.62 },
 )
 
 const emit = defineEmits<{ (e: 'select', node: EvidenceNode | null): void }>()
@@ -47,7 +53,7 @@ interface Placed {
 }
 
 // 径向 BFS 分层：从 Claim（答案主张）出发，证据逐层向外铺开，像星图一样。
-function layoutGraph(nodes: EvidenceNode[], edges: EvidenceEdge[], w: number, h: number): Placed[] {
+function layoutGraph(nodes: EvidenceNode[], edges: EvidenceEdge[], w: number, h: number, scale: number): Placed[] {
   const ids = new Set(nodes.map((n) => n.evidence_id))
   const adj = new Map<string, string[]>()
   ids.forEach((id) => adj.set(id, []))
@@ -99,7 +105,7 @@ function layoutGraph(nodes: EvidenceNode[], edges: EvidenceEdge[], w: number, h:
     const ll = l >= 99 ? maxLayer + 1 : l
     // 半径以外接正方形为基准：原来按 min(w,h) 且只用到 0.46 的外圈，
     // 在横向画布上会让星座缩在中间一小块。这里按对角线方向铺开并逐层接近边缘。
-    const radius = ll === 0 ? 0 : Math.min(w, h) * 0.62 * (ll / (maxLayer + 1))
+    const radius = ll === 0 ? 0 : Math.min(w, h) * scale * (ll / (maxLayer + 1))
     const count = layerNodes.length
     layerNodes.forEach((n, i) => {
       // 同层多节点时错开角度，避免重叠
@@ -113,7 +119,9 @@ function layoutGraph(nodes: EvidenceNode[], edges: EvidenceEdge[], w: number, h:
   return placed
 }
 
-const layout = computed(() => layoutGraph(props.nodes, props.edges, props.width, props.height))
+const layout = computed(() =>
+  layoutGraph(props.nodes, props.edges, props.width, props.height, props.radiusScale),
+)
 
 const nodeById = computed(() => {
   const m = new Map<string, EvidenceNode>()
