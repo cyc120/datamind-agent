@@ -52,13 +52,31 @@ export interface SqlResult {
   [key: string]: any
 }
 
+/** 引用的来源块（后端 source_blocks 的逐块定位） */
+export interface CitationSourceBlock {
+  block_id?: string
+  page_no?: number
+  bbox?: number[]
+  [key: string]: any
+}
+
 export interface Citation {
   chunk_id: string
   document_id: string
   title?: string
+  /** 后端真实返回的原文摘录字段（旧数据的兜底字段见 excerpt / text） */
+  quote?: string
   text?: string
   excerpt?: string
+  /** 后端真实返回的页码区间；page_no 是旧数据的单页兜底 */
+  page_start?: number
+  page_end?: number
   page_no?: number
+  section_path?: string[]
+  source_blocks?: CitationSourceBlock[]
+  /** 相对路径：'/v1/documents/{id}/file?...' 与 '/v1/documents/{id}/pages/{n}?...' */
+  source_url?: string
+  page_url?: string
   document_version?: number
   locator?: any
   [key: string]: any

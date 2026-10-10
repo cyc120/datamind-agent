@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
-import type { ChatMessage, TraceEvent } from '../../api/types'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import type { ChatMessage, Citation, TraceEvent } from '../../api/types'
 
 const props = defineProps<{
   messages: ChatMessage[]
@@ -115,6 +115,90 @@ function statusText(m: ChatMessage): string {
   if (m.runStatus === 'NEEDS_CLARIFICATION') return '需要澄清'
   return m.confidence ? `置信度 ${m.confidence}` : ''
 }
+
+/* ── 引用卡片：字段名读取逻辑统一收在这两个函数里 ──
+   后端 citation 真实返回 quote / page_start / page_end / section_path /
+   page_url / source_url；excerpt / text / page_no 只是旧数据的兜底。 */
+
+/** 摘录文本：quote → excerpt → text，都没有则空串 */
+function citationQuote(c: Citation | any): string {
+  const v = c?.quote ?? c?.excerpt ?? c?.text
+  return typeof v === 'string' ? v : ''
+}
+
+/** 页码标签：优先 page_start / page_end，「第 N 页」或「第 N–M 页」，无则空串 */
+function citationPage(c: Citation | any): string {
+  const n = (v: any) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+  const start = n(c?.page_start) ?? n(c?.page_end) ?? n(c?.page_no)
+  if (start == null) return ''
+  const end = n(c?.page_end) ?? start
+  return end !== start ? `第 ${start}–${end} 页` : `第 ${start} 页`
+}
+
+/** 章节路径：section_path 用 › 连接 */
+function citationSections(c: Citation | any): string {
+  const p = c?.section_path
+  if (!Array.isArray(p)) return ''
+  return p.filter((s: any) => typeof s === 'string' && s.trim()).join(' › ')
+}
+
+/** 链接补全：后端给的是相对路径，同源直接可用；绝对 URL 原样保留 */
+function citationUrl(c: Citation | any, key: 'page_url' | 'source_url'): string {
+  const v = c?.[key]
+  if (typeof v !== 'string' || !v) return ''
+  return /^(https?:)?\/\//i.test(v) ? v : v.startsWith('/') ? v : `/${v}`
+}
+
+/** 摘录可能很长，超过 max-height 才给「展开」；键就是卡片序号 */
+const expanded = ref<Set<number>>(new Set())
+const overflowing = ref<Set<number>>(new Set())
+const quoteEls = new Map<number, HTMLElement>()
+
+function setQuoteEl(ci: number, el: any) {
+  if (el) quoteEls.set(ci, el as HTMLElement)
+  else quoteEls.delete(ci)
+}
+
+function isExpanded(ci: number): boolean {
+  return expanded.value.has(ci)
+}
+
+function isOverflowing(ci: number): boolean {
+  return overflowing.value.has(ci)
+}
+
+function toggleCite(ci: number) {
+  const next = new Set(expanded.value)
+  if (next.has(ci)) next.delete(ci)
+  else next.add(ci)
+  expanded.value = next
+}
+
+/** 标记哪些摘录被截断；在引用卡片渲染后与窗口变化时重算。
+    注意：必须先量「已折叠」状态 —— scrollHeight 是完整内容高度、clientHeight 是
+    折叠后的高度，两者可比；若在未折叠状态下量，两者恒相等，永远测不出溢出。
+    量完把元素的 class 交回模板（模板按 isOverflowing / isExpanded 决定是否折叠）。 */
+function markOverflow() {
+  const next = new Set<number>()
+  quoteEls.forEach((el, ci) => {
+    const wasClamped = el.classList.contains('is-clamp')
+    el.classList.add('is-clamp')
+    if (el.scrollHeight > el.clientHeight + 1) next.add(ci)
+    if (!wasClamped) el.classList.remove('is-clamp')
+  })
+  overflowing.value = next
+}
+
+watch(
+  () => [props.messages.length, props.messages[props.messages.length - 1]?.citations?.length ?? 0],
+  () => nextTick(markOverflow),
+  { flush: 'post' },
+)
+onMounted(() => {
+  nextTick(markOverflow)
+  window.addEventListener('resize', markOverflow)
+})
+onBeforeUnmount(() => window.removeEventListener('resize', markOverflow))
 </script>
 
 <template>
@@ -178,12 +262,47 @@ function statusText(m: ChatMessage): string {
                 <!-- 引用卡片 -->
                 <div v-if="m.citations && m.citations.length" class="citations">
                   <div class="cite-title">引用来源</div>
-                  <div v-for="(c, i) in m.citations" :key="i" class="cite">
-                    <span class="cite-idx">{{ i + 1 }}</span>
+                  <div v-for="(c, ci) in m.citations" :key="ci" class="cite">
+                    <span class="cite-idx">{{ ci + 1 }}</span>
                     <div class="cite-body">
-                      <div class="cite-doc">{{ c.title || c.document_id }}</div>
-                      <p class="cite-text">{{ c.text || c.excerpt || '' }}</p>
-                      <div v-if="c.page_no != null" class="cite-meta">第 {{ c.page_no }} 页</div>
+                      <div class="cite-head">
+                        <span class="cite-doc">{{ c.title || c.document_id }}</span>
+                        <span v-if="c.document_version != null" class="cite-ver">v{{ c.document_version }}</span>
+                        <span v-if="citationPage(c)" class="cite-page">{{ citationPage(c) }}</span>
+                      </div>
+
+                      <div v-if="citationSections(c)" class="cite-path">{{ citationSections(c) }}</div>
+
+                      <div class="cite-quote-wrap">
+                        <div
+                          :ref="(el) => setQuoteEl(ci, el)"
+                          class="cite-text"
+                          :class="{ 'is-clamp': isOverflowing(ci) && !isExpanded(ci) }"
+                        >{{ citationQuote(c) }}</div>
+                        <button
+                          v-if="isOverflowing(ci) || isExpanded(ci)"
+                          class="cite-toggle"
+                          type="button"
+                          @click="toggleCite(ci)"
+                        >{{ isExpanded(ci) ? '收起' : '展开原文' }}</button>
+                      </div>
+
+                      <div class="cite-links">
+                        <a
+                          v-if="citationUrl(c, 'page_url')"
+                          class="cite-link"
+                          :href="citationUrl(c, 'page_url')"
+                          target="_blank"
+                          rel="noopener"
+                        >查看原页 ↗</a>
+                        <a
+                          v-if="citationUrl(c, 'source_url')"
+                          class="cite-link"
+                          :href="citationUrl(c, 'source_url')"
+                          target="_blank"
+                          rel="noopener"
+                        >原文件 ↗</a>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -653,26 +772,88 @@ tr:last-child td {
   flex-shrink: 0;
 }
 .cite-body {
+  flex: 1;
   min-width: 0;
+}
+.cite-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 .cite-doc {
   font-size: 12.5px;
   color: var(--color-text);
   font-weight: 600;
 }
+.cite-ver {
+  font-size: 10.5px;
+  color: var(--color-muted);
+  border: 1px solid var(--color-line);
+  border-radius: 4px;
+  padding: 0 4px;
+  line-height: 1.5;
+}
+.cite-page {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--color-muted);
+}
+.cite-path {
+  font-size: 11.5px;
+  color: var(--color-muted);
+  margin-top: 4px;
+  word-break: break-word;
+}
+.cite-quote-wrap {
+  margin: 9px 0 0;
+}
 .cite-text {
   font-size: 12px;
   color: var(--color-body);
-  line-height: 1.6;
-  margin: 3px 0;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding-left: 9px;
+  border-left: 2px solid var(--color-line);
+}
+.cite-text.is-clamp {
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  max-height: 7.2em;
 }
-.cite-meta {
+.cite-toggle {
+  margin: 4px 0 0;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
   font-size: 11px;
-  color: var(--color-muted);
+  color: var(--color-accent);
+}
+.cite-toggle:hover {
+  text-decoration: underline;
+}
+.cite-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+.cite-link {
+  font-size: 11.5px;
+  color: var(--color-accent);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(37, 99, 235, 0.35);
+  padding-bottom: 1px;
+  cursor: pointer;
+}
+.cite-link:hover {
+  border-bottom-color: var(--color-accent);
 }
 .meta {
   margin-top: 8px;
