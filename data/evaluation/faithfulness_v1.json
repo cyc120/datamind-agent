@@ -1,0 +1,278 @@
+{
+  "suite_version": "faithfulness-v1",
+  "data_version": "demo_kb-20261009",
+  "scope": "单文档问答（每例用 scope.document_refs 固定到 1 份文档，collection=demo_kb）",
+  "labeling_rules": {
+    "basis": "逐结论句的标注依据 = 本次运行 citations[].quote 的拼接原文（引用片段原文），不是冻结集里的期望答案，也不是模型自述。",
+    "conclusion_unit": "答案按 。！？；\\n 切句；纯引用标记、<8 个字符的寒暄/标题残片、以及拒答句式不计入结论分母（单列 refusal_sentences / boilerplate_sentences）。",
+    "supported": "数值型结论：句中断言数字包含 required_values 且其余数字都属于 allowed_values ∪ required_values。非数值结论：句中命中至少一个 required_term_groups 的任一同义词。",
+    "contradicted": "数值型结论：句中断言了 required_values ∪ allowed_values 之外、且不在题面/context_values 里的数字（即在同题上给出了冻结证据不支持/相冲突的取值）。",
+    "no_evidence": "其余情况：句中有数字但未命中 required_values（且数字落在允许集合内），或非数值结论没有命中任何 required_term_groups。",
+    "numbers": "数字 token = (?<![\\d.])数字（可带小数），丢弃紧邻 ASCII 字母的数字（如 450L、4K、Pro）、参考性编号（第3条、未识别列5、表2），再扣除题面中出现的数字与 context_values（年份等上下文）。",
+    "model_judgment": "本轮不使用模型判定；规则判定与模型判定不混算（model_judgment=null）。"
+  },
+  "cases": [
+    {
+      "case_id": "faith-001",
+      "document_title": "04_售后服务与退款管理制度",
+      "question": "七天无理由退款的条件是什么？",
+      "expected": "answer",
+      "evidence_quotes": ["第三条 自签收之日起 7 日内，商品未拆封且不影响二次销售的，支持七天无理由退款。"],
+      "required_values": ["7"],
+      "allowed_values": ["7"],
+      "required_term_groups": [["七天无理由"], ["拆封", "二次销售"]]
+    },
+    {
+      "case_id": "faith-002",
+      "document_title": "04_售后服务与退款管理制度",
+      "question": "一般商品退款多久到账？",
+      "expected": "answer",
+      "evidence_quotes": ["一般退款在验收后 3 个工作日内原路退回"],
+      "required_values": ["3"],
+      "allowed_values": ["3"],
+      "required_term_groups": [["工作日"], ["退回", "到账"]]
+    },
+    {
+      "case_id": "faith-003",
+      "document_title": "04_售后服务与退款管理制度",
+      "question": "大件家电退款时限是多久？",
+      "expected": "answer",
+      "evidence_quotes": ["大件家电上门取件后 5 个工作日内退回"],
+      "required_values": ["5"],
+      "allowed_values": ["5"],
+      "required_term_groups": [["大件"], ["工作日"]]
+    },
+    {
+      "case_id": "faith-004",
+      "document_title": "04_售后服务与退款管理制度",
+      "question": "哪些情形不予退款？",
+      "expected": "answer",
+      "evidence_quotes": ["以下情形不予退款：（一）定制类商品；（二）已激活的虚拟商品；（三）人为损坏。"],
+      "required_values": [],
+      "allowed_values": [],
+      "required_term_groups": [["定制"], ["已激活", "虚拟"], ["人为损坏"]],
+      "require_all_term_groups": true
+    },
+    {
+      "case_id": "faith-005",
+      "document_title": "04_售后服务与退款管理制度",
+      "question": "退款原因有哪几类？",
+      "expected": "answer",
+      "evidence_quotes": ["退款原因分为：质量问题、七天无理由、物流损坏、尺寸不符，共四类，录入系统时必须"],
+      "required_values": ["4"],
+      "allowed_values": ["4"],
+      "required_term_groups": [["质量问题"], ["七天无理由"], ["物流损坏"], ["尺寸不符"]],
+      "require_all_term_groups": true
+    },
+    {
+      "case_id": "faith-006",
+      "document_title": "09_无线降噪耳机Pro产品手册",
+      "question": "无线降噪耳机Pro的续航时间是多少？",
+      "expected": "answer",
+      "evidence_quotes": ["|续航|降噪开启约 38 小时|"],
+      "required_values": ["38"],
+      "allowed_values": ["38"],
+      "required_term_groups": [["续航"]]
+    },
+    {
+      "case_id": "faith-007",
+      "document_title": "09_无线降噪耳机Pro产品手册",
+      "question": "无线降噪耳机Pro的蓝牙版本是多少？",
+      "expected": "answer",
+      "evidence_quotes": ["|蓝牙版本|5.3|"],
+      "required_values": ["5.3"],
+      "allowed_values": ["5.3"],
+      "required_term_groups": [["蓝牙"]]
+    },
+    {
+      "case_id": "faith-008",
+      "document_title": "09_无线降噪耳机Pro产品手册",
+      "question": "无线降噪耳机Pro的重量是多少？",
+      "expected": "answer",
+      "evidence_quotes": ["|重量|252 g|"],
+      "required_values": ["252"],
+      "allowed_values": ["252"],
+      "required_term_groups": [["重量"]]
+    },
+    {
+      "case_id": "faith-009",
+      "document_title": "09_无线降噪耳机Pro产品手册",
+      "question": "无线降噪耳机Pro整机保修多长时间？",
+      "expected": "answer",
+      "evidence_quotes": ["自签收之日起整机保修 12 个月；人为损坏、进水不在保修范围。"],
+      "required_values": ["12"],
+      "allowed_values": ["12"],
+      "required_term_groups": [["保修"]]
+    },
+    {
+      "case_id": "faith-010",
+      "document_title": "09_无线降噪耳机Pro产品手册",
+      "question": "无线降噪耳机Pro无法配对时怎么处理？",
+      "expected": "answer",
+      "evidence_quotes": ["将耳机放入充电盒，长按功能键 6 秒直至指示灯快闪，重新搜索配对。"],
+      "required_values": ["6"],
+      "allowed_values": ["6"],
+      "required_term_groups": [["配对"]]
+    },
+    {
+      "case_id": "faith-011",
+      "document_title": "09_无线降噪耳机Pro产品手册",
+      "question": "无线降噪耳机Pro的充电时长是多少？",
+      "expected": "answer",
+      "evidence_quotes": ["|充电时长|约 1.5 小时|"],
+      "required_values": ["1.5"],
+      "allowed_values": ["1.5"],
+      "required_term_groups": [["充电"]]
+    },
+    {
+      "case_id": "faith-012",
+      "document_title": "01_重点产品市场分析报告_2025",
+      "question": "2025年度对开门冰箱450L的销售额约为多少万元？",
+      "expected": "answer",
+      "evidence_quotes": ["2025 年度，对开门冰箱 450L以约 44.3 万元的销售额位居全品类第一"],
+      "required_values": ["44.3"],
+      "allowed_values": ["44.3"],
+      "required_term_groups": [["对开门冰箱", "450L", "冰箱"]]
+    },
+    {
+      "case_id": "faith-013",
+      "document_title": "01_重点产品市场分析报告_2025",
+      "question": "2025年度公司整体销售额约为多少万元？",
+      "expected": "answer",
+      "evidence_quotes": ["公司整体销售额约 214.4 万元，同比增长 1.0%。"],
+      "required_values": ["214.4"],
+      "allowed_values": ["214.4", "1.0"],
+      "required_term_groups": [["整体", "公司"], ["销售额"]]
+    },
+    {
+      "case_id": "faith-014",
+      "document_title": "01_重点产品市场分析报告_2025",
+      "question": "2025年度对开门冰箱450L全年售出约多少台？",
+      "expected": "answer",
+      "evidence_quotes": ["全年售出约 190 台。"],
+      "required_values": ["190"],
+      "allowed_values": ["190"],
+      "required_term_groups": [["售出", "销量", "台"]]
+    },
+    {
+      "case_id": "faith-015",
+      "document_title": "01_重点产品市场分析报告_2025",
+      "question": "2026年对开门冰箱450L面临的主要风险有哪些？",
+      "expected": "answer",
+      "evidence_quotes": ["原材料价格波动、能效标准进一步收紧、竞品价格战为 2026 年主要风险。"],
+      "required_values": [],
+      "allowed_values": [],
+      "required_term_groups": [["原材料"], ["能效"], ["竞品"]]
+    },
+    {
+      "case_id": "faith-016",
+      "document_title": "03_2025年分区域经营数据简报",
+      "question": "2025年华东大区的全年销售额是多少万元？",
+      "expected": "answer",
+      "evidence_quotes": ["|6|华东|28.3|14.4%|"],
+      "required_values": ["28.3"],
+      "allowed_values": ["28.3", "14.4"],
+      "required_term_groups": [["华东"], ["销售额", "万元"]]
+    },
+    {
+      "case_id": "faith-017",
+      "document_title": "03_2025年分区域经营数据简报",
+      "question": "2025年退款原因里笔数最多的是哪一类？",
+      "expected": "answer",
+      "evidence_quotes": ["|1|物流损坏|50|"],
+      "required_values": ["50"],
+      "allowed_values": ["50"],
+      "required_term_groups": [["物流损坏", "物流"]]
+    },
+    {
+      "case_id": "faith-018",
+      "document_title": "02_渠道运营策略白皮书",
+      "question": "渠道年度预算中APP渠道占多少万元？",
+      "expected": "answer",
+      "evidence_quotes": ["|APP|90|30%|会员复购|"],
+      "required_values": ["90"],
+      "allowed_values": ["90", "30"],
+      "required_term_groups": [["APP", "App", "app"]]
+    },
+    {
+      "case_id": "faith-019",
+      "document_title": "11_客户服务话术手册",
+      "question": "钻石会员有哪些权益？",
+      "expected": "answer",
+      "evidence_quotes": ["钻石会员享全年免费上门安装、专属客服通道和大促提前购资格。"],
+      "required_values": [],
+      "allowed_values": [],
+      "required_term_groups": [["上门安装", "安装"], ["客服"], ["提前购", "大促"]]
+    },
+    {
+      "case_id": "faith-020",
+      "document_title": "11_客户服务话术手册",
+      "question": "积分的有效期是多久？",
+      "expected": "answer",
+      "evidence_quotes": ["积分有效期为获得之日起 12 个月。"],
+      "required_values": ["12"],
+      "allowed_values": ["12"],
+      "required_term_groups": [["积分"], ["有效期", "个月"]]
+    },
+    {
+      "case_id": "faith-021",
+      "document_title": "11_客户服务话术手册",
+      "question": "老带新双方各得多少积分？",
+      "expected": "answer",
+      "evidence_quotes": ["老带新双方各得 500 积分"],
+      "required_values": ["500"],
+      "allowed_values": ["500", "1"],
+      "required_term_groups": [["老带新", "积分"]]
+    },
+    {
+      "case_id": "faith-ref-001",
+      "document_title": "09_无线降噪耳机Pro产品手册",
+      "question": "无线降噪耳机Pro的批发供货价是多少元？",
+      "expected": "refuse",
+      "evidence_quotes": [],
+      "required_values": [],
+      "allowed_values": [],
+      "required_term_groups": []
+    },
+    {
+      "case_id": "faith-ref-002",
+      "document_title": "04_售后服务与退款管理制度",
+      "question": "公司员工的年假天数是多少？",
+      "expected": "refuse",
+      "evidence_quotes": [],
+      "required_values": [],
+      "allowed_values": [],
+      "required_term_groups": []
+    },
+    {
+      "case_id": "faith-ref-003",
+      "document_title": "03_2025年分区域经营数据简报",
+      "question": "2027年华东大区的销售额是多少万元？",
+      "expected": "refuse",
+      "evidence_quotes": [],
+      "required_values": [],
+      "allowed_values": [],
+      "required_term_groups": []
+    },
+    {
+      "case_id": "faith-ref-004",
+      "document_title": "11_客户服务话术手册",
+      "question": "大件家电的安装收费标准是多少元？",
+      "expected": "refuse",
+      "evidence_quotes": [],
+      "required_values": [],
+      "allowed_values": [],
+      "required_term_groups": []
+    },
+    {
+      "case_id": "faith-ref-005",
+      "document_title": "07_门店巡检记录_2025年12月_扫描版",
+      "question": "门店巡检中食品安全检查的评分细则是什么？",
+      "expected": "refuse",
+      "evidence_quotes": [],
+      "required_values": [],
+      "allowed_values": [],
+      "required_term_groups": []
+    }
+  ]
+}

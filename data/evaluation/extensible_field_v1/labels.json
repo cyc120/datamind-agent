@@ -1,0 +1,849 @@
+{
+  "suite_version": "extensible-field-v1",
+  "data_version": "maintenance-v1",
+  "domain": "设备维保工单",
+  "frozen_before_evaluation": true,
+  "annotation": "期望值来自 build_suite.py 中作者标注的 MATERIALS（材料 SPEC），与 scripts/eval_extensible_fields.py 的输出无关；缺省字段期望为 null（不得补值）。",
+  "assertions": [
+    {
+      "assertion_id": "m01_txt_labeled/EQ-001/equipment_id",
+      "material_id": "m01_txt_labeled",
+      "record_key": "EQ-001",
+      "field": "equipment_id",
+      "expected": "EQ-001"
+    },
+    {
+      "assertion_id": "m01_txt_labeled/EQ-001/fault_code",
+      "material_id": "m01_txt_labeled",
+      "record_key": "EQ-001",
+      "field": "fault_code",
+      "expected": "F-01"
+    },
+    {
+      "assertion_id": "m01_txt_labeled/EQ-001/service_date",
+      "material_id": "m01_txt_labeled",
+      "record_key": "EQ-001",
+      "field": "service_date",
+      "expected": "2026-03-02"
+    },
+    {
+      "assertion_id": "m01_txt_labeled/EQ-001/labor_hours",
+      "material_id": "m01_txt_labeled",
+      "record_key": "EQ-001",
+      "field": "labor_hours",
+      "expected": "2.5"
+    },
+    {
+      "assertion_id": "m01_txt_labeled/EQ-001/spare_part_no",
+      "material_id": "m01_txt_labeled",
+      "record_key": "EQ-001",
+      "field": "spare_part_no",
+      "expected": "SP-011"
+    },
+    {
+      "assertion_id": "m01_txt_labeled/EQ-001/conclusion",
+      "material_id": "m01_txt_labeled",
+      "record_key": "EQ-001",
+      "field": "conclusion",
+      "expected": "需更换备件"
+    },
+    {
+      "assertion_id": "m01_txt_labeled/EQ-002/equipment_id",
+      "material_id": "m01_txt_labeled",
+      "record_key": "EQ-002",
+      "field": "equipment_id",
+      "expected": "EQ-002"
+    },
+    {
+      "assertion_id": "m01_txt_labeled/EQ-002/fault_code",
+      "material_id": "m01_txt_labeled",
+      "record_key": "EQ-002",
+      "field": "fault_code",
+      "expected": "F-04"
+    },
+    {
+      "assertion_id": "m01_txt_labeled/EQ-002/service_date",
+      "material_id": "m01_txt_labeled",
+      "record_key": "EQ-002",
+      "field": "service_date",
+      "expected": "2026-03-03"
+    },
+    {
+      "assertion_id": "m01_txt_labeled/EQ-002/labor_hours",
+      "material_id": "m01_txt_labeled",
+      "record_key": "EQ-002",
+      "field": "labor_hours",
+      "expected": "1.0"
+    },
+    {
+      "assertion_id": "m01_txt_labeled/EQ-002/spare_part_no",
+      "material_id": "m01_txt_labeled",
+      "record_key": "EQ-002",
+      "field": "spare_part_no",
+      "expected": "SP-012"
+    },
+    {
+      "assertion_id": "m01_txt_labeled/EQ-002/conclusion",
+      "material_id": "m01_txt_labeled",
+      "record_key": "EQ-002",
+      "field": "conclusion",
+      "expected": "正常"
+    },
+    {
+      "assertion_id": "m01_txt_labeled/EQ-007/equipment_id",
+      "material_id": "m01_txt_labeled",
+      "record_key": "EQ-007",
+      "field": "equipment_id",
+      "expected": "EQ-007"
+    },
+    {
+      "assertion_id": "m01_txt_labeled/EQ-007/fault_code",
+      "material_id": "m01_txt_labeled",
+      "record_key": "EQ-007",
+      "field": "fault_code",
+      "expected": "F-12"
+    },
+    {
+      "assertion_id": "m01_txt_labeled/EQ-007/service_date",
+      "material_id": "m01_txt_labeled",
+      "record_key": "EQ-007",
+      "field": "service_date",
+      "expected": "2026-03-05"
+    },
+    {
+      "assertion_id": "m01_txt_labeled/EQ-007/labor_hours",
+      "material_id": "m01_txt_labeled",
+      "record_key": "EQ-007",
+      "field": "labor_hours",
+      "expected": "4.5"
+    },
+    {
+      "assertion_id": "m01_txt_labeled/EQ-007/spare_part_no",
+      "material_id": "m01_txt_labeled",
+      "record_key": "EQ-007",
+      "field": "spare_part_no",
+      "expected": "SP-013"
+    },
+    {
+      "assertion_id": "m01_txt_labeled/EQ-007/conclusion",
+      "material_id": "m01_txt_labeled",
+      "record_key": "EQ-007",
+      "field": "conclusion",
+      "expected": "需复检"
+    },
+    {
+      "assertion_id": "m02_docx_labeled/EQ-003/equipment_id",
+      "material_id": "m02_docx_labeled",
+      "record_key": "EQ-003",
+      "field": "equipment_id",
+      "expected": "EQ-003"
+    },
+    {
+      "assertion_id": "m02_docx_labeled/EQ-003/fault_code",
+      "material_id": "m02_docx_labeled",
+      "record_key": "EQ-003",
+      "field": "fault_code",
+      "expected": "F-02"
+    },
+    {
+      "assertion_id": "m02_docx_labeled/EQ-003/service_date",
+      "material_id": "m02_docx_labeled",
+      "record_key": "EQ-003",
+      "field": "service_date",
+      "expected": "2026-03-06"
+    },
+    {
+      "assertion_id": "m02_docx_labeled/EQ-003/labor_hours",
+      "material_id": "m02_docx_labeled",
+      "record_key": "EQ-003",
+      "field": "labor_hours",
+      "expected": "3.0"
+    },
+    {
+      "assertion_id": "m02_docx_labeled/EQ-003/spare_part_no",
+      "material_id": "m02_docx_labeled",
+      "record_key": "EQ-003",
+      "field": "spare_part_no",
+      "expected": "SP-014"
+    },
+    {
+      "assertion_id": "m02_docx_labeled/EQ-003/conclusion",
+      "material_id": "m02_docx_labeled",
+      "record_key": "EQ-003",
+      "field": "conclusion",
+      "expected": "需更换备件"
+    },
+    {
+      "assertion_id": "m02_docx_labeled/EQ-004/equipment_id",
+      "material_id": "m02_docx_labeled",
+      "record_key": "EQ-004",
+      "field": "equipment_id",
+      "expected": "EQ-004"
+    },
+    {
+      "assertion_id": "m02_docx_labeled/EQ-004/fault_code",
+      "material_id": "m02_docx_labeled",
+      "record_key": "EQ-004",
+      "field": "fault_code",
+      "expected": "F-07"
+    },
+    {
+      "assertion_id": "m02_docx_labeled/EQ-004/service_date",
+      "material_id": "m02_docx_labeled",
+      "record_key": "EQ-004",
+      "field": "service_date",
+      "expected": "2026-03-07"
+    },
+    {
+      "assertion_id": "m02_docx_labeled/EQ-004/labor_hours",
+      "material_id": "m02_docx_labeled",
+      "record_key": "EQ-004",
+      "field": "labor_hours",
+      "expected": "0.5"
+    },
+    {
+      "assertion_id": "m02_docx_labeled/EQ-004/spare_part_no",
+      "material_id": "m02_docx_labeled",
+      "record_key": "EQ-004",
+      "field": "spare_part_no",
+      "expected": null
+    },
+    {
+      "assertion_id": "m02_docx_labeled/EQ-004/conclusion",
+      "material_id": "m02_docx_labeled",
+      "record_key": "EQ-004",
+      "field": "conclusion",
+      "expected": "正常"
+    },
+    {
+      "assertion_id": "m02_docx_labeled/EQ-009/equipment_id",
+      "material_id": "m02_docx_labeled",
+      "record_key": "EQ-009",
+      "field": "equipment_id",
+      "expected": "EQ-009"
+    },
+    {
+      "assertion_id": "m02_docx_labeled/EQ-009/fault_code",
+      "material_id": "m02_docx_labeled",
+      "record_key": "EQ-009",
+      "field": "fault_code",
+      "expected": "F-03"
+    },
+    {
+      "assertion_id": "m02_docx_labeled/EQ-009/service_date",
+      "material_id": "m02_docx_labeled",
+      "record_key": "EQ-009",
+      "field": "service_date",
+      "expected": "2026-03-09"
+    },
+    {
+      "assertion_id": "m02_docx_labeled/EQ-009/labor_hours",
+      "material_id": "m02_docx_labeled",
+      "record_key": "EQ-009",
+      "field": "labor_hours",
+      "expected": "6.0"
+    },
+    {
+      "assertion_id": "m02_docx_labeled/EQ-009/spare_part_no",
+      "material_id": "m02_docx_labeled",
+      "record_key": "EQ-009",
+      "field": "spare_part_no",
+      "expected": "SP-015"
+    },
+    {
+      "assertion_id": "m02_docx_labeled/EQ-009/conclusion",
+      "material_id": "m02_docx_labeled",
+      "record_key": "EQ-009",
+      "field": "conclusion",
+      "expected": "观察"
+    },
+    {
+      "assertion_id": "m03_xlsx_table/EQ-005/equipment_id",
+      "material_id": "m03_xlsx_table",
+      "record_key": "EQ-005",
+      "field": "equipment_id",
+      "expected": "EQ-005"
+    },
+    {
+      "assertion_id": "m03_xlsx_table/EQ-005/fault_code",
+      "material_id": "m03_xlsx_table",
+      "record_key": "EQ-005",
+      "field": "fault_code",
+      "expected": "F-05"
+    },
+    {
+      "assertion_id": "m03_xlsx_table/EQ-005/service_date",
+      "material_id": "m03_xlsx_table",
+      "record_key": "EQ-005",
+      "field": "service_date",
+      "expected": "2026-03-10"
+    },
+    {
+      "assertion_id": "m03_xlsx_table/EQ-005/labor_hours",
+      "material_id": "m03_xlsx_table",
+      "record_key": "EQ-005",
+      "field": "labor_hours",
+      "expected": "2.0"
+    },
+    {
+      "assertion_id": "m03_xlsx_table/EQ-005/spare_part_no",
+      "material_id": "m03_xlsx_table",
+      "record_key": "EQ-005",
+      "field": "spare_part_no",
+      "expected": "SP-016"
+    },
+    {
+      "assertion_id": "m03_xlsx_table/EQ-005/conclusion",
+      "material_id": "m03_xlsx_table",
+      "record_key": "EQ-005",
+      "field": "conclusion",
+      "expected": "正常"
+    },
+    {
+      "assertion_id": "m03_xlsx_table/EQ-006/equipment_id",
+      "material_id": "m03_xlsx_table",
+      "record_key": "EQ-006",
+      "field": "equipment_id",
+      "expected": "EQ-006"
+    },
+    {
+      "assertion_id": "m03_xlsx_table/EQ-006/fault_code",
+      "material_id": "m03_xlsx_table",
+      "record_key": "EQ-006",
+      "field": "fault_code",
+      "expected": "F-06"
+    },
+    {
+      "assertion_id": "m03_xlsx_table/EQ-006/service_date",
+      "material_id": "m03_xlsx_table",
+      "record_key": "EQ-006",
+      "field": "service_date",
+      "expected": "2026-03-11"
+    },
+    {
+      "assertion_id": "m03_xlsx_table/EQ-006/labor_hours",
+      "material_id": "m03_xlsx_table",
+      "record_key": "EQ-006",
+      "field": "labor_hours",
+      "expected": "3.5"
+    },
+    {
+      "assertion_id": "m03_xlsx_table/EQ-006/spare_part_no",
+      "material_id": "m03_xlsx_table",
+      "record_key": "EQ-006",
+      "field": "spare_part_no",
+      "expected": "SP-017"
+    },
+    {
+      "assertion_id": "m03_xlsx_table/EQ-006/conclusion",
+      "material_id": "m03_xlsx_table",
+      "record_key": "EQ-006",
+      "field": "conclusion",
+      "expected": "需更换备件"
+    },
+    {
+      "assertion_id": "m03_xlsx_table/EQ-010/equipment_id",
+      "material_id": "m03_xlsx_table",
+      "record_key": "EQ-010",
+      "field": "equipment_id",
+      "expected": "EQ-010"
+    },
+    {
+      "assertion_id": "m03_xlsx_table/EQ-010/fault_code",
+      "material_id": "m03_xlsx_table",
+      "record_key": "EQ-010",
+      "field": "fault_code",
+      "expected": "F-08"
+    },
+    {
+      "assertion_id": "m03_xlsx_table/EQ-010/service_date",
+      "material_id": "m03_xlsx_table",
+      "record_key": "EQ-010",
+      "field": "service_date",
+      "expected": "2026-03-12"
+    },
+    {
+      "assertion_id": "m03_xlsx_table/EQ-010/labor_hours",
+      "material_id": "m03_xlsx_table",
+      "record_key": "EQ-010",
+      "field": "labor_hours",
+      "expected": "1.5"
+    },
+    {
+      "assertion_id": "m03_xlsx_table/EQ-010/spare_part_no",
+      "material_id": "m03_xlsx_table",
+      "record_key": "EQ-010",
+      "field": "spare_part_no",
+      "expected": "SP-018"
+    },
+    {
+      "assertion_id": "m03_xlsx_table/EQ-010/conclusion",
+      "material_id": "m03_xlsx_table",
+      "record_key": "EQ-010",
+      "field": "conclusion",
+      "expected": "需复检"
+    },
+    {
+      "assertion_id": "m03_xlsx_table/EQ-011/equipment_id",
+      "material_id": "m03_xlsx_table",
+      "record_key": "EQ-011",
+      "field": "equipment_id",
+      "expected": "EQ-011"
+    },
+    {
+      "assertion_id": "m03_xlsx_table/EQ-011/fault_code",
+      "material_id": "m03_xlsx_table",
+      "record_key": "EQ-011",
+      "field": "fault_code",
+      "expected": "F-09"
+    },
+    {
+      "assertion_id": "m03_xlsx_table/EQ-011/service_date",
+      "material_id": "m03_xlsx_table",
+      "record_key": "EQ-011",
+      "field": "service_date",
+      "expected": "2026-03-13"
+    },
+    {
+      "assertion_id": "m03_xlsx_table/EQ-011/labor_hours",
+      "material_id": "m03_xlsx_table",
+      "record_key": "EQ-011",
+      "field": "labor_hours",
+      "expected": "5.0"
+    },
+    {
+      "assertion_id": "m03_xlsx_table/EQ-011/spare_part_no",
+      "material_id": "m03_xlsx_table",
+      "record_key": "EQ-011",
+      "field": "spare_part_no",
+      "expected": "SP-019"
+    },
+    {
+      "assertion_id": "m03_xlsx_table/EQ-011/conclusion",
+      "material_id": "m03_xlsx_table",
+      "record_key": "EQ-011",
+      "field": "conclusion",
+      "expected": "观察"
+    },
+    {
+      "assertion_id": "m04_docx_table/EQ-012/equipment_id",
+      "material_id": "m04_docx_table",
+      "record_key": "EQ-012",
+      "field": "equipment_id",
+      "expected": "EQ-012"
+    },
+    {
+      "assertion_id": "m04_docx_table/EQ-012/fault_code",
+      "material_id": "m04_docx_table",
+      "record_key": "EQ-012",
+      "field": "fault_code",
+      "expected": "F-10"
+    },
+    {
+      "assertion_id": "m04_docx_table/EQ-012/service_date",
+      "material_id": "m04_docx_table",
+      "record_key": "EQ-012",
+      "field": "service_date",
+      "expected": "2026-03-14"
+    },
+    {
+      "assertion_id": "m04_docx_table/EQ-012/labor_hours",
+      "material_id": "m04_docx_table",
+      "record_key": "EQ-012",
+      "field": "labor_hours",
+      "expected": "2.25"
+    },
+    {
+      "assertion_id": "m04_docx_table/EQ-012/spare_part_no",
+      "material_id": "m04_docx_table",
+      "record_key": "EQ-012",
+      "field": "spare_part_no",
+      "expected": "SP-020"
+    },
+    {
+      "assertion_id": "m04_docx_table/EQ-012/conclusion",
+      "material_id": "m04_docx_table",
+      "record_key": "EQ-012",
+      "field": "conclusion",
+      "expected": "正常"
+    },
+    {
+      "assertion_id": "m04_docx_table/EQ-013/equipment_id",
+      "material_id": "m04_docx_table",
+      "record_key": "EQ-013",
+      "field": "equipment_id",
+      "expected": "EQ-013"
+    },
+    {
+      "assertion_id": "m04_docx_table/EQ-013/fault_code",
+      "material_id": "m04_docx_table",
+      "record_key": "EQ-013",
+      "field": "fault_code",
+      "expected": "F-02"
+    },
+    {
+      "assertion_id": "m04_docx_table/EQ-013/service_date",
+      "material_id": "m04_docx_table",
+      "record_key": "EQ-013",
+      "field": "service_date",
+      "expected": "2026-03-15"
+    },
+    {
+      "assertion_id": "m04_docx_table/EQ-013/labor_hours",
+      "material_id": "m04_docx_table",
+      "record_key": "EQ-013",
+      "field": "labor_hours",
+      "expected": "0.75"
+    },
+    {
+      "assertion_id": "m04_docx_table/EQ-013/spare_part_no",
+      "material_id": "m04_docx_table",
+      "record_key": "EQ-013",
+      "field": "spare_part_no",
+      "expected": "SP-021"
+    },
+    {
+      "assertion_id": "m04_docx_table/EQ-013/conclusion",
+      "material_id": "m04_docx_table",
+      "record_key": "EQ-013",
+      "field": "conclusion",
+      "expected": "需更换备件"
+    },
+    {
+      "assertion_id": "m04_docx_table/EQ-014/equipment_id",
+      "material_id": "m04_docx_table",
+      "record_key": "EQ-014",
+      "field": "equipment_id",
+      "expected": "EQ-014"
+    },
+    {
+      "assertion_id": "m04_docx_table/EQ-014/fault_code",
+      "material_id": "m04_docx_table",
+      "record_key": "EQ-014",
+      "field": "fault_code",
+      "expected": "F-11"
+    },
+    {
+      "assertion_id": "m04_docx_table/EQ-014/service_date",
+      "material_id": "m04_docx_table",
+      "record_key": "EQ-014",
+      "field": "service_date",
+      "expected": "2026-03-16"
+    },
+    {
+      "assertion_id": "m04_docx_table/EQ-014/labor_hours",
+      "material_id": "m04_docx_table",
+      "record_key": "EQ-014",
+      "field": "labor_hours",
+      "expected": "3.75"
+    },
+    {
+      "assertion_id": "m04_docx_table/EQ-014/spare_part_no",
+      "material_id": "m04_docx_table",
+      "record_key": "EQ-014",
+      "field": "spare_part_no",
+      "expected": null
+    },
+    {
+      "assertion_id": "m04_docx_table/EQ-014/conclusion",
+      "material_id": "m04_docx_table",
+      "record_key": "EQ-014",
+      "field": "conclusion",
+      "expected": "正常"
+    },
+    {
+      "assertion_id": "m05_txt_delimited/EQ-015/equipment_id",
+      "material_id": "m05_txt_delimited",
+      "record_key": "EQ-015",
+      "field": "equipment_id",
+      "expected": "EQ-015"
+    },
+    {
+      "assertion_id": "m05_txt_delimited/EQ-015/fault_code",
+      "material_id": "m05_txt_delimited",
+      "record_key": "EQ-015",
+      "field": "fault_code",
+      "expected": "F-12"
+    },
+    {
+      "assertion_id": "m05_txt_delimited/EQ-015/service_date",
+      "material_id": "m05_txt_delimited",
+      "record_key": "EQ-015",
+      "field": "service_date",
+      "expected": "2026-03-17"
+    },
+    {
+      "assertion_id": "m05_txt_delimited/EQ-015/labor_hours",
+      "material_id": "m05_txt_delimited",
+      "record_key": "EQ-015",
+      "field": "labor_hours",
+      "expected": "1.0"
+    },
+    {
+      "assertion_id": "m05_txt_delimited/EQ-015/spare_part_no",
+      "material_id": "m05_txt_delimited",
+      "record_key": "EQ-015",
+      "field": "spare_part_no",
+      "expected": "SP-022"
+    },
+    {
+      "assertion_id": "m05_txt_delimited/EQ-015/conclusion",
+      "material_id": "m05_txt_delimited",
+      "record_key": "EQ-015",
+      "field": "conclusion",
+      "expected": "需复检"
+    },
+    {
+      "assertion_id": "m05_txt_delimited/EQ-016/equipment_id",
+      "material_id": "m05_txt_delimited",
+      "record_key": "EQ-016",
+      "field": "equipment_id",
+      "expected": "EQ-016"
+    },
+    {
+      "assertion_id": "m05_txt_delimited/EQ-016/fault_code",
+      "material_id": "m05_txt_delimited",
+      "record_key": "EQ-016",
+      "field": "fault_code",
+      "expected": "F-13"
+    },
+    {
+      "assertion_id": "m05_txt_delimited/EQ-016/service_date",
+      "material_id": "m05_txt_delimited",
+      "record_key": "EQ-016",
+      "field": "service_date",
+      "expected": "2026-03-18"
+    },
+    {
+      "assertion_id": "m05_txt_delimited/EQ-016/labor_hours",
+      "material_id": "m05_txt_delimited",
+      "record_key": "EQ-016",
+      "field": "labor_hours",
+      "expected": "4.0"
+    },
+    {
+      "assertion_id": "m05_txt_delimited/EQ-016/spare_part_no",
+      "material_id": "m05_txt_delimited",
+      "record_key": "EQ-016",
+      "field": "spare_part_no",
+      "expected": "SP-023"
+    },
+    {
+      "assertion_id": "m05_txt_delimited/EQ-016/conclusion",
+      "material_id": "m05_txt_delimited",
+      "record_key": "EQ-016",
+      "field": "conclusion",
+      "expected": "观察"
+    },
+    {
+      "assertion_id": "m05_txt_delimited/EQ-017/equipment_id",
+      "material_id": "m05_txt_delimited",
+      "record_key": "EQ-017",
+      "field": "equipment_id",
+      "expected": "EQ-017"
+    },
+    {
+      "assertion_id": "m05_txt_delimited/EQ-017/fault_code",
+      "material_id": "m05_txt_delimited",
+      "record_key": "EQ-017",
+      "field": "fault_code",
+      "expected": "F-14"
+    },
+    {
+      "assertion_id": "m05_txt_delimited/EQ-017/service_date",
+      "material_id": "m05_txt_delimited",
+      "record_key": "EQ-017",
+      "field": "service_date",
+      "expected": "2026-03-19"
+    },
+    {
+      "assertion_id": "m05_txt_delimited/EQ-017/labor_hours",
+      "material_id": "m05_txt_delimited",
+      "record_key": "EQ-017",
+      "field": "labor_hours",
+      "expected": "2.0"
+    },
+    {
+      "assertion_id": "m05_txt_delimited/EQ-017/spare_part_no",
+      "material_id": "m05_txt_delimited",
+      "record_key": "EQ-017",
+      "field": "spare_part_no",
+      "expected": "SP-024"
+    },
+    {
+      "assertion_id": "m05_txt_delimited/EQ-017/conclusion",
+      "material_id": "m05_txt_delimited",
+      "record_key": "EQ-017",
+      "field": "conclusion",
+      "expected": "需更换备件"
+    },
+    {
+      "assertion_id": "m06_xlsx_two_sheets/EQ-018/equipment_id",
+      "material_id": "m06_xlsx_two_sheets",
+      "record_key": "EQ-018",
+      "field": "equipment_id",
+      "expected": "EQ-018"
+    },
+    {
+      "assertion_id": "m06_xlsx_two_sheets/EQ-018/fault_code",
+      "material_id": "m06_xlsx_two_sheets",
+      "record_key": "EQ-018",
+      "field": "fault_code",
+      "expected": "F-15"
+    },
+    {
+      "assertion_id": "m06_xlsx_two_sheets/EQ-018/service_date",
+      "material_id": "m06_xlsx_two_sheets",
+      "record_key": "EQ-018",
+      "field": "service_date",
+      "expected": "2026-03-20"
+    },
+    {
+      "assertion_id": "m06_xlsx_two_sheets/EQ-018/labor_hours",
+      "material_id": "m06_xlsx_two_sheets",
+      "record_key": "EQ-018",
+      "field": "labor_hours",
+      "expected": "3.0"
+    },
+    {
+      "assertion_id": "m06_xlsx_two_sheets/EQ-018/spare_part_no",
+      "material_id": "m06_xlsx_two_sheets",
+      "record_key": "EQ-018",
+      "field": "spare_part_no",
+      "expected": "SP-025"
+    },
+    {
+      "assertion_id": "m06_xlsx_two_sheets/EQ-018/conclusion",
+      "material_id": "m06_xlsx_two_sheets",
+      "record_key": "EQ-018",
+      "field": "conclusion",
+      "expected": "正常"
+    },
+    {
+      "assertion_id": "m06_xlsx_two_sheets/EQ-019/equipment_id",
+      "material_id": "m06_xlsx_two_sheets",
+      "record_key": "EQ-019",
+      "field": "equipment_id",
+      "expected": "EQ-019"
+    },
+    {
+      "assertion_id": "m06_xlsx_two_sheets/EQ-019/fault_code",
+      "material_id": "m06_xlsx_two_sheets",
+      "record_key": "EQ-019",
+      "field": "fault_code",
+      "expected": "F-16"
+    },
+    {
+      "assertion_id": "m06_xlsx_two_sheets/EQ-019/service_date",
+      "material_id": "m06_xlsx_two_sheets",
+      "record_key": "EQ-019",
+      "field": "service_date",
+      "expected": "2026-03-21"
+    },
+    {
+      "assertion_id": "m06_xlsx_two_sheets/EQ-019/labor_hours",
+      "material_id": "m06_xlsx_two_sheets",
+      "record_key": "EQ-019",
+      "field": "labor_hours",
+      "expected": null
+    },
+    {
+      "assertion_id": "m06_xlsx_two_sheets/EQ-019/spare_part_no",
+      "material_id": "m06_xlsx_two_sheets",
+      "record_key": "EQ-019",
+      "field": "spare_part_no",
+      "expected": "SP-026"
+    },
+    {
+      "assertion_id": "m06_xlsx_two_sheets/EQ-019/conclusion",
+      "material_id": "m06_xlsx_two_sheets",
+      "record_key": "EQ-019",
+      "field": "conclusion",
+      "expected": "需复检"
+    },
+    {
+      "assertion_id": "m06_xlsx_two_sheets/EQ-020/equipment_id",
+      "material_id": "m06_xlsx_two_sheets",
+      "record_key": "EQ-020",
+      "field": "equipment_id",
+      "expected": "EQ-020"
+    },
+    {
+      "assertion_id": "m06_xlsx_two_sheets/EQ-020/fault_code",
+      "material_id": "m06_xlsx_two_sheets",
+      "record_key": "EQ-020",
+      "field": "fault_code",
+      "expected": "F-17"
+    },
+    {
+      "assertion_id": "m06_xlsx_two_sheets/EQ-020/service_date",
+      "material_id": "m06_xlsx_two_sheets",
+      "record_key": "EQ-020",
+      "field": "service_date",
+      "expected": "2026-03-22"
+    },
+    {
+      "assertion_id": "m06_xlsx_two_sheets/EQ-020/labor_hours",
+      "material_id": "m06_xlsx_two_sheets",
+      "record_key": "EQ-020",
+      "field": "labor_hours",
+      "expected": "1.25"
+    },
+    {
+      "assertion_id": "m06_xlsx_two_sheets/EQ-020/spare_part_no",
+      "material_id": "m06_xlsx_two_sheets",
+      "record_key": "EQ-020",
+      "field": "spare_part_no",
+      "expected": "SP-027"
+    },
+    {
+      "assertion_id": "m06_xlsx_two_sheets/EQ-020/conclusion",
+      "material_id": "m06_xlsx_two_sheets",
+      "record_key": "EQ-020",
+      "field": "conclusion",
+      "expected": "观察"
+    },
+    {
+      "assertion_id": "m06_xlsx_two_sheets/EQ-021/equipment_id",
+      "material_id": "m06_xlsx_two_sheets",
+      "record_key": "EQ-021",
+      "field": "equipment_id",
+      "expected": "EQ-021"
+    },
+    {
+      "assertion_id": "m06_xlsx_two_sheets/EQ-021/fault_code",
+      "material_id": "m06_xlsx_two_sheets",
+      "record_key": "EQ-021",
+      "field": "fault_code",
+      "expected": "F-18"
+    },
+    {
+      "assertion_id": "m06_xlsx_two_sheets/EQ-021/service_date",
+      "material_id": "m06_xlsx_two_sheets",
+      "record_key": "EQ-021",
+      "field": "service_date",
+      "expected": "2026-03-23"
+    },
+    {
+      "assertion_id": "m06_xlsx_two_sheets/EQ-021/labor_hours",
+      "material_id": "m06_xlsx_two_sheets",
+      "record_key": "EQ-021",
+      "field": "labor_hours",
+      "expected": "5.5"
+    },
+    {
+      "assertion_id": "m06_xlsx_two_sheets/EQ-021/spare_part_no",
+      "material_id": "m06_xlsx_two_sheets",
+      "record_key": "EQ-021",
+      "field": "spare_part_no",
+      "expected": "SP-028"
+    },
+    {
+      "assertion_id": "m06_xlsx_two_sheets/EQ-021/conclusion",
+      "material_id": "m06_xlsx_two_sheets",
+      "record_key": "EQ-021",
+      "field": "conclusion",
+      "expected": "需更换备件"
+    }
+  ]
+}

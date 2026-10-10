@@ -1,0 +1,820 @@
+{
+  "suite": "qa_samples",
+  "suite_version": "qa-samples-v1",
+  "created_at": "2026-10-09T14:35:54.996944+00:00",
+  "commit": "e4e2ebf",
+  "generator": "data/qa_samples/build_samples.py",
+  "frozen": true,
+  "determinism": {
+    "zip_timestamp": [
+      1980,
+      1,
+      1,
+      0,
+      0,
+      0
+    ],
+    "ooxml_core_properties": "2026-10-10T00:00:00+00:00",
+    "pdf_metadata": "D:20261010000000Z",
+    "pdf_writer": "pymupdf tobytes(no_new_id=True, reproducible=True)",
+    "dxf_normalisation": "fixed julian timestamps + fixed GUIDs + fixed build comment",
+    "scan_renderer": "Pillow RGB + fixed CJK font, 150 dpi page placement",
+    "scan_font": {
+      "path": "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+      "sha256": "876af2cd4854644e7f3e7feb2f688997fdb3343c6df6693611209c9dfb47ccec"
+    }
+  },
+  "counts": {
+    "samples": 11,
+    "formats": [
+      "docx-native",
+      "dxf-native",
+      "pdf-native",
+      "pdf-scanned",
+      "pptx-native",
+      "xlsx-native"
+    ],
+    "questions": 23
+  },
+  "note": "问答样本集；答案断言可由 tests/test_qa_samples.py 从文件本身或冻结的 ground_truth 复核。两个扫描件无文本层，其证据是确定性渲染用的 ground_truth。",
+  "samples": [
+    {
+      "file": "01_data_service_policy_native.pdf",
+      "format": "pdf-native",
+      "suffix": ".pdf",
+      "description": "原生文本 PDF：编号条款 + 跨页数值表",
+      "size": 3252,
+      "sha256": "c73f4c6120fba820885bf04bbc3529c2303e60ebb147c193000dc4d8901ee2f2",
+      "pages": 2,
+      "text_layer": true,
+      "expected_locator_kinds": [
+        "pdf_region"
+      ],
+      "expected_locator_fields": {
+        "pdf_region": [
+          "page_no",
+          "page_width",
+          "page_height",
+          "bbox",
+          "unit",
+          "coordinate_system"
+        ]
+      },
+      "ground_truth": {
+        "refund_sla_hours": "48 小时",
+        "escalate_hours": "24 小时",
+        "deposit_ratio": "15%",
+        "q1_approved": "120",
+        "q2_approved": "90"
+      },
+      "questions": [
+        {
+          "id": "qa-01-q1",
+          "question": "退款审批时限是多少小时？",
+          "answer": "48 小时",
+          "checkable_from": "file_text",
+          "assertion": {
+            "kind": "exact_text",
+            "expected": "48 小时",
+            "ground_truth_key": "refund_sla_hours"
+          }
+        },
+        {
+          "id": "qa-01-q2",
+          "question": "第一、二季度审批量合计是多少笔？",
+          "answer": "210 笔",
+          "checkable_from": "file_text",
+          "assertion": {
+            "kind": "arith_sum",
+            "operands": [
+              120,
+              90
+            ],
+            "expected": 210,
+            "operand_sources": [
+              {
+                "pointer": "page:2",
+                "value": 120
+              },
+              {
+                "pointer": "page:2",
+                "value": 90
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "file": "02_regional_sales_native.pdf",
+      "format": "pdf-native",
+      "suffix": ".pdf",
+      "description": "原生文本 PDF：区域销售额表 + 口径说明",
+      "size": 2244,
+      "sha256": "ab4eae6f4cbba5c5699e617ecb70618dd81e24d0041f5531a69ac29c4a875952",
+      "pages": 1,
+      "text_layer": true,
+      "expected_locator_kinds": [
+        "pdf_region"
+      ],
+      "expected_locator_fields": {
+        "pdf_region": [
+          "page_no",
+          "page_width",
+          "page_height",
+          "bbox",
+          "unit",
+          "coordinate_system"
+        ]
+      },
+      "ground_truth": {
+        "caliber_note": "不含税金额",
+        "east": "320",
+        "south": "180",
+        "north": "150",
+        "total": "650"
+      },
+      "questions": [
+        {
+          "id": "qa-02-q1",
+          "question": "三个区域销售额合计是多少万元？",
+          "answer": "650 万元",
+          "checkable_from": "file_text",
+          "assertion": {
+            "kind": "arith_sum",
+            "operands": [
+              320,
+              180,
+              150
+            ],
+            "expected": 650,
+            "operand_sources": [
+              {
+                "pointer": "page:1",
+                "value": 320
+              },
+              {
+                "pointer": "page:1",
+                "value": 180
+              },
+              {
+                "pointer": "page:1",
+                "value": 150
+              }
+            ]
+          }
+        },
+        {
+          "id": "qa-02-q2",
+          "question": "华东销售额占三区域合计的百分比（保留整数）？",
+          "answer": "49%",
+          "checkable_from": "file_text",
+          "assertion": {
+            "kind": "arith_ratio_percent",
+            "operands": [
+              320
+            ],
+            "denominator": 650,
+            "expected": 49,
+            "operand_sources": [
+              {
+                "pointer": "page:1",
+                "value": 320
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "file": "03_equipment_inspection_scanned.pdf",
+      "format": "pdf-scanned",
+      "suffix": ".pdf",
+      "description": "扫描版 PDF：仅图像、无文本层（OCR 路径样本）",
+      "size": 28590,
+      "sha256": "e67a5d62129af51cf51f980d66f36ca4baea387203d78e45aec4bf4047314f37",
+      "pages": 1,
+      "text_layer": false,
+      "expected_locator_kinds": [
+        "pdf_region"
+      ],
+      "expected_locator_fields": {
+        "pdf_region": [
+          "page_no",
+          "page_width",
+          "page_height",
+          "bbox",
+          "unit",
+          "coordinate_system"
+        ]
+      },
+      "ground_truth": {
+        "equipment_id": "EQ-2049",
+        "temperature": "88.5 C",
+        "verdict": "超限",
+        "items_total": "3 项",
+        "items_failed": "2 项",
+        "items_passed": "1 项"
+      },
+      "questions": [
+        {
+          "id": "qa-03-q1",
+          "question": "设备 EQ-2049 的巡检温度是多少？",
+          "answer": "88.5 C",
+          "checkable_from": "ground_truth_only",
+          "assertion": {
+            "kind": "exact_text",
+            "expected": "88.5 C",
+            "ground_truth_key": "temperature"
+          }
+        },
+        {
+          "id": "qa-03-q2",
+          "question": "不合格项数与合格项数之差是多少项？",
+          "answer": "1 项",
+          "checkable_from": "ground_truth_only",
+          "assertion": {
+            "kind": "arith_diff",
+            "operands": [
+              2,
+              1
+            ],
+            "expected": 1,
+            "operand_sources": [
+              {
+                "pointer": "ground_truth:items_failed",
+                "value": 2
+              },
+              {
+                "pointer": "ground_truth:items_passed",
+                "value": 1
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "file": "04_quality_notice_scanned.pdf",
+      "format": "pdf-scanned",
+      "suffix": ".pdf",
+      "description": "扫描版 PDF：两页、仅图像、含抽检结论",
+      "size": 43229,
+      "sha256": "861d44e5068ea186ee25d7efcaaafeba550d0eedc1a556166ab2ef649a00e01a",
+      "pages": 2,
+      "text_layer": false,
+      "expected_locator_kinds": [
+        "pdf_region"
+      ],
+      "expected_locator_fields": {
+        "pdf_region": [
+          "page_no",
+          "page_width",
+          "page_height",
+          "bbox",
+          "unit",
+          "coordinate_system"
+        ]
+      },
+      "ground_truth": {
+        "batch_no": "B-2026-0715",
+        "sampled": "200 件",
+        "failed": "6 件",
+        "passed": "194 件",
+        "pass_rate": "97%"
+      },
+      "questions": [
+        {
+          "id": "qa-04-q1",
+          "question": "抽检批次号是多少？",
+          "answer": "B-2026-0715",
+          "checkable_from": "ground_truth_only",
+          "assertion": {
+            "kind": "exact_text",
+            "expected": "B-2026-0715",
+            "ground_truth_key": "batch_no"
+          }
+        },
+        {
+          "id": "qa-04-q2",
+          "question": "合格件数是多少件？",
+          "answer": "194 件",
+          "checkable_from": "ground_truth_only",
+          "assertion": {
+            "kind": "arith_diff",
+            "operands": [
+              200,
+              6
+            ],
+            "expected": 194,
+            "operand_sources": [
+              {
+                "pointer": "ground_truth:sampled",
+                "value": 200
+              },
+              {
+                "pointer": "ground_truth:failed",
+                "value": 6
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "file": "05_service_sla_manual.docx",
+      "format": "docx-native",
+      "suffix": ".docx",
+      "description": "DOCX：标题层级 + 三行表格（真实 body 顺序）",
+      "size": 36907,
+      "sha256": "e8b99022dffb2ca620d2374728bff85c42d2bad7dbc77e3fc43f5018917676a4",
+      "pages": 1,
+      "text_layer": true,
+      "expected_locator_kinds": [
+        "office_object"
+      ],
+      "expected_locator_fields": {
+        "office_object": [
+          "part"
+        ]
+      },
+      "ground_truth": {
+        "first_line_hours": "2 小时",
+        "second": "8 小时",
+        "third": "24 小时",
+        "sum": "34 小时"
+      },
+      "questions": [
+        {
+          "id": "qa-05-q1",
+          "question": "一线响应时限是多少小时？",
+          "answer": "2 小时",
+          "checkable_from": "file_text",
+          "assertion": {
+            "kind": "exact_text",
+            "expected": "2 小时",
+            "ground_truth_key": "first_line_hours"
+          }
+        },
+        {
+          "id": "qa-05-q2",
+          "question": "三级响应时限合计是多少小时？",
+          "answer": "34 小时",
+          "checkable_from": "file_cell",
+          "assertion": {
+            "kind": "arith_sum",
+            "operands": [
+              2,
+              8,
+              24
+            ],
+            "expected": 34,
+            "operand_sources": [
+              {
+                "pointer": "docx_table:0:1:1",
+                "value": 2
+              },
+              {
+                "pointer": "docx_table:0:2:1",
+                "value": 8
+              },
+              {
+                "pointer": "docx_table:0:3:1",
+                "value": 24
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "file": "06_downtime_incident.docx",
+      "format": "docx-native",
+      "suffix": ".docx",
+      "description": "DOCX：事件报告段落 + 时间构成数字",
+      "size": 36840,
+      "sha256": "7520a0bb3dccd51f2f6a7280f0ab1eff4cf5409c33a0ca091ee22a6425c6639d",
+      "pages": 1,
+      "text_layer": true,
+      "expected_locator_kinds": [
+        "office_object"
+      ],
+      "expected_locator_fields": {
+        "office_object": [
+          "part"
+        ]
+      },
+      "ground_truth": {
+        "incident_id": "INC-7781",
+        "planned": "120 分钟",
+        "unplanned": "45 分钟",
+        "total": "165 分钟"
+      },
+      "questions": [
+        {
+          "id": "qa-06-q1",
+          "question": "事件编号是什么？",
+          "answer": "INC-7781",
+          "checkable_from": "file_text",
+          "assertion": {
+            "kind": "exact_text",
+            "expected": "INC-7781",
+            "ground_truth_key": "incident_id"
+          }
+        },
+        {
+          "id": "qa-06-q2",
+          "question": "非计划停机占总停机时间的百分比（保留整数）？",
+          "answer": "27%",
+          "checkable_from": "file_text",
+          "assertion": {
+            "kind": "arith_ratio_percent",
+            "operands": [
+              45
+            ],
+            "denominator": 165,
+            "expected": 27,
+            "operand_sources": [
+              {
+                "pointer": "paragraph:5",
+                "value": 45
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "file": "07_sales_ledger.xlsx",
+      "format": "xlsx-native",
+      "suffix": ".xlsx",
+      "description": "XLSX：两个工作表，销售明细逐行成块（sheet_range 定位）",
+      "size": 5619,
+      "sha256": "b9942c79cb4ca1654a46e4d0b069605775be96203db602e3e05a1215e78f15aa",
+      "pages": 1,
+      "text_layer": true,
+      "expected_locator_kinds": [
+        "sheet_range"
+      ],
+      "expected_locator_fields": {
+        "sheet_range": [
+          "sheet"
+        ]
+      },
+      "ground_truth": {
+        "east_sum": "250",
+        "grand_total": "570",
+        "east_rows": "2"
+      },
+      "questions": [
+        {
+          "id": "qa-07-q1",
+          "question": "华东区域两个月销售额合计是多少万元？",
+          "answer": "250 万元",
+          "checkable_from": "file_cell",
+          "assertion": {
+            "kind": "arith_sum",
+            "operands": [
+              120,
+              130
+            ],
+            "expected": 250,
+            "operand_sources": [
+              {
+                "pointer": "cell:销售明细:C2",
+                "value": 120
+              },
+              {
+                "pointer": "cell:销售明细:C3",
+                "value": 130
+              }
+            ]
+          }
+        },
+        {
+          "id": "qa-07-q2",
+          "question": "全部六条记录的销售额合计是多少万元？",
+          "answer": "570 万元",
+          "checkable_from": "file_cell",
+          "assertion": {
+            "kind": "arith_sum",
+            "operands": [
+              120,
+              130,
+              90,
+              95,
+              70,
+              65
+            ],
+            "expected": 570,
+            "operand_sources": [
+              {
+                "pointer": "cell:销售明细:C2",
+                "value": 120
+              },
+              {
+                "pointer": "cell:销售明细:C3",
+                "value": 130
+              },
+              {
+                "pointer": "cell:销售明细:C4",
+                "value": 90
+              },
+              {
+                "pointer": "cell:销售明细:C5",
+                "value": 95
+              },
+              {
+                "pointer": "cell:销售明细:C6",
+                "value": 70
+              },
+              {
+                "pointer": "cell:销售明细:C7",
+                "value": 65
+              }
+            ]
+          }
+        },
+        {
+          "id": "qa-07-q3",
+          "question": "华东区域共有几条销售记录？",
+          "answer": "2 条",
+          "checkable_from": "file_cell",
+          "assertion": {
+            "kind": "count_matching",
+            "expected": 2,
+            "column": "销售明细!A",
+            "equals": "华东",
+            "operand_sources": [
+              {
+                "pointer": "cell:销售明细:A2",
+                "value": "华东"
+              },
+              {
+                "pointer": "cell:销售明细:A3",
+                "value": "华东"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "file": "08_inventory_levels.xlsx",
+      "format": "xlsx-native",
+      "suffix": ".xlsx",
+      "description": "XLSX：库存与安全库存对照（低于安全库存计数）",
+      "size": 4972,
+      "sha256": "e8d4c2e3c38a063d838ec5d570e7336a2c91992f34d66b6544ed63c786a26ba8",
+      "pages": 1,
+      "text_layer": true,
+      "expected_locator_kinds": [
+        "sheet_range"
+      ],
+      "expected_locator_fields": {
+        "sheet_range": [
+          "sheet"
+        ]
+      },
+      "ground_truth": {
+        "below_safety": "2",
+        "stock_total": "245"
+      },
+      "questions": [
+        {
+          "id": "qa-08-q1",
+          "question": "低于安全库存的物料有几项？",
+          "answer": "2 项",
+          "checkable_from": "file_cell",
+          "assertion": {
+            "kind": "count_less_than",
+            "expected": 2,
+            "columns": [
+              "库存!B",
+              "库存!C"
+            ],
+            "operand_sources": [
+              {
+                "pointer": "cell:库存:B2",
+                "value": 40
+              },
+              {
+                "pointer": "cell:库存:C2",
+                "value": 50
+              },
+              {
+                "pointer": "cell:库存:B4",
+                "value": 25
+              },
+              {
+                "pointer": "cell:库存:C4",
+                "value": 30
+              }
+            ]
+          }
+        },
+        {
+          "id": "qa-08-q2",
+          "question": "四项物料的库存总量是多少？",
+          "answer": "245",
+          "checkable_from": "file_cell",
+          "assertion": {
+            "kind": "arith_sum",
+            "operands": [
+              40,
+              80,
+              25,
+              100
+            ],
+            "expected": 245,
+            "operand_sources": [
+              {
+                "pointer": "cell:库存:B2",
+                "value": 40
+              },
+              {
+                "pointer": "cell:库存:B3",
+                "value": 80
+              },
+              {
+                "pointer": "cell:库存:B4",
+                "value": 25
+              },
+              {
+                "pointer": "cell:库存:B5",
+                "value": 100
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "file": "09_product_review.pptx",
+      "format": "pptx-native",
+      "suffix": ".pptx",
+      "description": "PPTX：4 页复盘（标题 + 正文文本框，slide/shape 定位）",
+      "size": 31041,
+      "sha256": "8777e601c0c5577ef1b0ae4ea24a94fabac93da6fcf08adb82431ea8cf3bc31e",
+      "pages": 1,
+      "text_layer": true,
+      "expected_locator_kinds": [
+        "office_object"
+      ],
+      "expected_locator_fields": {
+        "office_object": [
+          "part"
+        ]
+      },
+      "ground_truth": {
+        "target": "500 万元",
+        "actual": "430 万元",
+        "delay_times": "3 次"
+      },
+      "questions": [
+        {
+          "id": "qa-09-q1",
+          "question": "本季度目标销售额是多少万元？",
+          "answer": "500 万元",
+          "checkable_from": "file_text",
+          "assertion": {
+            "kind": "exact_text",
+            "expected": "500 万元",
+            "ground_truth_key": "target"
+          }
+        },
+        {
+          "id": "qa-09-q2",
+          "question": "目标与实际销售额的差额是多少万元？",
+          "answer": "70 万元",
+          "checkable_from": "file_text",
+          "assertion": {
+            "kind": "arith_diff",
+            "operands": [
+              500,
+              430
+            ],
+            "expected": 70,
+            "operand_sources": [
+              {
+                "pointer": "slide:2",
+                "value": 500
+              },
+              {
+                "pointer": "slide:3",
+                "value": 430
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "file": "10_safety_training.pptx",
+      "format": "pptx-native",
+      "suffix": ".pptx",
+      "description": "PPTX：3 页安全培训课件（阈值 + 演练频次）",
+      "size": 30141,
+      "sha256": "4e87f29ea89943140e958d418beeb86e0fab0744316dc77e2eb016f99199bc23",
+      "pages": 1,
+      "text_layer": true,
+      "expected_locator_kinds": [
+        "office_object"
+      ],
+      "expected_locator_fields": {
+        "office_object": [
+          "part"
+        ]
+      },
+      "ground_truth": {
+        "threshold": "40 摄氏度",
+        "drill_per_quarter": "1 次",
+        "per_year": "4"
+      },
+      "questions": [
+        {
+          "id": "qa-10-q1",
+          "question": "高温作业阈值是多少摄氏度？",
+          "answer": "40 摄氏度",
+          "checkable_from": "file_text",
+          "assertion": {
+            "kind": "exact_text",
+            "expected": "40 摄氏度",
+            "ground_truth_key": "threshold"
+          }
+        },
+        {
+          "id": "qa-10-q2",
+          "question": "按每季度 1 次计算，全年应急演练共几次？",
+          "answer": "4 次",
+          "checkable_from": "file_text",
+          "assertion": {
+            "kind": "arith_product",
+            "operands": [
+              1,
+              4
+            ],
+            "expected": 4,
+            "operand_sources": [
+              {
+                "pointer": "slide:3",
+                "value": 1
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "file": "11_bracket_spec_layers.dxf",
+      "format": "dxf-native",
+      "suffix": ".dxf",
+      "description": "DXF（工业特色）：两图层 + 尺寸线 + 文本标注（cad_entity 定位）",
+      "size": 18680,
+      "sha256": "12511e7061c1636daad5f784399ab938feb5ddc8ed2ac98f634e3abd0444c412",
+      "pages": 1,
+      "text_layer": true,
+      "expected_locator_kinds": [
+        "cad_entity"
+      ],
+      "expected_locator_fields": {
+        "cad_entity": [
+          "layout",
+          "layer",
+          "model_xy",
+          "unit"
+        ]
+      },
+      "ground_truth": {
+        "model": "BR-220",
+        "temp_limit": "88.5C",
+        "layers": "2"
+      },
+      "questions": [
+        {
+          "id": "qa-11-q1",
+          "question": "图纸标注的型号是什么？",
+          "answer": "BR-220",
+          "checkable_from": "file_text",
+          "assertion": {
+            "kind": "exact_text",
+            "expected": "BR-220",
+            "ground_truth_key": "model"
+          }
+        },
+        {
+          "id": "qa-11-q2",
+          "question": "图纸中标注的温度上限值是多少？",
+          "answer": "88.5C",
+          "checkable_from": "file_text",
+          "assertion": {
+            "kind": "exact_text",
+            "expected": "88.5C",
+            "ground_truth_key": "temp_limit"
+          }
+        }
+      ]
+    }
+  ],
+  "digest": "8080b273c4cd2325a5fec45142b812b0df0f9a06aa07d818defa03e9886acc67"
+}

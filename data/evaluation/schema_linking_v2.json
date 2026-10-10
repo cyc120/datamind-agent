@@ -1,0 +1,2915 @@
+{
+  "suite_version": "schema-linking-v2",
+  "data_version": "fixture-v2",
+  "annotation": "真值作者标注：正例的 tables/columns/metrics/paths 按问题语义人工标注；拒绝类分三种（受权限保护字段 / 未纳入 allowlist 的表 / 无已批准连接路径），拒绝不计入召回分母。expected_absent_tables/columns 是「干扰表不得误选」的反例断言。基线表来自元数据库 schema_snapshots 的真实表（只读读取）；构造表与干扰表在本文件声明，因为演示库只有 19 张真实表，且本 WP 不允许向元数据库写入。",
+  "pool": {
+    "description": "只读 fixture 表池：19 张真实表（3 个快照的并集）+ 本文件声明的构造表；excluded_tables 模拟未纳入 table_allowlist 的表。",
+    "real_sources": [
+      {
+        "source_id": "demo_retail",
+        "snapshot_id": "snap-demo_retail-e9495c660cd1"
+      },
+      {
+        "source_id": "chinook",
+        "snapshot_id": "snap-chinook-9bb432273bcd"
+      },
+      {
+        "source_id": "demo_industrial",
+        "snapshot_id": "snap-industrial-4fd6776592a800b8b082"
+      }
+    ],
+    "synthetic_tables": [
+      {
+        "table_name": "sales_orders",
+        "schema_name": "fixture",
+        "business_name": "销售订单汇总表",
+        "aliases": [
+          "销售单",
+          "订单汇总"
+        ],
+        "columns": [
+          {
+            "column_name": "id",
+            "business_name": "汇总ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "id",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "order_id",
+            "business_name": "订单ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "sales_amount",
+            "business_name": "销售额",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "metric",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "updated_at",
+            "business_name": "更新时间",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "time",
+            "sensitivity": "public"
+          }
+        ],
+        "note": "干扰表：与真实表 orders（订单表/订单）名称与语义近似"
+      },
+      {
+        "table_name": "order_sales_detail",
+        "schema_name": "fixture",
+        "business_name": "订单销售明细汇总表",
+        "aliases": [
+          "明细汇总"
+        ],
+        "columns": [
+          {
+            "column_name": "id",
+            "business_name": "汇总ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "id",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "order_id",
+            "business_name": "订单ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "product_id",
+            "business_name": "产品",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "sales_amount",
+            "business_name": "销售额",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "metric",
+            "sensitivity": "public"
+          }
+        ],
+        "note": "干扰表：与真实表 order_items（订单明细表）近似"
+      },
+      {
+        "table_name": "customer_sales",
+        "schema_name": "fixture",
+        "business_name": "客户销售汇总表",
+        "aliases": [
+          "客户销售额"
+        ],
+        "columns": [
+          {
+            "column_name": "id",
+            "business_name": "汇总ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "id",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "customer_id",
+            "business_name": "客户ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "sales_amount",
+            "business_name": "销售额",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "metric",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "period",
+            "business_name": "统计周期",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "time",
+            "sensitivity": "public"
+          }
+        ],
+        "note": "干扰表：与真实表 customers（客户表）近似"
+      },
+      {
+        "table_name": "product_sales_summary",
+        "schema_name": "fixture",
+        "business_name": "产品销售汇总表",
+        "aliases": [
+          "产品销售"
+        ],
+        "columns": [
+          {
+            "column_name": "id",
+            "business_name": "汇总ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "id",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "product_id",
+            "business_name": "产品ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "units_sold",
+            "business_name": "销量",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "metric",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "sales_amount",
+            "business_name": "销售额",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "metric",
+            "sensitivity": "public"
+          }
+        ]
+      },
+      {
+        "table_name": "refund_requests",
+        "schema_name": "fixture",
+        "business_name": "退款申请表",
+        "aliases": [
+          "退款审批"
+        ],
+        "columns": [
+          {
+            "column_name": "request_id",
+            "business_name": "申请编号",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "id",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "refund_id",
+            "business_name": "退款ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "request_status",
+            "business_name": "审批状态",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "requested_at",
+            "business_name": "申请时间",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "time",
+            "sensitivity": "public"
+          }
+        ]
+      },
+      {
+        "table_name": "region_managers",
+        "schema_name": "fixture",
+        "business_name": "大区负责人表",
+        "aliases": [
+          "负责人"
+        ],
+        "columns": [
+          {
+            "column_name": "region_id",
+            "business_name": "大区ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "manager_name",
+            "business_name": "负责人姓名",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "phone",
+            "business_name": "负责人电话",
+            "aliases": [
+              "联系电话",
+              "手机号"
+            ],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "restricted"
+          },
+          {
+            "column_name": "effective_date",
+            "business_name": "生效日期",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "time",
+            "sensitivity": "public"
+          }
+        ]
+      },
+      {
+        "table_name": "customer_profiles",
+        "schema_name": "fixture",
+        "business_name": "客户画像表",
+        "aliases": [
+          "画像"
+        ],
+        "columns": [
+          {
+            "column_name": "profile_id",
+            "business_name": "画像ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "id",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "customer_id",
+            "business_name": "客户ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "segment",
+            "business_name": "分群字段",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "updated_at",
+            "business_name": "更新时间",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "time",
+            "sensitivity": "public"
+          }
+        ]
+      },
+      {
+        "table_name": "order_status_history",
+        "schema_name": "fixture",
+        "business_name": "订单状态变更记录",
+        "aliases": [
+          "状态变更"
+        ],
+        "columns": [
+          {
+            "column_name": "history_id",
+            "business_name": "记录ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "id",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "order_id",
+            "business_name": "订单ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "from_status",
+            "business_name": "原状态",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "to_status",
+            "business_name": "新状态",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "changed_at",
+            "business_name": "变更时间",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "time",
+            "sensitivity": "public"
+          }
+        ]
+      },
+      {
+        "table_name": "payment_transactions",
+        "schema_name": "fixture",
+        "business_name": "支付流水表",
+        "aliases": [
+          "收款记录"
+        ],
+        "columns": [
+          {
+            "column_name": "transaction_id",
+            "business_name": "流水号",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "id",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "order_id",
+            "business_name": "订单ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "amount",
+            "business_name": "支付金额",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "metric",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "paid_at",
+            "business_name": "支付时间",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "time",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "method",
+            "business_name": "支付方式",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          }
+        ]
+      },
+      {
+        "table_name": "shipment_records",
+        "schema_name": "fixture",
+        "business_name": "发货记录表",
+        "aliases": [
+          "物流记录"
+        ],
+        "columns": [
+          {
+            "column_name": "shipment_id",
+            "business_name": "发货单号",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "id",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "order_id",
+            "business_name": "订单ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "shipped_at",
+            "business_name": "发货时间",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "time",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "carrier",
+            "business_name": "承运商",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "status",
+            "business_name": "发货状态",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          }
+        ]
+      },
+      {
+        "table_name": "warehouse_stock",
+        "schema_name": "fixture",
+        "business_name": "仓库库存表",
+        "aliases": [
+          "库存"
+        ],
+        "columns": [
+          {
+            "column_name": "stock_id",
+            "business_name": "库存ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "id",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "spare_part_no",
+            "business_name": "备件号",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "quantity_on_hand",
+            "business_name": "在库数量",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "metric",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "warehouse_code",
+            "business_name": "仓库编码",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          }
+        ]
+      },
+      {
+        "table_name": "purchase_orders",
+        "schema_name": "fixture",
+        "business_name": "采购订单表",
+        "aliases": [
+          "采购单",
+          "采购订单"
+        ],
+        "columns": [
+          {
+            "column_name": "po_id",
+            "business_name": "采购单号",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "id",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "supplier_id",
+            "business_name": "供应商ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "po_amount",
+            "business_name": "采购金额",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "metric",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "created_at",
+            "business_name": "下单时间",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "time",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "status",
+            "business_name": "采购状态",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          }
+        ]
+      },
+      {
+        "table_name": "supplier_master",
+        "schema_name": "fixture",
+        "business_name": "供应商主数据",
+        "aliases": [
+          "供应商"
+        ],
+        "columns": [
+          {
+            "column_name": "supplier_id",
+            "business_name": "供应商ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "id",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "supplier_name",
+            "business_name": "供应商名称",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "contact_name",
+            "business_name": "联系人",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "contact_phone",
+            "business_name": "联系人电话",
+            "aliases": [
+              "供应商联系电话"
+            ],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "restricted"
+          },
+          {
+            "column_name": "rating",
+            "business_name": "供应商评级",
+            "aliases": [],
+            "enum_map": {
+              "A": "A级",
+              "B": "B级",
+              "C": "C级"
+            },
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          }
+        ]
+      },
+      {
+        "table_name": "equipment_records",
+        "schema_name": "fixture",
+        "business_name": "设备档案表",
+        "aliases": [
+          "设备台账",
+          "设备"
+        ],
+        "columns": [
+          {
+            "column_name": "equipment_id",
+            "business_name": "设备编号",
+            "aliases": [
+              "设备号"
+            ],
+            "enum_map": {},
+            "semantic_role": "id",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "equipment_name",
+            "business_name": "设备名称",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "model",
+            "business_name": "设备型号",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "region_id",
+            "business_name": "所属大区",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "commissioned_at",
+            "business_name": "投产日期",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "time",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "status",
+            "business_name": "设备状态",
+            "aliases": [],
+            "enum_map": {
+              "running": "运行",
+              "idle": "闲置",
+              "repair": "维修"
+            },
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          }
+        ]
+      },
+      {
+        "table_name": "maintenance_orders",
+        "schema_name": "fixture",
+        "business_name": "设备维保工单表",
+        "aliases": [
+          "维保工单",
+          "工单"
+        ],
+        "columns": [
+          {
+            "column_name": "work_order_id",
+            "business_name": "工单编号",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "id",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "equipment_id",
+            "business_name": "设备编号",
+            "aliases": [
+              "设备号"
+            ],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "fault_code",
+            "business_name": "故障代码",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "service_date",
+            "business_name": "维保日期",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "time",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "labor_hours",
+            "business_name": "工时",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "metric",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "spare_part_no",
+            "business_name": "备件号",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "engineer_id",
+            "business_name": "维保工程师",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "conclusion",
+            "business_name": "维保结论",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          }
+        ]
+      },
+      {
+        "table_name": "maintenance_parts",
+        "schema_name": "fixture",
+        "business_name": "维保备件表",
+        "aliases": [
+          "备件"
+        ],
+        "columns": [
+          {
+            "column_name": "part_no",
+            "business_name": "备件号",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "id",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "part_name",
+            "business_name": "备件名称",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "unit_price",
+            "business_name": "备件单价",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "metric",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "stock_qty",
+            "business_name": "备件库存",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "metric",
+            "sensitivity": "public"
+          }
+        ]
+      },
+      {
+        "table_name": "equipment_faults",
+        "schema_name": "fixture",
+        "business_name": "设备故障记录表",
+        "aliases": [
+          "故障记录",
+          "故障"
+        ],
+        "columns": [
+          {
+            "column_name": "fault_id",
+            "business_name": "故障记录ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "id",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "equipment_id",
+            "business_name": "设备编号",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "fault_code",
+            "business_name": "故障代码",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "fault_desc",
+            "business_name": "故障描述",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "occurred_at",
+            "business_name": "发生时间",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "time",
+            "sensitivity": "public"
+          }
+        ]
+      },
+      {
+        "table_name": "equipment_runtime_log",
+        "schema_name": "fixture",
+        "business_name": "设备运行日志表",
+        "aliases": [
+          "运行日志"
+        ],
+        "columns": [
+          {
+            "column_name": "log_id",
+            "business_name": "日志ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "id",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "equipment_id",
+            "business_name": "设备编号",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "runtime_hours",
+            "business_name": "运行时长",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "metric",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "logged_at",
+            "business_name": "记录时间",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "time",
+            "sensitivity": "public"
+          }
+        ]
+      },
+      {
+        "table_name": "spare_part_inventory",
+        "schema_name": "fixture",
+        "business_name": "备件库存表",
+        "aliases": [
+          "备件库存"
+        ],
+        "columns": [
+          {
+            "column_name": "record_id",
+            "business_name": "记录ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "id",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "spare_part_no",
+            "business_name": "备件号",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "quantity_on_hand",
+            "business_name": "在库数量",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "metric",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "warehouse_code",
+            "business_name": "仓库编码",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          }
+        ]
+      },
+      {
+        "table_name": "service_engineers",
+        "schema_name": "fixture",
+        "business_name": "维保工程师表",
+        "aliases": [
+          "工程师"
+        ],
+        "columns": [
+          {
+            "column_name": "engineer_id",
+            "business_name": "工程师编号",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "id",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "engineer_name",
+            "business_name": "工程师姓名",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "skill_level",
+            "business_name": "技能等级",
+            "aliases": [],
+            "enum_map": {
+              "junior": "初级",
+              "middle": "中级",
+              "senior": "高级"
+            },
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "hired_at",
+            "business_name": "入职日期",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "time",
+            "sensitivity": "public"
+          }
+        ]
+      },
+      {
+        "table_name": "service_contracts",
+        "schema_name": "fixture",
+        "business_name": "维保合同表",
+        "aliases": [
+          "维保合同",
+          "合同"
+        ],
+        "columns": [
+          {
+            "column_name": "contract_id",
+            "business_name": "合同编号",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "id",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "supplier_id",
+            "business_name": "供应商ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "equipment_id",
+            "business_name": "设备编号",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "signed_at",
+            "business_name": "签订日期",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "time",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "amount",
+            "business_name": "合同金额",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "metric",
+            "sensitivity": "public"
+          }
+        ]
+      },
+      {
+        "table_name": "inspection_reports",
+        "schema_name": "fixture",
+        "business_name": "巡检报告表",
+        "aliases": [
+          "巡检"
+        ],
+        "columns": [
+          {
+            "column_name": "report_id",
+            "business_name": "报告编号",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "id",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "equipment_id",
+            "business_name": "设备编号",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "inspector",
+            "business_name": "巡检人",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "inspected_at",
+            "business_name": "巡检时间",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "time",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "result",
+            "business_name": "巡检结果",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          }
+        ]
+      },
+      {
+        "table_name": "complaint_tickets",
+        "schema_name": "fixture",
+        "business_name": "客诉工单表",
+        "aliases": [
+          "投诉单"
+        ],
+        "columns": [
+          {
+            "column_name": "ticket_id",
+            "business_name": "工单编号",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "id",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "order_id",
+            "business_name": "订单ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "customer_id",
+            "business_name": "客户ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "ticket_status",
+            "business_name": "工单状态",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "created_at",
+            "business_name": "创建时间",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "time",
+            "sensitivity": "public"
+          }
+        ]
+      },
+      {
+        "table_name": "ticket_followups",
+        "schema_name": "fixture",
+        "business_name": "工单跟进记录表",
+        "aliases": [
+          "跟进记录"
+        ],
+        "columns": [
+          {
+            "column_name": "followup_id",
+            "business_name": "跟进ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "id",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "ticket_id",
+            "business_name": "工单编号",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "followup_note",
+            "business_name": "跟进说明",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "followed_at",
+            "business_name": "跟进时间",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "time",
+            "sensitivity": "public"
+          }
+        ]
+      },
+      {
+        "table_name": "kpi_monthly",
+        "schema_name": "fixture",
+        "business_name": "月度经营指标表",
+        "aliases": [
+          "经营指标",
+          "指标"
+        ],
+        "columns": [
+          {
+            "column_name": "kpi_id",
+            "business_name": "指标ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "id",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "region_id",
+            "business_name": "大区ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "month",
+            "business_name": "统计月份",
+            "aliases": [
+              "月份"
+            ],
+            "enum_map": {},
+            "semantic_role": "time",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "sales_amount",
+            "business_name": "销售额",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "metric",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "order_count",
+            "business_name": "订单数",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "metric",
+            "sensitivity": "public"
+          }
+        ]
+      },
+      {
+        "table_name": "campaign_events",
+        "schema_name": "fixture",
+        "business_name": "营销活动表",
+        "aliases": [
+          "活动"
+        ],
+        "columns": [
+          {
+            "column_name": "campaign_id",
+            "business_name": "活动编号",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "id",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "campaign_name",
+            "business_name": "活动名称",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "channel",
+            "business_name": "投放渠道",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "started_at",
+            "business_name": "开始时间",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "time",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "budget",
+            "business_name": "活动预算",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "metric",
+            "sensitivity": "public"
+          }
+        ]
+      },
+      {
+        "table_name": "vendor_invoices",
+        "schema_name": "fixture",
+        "business_name": "供应商发票表",
+        "aliases": [
+          "供应商发票",
+          "发票"
+        ],
+        "columns": [
+          {
+            "column_name": "vendor_invoice_id",
+            "business_name": "发票编号",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "id",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "supplier_id",
+            "business_name": "供应商ID",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "invoice_amount",
+            "business_name": "发票金额",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "metric",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "issued_at",
+            "business_name": "开票日期",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "time",
+            "sensitivity": "public"
+          },
+          {
+            "column_name": "status",
+            "business_name": "发票状态",
+            "aliases": [],
+            "enum_map": {},
+            "semantic_role": "dimension",
+            "sensitivity": "public"
+          }
+        ]
+      }
+    ],
+    "synthetic_relations": [
+      {
+        "relation_id": "rel-fixture-maintenance-equipment",
+        "from_table": "maintenance_orders",
+        "from_columns": [
+          "equipment_id"
+        ],
+        "to_table": "equipment_records",
+        "to_columns": [
+          "equipment_id"
+        ],
+        "approved": true,
+        "ambiguity_penalty": 0,
+        "fanout_penalty": 0,
+        "privacy_penalty": 0,
+        "description": "fixture approved relation"
+      },
+      {
+        "relation_id": "rel-fixture-maintenance-engineer",
+        "from_table": "maintenance_orders",
+        "from_columns": [
+          "engineer_id"
+        ],
+        "to_table": "service_engineers",
+        "to_columns": [
+          "engineer_id"
+        ],
+        "approved": true,
+        "ambiguity_penalty": 0,
+        "fanout_penalty": 0,
+        "privacy_penalty": 0,
+        "description": "fixture approved relation"
+      },
+      {
+        "relation_id": "rel-fixture-maintenance-part",
+        "from_table": "maintenance_orders",
+        "from_columns": [
+          "spare_part_no"
+        ],
+        "to_table": "maintenance_parts",
+        "to_columns": [
+          "part_no"
+        ],
+        "approved": true,
+        "ambiguity_penalty": 0,
+        "fanout_penalty": 0,
+        "privacy_penalty": 0,
+        "description": "fixture approved relation"
+      },
+      {
+        "relation_id": "rel-fixture-part-inventory",
+        "from_table": "maintenance_parts",
+        "from_columns": [
+          "part_no"
+        ],
+        "to_table": "spare_part_inventory",
+        "to_columns": [
+          "spare_part_no"
+        ],
+        "approved": true,
+        "ambiguity_penalty": 0,
+        "fanout_penalty": 0,
+        "privacy_penalty": 0,
+        "description": "fixture approved relation"
+      },
+      {
+        "relation_id": "rel-fixture-equipment-region",
+        "from_table": "equipment_records",
+        "from_columns": [
+          "region_id"
+        ],
+        "to_table": "regions",
+        "to_columns": [
+          "region_id"
+        ],
+        "approved": true,
+        "ambiguity_penalty": 0,
+        "fanout_penalty": 0,
+        "privacy_penalty": 0,
+        "description": "fixture approved relation"
+      },
+      {
+        "relation_id": "rel-fixture-faults-equipment",
+        "from_table": "equipment_faults",
+        "from_columns": [
+          "equipment_id"
+        ],
+        "to_table": "equipment_records",
+        "to_columns": [
+          "equipment_id"
+        ],
+        "approved": true,
+        "ambiguity_penalty": 0,
+        "fanout_penalty": 0,
+        "privacy_penalty": 0,
+        "description": "fixture approved relation"
+      },
+      {
+        "relation_id": "rel-fixture-runtime-equipment",
+        "from_table": "equipment_runtime_log",
+        "from_columns": [
+          "equipment_id"
+        ],
+        "to_table": "equipment_records",
+        "to_columns": [
+          "equipment_id"
+        ],
+        "approved": true,
+        "ambiguity_penalty": 0,
+        "fanout_penalty": 0,
+        "privacy_penalty": 0,
+        "description": "fixture approved relation"
+      },
+      {
+        "relation_id": "rel-fixture-inspection-equipment",
+        "from_table": "inspection_reports",
+        "from_columns": [
+          "equipment_id"
+        ],
+        "to_table": "equipment_records",
+        "to_columns": [
+          "equipment_id"
+        ],
+        "approved": true,
+        "ambiguity_penalty": 0,
+        "fanout_penalty": 0,
+        "privacy_penalty": 0,
+        "description": "fixture approved relation"
+      },
+      {
+        "relation_id": "rel-fixture-contract-equipment",
+        "from_table": "service_contracts",
+        "from_columns": [
+          "equipment_id"
+        ],
+        "to_table": "equipment_records",
+        "to_columns": [
+          "equipment_id"
+        ],
+        "approved": true,
+        "ambiguity_penalty": 0,
+        "fanout_penalty": 0,
+        "privacy_penalty": 0,
+        "description": "fixture approved relation"
+      },
+      {
+        "relation_id": "rel-fixture-contract-supplier",
+        "from_table": "service_contracts",
+        "from_columns": [
+          "supplier_id"
+        ],
+        "to_table": "supplier_master",
+        "to_columns": [
+          "supplier_id"
+        ],
+        "approved": true,
+        "ambiguity_penalty": 0,
+        "fanout_penalty": 0,
+        "privacy_penalty": 0,
+        "description": "fixture approved relation"
+      },
+      {
+        "relation_id": "rel-fixture-po-supplier",
+        "from_table": "purchase_orders",
+        "from_columns": [
+          "supplier_id"
+        ],
+        "to_table": "supplier_master",
+        "to_columns": [
+          "supplier_id"
+        ],
+        "approved": true,
+        "ambiguity_penalty": 0,
+        "fanout_penalty": 0,
+        "privacy_penalty": 0,
+        "description": "fixture approved relation"
+      },
+      {
+        "relation_id": "rel-fixture-vendor-invoice-supplier",
+        "from_table": "vendor_invoices",
+        "from_columns": [
+          "supplier_id"
+        ],
+        "to_table": "supplier_master",
+        "to_columns": [
+          "supplier_id"
+        ],
+        "approved": true,
+        "ambiguity_penalty": 0,
+        "fanout_penalty": 0,
+        "privacy_penalty": 0,
+        "description": "fixture approved relation"
+      },
+      {
+        "relation_id": "rel-fixture-stock-part",
+        "from_table": "warehouse_stock",
+        "from_columns": [
+          "spare_part_no"
+        ],
+        "to_table": "spare_part_inventory",
+        "to_columns": [
+          "spare_part_no"
+        ],
+        "approved": true,
+        "ambiguity_penalty": 0,
+        "fanout_penalty": 0,
+        "privacy_penalty": 0,
+        "description": "fixture approved relation"
+      },
+      {
+        "relation_id": "rel-fixture-shipment-orders",
+        "from_table": "shipment_records",
+        "from_columns": [
+          "order_id"
+        ],
+        "to_table": "orders",
+        "to_columns": [
+          "order_id"
+        ],
+        "approved": true,
+        "ambiguity_penalty": 0,
+        "fanout_penalty": 0,
+        "privacy_penalty": 0,
+        "description": "fixture approved relation"
+      },
+      {
+        "relation_id": "rel-fixture-payment-orders",
+        "from_table": "payment_transactions",
+        "from_columns": [
+          "order_id"
+        ],
+        "to_table": "orders",
+        "to_columns": [
+          "order_id"
+        ],
+        "approved": true,
+        "ambiguity_penalty": 0,
+        "fanout_penalty": 0,
+        "privacy_penalty": 0,
+        "description": "fixture approved relation"
+      },
+      {
+        "relation_id": "rel-fixture-tickets-orders",
+        "from_table": "complaint_tickets",
+        "from_columns": [
+          "order_id"
+        ],
+        "to_table": "orders",
+        "to_columns": [
+          "order_id"
+        ],
+        "approved": true,
+        "ambiguity_penalty": 0,
+        "fanout_penalty": 0,
+        "privacy_penalty": 0,
+        "description": "fixture approved relation"
+      },
+      {
+        "relation_id": "rel-fixture-followups-tickets",
+        "from_table": "ticket_followups",
+        "from_columns": [
+          "ticket_id"
+        ],
+        "to_table": "complaint_tickets",
+        "to_columns": [
+          "ticket_id"
+        ],
+        "approved": true,
+        "ambiguity_penalty": 0,
+        "fanout_penalty": 0,
+        "privacy_penalty": 0,
+        "description": "fixture approved relation"
+      },
+      {
+        "relation_id": "rel-fixture-status-history-orders",
+        "from_table": "order_status_history",
+        "from_columns": [
+          "order_id"
+        ],
+        "to_table": "orders",
+        "to_columns": [
+          "order_id"
+        ],
+        "approved": true,
+        "ambiguity_penalty": 0,
+        "fanout_penalty": 0,
+        "privacy_penalty": 0,
+        "description": "fixture approved relation"
+      },
+      {
+        "relation_id": "rel-fixture-kpi-region",
+        "from_table": "kpi_monthly",
+        "from_columns": [
+          "region_id"
+        ],
+        "to_table": "regions",
+        "to_columns": [
+          "region_id"
+        ],
+        "approved": true,
+        "ambiguity_penalty": 0,
+        "fanout_penalty": 0,
+        "privacy_penalty": 0,
+        "description": "fixture approved relation"
+      },
+      {
+        "relation_id": "rel-fixture-refund-requests-refunds",
+        "from_table": "refund_requests",
+        "from_columns": [
+          "refund_id"
+        ],
+        "to_table": "refunds",
+        "to_columns": [
+          "refund_id"
+        ],
+        "approved": true,
+        "ambiguity_penalty": 0,
+        "fanout_penalty": 0,
+        "privacy_penalty": 0,
+        "description": "fixture approved relation"
+      }
+    ],
+    "synthetic_metrics": [],
+    "excluded_tables": [
+      {
+        "table_name": "equipment_archive",
+        "similar_to": "equipment_records",
+        "reason": "归档表未纳入 table_allowlist（越权/未登记数据源）"
+      },
+      {
+        "table_name": "invoice_archive",
+        "similar_to": "vendor_invoices",
+        "reason": "归档表未纳入 table_allowlist"
+      },
+      {
+        "table_name": "legacy_orders_2019",
+        "similar_to": "orders",
+        "reason": "历史遗留表未纳入 table_allowlist"
+      }
+    ],
+    "distractors": {
+      "sales_orders": "与 orders 名称/语义近似（销售订单汇总）",
+      "order_sales_detail": "与 order_items 名称/语义近似（订单销售明细汇总）",
+      "customer_sales": "与 customers 名称/语义近似（客户销售汇总）",
+      "product_sales_summary": "与 products 名称/语义近似（产品销售汇总）",
+      "customer_profiles": "与 customers 名称近似（客户画像）",
+      "refund_requests": "与 refunds 语义近似（退款申请）"
+    }
+  },
+  "cases": [
+    {
+      "case_id": "v2-001",
+      "question": "各订单状态分别有多少笔订单？",
+      "tables": [
+        "orders"
+      ],
+      "columns": [
+        "orders.order_status"
+      ],
+      "metrics": [],
+      "paths": [],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-002",
+      "question": "不同销售渠道的订单占比是多少？",
+      "tables": [
+        "orders"
+      ],
+      "columns": [
+        "orders.channel"
+      ],
+      "metrics": [],
+      "paths": [],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-003",
+      "question": "客户等级为金卡的客户有多少人？",
+      "tables": [
+        "customers"
+      ],
+      "columns": [
+        "customers.customer_level"
+      ],
+      "metrics": [],
+      "paths": [],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-004",
+      "question": "产品里有哪些品牌？",
+      "tables": [
+        "products"
+      ],
+      "columns": [
+        "products.brand"
+      ],
+      "metrics": [],
+      "paths": [],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-005",
+      "question": "每个产品类别的平均标价是多少？",
+      "tables": [
+        "products"
+      ],
+      "columns": [
+        "products.category",
+        "products.list_price"
+      ],
+      "metrics": [],
+      "paths": [],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-006",
+      "question": "退款原因都有哪些？",
+      "tables": [
+        "refunds"
+      ],
+      "columns": [
+        "refunds.reason"
+      ],
+      "metrics": [],
+      "paths": [],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-007",
+      "question": "各大区的省会城市是什么？",
+      "tables": [
+        "regions"
+      ],
+      "columns": [
+        "regions.region_name",
+        "regions.capital"
+      ],
+      "metrics": [],
+      "paths": [],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-008",
+      "question": "2026年3月注册的客户有多少人？",
+      "tables": [
+        "customers"
+      ],
+      "columns": [
+        "customers.registered_at"
+      ],
+      "metrics": [],
+      "paths": [],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-009",
+      "question": "订单备注非空的订单有多少？",
+      "tables": [
+        "orders"
+      ],
+      "columns": [
+        "orders.remark"
+      ],
+      "metrics": [],
+      "paths": [],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-010",
+      "question": "2025年各渠道的销售额是多少？",
+      "tables": [
+        "order_items",
+        "orders"
+      ],
+      "columns": [
+        "orders.channel",
+        "orders.created_at"
+      ],
+      "metrics": [
+        "demo_retail.sales_amount"
+      ],
+      "paths": [],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-011",
+      "question": "2025年一共卖出多少件商品？",
+      "tables": [
+        "order_items",
+        "orders"
+      ],
+      "columns": [
+        "orders.created_at"
+      ],
+      "metrics": [
+        "demo_retail.units_sold"
+      ],
+      "paths": [],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-012",
+      "question": "2024年的订单数是多少？",
+      "tables": [
+        "orders"
+      ],
+      "columns": [
+        "orders.created_at"
+      ],
+      "metrics": [
+        "demo_retail.order_count"
+      ],
+      "paths": [],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-013",
+      "question": "净销售额是多少？",
+      "tables": [
+        "order_items",
+        "orders",
+        "refunds"
+      ],
+      "columns": [],
+      "metrics": [
+        "demo_retail.net_sales"
+      ],
+      "paths": [],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-014",
+      "question": "有多少客户？",
+      "tables": [
+        "customers"
+      ],
+      "columns": [],
+      "metrics": [
+        "demo_retail.customer_count"
+      ],
+      "paths": [],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-015",
+      "question": "2025年各退款原因的退款金额合计是多少？",
+      "tables": [
+        "refunds"
+      ],
+      "columns": [
+        "refunds.reason",
+        "refunds.refunded_at"
+      ],
+      "metrics": [
+        "demo_retail.refund_amount"
+      ],
+      "paths": [],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-016",
+      "question": "华东地区的客户下的订单明细有多少条？",
+      "tables": [
+        "order_items",
+        "orders",
+        "customers",
+        "regions"
+      ],
+      "columns": [
+        "regions.region_name"
+      ],
+      "metrics": [],
+      "paths": [
+        {
+          "from": "order_items",
+          "to": "regions",
+          "tables": [
+            "order_items",
+            "orders",
+            "customers",
+            "regions"
+          ]
+        }
+      ],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-017",
+      "question": "退款金额最高的产品是哪个？",
+      "tables": [
+        "refunds",
+        "order_items",
+        "products"
+      ],
+      "columns": [
+        "products.product_name"
+      ],
+      "metrics": [],
+      "paths": [
+        {
+          "from": "refunds",
+          "to": "products",
+          "tables": [
+            "refunds",
+            "order_items",
+            "products"
+          ]
+        }
+      ],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-018",
+      "question": "2025年各品牌产品的销售额是多少？",
+      "tables": [
+        "order_items",
+        "orders",
+        "products"
+      ],
+      "columns": [
+        "products.brand",
+        "orders.created_at"
+      ],
+      "metrics": [
+        "demo_retail.sales_amount"
+      ],
+      "paths": [
+        {
+          "from": "order_items",
+          "to": "products",
+          "tables": [
+            "order_items",
+            "products"
+          ]
+        }
+      ],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-019",
+      "question": "哪些大区的退款金额超过一万元？",
+      "tables": [
+        "refunds",
+        "order_items",
+        "orders",
+        "customers",
+        "regions"
+      ],
+      "columns": [
+        "regions.region_name",
+        "refunds.refund_amount"
+      ],
+      "metrics": [],
+      "paths": [
+        {
+          "from": "refunds",
+          "to": "regions",
+          "tables": [
+            "refunds",
+            "order_items",
+            "orders",
+            "customers",
+            "regions"
+          ]
+        }
+      ],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-020",
+      "question": "各客户等级的销售额分别是多少？",
+      "tables": [
+        "order_items",
+        "orders",
+        "customers"
+      ],
+      "columns": [
+        "customers.customer_level"
+      ],
+      "metrics": [
+        "demo_retail.sales_amount"
+      ],
+      "paths": [
+        {
+          "from": "order_items",
+          "to": "customers",
+          "tables": [
+            "order_items",
+            "orders",
+            "customers"
+          ]
+        }
+      ],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-021",
+      "question": "每个大区的客户数量是多少？",
+      "tables": [
+        "customers",
+        "regions"
+      ],
+      "columns": [
+        "regions.region_name"
+      ],
+      "metrics": [],
+      "paths": [
+        {
+          "from": "customers",
+          "to": "regions",
+          "tables": [
+            "customers",
+            "regions"
+          ]
+        }
+      ],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-022",
+      "question": "折扣最高的订单明细对应的产品是什么？",
+      "tables": [
+        "order_items",
+        "products"
+      ],
+      "columns": [
+        "order_items.discount",
+        "products.product_name"
+      ],
+      "metrics": [],
+      "paths": [
+        {
+          "from": "order_items",
+          "to": "products",
+          "tables": [
+            "order_items",
+            "products"
+          ]
+        }
+      ],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-023",
+      "question": "2025年退货的退款单对应的订单渠道是什么？",
+      "tables": [
+        "refunds",
+        "order_items",
+        "orders"
+      ],
+      "columns": [
+        "refunds.refunded_at",
+        "orders.channel"
+      ],
+      "metrics": [],
+      "paths": [
+        {
+          "from": "refunds",
+          "to": "orders",
+          "tables": [
+            "refunds",
+            "order_items",
+            "orders"
+          ]
+        }
+      ],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-024",
+      "question": "已发货订单的发货记录承运商有哪些？",
+      "tables": [
+        "orders",
+        "shipment_records"
+      ],
+      "columns": [
+        "orders.order_status",
+        "shipment_records.carrier"
+      ],
+      "metrics": [],
+      "paths": [
+        {
+          "from": "shipment_records",
+          "to": "orders",
+          "tables": [
+            "shipment_records",
+            "orders"
+          ]
+        }
+      ],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-025",
+      "question": "2025年各销售大区的销售额是多少？",
+      "tables": [
+        "order_items",
+        "orders",
+        "customers",
+        "regions"
+      ],
+      "columns": [
+        "regions.region_name",
+        "orders.created_at"
+      ],
+      "metrics": [
+        "demo_retail.sales_amount"
+      ],
+      "paths": [
+        {
+          "from": "order_items",
+          "to": "regions",
+          "tables": [
+            "order_items",
+            "orders",
+            "customers",
+            "regions"
+          ]
+        }
+      ],
+      "expected_reject": false,
+      "expected_absent_tables": [
+        "sales_orders",
+        "order_sales_detail",
+        "customer_sales",
+        "kpi_monthly"
+      ],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-026",
+      "question": "客户画像里的分群字段有哪些？",
+      "tables": [
+        "customer_profiles"
+      ],
+      "columns": [
+        "customer_profiles.segment"
+      ],
+      "metrics": [],
+      "paths": [],
+      "expected_reject": false,
+      "expected_absent_tables": [
+        "customer_sales",
+        "sales_orders"
+      ],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-027",
+      "question": "产品销售汇总表里销量最高的产品是哪几个？",
+      "tables": [
+        "product_sales_summary"
+      ],
+      "columns": [
+        "product_sales_summary.units_sold"
+      ],
+      "metrics": [],
+      "paths": [],
+      "expected_reject": false,
+      "expected_absent_tables": [
+        "order_sales_detail",
+        "sales_orders",
+        "customer_sales"
+      ],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-028",
+      "question": "退款申请表里各审批状态的申请有多少？",
+      "tables": [
+        "refund_requests"
+      ],
+      "columns": [
+        "refund_requests.request_status"
+      ],
+      "metrics": [],
+      "paths": [],
+      "expected_reject": false,
+      "expected_absent_tables": [
+        "sales_orders",
+        "customer_sales"
+      ],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-029",
+      "question": "订单状态变更记录里新状态和原状态分别出现了多少次？",
+      "tables": [
+        "order_status_history",
+        "orders"
+      ],
+      "columns": [
+        "order_status_history.from_status",
+        "order_status_history.to_status"
+      ],
+      "metrics": [],
+      "paths": [
+        {
+          "from": "order_status_history",
+          "to": "orders",
+          "tables": [
+            "order_status_history",
+            "orders"
+          ]
+        }
+      ],
+      "expected_reject": false,
+      "expected_absent_tables": [
+        "sales_orders",
+        "order_sales_detail"
+      ],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-030",
+      "question": "每个流派有多少首曲目？",
+      "tables": [
+        "track",
+        "genre"
+      ],
+      "columns": [],
+      "metrics": [],
+      "paths": [
+        {
+          "from": "track",
+          "to": "genre",
+          "tables": [
+            "track",
+            "genre"
+          ]
+        }
+      ],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-031",
+      "question": "各艺术家的专辑数量是多少？",
+      "tables": [
+        "album",
+        "artist"
+      ],
+      "columns": [],
+      "metrics": [],
+      "paths": [
+        {
+          "from": "album",
+          "to": "artist",
+          "tables": [
+            "album",
+            "artist"
+          ]
+        }
+      ],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-032",
+      "question": "账单金额最高的客户所在国家是哪里？",
+      "tables": [
+        "invoice",
+        "customer"
+      ],
+      "columns": [
+        "invoice.total",
+        "customer.country"
+      ],
+      "metrics": [],
+      "paths": [
+        {
+          "from": "invoice",
+          "to": "customer",
+          "tables": [
+            "invoice",
+            "customer"
+          ]
+        }
+      ],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-033",
+      "question": "员工汇报对象的职位是什么？",
+      "tables": [
+        "employee"
+      ],
+      "columns": [
+        "employee.reports_to",
+        "employee.title"
+      ],
+      "metrics": [],
+      "paths": [
+        {
+          "from": "employee",
+          "to": "employee",
+          "tables": [
+            "employee"
+          ]
+        }
+      ],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-034",
+      "question": "播放列表里各曲目的时长是多少？",
+      "tables": [
+        "playlist_track",
+        "track",
+        "playlist"
+      ],
+      "columns": [
+        "track.milliseconds"
+      ],
+      "metrics": [],
+      "paths": [
+        {
+          "from": "playlist_track",
+          "to": "playlist",
+          "tables": [
+            "playlist_track",
+            "playlist"
+          ]
+        }
+      ],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-035",
+      "question": "各账单的售出曲目数（销量）是多少？",
+      "tables": [
+        "invoice_line",
+        "invoice"
+      ],
+      "columns": [],
+      "metrics": [
+        "chinook.tracks_sold"
+      ],
+      "paths": [
+        {
+          "from": "invoice_line",
+          "to": "invoice",
+          "tables": [
+            "invoice_line",
+            "invoice"
+          ]
+        }
+      ],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-036",
+      "question": "设备档案里运行中和维修状态的设备各有多少台？",
+      "tables": [
+        "equipment_records"
+      ],
+      "columns": [
+        "equipment_records.status"
+      ],
+      "metrics": [],
+      "paths": [],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-037",
+      "question": "各设备的维保工单数量是多少？",
+      "tables": [
+        "maintenance_orders",
+        "equipment_records"
+      ],
+      "columns": [],
+      "metrics": [],
+      "paths": [
+        {
+          "from": "maintenance_orders",
+          "to": "equipment_records",
+          "tables": [
+            "maintenance_orders",
+            "equipment_records"
+          ]
+        }
+      ],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-038",
+      "question": "维保工时超过4小时的工单有哪些？",
+      "tables": [
+        "maintenance_orders"
+      ],
+      "columns": [
+        "maintenance_orders.labor_hours"
+      ],
+      "metrics": [],
+      "paths": [],
+      "expected_reject": false,
+      "expected_absent_tables": [
+        "sales_orders",
+        "order_sales_detail"
+      ],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-039",
+      "question": "故障代码F-02对应的设备是哪些？",
+      "tables": [
+        "equipment_faults",
+        "equipment_records"
+      ],
+      "columns": [
+        "equipment_faults.fault_code"
+      ],
+      "metrics": [],
+      "paths": [
+        {
+          "from": "equipment_faults",
+          "to": "equipment_records",
+          "tables": [
+            "equipment_faults",
+            "equipment_records"
+          ]
+        }
+      ],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-040",
+      "question": "备件库存里各备件的在库数量是多少？",
+      "tables": [
+        "spare_part_inventory"
+      ],
+      "columns": [
+        "spare_part_inventory.quantity_on_hand"
+      ],
+      "metrics": [],
+      "paths": [],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-041",
+      "question": "维保工程师的技能等级分布是什么？",
+      "tables": [
+        "service_engineers"
+      ],
+      "columns": [
+        "service_engineers.skill_level"
+      ],
+      "metrics": [],
+      "paths": [],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-042",
+      "question": "供应商评级和供应商发票金额怎么关联？",
+      "tables": [
+        "supplier_master",
+        "vendor_invoices"
+      ],
+      "columns": [
+        "supplier_master.rating",
+        "vendor_invoices.invoice_amount"
+      ],
+      "metrics": [],
+      "paths": [
+        {
+          "from": "supplier_master",
+          "to": "vendor_invoices",
+          "tables": [
+            "supplier_master",
+            "vendor_invoices"
+          ]
+        }
+      ],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-043",
+      "question": "采购订单的采购金额和供应商名称？",
+      "tables": [
+        "purchase_orders",
+        "supplier_master"
+      ],
+      "columns": [
+        "purchase_orders.po_amount",
+        "supplier_master.supplier_name"
+      ],
+      "metrics": [],
+      "paths": [
+        {
+          "from": "purchase_orders",
+          "to": "supplier_master",
+          "tables": [
+            "purchase_orders",
+            "supplier_master"
+          ]
+        }
+      ],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-044",
+      "question": "维保合同覆盖了哪些设备？",
+      "tables": [
+        "service_contracts",
+        "equipment_records"
+      ],
+      "columns": [],
+      "metrics": [],
+      "paths": [
+        {
+          "from": "service_contracts",
+          "to": "equipment_records",
+          "tables": [
+            "service_contracts",
+            "equipment_records"
+          ]
+        }
+      ],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-045",
+      "question": "月度经营指标里各月份的销售额是多少？",
+      "tables": [
+        "kpi_monthly",
+        "regions"
+      ],
+      "columns": [
+        "kpi_monthly.month",
+        "kpi_monthly.sales_amount"
+      ],
+      "metrics": [],
+      "paths": [
+        {
+          "from": "kpi_monthly",
+          "to": "regions",
+          "tables": [
+            "kpi_monthly",
+            "regions"
+          ]
+        }
+      ],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-046",
+      "question": "哪些订单有客诉工单？",
+      "tables": [
+        "complaint_tickets",
+        "orders"
+      ],
+      "columns": [],
+      "metrics": [],
+      "paths": [
+        {
+          "from": "complaint_tickets",
+          "to": "orders",
+          "tables": [
+            "complaint_tickets",
+            "orders"
+          ]
+        }
+      ],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-047",
+      "question": "支付流水里的支付方式有哪些？",
+      "tables": [
+        "payment_transactions"
+      ],
+      "columns": [
+        "payment_transactions.method"
+      ],
+      "metrics": [],
+      "paths": [],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-048",
+      "question": "设备巡检结果不合格的设备有哪些？",
+      "tables": [
+        "inspection_reports",
+        "equipment_records"
+      ],
+      "columns": [
+        "inspection_reports.result"
+      ],
+      "metrics": [],
+      "paths": [
+        {
+          "from": "inspection_reports",
+          "to": "equipment_records",
+          "tables": [
+            "inspection_reports",
+            "equipment_records"
+          ]
+        }
+      ],
+      "expected_reject": false,
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-r01",
+      "question": "客户的手机号是多少？",
+      "tables": [],
+      "columns": [],
+      "metrics": [],
+      "paths": [],
+      "expected_reject": true,
+      "reject": {
+        "kind": "restricted_column",
+        "targets": [
+          "customers.phone"
+        ],
+        "reason": "受权限保护的字段必须在召回阶段被排除"
+      },
+      "expected_absent_tables": [],
+      "expected_absent_columns": [
+        "customers.phone"
+      ]
+    },
+    {
+      "case_id": "v2-r02",
+      "question": "客户的邮箱是多少？",
+      "tables": [],
+      "columns": [],
+      "metrics": [],
+      "paths": [],
+      "expected_reject": true,
+      "reject": {
+        "kind": "restricted_column",
+        "targets": [
+          "customer.email"
+        ],
+        "reason": "受权限保护的字段必须在召回阶段被排除"
+      },
+      "expected_absent_tables": [],
+      "expected_absent_columns": [
+        "customer.email"
+      ]
+    },
+    {
+      "case_id": "v2-r03",
+      "question": "大区负责人的联系电话是什么？",
+      "tables": [],
+      "columns": [],
+      "metrics": [],
+      "paths": [],
+      "expected_reject": true,
+      "reject": {
+        "kind": "restricted_column",
+        "targets": [
+          "region_managers.phone",
+          "customers.phone"
+        ],
+        "reason": "受权限保护的字段必须在召回阶段被排除"
+      },
+      "expected_absent_tables": [],
+      "expected_absent_columns": [
+        "region_managers.phone",
+        "customers.phone"
+      ]
+    },
+    {
+      "case_id": "v2-r04",
+      "question": "供应商的联系人电话是多少？",
+      "tables": [],
+      "columns": [],
+      "metrics": [],
+      "paths": [],
+      "expected_reject": true,
+      "reject": {
+        "kind": "restricted_column",
+        "targets": [
+          "supplier_master.contact_phone"
+        ],
+        "reason": "受权限保护的字段必须在召回阶段被排除"
+      },
+      "expected_absent_tables": [],
+      "expected_absent_columns": [
+        "supplier_master.contact_phone"
+      ]
+    },
+    {
+      "case_id": "v2-r05",
+      "question": "归档台账里的归档编号一共有多少条？",
+      "tables": [],
+      "columns": [],
+      "metrics": [],
+      "paths": [],
+      "expected_reject": true,
+      "reject": {
+        "kind": "absent_table",
+        "targets": [
+          "equipment_archive"
+        ],
+        "reason": "未纳入 allowlist 的表不得被召回（fail-closed）"
+      },
+      "expected_absent_tables": [
+        "equipment_archive",
+        "equipment_records",
+        "equipment_faults",
+        "equipment_runtime_log",
+        "maintenance_orders",
+        "inspection_reports"
+      ],
+      "expected_absent_columns": [
+        "equipment_records.equipment_id"
+      ]
+    },
+    {
+      "case_id": "v2-r06",
+      "question": "归档的历史单据一共有多少条？",
+      "tables": [],
+      "columns": [],
+      "metrics": [],
+      "paths": [],
+      "expected_reject": true,
+      "reject": {
+        "kind": "absent_table",
+        "targets": [
+          "legacy_orders_2019"
+        ],
+        "reason": "未纳入 allowlist 的表不得被召回（fail-closed）"
+      },
+      "expected_absent_tables": [
+        "legacy_orders_2019",
+        "orders",
+        "sales_orders",
+        "order_sales_detail"
+      ],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-r07",
+      "question": "发票归档表里有多少张发票？",
+      "tables": [],
+      "columns": [],
+      "metrics": [],
+      "paths": [],
+      "expected_reject": true,
+      "reject": {
+        "kind": "absent_table",
+        "targets": [
+          "invoice_archive"
+        ],
+        "reason": "未纳入 allowlist 的表不得被召回（fail-closed）"
+      },
+      "expected_absent_tables": [
+        "invoice_archive"
+      ],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-r08",
+      "question": "客诉工单和曲目之间怎么关联？",
+      "tables": [
+        "complaint_tickets",
+        "track"
+      ],
+      "columns": [],
+      "metrics": [],
+      "paths": [],
+      "expected_reject": true,
+      "reject": {
+        "kind": "no_approved_path",
+        "targets": [],
+        "reason": "无已批准连接路径时必须拒绝，不得臆造路径",
+        "from": "complaint_tickets",
+        "to": "track"
+      },
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    },
+    {
+      "case_id": "v2-r09",
+      "question": "销售订单汇总表和曲目之间怎么关联？",
+      "tables": [
+        "sales_orders",
+        "track"
+      ],
+      "columns": [],
+      "metrics": [],
+      "paths": [],
+      "expected_reject": true,
+      "reject": {
+        "kind": "no_approved_path",
+        "targets": [],
+        "reason": "无已批准连接路径时必须拒绝，不得臆造路径",
+        "from": "sales_orders",
+        "to": "track"
+      },
+      "expected_absent_tables": [],
+      "expected_absent_columns": []
+    }
+  ]
+}

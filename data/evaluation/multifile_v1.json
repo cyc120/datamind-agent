@@ -1,0 +1,207 @@
+{
+  "suite_version": "multifile-v1",
+  "data_version": "demo_kb-20261009",
+  "scope": "固定多文档集：每题用 scope.document_refs 指定 2–4 份 demo_kb 文档，mode=rag，真实 HTTP 串行调用",
+  "metrics": {
+    "correctness": "可答题：status=COMPLETED 且 required_values 全部出现在答案中、required_term_groups 全部命中；cite_all_expected=true 时还要求引用覆盖全部指定文件。",
+    "citation_coverage": "cited_document_ids ⊇ 本题指定的全部 document_id（逐题布尔值，另按 cite_all_expected 单列出分母）。",
+    "refusal": "拒答题：status=ABSTAINED（或 INSUFFICIENT_EVIDENCE）且没有任何引用。",
+    "faithfulness": "逐结论三态标注复用 scripts/eval_faithfulness.py 的确定性规则引擎，证据=引用片段原文。"
+  },
+  "cases": [
+    {
+      "case_id": "mf-001",
+      "question": "《2025年分区域经营数据简报》和《重点产品市场分析报告（2025年度）》里，华东大区2025年全年销售额分别是多少万元？两份是否一致？",
+      "document_titles": ["03_2025年分区域经营数据简报", "01_重点产品市场分析报告_2025"],
+      "expected": "answer",
+      "cross_document": true,
+      "cite_all_expected": true,
+      "evidence_quotes": {
+        "03_2025年分区域经营数据简报": ["|6|华东|28.3|14.4%|"],
+        "01_重点产品市场分析报告_2025": ["|华东|4.5|7.1|7.2|9.5|28.3|"]
+      },
+      "required_values": ["28.3"],
+      "allowed_values": ["28.3", "14.4"],
+      "required_term_groups": [["华东"], ["28.3"]],
+      "note": "跨文档核对同一大区全年销售额；两份文档都给出 28.3 万元"
+    },
+    {
+      "case_id": "mf-002",
+      "question": "根据《售后服务与退款管理制度》和《客户服务话术手册》，一般商品退款多久到账？",
+      "document_titles": ["04_售后服务与退款管理制度", "11_客户服务话术手册"],
+      "expected": "answer",
+      "cross_document": true,
+      "cite_all_expected": true,
+      "evidence_quotes": {
+        "04_售后服务与退款管理制度": ["一般退款在验收后 3 个工作日内原路退回"],
+        "11_客户服务话术手册": ["一般商品验收后 3 个工作日内原路退回"]
+      },
+      "required_values": ["3"],
+      "allowed_values": ["3"],
+      "required_term_groups": [["工作日"], ["退回", "到账"]],
+      "note": "两份文档对同一规定一致（3 个工作日）"
+    },
+    {
+      "case_id": "mf-003",
+      "question": "销售额和净销售额的口径差异是什么？退款按什么时间归属统计期？",
+      "document_titles": ["05_经营指标核算与计算公式说明", "12_财务指标核算办法"],
+      "expected": "answer",
+      "cross_document": true,
+      "cite_all_expected": true,
+      "evidence_quotes": {
+        "05_经营指标核算与计算公式说明": ["净销售额等于销售额扣除同期退款金额：", "退款的统计期间以退款发生时间（refunded_at）计"],
+        "12_财务指标核算办法": ["净销售额指标另行列示", "退款金额以退款发生时间归属统计期间"]
+      },
+      "required_values": [],
+      "allowed_values": [],
+      "required_term_groups": [["净销售额"], ["退款"], ["时间", "refunded_at", "发生"]],
+      "note": "两文档口径互补；无固定数值，只判术语锚点"
+    },
+    {
+      "case_id": "mf-004",
+      "question": "无线降噪耳机Pro的续航时长和抽检不良率分别是多少？",
+      "document_titles": ["09_无线降噪耳机Pro产品手册", "08_产品质检报告_数码品类_扫描版"],
+      "expected": "answer",
+      "cross_document": true,
+      "cite_all_expected": true,
+      "evidence_quotes": {
+        "09_无线降噪耳机Pro产品手册": ["|续航|降噪开启约 38 小时|"],
+        "08_产品质检报告_数码品类_扫描版": ["| 无线降噪耳机Pro | 45 | 3 | 1 | 8.9% |"]
+      },
+      "required_values": ["38", "8.9"],
+      "allowed_values": ["38", "8.9"],
+      "required_term_groups": [["续航", "38"], ["不良率", "8.9%", "8.9"]],
+      "note": "产品手册与质检报告跨文档对比：续航 38 小时 + 不良率 8.9%"
+    },
+    {
+      "case_id": "mf-005",
+      "question": "2025年退款原因里笔数最多的是哪一类？有多少笔？",
+      "document_titles": ["03_2025年分区域经营数据简报", "12_财务指标核算办法"],
+      "expected": "answer",
+      "cross_document": false,
+      "cite_all_expected": false,
+      "evidence_quotes": {
+        "03_2025年分区域经营数据简报": ["|1|物流损坏|50|"],
+        "12_财务指标核算办法": ["退款金额以退款发生时间归属统计期间"]
+      },
+      "required_values": ["50"],
+      "allowed_values": ["50"],
+      "required_term_groups": [["物流损坏", "物流"]],
+      "note": "只有简报含退款原因统计（12 只给口径）→ 不要求引用全部指定文件"
+    },
+    {
+      "case_id": "mf-006",
+      "question": "对开门冰箱450L的全年销售额在《重点产品市场分析报告（2025年度）》和《2025年度经营分析报告》里分别是多少万元？",
+      "document_titles": ["01_重点产品市场分析报告_2025", "06_2025年度经营分析报告"],
+      "expected": "answer",
+      "cross_document": true,
+      "cite_all_expected": true,
+      "evidence_quotes": {
+        "01_重点产品市场分析报告_2025": ["2025 年度，对开门冰箱 450L以约 44.3 万元的销售额位居全品类第一"],
+        "06_2025年度经营分析报告": ["全年约 44.3 万元"]
+      },
+      "required_values": ["44.3"],
+      "allowed_values": ["44.3"],
+      "required_term_groups": [["对开门冰箱", "450L", "44.3"]],
+      "note": "两份文档的冠军品类销售额一致性核对"
+    },
+    {
+      "case_id": "mf-007",
+      "question": "南京新街口店巡检得分是多少？整改要求多久完成？",
+      "document_titles": ["07_门店巡检记录_2025年12月_扫描版", "11_客户服务话术手册"],
+      "expected": "answer",
+      "cross_document": false,
+      "cite_all_expected": false,
+      "evidence_quotes": {
+        "07_门店巡检记录_2025年12月_扫描版": ["| 南京新街口店 | 76 | 陈列卫生 | 物科过期 |",
+                                              "南京新街口店须在10个工作日内完成整改并提交照片"],
+        "11_客户服务话术手册": ["进水属于人为损坏，不在保修范围"]
+      },
+      "required_values": ["76", "10"],
+      "allowed_values": ["76", "10"],
+      "required_term_groups": [["新街口", "南京"], ["整改"]],
+      "note": "范围里含一份不覆盖巡检的话术手册：验证无关文件不会污染答案（不要求引用全部）"
+    },
+    {
+      "case_id": "mf-008",
+      "question": "渠道预算中APP渠道占多少万元？渠道口径以什么为准？",
+      "document_titles": ["02_渠道运营策略白皮书", "12_财务指标核算办法"],
+      "expected": "answer",
+      "cross_document": true,
+      "cite_all_expected": true,
+      "evidence_quotes": {
+        "02_渠道运营策略白皮书": ["|APP|90|30%|会员复购|"],
+        "12_财务指标核算办法": ["渠道以订单创建渠道为准（online/app/offline）"]
+      },
+      "required_values": ["90"],
+      "allowed_values": ["90", "30"],
+      "required_term_groups": [["APP", "App", "app"], ["渠道"]],
+      "note": "预算值（白皮书）+ 渠道口径（财务办法）跨文档合并"
+    },
+    {
+      "case_id": "mf-012",
+      "question": "2025年公司整体销售额和华东大区全年销售额分别是多少万元？请跨文档核对。",
+      "document_titles": ["01_重点产品市场分析报告_2025", "03_2025年分区域经营数据简报", "06_2025年度经营分析报告"],
+      "expected": "answer",
+      "cross_document": true,
+      "cite_all_expected": true,
+      "evidence_quotes": {
+        "01_重点产品市场分析报告_2025": ["公司整体销售额约 214.4 万元", "|华东|4.5|7.1|7.2|9.5|28.3|"],
+        "03_2025年分区域经营数据简报": ["|6|华东|28.3|14.4%|"],
+        "06_2025年度经营分析报告": ["2025 年公司实现销售额约 214.4 万元"]
+      },
+      "required_values": ["214.4", "28.3"],
+      "allowed_values": ["214.4", "28.3", "14.4", "1.0"],
+      "required_term_groups": [["整体", "公司"], ["华东"]],
+      "note": "3 份文档的多跳核对：整体 214.4 + 华东 28.3"
+    },
+    {
+      "case_id": "mf-009",
+      "question": "真无线耳机 Air 的保修期是多久？",
+      "document_titles": ["09_无线降噪耳机Pro产品手册", "08_产品质检报告_数码品类_扫描版"],
+      "expected": "refuse",
+      "cross_document": true,
+      "cite_all_expected": false,
+      "evidence_quotes": {
+        "09_无线降噪耳机Pro产品手册": ["自签收之日起整机保修 12 个月"],
+        "08_产品质检报告_数码品类_扫描版": ["| 真无线耳机 Air | 40 | 2 | 1 | 7.5% |"]
+      },
+      "required_values": [],
+      "allowed_values": [],
+      "required_term_groups": [],
+      "note": "质检报告提到该型号但不覆盖保修期；产品手册的保修只针对 Pro → 应拒答，不得套用 12 个月"
+    },
+    {
+      "case_id": "mf-010",
+      "question": "customers 表的 registered_at 字段用的是什么时区？",
+      "document_titles": ["10_零售演示库数据字典", "12_财务指标核算办法"],
+      "expected": "refuse",
+      "cross_document": true,
+      "cite_all_expected": false,
+      "evidence_quotes": {
+        "10_零售演示库数据字典": ["|registered_at|date|是|"],
+        "12_财务指标核算办法": ["销售额按订单下单时间（created_at）归属统计期间"]
+      },
+      "required_values": [],
+      "allowed_values": [],
+      "required_term_groups": [],
+      "note": "数据字典只给字段类型，没有时区说明 → 应拒答"
+    },
+    {
+      "case_id": "mf-011",
+      "question": "《2025年分区域经营数据简报》里西南大区2026年的销售额是多少万元？",
+      "document_titles": ["03_2025年分区域经营数据简报", "01_重点产品市场分析报告_2025"],
+      "expected": "refuse",
+      "cross_document": true,
+      "cite_all_expected": false,
+      "evidence_quotes": {
+        "03_2025年分区域经营数据简报": ["|西南|10.3|4.5|11.5|8.6|"],
+        "01_重点产品市场分析报告_2025": ["|西南|10.3|4.5|11.5|8.6|34.9|"]
+      },
+      "required_values": [],
+      "allowed_values": [],
+      "required_term_groups": [],
+      "note": "2026 年数据不在文档覆盖范围 → 应拒答，不得外推 2025 数值"
+    }
+  ]
+}
