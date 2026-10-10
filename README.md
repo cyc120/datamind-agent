@@ -2,11 +2,27 @@
 
 赛题八（"中国电子杯"高校 ICT 产教融合创新大赛 · 中电云计算技术有限公司命题）项目仓库。
 
+## 当前前端与本地构建（2026-10-10）
+
+当前页面由 `frontend/` 的 Vue 源码构建，产物位于 `web/vue/`，首页为 `http://127.0.0.1:8000/#/`，问数工作台为 `http://127.0.0.1:8000/#/app`。旧版 `web/index.html`、`web/app.js`、`web/multifile.js`、`web/style.css` 已删除；后端 API、数据库、文件处理及模型配置保持原有服务能力。
+
+首次运行或更新前端源码后，先在项目根目录构建：
+
+```bash
+npm --prefix frontend ci
+npm --prefix frontend run deploy
+bash scripts/start_local.sh --background
+```
+
+Windows 在项目根目录执行前两条 npm 命令，再运行 `powershell -ExecutionPolicy Bypass -File scripts/start_local.ps1`。启动脚本本身不自动构建 Vue；产物缺失时首页返回 `503 FRONTEND_NOT_BUILT`，后端 API 仍可独立运行。交付包包含 Vue 源码及现有 `web/vue/` 产物，不包含 `node_modules` 或开发缓存。
+
+当前新版已接入问数、文档问答、工业核验摘要、执行过程、SQL 结果表和证据星图；运行记录与模型接入页面仍为占位，文件管理、字段复核、审批等页面待迁移。下文旧页面操作、`/#model` 等旧深链及 1666 项历史回归记录均属于退役前版本，不能作为新版页面已完成迁移的证明。后续前端计划见 [新版前端评估与功能建议](docs/FRONTEND_NEXT_STEPS_20261010.md)。旧源码与旧 UI 测试可从 Git 历史恢复。
+
 本仓库包含三大部分：
 
-1. **模型接入：直连上游**。应用直接调用 OpenAI 兼容（或 Anthropic Messages）接口，不依赖任何本地网关：登录管理员后在左侧「模型接入」填入接口地址、模型名与 API 密钥即可（默认地址 `https://api.deepseek.com/v1`）。需要渠道池、令牌配额或调用审计时，可自行在前面加一层网关并把接口地址指向它——本仓库不再内置网关。
+1. **模型接入：直连上游**。应用直接调用 OpenAI 兼容（或 Anthropic Messages）接口，不依赖任何本地网关；模型配置通过受认证保护的 `/v1/model/config` 和 `/v1/model/profiles` 接口管理，新版设置页面待迁移（默认地址 `https://api.deepseek.com/v1`）。需要渠道池、令牌配额或调用审计时，可自行在前面加一层网关并把接口地址指向它——本仓库不再内置网关。
 2. **`deploy/` `db/` `ingestion/` `scripts/` `data/` — 基础数据库底座**（本 README 主体）：结构化业务库 + 非结构化知识库 + 元数据基础设施 + 评测集，全部可重置、可复现。
-3. **`datamind/` `web/` — 应用层**：结构化问数与文档问答 Agent、HTTP/SSE 接口、引用定位和运行回放。
+3. **`datamind/` `frontend/` `web/vue/` — 应用层**：结构化问数与文档问答 Agent、HTTP/SSE 接口、Vue 页面源码与构建产物；引用定位与运行回放的页面迁移见前端计划。
 
 `赛题/` 和 `技术文档/` 为项目资料，不参与网关运行。
 

@@ -800,13 +800,24 @@ def authority_activate(rule_id: str,payload: AuthorityEventRequest,request: Requ
     from .authority import activation
     return jsonable_encoder({'event':activation(rule_id,payload.model_dump(),request.state.identity,_write_dsn())})
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
-WEB = WEB_DIR / "index.html"
-app.mount("/assets", StaticFiles(directory=WEB_DIR), name="assets")
+# 对外入口是新前端（Vue）的构建产物：在 frontend/ 执行 `npm run deploy` 生成到 web/vue/。
+# 首次构建前目录可能缺失，所以这里先确保目录存在——StaticFiles 默认 check_dir=True，
+# 目录缺失会在 **import 期** 抛 RuntimeError，连带后端起不来、全部 API 测试收集失败。
+VUE_DIR = WEB_DIR / "vue"
+VUE_DIR.mkdir(parents=True, exist_ok=True)
+VUE_INDEX = VUE_DIR / "index.html"
+# 静态资源仅提供 Vue 构建目录；旧单页前端已退役并从工作区移除。
+app.mount("/assets/vue", StaticFiles(directory=VUE_DIR), name="vue")
 
 
 @app.get("/")
 def index():
-    return FileResponse(WEB)
+    if not VUE_INDEX.is_file():
+        return JSONResponse(
+            {'error_code': 'FRONTEND_NOT_BUILT',
+             'detail': '前端产物缺失：请在 frontend/ 执行 npm install && npm run deploy'},
+            status_code=503)
+    return FileResponse(VUE_INDEX)
 
 
 def _vector_store_status() -> str:

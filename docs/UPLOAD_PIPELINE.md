@@ -1,5 +1,7 @@
 # 上传 → 解析 → 入库 → 查询 管道接口契约（冻结）
 
+**前端版本说明（2026-10-10）**：旧版 `web/multifile.js` 已退役删除，本文相关页面实现与验收属于历史记录；上传 API 与 worker 保留，新版文件管理入口待接入。页面迁移计划见 [前端评估](FRONTEND_NEXT_STEPS_20261010.md)，旧源码可从 Git 历史查阅。
+
 本文件是 `/v1/uploads` 系列接口的**唯一规范来源**，供前端与后端并行实现时对齐。
 实现位于 `ingestion/upload_pipeline.py`（管道与队列）、`ingestion/upload_worker.py`
 （独立 worker：领取、心跳、波次与并发上限）、`datamind/file_uploads.py`

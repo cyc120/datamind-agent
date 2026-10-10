@@ -1,5 +1,7 @@
 # CAD 本地资产与版本查看（API 0.11.0 起）
 
+**前端版本补充（2026-10-10）**：本文旧版页面操作与深链属于历史流程；旧前端已退役删除，CAD API 保留，新版 CAD 管理页面待接入。当前页面范围见 [前端评估](../../docs/FRONTEND_NEXT_STEPS_20261010.md)，旧页面源码可从 Git 历史查阅。
+
 本流程接入已冻结的限定 DXF 读取器，不扩展图纸识别范围。读取范围、材料限制见 [DXF_PROFILE.md](DXF_PROFILE.md)，结构与业务绑定门禁见 [CONTRACT.md](CONTRACT.md)。资产接口固定提取和显式对象引用；API 0.12.0 新增独立的 [认证关联复核](ASSOCIATION_REVIEW_WORKFLOW.md)，正式图纸审批或生产尺寸判定仍待实现。
 
 ## 准备与页面操作

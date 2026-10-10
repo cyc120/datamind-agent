@@ -1,5 +1,7 @@
 # 交付清单（官方提交物 × 当前状态 × 文件路径 × 缺什么）
 
+**前端交付补充（2026-10-10）**：旧版 `web/` 根目录前端已退役删除；交付脚本现纳入 `frontend/` Vue 源码与现有 `web/vue/` 产物，排除依赖目录和开发缓存。首次运行需按 [README](../README.md) 构建 Vue。下文既有 ZIP 计划、交付件和 UI 验收是历史快照，本次未重新生成 ZIP 或 Office 交付件；新版页面范围见 [前端评估](FRONTEND_NEXT_STEPS_20261010.md)。
+
 | 字段 | 值 |
 |---|---|
 | **WP** | WP10「交付材料成套化」 |
@@ -21,7 +23,7 @@
 |---|---|---|---|---|
 | D1 | 设计报告：Word + PDF，建议 ≤20 页，第 1–2 页「项目核心亮点预览页」（p.8） | **已具备** | [交付/01_设计报告_DataMind_Agent.docx](../交付/01_设计报告_DataMind_Agent.docx)、[.pdf](../交付/01_设计报告_DataMind_Agent.pdf) | 未做逐页人工视觉检查（会话模型不接受图像输入）；决赛深化稿未做 |
 | D2 | 技术实现说明书：Word + PDF，建议 ≤30 页，覆盖架构/NL2SQL/RAG/多源融合/可解释性/中级任务/测试评估（p.9） | **已具备** | [交付/02_技术实现说明书_DataMind_Agent.docx](../交付/02_技术实现说明书_DataMind_Agent.docx)、[.pdf](../交付/02_技术实现说明书_DataMind_Agent.pdf) | 同上；Mermaid 以文字 + 代码块给出，Word 内不渲染 |
-| D3 | 完整源代码 + 清晰目录结构说明 + README | **已具备** | 源码：`datamind/`、`ingestion/`、`web/`、`scripts/`、`tests/`、`deploy/`；说明：[README.md](../README.md)、[PROGRESS.md](../PROGRESS.md) | README/PROGRESS 的回归分母已在第四轮同步为 **1578/1578**（`grep -c 1497 PROGRESS.md README.md` → 0）；**是否全绿只认 `reports/latest_regression.json` 的 `failures`/`errors`**，该文件会被任何 `--pattern` 运行覆写（见 §4 第 1 条） |
+| D3 | 完整源代码 + 清晰目录结构说明 + README | **已具备** | 源码：`datamind/`、`ingestion/`、`frontend/`、`web/vue/`、`scripts/`、`tests/`、`deploy/`；说明：[README.md](../README.md)、[PROGRESS.md](../PROGRESS.md) | README/PROGRESS 的回归分母已在第四轮同步为 **1578/1578**（`grep -c 1497 PROGRESS.md README.md` → 0）；**是否全绿只认 `reports/latest_regression.json` 的 `failures`/`errors`**，该文件会被任何 `--pattern` 运行覆写（见 §4 第 1 条） |
 | D4 | 数据库 schema 定义文件 | **已具备** | `db/migrations/001–019`（19 个；019 仍为未跟踪 `??`）、`db/chinook/Chinook_PostgreSql.sql`、`deploy/init/*.sql` | `db/migrations` 与 `deploy/init` 两套 DDL 的**空库等效性未验证**（本轮禁止重建容器/库） |
 | D5 | 知识库文档样本 ≥10 份、涵盖不同类型文档格式 | **已具备（打包前需确认纳入方式）** | `data/knowledge_base/*.pdf`（12 份 + 2 份原生版）、`data/ohr_bench_samples/*.json`（15 份）、`data/qa_samples/01–11`（原生 PDF 2 / 扫描 PDF 2 / DOCX 2 / XLSX 2 / PPTX 2 / DXF 1）、`data/evaluation/extensible_field_v1/materials/`、**第三轮新增 `data/knowledge_sources/`（5 PDF + 9 DOCX，30 条条款）** | `data/qa_samples/`、`extensible_field_v1/materials/` 与 `data/knowledge_sources/` 均为**未跟踪文件**（`git ls-files` 无输出），需拍板是否纳入版本控制；`data/uploads/development/` 的上传临时件**不进包** |
 | D6 | 模型权重文件（若适用） | **按官方「列明获取/缓存/网络依赖」提供清单** | [docs/MODEL_WEIGHTS.md](MODEL_WEIGHTS.md) | 仓库不含权重（`.cache/` 被忽略）；不得把「只列下载地址」等同于官方接受的权重交付 |

@@ -32,7 +32,7 @@ export async function getEvents(runId: string): Promise<{ events: TraceEvent[] }
 
 /**
  * CSRF：0.39.0 起写操作（含 POST /v1/chat/stream）必须带 X-CSRF-Token，
- * 令牌由 GET /v1/auth/me 下发。旧版 web/app.js 一直是这么做的，这里补齐同样的处理，
+ * 令牌由 GET /v1/auth/me 下发，写请求通过同源凭据与服务端 CSRF 校验，
  * 否则问答请求会以 403 CSRF_REQUIRED 失败。
  */
 let csrfToken: string | null = null

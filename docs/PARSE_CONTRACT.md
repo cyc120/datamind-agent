@@ -1,5 +1,7 @@
 # 统一解析契约：ParseResult / SourceLocator / Block / Relation
 
+**前端版本说明（2026-10-10）**：本文对旧版 `web/` 引用卡片和区域高亮的描述按历史版本保留；旧前端已删除，新版呈现待按 [前端计划](FRONTEND_NEXT_STEPS_20261010.md) 接入。解析与定位后端契约继续有效，旧页面源码可从 Git 历史查阅。
+
 2026-10-07，API **0.25.0**。本阶段实现技术设计说明书 **§5.2**（Parser Adapter 与解析状态）与 **§5.4**（Block、Relation、Chunk 与来源定位）记载的目标契约。
 
 契约位于 `datamind/parse_contract.py`；API 0.26.0 起 `ingestion/ingest.py` 的 `parse_pdf` **实际产出并校验**该契约（结果写入质量明细的 `parse_contract` 字段）。模块本身**只描述并校验契约**：不读文件、不调用模型、不接管摄取路由；缺失信息一律报错，**不用默认值或猜测补造**。
