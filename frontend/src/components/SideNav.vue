@@ -33,9 +33,15 @@ const {
 } = useModelAccess()
 
 /**
- * 导航入口沿用旧版控制台（web/index.html）的八项，一个都不少。
- * 旧版是后端的根页面（GET /），用 hash 深链切换视图：/#runs、/#fields …
- * 这里只做「图标 + 文字 + 分组小标题」的版式改造，入口本身保持可用。
+ * 导航入口沿用旧版控制台（web/index.html）的八项。旧版是后端的根页面（GET /），
+ * 用 hash 深链切换视图：/#runs、/#fields …
+ *
+ * 但旧控制台已经在 retire legacy UI 那次提交里删掉了，新前端只实现了 / 与 /app，
+ * 所以这七项的后端页面**已经不存在**：
+ *   · href="/#runs" 会让浏览器整页跳到 GET /（现在后端根路由返回 500 → 白屏）；
+ *   · hash 版本（#/runs）则匹配不到任何 vue 路由（已加兜底重定向，但也不是这些页面）。
+ * 留着可点的死链比「暂时去掉入口」更糟，所以这里改成不可点的占位项：
+ * 保留图标与文字（用户仍能看到产品结构），title 里说明原因，不能点也不会跳走。
  */
 interface NavItem {
   key: string
@@ -43,8 +49,8 @@ interface NavItem {
   icon: string
   /** 站内路由：问数与问答就是本页 */
   to?: string
-  /** 旧版控制台的 hash 深链 */
-  href?: string
+  /** 旧版控制台的后端页面入口；这些页面尚未在新前端的 Vue 侧实现，故暂不可点 */
+  legacy?: string
 }
 
 const GROUPS: { title: string; items: NavItem[] }[] = [
@@ -52,24 +58,27 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
     title: '工作台',
     items: [
       { key: 'chat', label: '问数与问答', icon: '◎', to: '/app' },
-      { key: 'runs', label: '运行记录', icon: '↺', href: '/#runs' },
-      { key: 'model', label: '模型接入', icon: '⚙', href: '/#model' },
+      { key: 'runs', label: '运行记录', icon: '↺', legacy: '/#runs' },
+      { key: 'model', label: '模型接入', icon: '⚙', legacy: '/#model' },
     ],
   },
   {
     title: '数据治理',
     items: [
-      { key: 'fields', label: '字段复核', icon: '▤', href: '/#fields' },
-      { key: 'authority', label: '来源权威规则', icon: '◇', href: '/#authority' },
-      { key: 'cad', label: '图纸与实体', icon: '⌖', href: '/#cad' },
-      { key: 'dimensions', label: '尺寸核验', icon: '↔', href: '/#dimensions' },
+      { key: 'fields', label: '字段复核', icon: '▤', legacy: '/#fields' },
+      { key: 'authority', label: '来源权威规则', icon: '◇', legacy: '/#authority' },
+      { key: 'cad', label: '图纸与实体', icon: '⌖', legacy: '/#cad' },
+      { key: 'dimensions', label: '尺寸核验', icon: '↔', legacy: '/#dimensions' },
     ],
   },
   {
     title: '我的',
-    items: [{ key: 'files', label: '我的文件', icon: '⇈', href: '/#files' }],
+    items: [{ key: 'files', label: '我的文件', icon: '⇈', legacy: '/#files' }],
   },
 ]
+
+/** 后端仍有这些 API，只是新前端没有对应页面 */
+const RETIRED_TIP = '该页面属于旧版控制台，尚未在新前端实现（后端接口仍在，可从 API 直接调用）'
 
 function newChat() {
   emit('new-chat')
@@ -111,14 +120,17 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       <template v-for="g in GROUPS" :key="g.title">
         <div class="group-title">{{ g.title }}</div>
         <template v-for="it in g.items" :key="it.key">
-          <a v-if="it.href" class="nav-item" :href="it.href" :title="it.label">
+          <!-- 本页入口：唯一有实际页面的入口 -->
+          <a v-if="it.to" class="nav-item active" :href="'#' + it.to" :title="it.label">
             <span class="ico" aria-hidden="true">{{ it.icon }}</span>
             <span class="txt">{{ it.label }}</span>
           </a>
-          <button v-else class="nav-item active" type="button" :title="it.label">
+          <!-- 尚未实现页面的入口：不可点，避免跳走变白屏（详见脚本里的说明） -->
+          <span v-else class="nav-item is-retired" :title="RETIRED_TIP" aria-disabled="true">
             <span class="ico" aria-hidden="true">{{ it.icon }}</span>
             <span class="txt">{{ it.label }}</span>
-          </button>
+            <span class="soon" aria-hidden="true">未实现</span>
+          </span>
         </template>
       </template>
     </nav>
@@ -298,6 +310,27 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 }
 .nav-item.active .ico {
   color: var(--color-accent);
+}
+/* 尚未实现页面的入口：弱化 + 不可点（不能是 <a>，否则一按就整页跳走变白屏） */
+.nav-item.is-retired {
+  color: var(--color-muted);
+  cursor: not-allowed;
+}
+.nav-item.is-retired:hover {
+  background: transparent;
+  color: var(--color-muted);
+}
+.nav-item.is-retired .ico {
+  opacity: 0.55;
+}
+.soon {
+  flex-shrink: 0;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--color-muted);
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  padding: 2px 5px;
 }
 .ico {
   width: 16px;
