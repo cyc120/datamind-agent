@@ -253,7 +253,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', markOverflow))
 
                 <!-- 结果表 -->
                 <div v-if="m.sqlResult && m.sqlResult.columns" class="result-table">
-                  <div class="table-caption">查询结果 · {{ m.sqlResult.row_count ?? m.sqlResult.rows?.length ?? 0 }} 行</div>
+                  <div class="result-caption">查询结果 · {{ m.sqlResult.row_count ?? m.sqlResult.rows?.length ?? 0 }} 行</div>
                   <div class="twrap">
                     <table>
                       <thead><tr><th v-for="c in m.sqlResult.columns" :key="c">{{ c }}</th></tr></thead>
@@ -717,10 +717,17 @@ onBeforeUnmount(() => window.removeEventListener('resize', markOverflow))
 .result-table {
   margin-top: 10px;
 }
-.table-caption {
+.result-caption {
+  /* 原名撞上 Tailwind 工具类（它会生成 display:table-caption）。组件的 scoped 规则
+     只对**自己声明过的属性**有更高优先级，没声明 display 就被工具类接管，
+     元素变成表格标题盒、按 min-content 收缩，结果「查询结果 · 6 行」每个汉字占一行。
+     这与 .collapse（visibility:collapse 让按钮永远不可见）是同一类事故。
+     改名 + 显式声明 display 双保险。 */
+  display: block;
   font-size: 12px;
   color: var(--color-muted);
   margin-bottom: 6px;
+  white-space: nowrap;
 }
 .twrap {
   overflow-x: auto;
