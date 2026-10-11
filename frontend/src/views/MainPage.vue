@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import SideNav from '../components/SideNav.vue'
 import ChatPanel from '../components/chat/ChatPanel.vue'
 import ConstellationGraph from '../components/stargraph/ConstellationGraph.vue'
 import NodeDetail from '../components/stargraph/NodeDetail.vue'
-import { health, streamChat, getEvidence } from '../api/client'
+import { streamChat, getEvidence } from '../api/client'
+import { useModelAccess } from '../composables/useModelAccess'
 import type { ChatMessage, ChatPayload, EvidenceGraph, EvidenceNode } from '../api/types'
 
 const route = useRoute()
@@ -15,10 +16,32 @@ const messages = ref<ChatMessage[]>([])
 const running = ref(false)
 const graph = reactive<EvidenceGraph>({ nodes: [], edges: [], claims: [] })
 const selectedNode = ref<EvidenceNode | null>(null)
-const healthState = ref<'checking' | 'ok' | 'down'>('checking')
-const modelState = ref<'checking' | 'ok' | 'down'>('checking')
+/** 服务健康来自 /health，与「模型可用」是两件事（见 useModelAccess） */
+const { serviceState: healthState, bootstrap: bootstrapModelAccess } = useModelAccess()
 /** 证据面板：默认展开，可收成一条窄轨，把宽度还给对话 */
 const collapsed = ref(false)
+
+/**
+ * 窄屏（≤1100px）下右栏不再是常驻列，而是可开关的抽屉。
+ * 关键点：抽屉与常驻右栏是**同一个 `<aside class="right">` 实例**——
+ * 只切换定位/位移，不 v-if 换 DOM，所以 ConstellationGraph、NodeDetail 的状态
+ * 和 graph 响应式数据都只有一份：抽屉开着时发问，星链照常更新。
+ */
+const NARROW_QUERY = '(max-width: 1100px)'
+const isNarrow = ref(false)
+const drawerOpen = ref(false)
+let mq: MediaQueryList | null = null
+
+function syncNarrow(): void {
+  isNarrow.value = mq ? mq.matches : false
+  // 回到宽屏：抽屉复位，右栏恢复常驻，避免留下「抽屉开着」的残留状态
+  if (!isNarrow.value) drawerOpen.value = false
+}
+
+/** Esc 关闭抽屉（只在窄屏且打开时生效，不影响宽屏） */
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && drawerOpen.value) drawerOpen.value = false
+}
 
 /**
  * 星链图的内部坐标系直接按面板内容宽度给定（面板 340 - 左右内边距）。
@@ -128,15 +151,13 @@ async function send(payload: { question: string; mode: string }) {
 }
 
 onMounted(async () => {
-  try {
-    const h = await health()
-    healthState.value = h.status === 'ok' ? 'ok' : 'down'
-    // 健康接口带 capabilities；模型状态这里只做粗略判断
-    modelState.value = 'ok'
-  } catch {
-    healthState.value = 'down'
-    modelState.value = 'down'
-  }
+  mq = window.matchMedia(NARROW_QUERY)
+  syncNarrow()
+  mq.addEventListener('change', syncNarrow)
+  window.addEventListener('keydown', onKeydown)
+
+  // 服务健康 + 模型配置 + 读回上次连通性检测（三件事各自独立）
+  void bootstrapModelAccess()
 
   // 深链提问：#/app?q=…&mode=retail —— 与旧版控制台的 hash 深链同一套用法
   const q = route.query.q
@@ -145,11 +166,16 @@ onMounted(async () => {
     await send({ question: q, mode: typeof m === 'string' ? m : 'auto' })
   }
 })
+
+onBeforeUnmount(() => {
+  mq?.removeEventListener('change', syncNarrow)
+  window.removeEventListener('keydown', onKeydown)
+})
 </script>
 
 <template>
   <div class="mainpage">
-    <SideNav :health="healthState" :model="modelState" @new-chat="newChat" />
+    <SideNav @new-chat="newChat" />
 
     <div class="center">
       <!-- 顶栏：左侧标题，右侧与 Kimi 的「Log in / Download」同位的一对控件 -->
@@ -169,9 +195,40 @@ onMounted(async () => {
       <ChatPanel :messages="messages" :running="running" @send="send" />
     </div>
 
-    <aside class="right" :class="{ 'is-collapsed': collapsed }">
-      <!-- 收起后只剩一条窄轨 -->
-      <button v-if="collapsed" class="rail" type="button" title="展开证据面板" @click="collapsed = false">
+    <!-- 窄屏：抽屉遮罩（点一下关闭）。宽屏不渲染，右栏本来就是常驻列 -->
+    <div
+      v-if="isNarrow && drawerOpen"
+      class="scrim"
+      data-testid="evidence-scrim"
+      aria-hidden="true"
+      @click="drawerOpen = false"
+    ></div>
+
+    <!-- 窄屏：唯一的证据面板入口。没有它，窄屏在改动前是完全看不到星链的 -->
+    <button
+      v-if="isNarrow && !drawerOpen"
+      class="fab"
+      type="button"
+      data-testid="evidence-fab"
+      @click="drawerOpen = true"
+    >
+      <span class="fab-ico" aria-hidden="true">✦</span>
+      <span class="fab-text">查看证据</span>
+      <span v-if="graph.nodes.length" class="fab-count">{{ graph.nodes.length }}</span>
+    </button>
+
+    <aside
+      class="right"
+      :class="{ 'is-collapsed': collapsed && !isNarrow, 'is-open': isNarrow && drawerOpen }"
+    >
+      <!-- 收起后只剩一条窄轨（宽屏专有：窄屏下折叠没有意义，抽屉本身就是收起态） -->
+      <button
+        v-if="collapsed && !isNarrow"
+        class="rail"
+        type="button"
+        title="展开证据面板"
+        @click="collapsed = false"
+      >
         <span class="rail-icon" aria-hidden="true">✦</span>
         <span class="rail-text">证据面板</span>
         <span class="rail-badge">{{ graph.nodes.length }}</span>
@@ -184,7 +241,27 @@ onMounted(async () => {
             <h2>推理星链</h2>
           </div>
           <span class="count">{{ graph.nodes.length }} 节点</span>
-          <button class="collapse" type="button" title="收起证据面板" @click="collapsed = true">›</button>
+          <button
+            v-if="isNarrow"
+            class="panel-toggle"
+            type="button"
+            data-testid="evidence-close"
+            title="关闭证据面板"
+            aria-label="关闭证据面板"
+            @click="drawerOpen = false"
+          >
+            ✕
+          </button>
+          <button
+            v-else
+            class="panel-toggle"
+            type="button"
+            data-testid="evidence-collapse"
+            title="收起证据面板"
+            @click="collapsed = true"
+          >
+            ›
+          </button>
         </div>
 
         <div class="graph-wrap">
@@ -390,7 +467,11 @@ onMounted(async () => {
   padding: 3px 9px;
   white-space: nowrap;
 }
-.collapse {
+/* 命名注意：这里**不能**叫 .collapse —— style.css 引入了 tailwindcss，
+   构建期扫描源码生成 @layer utilities{.collapse{visibility:collapse}}，
+   作用在本组件上就是「按钮一直在，但永远看不见」。
+   抽屉的关闭按钮必须可见，所以换一个不与 Tailwind 工具类重名的类名。 */
+.panel-toggle {
   width: 26px;
   height: 26px;
   flex-shrink: 0;
@@ -402,7 +483,7 @@ onMounted(async () => {
   line-height: 1;
   cursor: pointer;
 }
-.collapse:hover {
+.panel-toggle:hover {
   background: var(--color-ink);
   color: var(--color-text);
 }
@@ -449,9 +530,76 @@ onMounted(async () => {
   border-top: 1px solid var(--color-line);
 }
 
+/* ── 窄屏证据抽屉 ──
+   改动前这里是 `.right { display: none }`：窄屏下「推理星链」和节点详情
+   一个入口都没有。现在同一个 .right 元素在窄屏变成从右侧滑入的浮层：
+   抽屉关闭时只做位移（不卸载），组件状态与 graph 因此只有一份。 */
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(15, 23, 42, 0.38);
+}
+.fab {
+  position: fixed;
+  right: 18px;
+  /* 必须让开底部的提问框：composer-wrap 底距 18px + 输入框高 60px，
+     取 100px 可以让 FAB 完全落在输入框上方，不遮挡模式选择与发送键
+     （textarea 变高时是向左上生长，右上方是输入框的空内边距，不会挡到按钮）。 */
+  bottom: 100px;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(37, 99, 235, 0.28);
+}
+.fab:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+.fab-ico {
+  font-size: 12px;
+}
+.fab-count {
+  font-size: 11px;
+  color: var(--color-accent);
+  background: #ffffff;
+  border-radius: 999px;
+  padding: 1px 6px;
+}
+
 @media (max-width: 1100px) {
   .right {
-    display: none;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    width: min(88vw, 420px);
+    /* 关闭态：滑出视口右侧并停用交互。
+       visibility 用 0s + 0.22s 延迟，等位移动画走完再隐藏；
+       直接 transition visibility 会让它在过渡中点才翻转（离散属性），
+       打开时前 110ms 是「在滑但看不见」。 */
+    transform: translateX(100%);
+    visibility: hidden;
+    pointer-events: none;
+    box-shadow: -16px 0 40px rgba(15, 23, 42, 0.18);
+    transition: transform 0.22s ease, visibility 0s linear 0.22s;
+  }
+  .right.is-open {
+    transform: translateX(0);
+    visibility: visible;
+    pointer-events: auto;
+    transition: transform 0.22s ease, visibility 0s linear 0s;
   }
 }
 </style>

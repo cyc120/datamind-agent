@@ -1,15 +1,36 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-
-defineProps<{
-  health: 'checking' | 'ok' | 'down'
-  model: 'checking' | 'ok' | 'down'
-}>()
+import { useModelAccess } from '../composables/useModelAccess'
 
 const emit = defineEmits<{ (e: 'new-chat'): void }>()
 
 const router = useRouter()
+
+/**
+ * 接入状态三件事分开显示，各自有各自的依据（细节见 useModelAccess 的注释）：
+ *   服务健康 ← /health · 模型配置 ← /v1/model/config · 连通性 ← /v1/model/config/test
+ * 以前这里只有一行「模型 已接入」，而它的依据仅仅是 /health 返回 200——
+ * 后端在线不等于模型可用，那条状态是假的，已删掉。
+ */
+const {
+  serviceText,
+  serviceDot,
+  configState,
+  config,
+  configText,
+  configDot,
+  connDot,
+  connText,
+  testing,
+  canTest,
+  testBlockedReason,
+  lastTest,
+  lastTestText,
+  lastTestDetail,
+  bootstrap,
+  runTest,
+} = useModelAccess()
 
 /**
  * 导航入口沿用旧版控制台（web/index.html）的八项，一个都不少。
@@ -62,7 +83,11 @@ function onKeydown(e: KeyboardEvent) {
   }
 }
 
-onMounted(() => window.addEventListener('keydown', onKeydown))
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown)
+  // 读回上次连通性检测结果 + 刷新服务健康与模型配置
+  void bootstrap()
+})
 onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
@@ -98,19 +123,49 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       </template>
     </nav>
 
-    <!-- 底部固定：服务状态 + 用户区 -->
+    <!-- 底部固定：接入状态 + 用户区 -->
     <div class="side-foot">
-      <div class="status">
+      <div class="status" data-testid="model-access">
+        <div class="st-title">接入状态</div>
+
+        <!-- ① 服务健康：只反映 /health，说明后端进程活着 -->
         <div class="row">
-          <span class="dot" :class="health"></span>
-          <span class="k">服务</span>
-          <span class="v">{{ health === 'ok' ? '在线' : health === 'down' ? '离线' : '检测中' }}</span>
+          <span class="dot" :class="serviceDot"></span>
+          <span class="k">服务健康</span>
+          <span class="v">{{ serviceText }}</span>
         </div>
+
+        <!-- ② 模型配置：只反映 /v1/model/config 的 has_key / model / base_url -->
         <div class="row">
-          <span class="dot" :class="model"></span>
-          <span class="k">模型</span>
-          <span class="v">{{ model === 'ok' ? '已接入' : model === 'down' ? '未接入' : '检测中' }}</span>
+          <span class="dot" :class="configDot"></span>
+          <span class="k">模型配置</span>
+          <span class="v">{{ configText }}</span>
         </div>
+        <div v-if="config" class="sub">
+          <span class="sub-model" :title="config.model || ''">{{ config.model || '—' }}</span>
+          <span class="sub-url" :title="config.base_url || ''">{{ config.base_url || '—' }}</span>
+        </div>
+
+        <!-- ③ 连通性：只是「配了密钥」不等于「模型可用」，所以单独一行且默认未检测 -->
+        <div class="row">
+          <span class="dot" :class="connDot"></span>
+          <span class="k">连通性</span>
+          <span class="v">{{ connText }}</span>
+        </div>
+        <p class="evidence" data-testid="conn-evidence">{{ lastTestText }}</p>
+        <p v-if="lastTestDetail" class="evidence detail-line">{{ lastTestDetail }}</p>
+
+        <button
+          class="test-btn"
+          type="button"
+          data-testid="test-conn"
+          :disabled="!canTest"
+          @click="runTest"
+        >
+          {{ testing ? '检测中…' : '测试连通性' }}
+        </button>
+        <p v-if="testBlockedReason" class="hint">{{ testBlockedReason }}</p>
+        <p v-else-if="!lastTest" class="hint">检测结果只存在本机浏览器，未检测时不会显示通过。</p>
       </div>
 
       <a class="user" href="/#model" title="本地身份与模型接入在旧版控制台">
@@ -273,6 +328,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   font-size: 12px;
   color: var(--color-muted);
 }
+.st-title {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  color: var(--color-muted);
+  padding-bottom: 1px;
+}
 .row {
   display: flex;
   align-items: center;
@@ -281,6 +342,68 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .row .v {
   margin-left: auto;
   color: var(--color-body);
+  white-space: nowrap;
+}
+/* 模型名 / 网关地址：只作依据展示，压到最小号，超长省略 */
+.sub {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-left: 15px;
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+.sub-model {
+  color: var(--color-body);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sub-url {
+  color: var(--color-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 「最近检测：…」是连通性这一行唯一的依据，必须比普通说明更醒目 */
+.evidence {
+  margin: 0;
+  padding-left: 15px;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--color-body);
+}
+.evidence.detail-line {
+  color: var(--color-muted);
+  word-break: break-all;
+}
+.hint {
+  margin: 0;
+  padding-left: 15px;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+.test-btn {
+  margin: 2px 0 0 15px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--color-line);
+  background: #ffffff;
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.test-btn:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+.test-btn:disabled {
+  cursor: not-allowed;
+  color: var(--color-muted);
+  background: var(--color-ink);
 }
 .dot {
   width: 7px;
@@ -293,6 +416,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 }
 .dot.down {
   background: #e11d48;
+}
+/* 警告态（如「密钥没配」）：既不是成功也不是失败 */
+.dot.warn {
+  background: #d97706;
+}
+/* 无记录：灰点，明确区别于通过（绿）与失败（红） */
+.dot.idle {
+  background: #cbd5e1;
 }
 .dot.checking {
   background: #d97706;

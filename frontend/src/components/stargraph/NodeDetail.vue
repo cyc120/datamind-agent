@@ -356,7 +356,8 @@ const checkIssues = computed(() => {
 
   <div v-else class="empty">
     <div class="dot breathe">✦</div>
-    <p>点击左侧星链图里的星点，查看它的 SQL、检索片段、原始数据或推导关系。</p>
+    <!-- 措辞不写方位：宽屏时星链在左边，窄屏抽屉里它在上面，两者共用这一份文案 -->
+    <p>点击星链图里的星点，查看它的 SQL、检索片段、原始数据或推导关系。</p>
   </div>
 </template>
 
