@@ -377,7 +377,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', markOverflow))
           </button>
         </div>
 
-        <p v-if="isEmpty" class="tip">Enter 发送 · Ctrl K 新对话 · 答案右侧会点亮可点击的证据星链</p>
+        <p v-if="isEmpty" class="tip">Enter 发送 · Ctrl K 新对话 · 证据在「证据轨迹」里逐条可点</p>
       </div>
     </div>
   </section>
