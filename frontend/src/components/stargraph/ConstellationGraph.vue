@@ -168,7 +168,7 @@ const TEXT_KEYS = new Set([
 ])
 
 /**
- * 卡片正文：只挑最能说明这条证据的 2–4 行。
+ * 卡片正文（内部实现，不做截断）：只挑最能说明这条证据的 2–4 行。
  *
  * 字段名一律照抄真实 payload（NodeDetail 里那份实测结论），特别注意：
  *   SQLRow 的 payload 本身就是一行（扁平键，没有 columns / rows）；
@@ -176,8 +176,13 @@ const TEXT_KEYS = new Set([
  *   Document 工业侧给 source_sha256、RAG 侧给 origin + document_sha256，两边都要认；
  *   ConflictRecord 的双方原值在 normalized_values 里，left/right_fact_refs 只是引用 id。
  * 上面这些键一个都不存在时，兜底取最先出现的 2 个标量字段，绝不留一张空卡片。
+ * 长文本统一交给 packRows() 按卡片可用宽度截断，这里不写死长度上限。
  */
-function buildRows(n: EvidenceNode, dense: boolean): Row[] {
+/**
+ * 卡片内容（不截断、不算宽度）：只挑最能说明这条证据的 2–4 行。
+ * 截断交给 packRows()，按卡片可用宽度来；行数在这里定，供「卡高下限」估算用。
+ */
+function extractRows(n: EvidenceNode): Row[] {
   const p: Record<string, any> = (n.payload ?? {}) as Record<string, any>
   const out: Row[] = []
   const at = (k: string, v: any, unit?: any) => {
@@ -187,11 +192,11 @@ function buildRows(n: EvidenceNode, dense: boolean): Row[] {
   switch (n.node_type) {
     case 'Claim': {
       const t = p.text ?? p.claim ?? p.statement
-      if (t) at('主张', truncate(String(t), dense ? 70 : 116))
+      if (t) at('主张', String(t))
       break
     }
     case 'SQLQuery': {
-      if (p.sql) at('SQL', truncate(String(p.sql), dense ? 58 : 120))
+      if (p.sql) at('SQL', String(p.sql))
       const bp = p.bound_params
       if (bp) at('绑定参数', Array.isArray(bp) ? bp.join(' · ') : bp)
       break
@@ -205,7 +210,7 @@ function buildRows(n: EvidenceNode, dense: boolean): Row[] {
       break
     }
     case 'Document': {
-      if (p.title) at('标题', truncate(String(p.title), dense ? 22 : 40))
+      if (p.title) at('标题', String(p.title))
       at('source', p.origin ?? (p.source_sha256 ? '工业入库' : ''))
       const h = p.source_sha256 ?? p.document_sha256
       if (h) out.push({ k: '哈希', v: `${String(h).slice(0, 8)}…`, mono: true })
@@ -213,7 +218,7 @@ function buildRows(n: EvidenceNode, dense: boolean): Row[] {
     }
     case 'Chunk': {
       at('title', p.title)
-      if (p.quote) at('摘录', truncate(String(p.quote), dense ? 60 : 108))
+      if (p.quote) at('摘录', String(p.quote))
       const pg = pageRange(p)
       if (pg) at('page', pg)
       break
@@ -262,17 +267,126 @@ function buildRows(n: EvidenceNode, dense: boolean): Row[] {
     for (const [k, v] of Object.entries(p)) {
       if (out.length >= 2) break
       if (v == null || typeof v === 'object') continue
-      out.push({ k, v: truncate(String(v), 40), mono: !TEXT_KEYS.has(k) })
+      out.push({ k, v: String(v), mono: !TEXT_KEYS.has(k) })
     }
   }
-  return out.slice(0, dense ? 2 : 3)
+  return out.slice(0, 4)
 }
 
-/* ── 密度与尺寸 ──
- * 少节点 → 卡片大、行多、留白足；多节点 → 卡片紧凑、只留 2 行，靠列数与纵向滚动换可读性。
- * 卡宽不是拍脑袋的常量：先由节点数定列数，再由容器实测宽度反推卡宽（minClamp～maxCard）。
+/** 按卡片可用宽度把每行的值截断（不改变行数） */
+function packRows(n: EvidenceNode, avail: number, fs: number): Row[] {
+  return extractRows(n).map((r) => ({ ...r, v: fitText(r.v, avail, fs) }))
+}
+
+/**
+ * 行高够大、且卡片足够宽时，改成「键一行、值一行」（阈值与 CSS 的 .is-2line 同源）：
+ * 长值（SQL、摘录、主张正文）在放大后的卡片里才有地方铺开。
+ * 卡宽太窄（如 1000 视口下 9 列那种）时不切两行——一行里「键在左、值靠右」更省地方、
+ * 也不会有那么多省略号，并且保证卡高估算与 DOM 一致。
  */
-const maxRows = computed(() => (props.nodes.length <= 8 ? 3 : 2))
+const twoLineFor = (p: Record<string, number>, cw = 999) => p.row >= 26 && cw >= 150
+
+/** 中英文混排的粗估字宽（CJK ≈ 1 个全角，拉丁 ≈ 0.56）：用来决定排几行、截多长 */
+function textWidth(s: string, fs: number): number {
+  let w = 0
+  for (const ch of s) w += ch.charCodeAt(0) > 0x2e80 ? fs : fs * 0.56
+  return w
+}
+
+/** 每行值能用的宽度：两行模式独占整卡宽（减内边距），单行模式只占右侧值列 */
+function valueRoom(cw: number, p: Record<string, number>, k: string): number {
+  const avail = Math.max(40, cw - 2 * p.padX)
+  return twoLineFor(p, cw)
+    ? avail
+    : Math.max(28, Math.floor(avail * 0.58) - Math.round(textWidth(k, p.fs)))
+}
+
+/** 按可用宽度截断（CJK 与拉丁分别计宽），超出部分用省略号 */
+function fitText(s: string, avail: number, fs: number): string {
+  const flat = s.replace(/\s+/g, ' ').trim()
+  if (textWidth(flat, fs) <= avail) return flat
+  let out = ''
+  let w = 0
+  for (const ch of flat) {
+    const c = ch.charCodeAt(0) > 0x2e80 ? fs : fs * 0.56
+    if (w + c > avail - fs) break
+    out += ch
+    w += c
+  }
+  return `${out.replace(/[\s·,，、/|-]+$/, '')}…`
+}
+
+/** 值排 1 行还是 2 行：粗估，估多一行只是多留一点高度，不会裁字 */
+function valueLines(k: string, v: string, cw: number, p: Record<string, number>): number {
+  if (!twoLineFor(p, cw)) return 1
+  const avail = Math.max(60, cw - 2 * p.padX)
+  return textWidth(`${k} ${v}`, p.fs) <= avail ? 1 : 2
+}
+
+/** 卡高（含两行模式）：逐项对齐 CSS 盒模型，并用 budget 封顶，绝不超出预留带高 */
+function cardHeightRows(rows: Row[], cw: number, p: Record<string, number>, budget: number): number {
+  const chrome = 2 * p.padY + 2 + p.head
+  if (!twoLineFor(p, cw)) {
+    const h = chrome + rows.length * p.row + Math.max(0, rows.length - 1) * p.rowgap
+    return Math.round(Math.min(h, budget))
+  }
+  const content = rows.reduce((acc, r, i) => {
+    const lines = valueLines(r.k, r.v, cw, p)
+    return acc + p.row * 0.92 + lines * p.row * 1.06 + (i < rows.length - 1 ? p.rowgap : 0)
+  }, 0)
+  return Math.round(Math.min(chrome + content, budget))
+}
+
+/** 卡片内容：先按可用宽度把值截断，再取前 2–3 行 */
+function buildRows(n: EvidenceNode, p: Record<string, number>, cw: number): Row[] {
+  const rows = packRows(n, valueRoom(cw, p, n.node_type), p.fs)
+  return rows.slice(0, twoLineFor(p, cw) ? 2 : 3)
+}
+
+/** 行的最终卡高 */
+function cardHeight(n: EvidenceNode, p: Record<string, number>, cw: number, budget: number): number {
+  return cardHeightRows(buildRows(n, p, cw), cw, p, budget)
+}
+
+/* ── 展示精度：字号 / 徽标 / 内边距 / 行高 ──
+ * minimal = 最紧凑（48 节点那种必须滚动的规模），full = 最宽松（1–2 个节点）。
+ * 所有数值都在 JS 里算好，再以 CSS 变量交给卡片（见 <style> 里的 --sg-*）。
+ */
+const DISPLAY = {
+  minimal: { fs: 9.5, title: 11, ref: 9, badge: 14, padX: 8, padY: 6, head: 15, row: 18, rowgap: 3 },
+  full: { fs: 16, title: 19.5, ref: 14.5, badge: 26, padX: 22, padY: 20, head: 30, row: 36, rowgap: 7 },
+}
+
+/** 卡与卡、层与层、卡与画布边缘的间距与内边距：跟展示精度同一条曲线放大 */
+const padXFor = (dense: boolean, p: Record<string, number>) => Math.round((dense ? 8 : 12) + (dense ? 8 : 8) * (p.k ?? 0))
+const padYFor = (dense: boolean, p: Record<string, number>) => Math.round((dense ? 12 : 16) + 12 * (p.k ?? 0))
+
+/**
+ * 卡与卡的水平间距：**必须 ≥ 2×padX**，否则「卡宽按可用宽反推」时画布会超宽
+ * （padX 是画布内边距，gapX 太小时 cw 会把两侧内边距挤掉）。
+ */
+const gapXFor = (dense: boolean, p: Record<string, number>) => {
+  const base = (dense ? 12 : 16) + (dense ? 18 : 26) * (p.k ?? 0)
+  return Math.round(Math.max(base, 2 * padXFor(dense, p) + 4))
+}
+const gapYFor = (dense: boolean, p: Record<string, number>) => Math.round((dense ? 14 : 18) + (dense ? 16 : 26) * (p.k ?? 0))
+const gapBandFor = (dense: boolean, p: Record<string, number>) => Math.round((dense ? 28 : 34) + (dense ? 20 : 46) * (p.k ?? 0))
+
+/**
+ * 展示精度由「卡高」连续插值，而不是按节点数切档：
+ * 卡高本身是容器空间与层数算出来的，所以 1 → 48 个节点之间是平滑过渡，
+ * 不会出现「8 个这样、9 个那样」的跳变。
+ * k 是精度爬升速度（卡高 44px 时到最紧凑，280px 以上到最宽松）。
+ */
+function displayProfile(cardHeight: number): Record<string, number> & { k: number } {
+  const k = Math.min(1, Math.max(0, (cardHeight - 44) / 236))
+  const out: Record<string, number> = { k }
+  for (const key of Object.keys(DISPLAY.minimal) as Array<keyof typeof DISPLAY.minimal>) {
+    const v = DISPLAY.minimal[key] + (DISPLAY.full[key] - DISPLAY.minimal[key]) * k
+    out[key] = Math.round(v * 10) / 10
+  }
+  return out as Record<string, number> & { k: number }
+}
 
 /** 旧版按较短边铺开的径向半径系数，分层布局不再使用；width/height 只作为
  *  首帧容器宽度未知时的兜底期望尺寸，实际画布按容器实测宽度重算。 */
@@ -281,18 +395,23 @@ void props.height
 
 const shellEl = ref<HTMLElement | null>(null)
 const shellW = ref(0)
+/** 容器的可用高度也参与定尺寸：卡高公式里的 hMaxByRows 分母就是它。 */
+const shellH = ref(0)
 let ro: ResizeObserver | null = null
 
 onMounted(() => {
   const el = shellEl.value
   if (!el) return
-  shellW.value = el.clientWidth || 0
+  const read = () => {
+    const w = el.clientWidth || 0
+    const h = el.clientHeight || 0
+    // 只在真的变了才写，避免与滚动条互相触发
+    if (Math.abs(w - shellW.value) > 1) shellW.value = w
+    if (Math.abs(h - shellH.value) > 1) shellH.value = h
+  }
+  read()
   if (typeof ResizeObserver !== 'undefined') {
-    ro = new ResizeObserver(() => {
-      const w = el.clientWidth || 0
-      // 只在宽度真的变了才写，避免与滚动条互相触发
-      if (Math.abs(w - shellW.value) > 1) shellW.value = w
-    })
+    ro = new ResizeObserver(read)
     ro.observe(el)
   }
 })
@@ -469,6 +588,7 @@ function layerize(nodes: EvidenceNode[], edges: EvidenceEdge[]) {
 
 const layout = computed(() => {
   const nodes = props.nodes
+  const emptyProf = displayProfile(240)
   if (!nodes.length) {
     return {
       placed: [] as Placed[],
@@ -476,58 +596,139 @@ const layout = computed(() => {
       near: new Map<string, Set<string>>(),
       cw: 0,
       ch: 0,
-      rows: maxRows.value,
+      prof: emptyProf,
+      dense: false,
     }
   }
   // 实测宽度优先；首帧拿到 0 时退回调用方给的期望宽（无头截图第一帧就可能是这种情况）
   const avail = Math.max(shellW.value || props.width || 520, 260)
-  const rowsPerCard = maxRows.value
-  const dense = nodes.length > 8
   const total = nodes.length
+  const dense = total > 8
 
-  // 列数：先按节点数给个舒服的列数，再被容器宽度压回去（卡宽不小于 138px）
-  const baseCols = total <= 4 ? total : total <= 9 ? 3 : total <= 20 ? 3 : total <= 40 ? 4 : 5
-  const gapX = dense ? 12 : 16
-  const gapY = dense ? 14 : 20
-  // 画布左右内边距。必须 ≤ gapX，否则「列数按容器宽算、画布再加两侧内边距」会
-  // 让画布比容器内容盒宽出 2*padX——实测就是这样多出 20px，
-  // 让十几张卡越过了容器右边（卡行居中所以看不出来，但 scrollWidth 是实打实超了）。
-  const padX = dense ? 10 : 12
-  const padY = dense ? 12 : 16
-  const usable = Math.max(180, avail - padX * 2)
-  const maxCols = Math.max(1, Math.min(baseCols, Math.floor((usable + gapX) / (138 + gapX))))
+  // 可用高度：滚动容器实测高度优先，取不到时按 0.62×宽 估（渲染前的兜底）
+  const availH = Math.max(shellH.value || 0, 240)
+
+  /* ────────────────────────────────────────────────────────────────────────
+   * 尺寸策略（这一版的核心改动：从「固定尺寸 + 两档密度」改成「按容器空间反推」）
+   *
+   * 旧版卡宽上限 244px、字号 9.5px 写死，于是 3 个节点时就是「三条小横条缩在
+   * 1314×887 画布中间」，用户看到的就是一片空。规则：
+   *
+   * 1) 展示精度由卡高连续插值（displayProfile(scale)）：字号、行高、内边距、徽标、
+   *    间距一起放大，1 → 48 个节点平滑过渡，没有「8 个这样、9 个那样」的跳变。
+   * 2) 卡宽永远铺满：cw = min(单列可用宽 × 0.98, scale × 4.5)。宽度是硬约束，
+   *    所以**任何候选都不会横向溢出**；4.5 倍是宽高比上限，防止 1 个节点时变成一条横幅。
+   * 3) 卡高由内容行数决定（key/value 行数 × 行高），随 scale 一起长。
+   * 4) 列数枚举：c = 1 … 最宽层的节点数（再乘个上界）。对每个 c 二分出
+   *    「高度不溢出容器」的最大 scale，再按下面这条打分挑一档：
+   *
+   *      score = 0.45 × 宽向填充 + 0.55 × 高向填充       （两个填充都封顶到 1）
+   *      高向填充 = 内容高 / 容器高，**超过 1 时按 1/(超出比例) 处罚** ——
+   *      即「能不滚动就不滚动」，实在放不下（48 节点）时溢出惩罚会饱和，
+   *      于是退化为「尽量铺满宽度」，不会再退回单列长条；高向权重略高，
+   *      是为了让窄视口（1000px）不要为了铺满宽度而选 9 列、把卡片压成 86px 细条。
+   *
+   * 教训（都踩过）：评估候选必须用**真实卡高**（内容行数决定），不能用上限估算，
+   * 否则会选中「上限很大、实际很矮」的档；卡宽必须无条件夹到可用宽，
+   * 否则 1000 视口 + 详情面板（avail 只剩 354px）会横向溢出 50px。
+   * ──────────────────────────────────────────────────────────────────────── */
+  const MAX_CARD_H = 300
+  const FILL = 0.98
+  const MAX_ASPECT = 4.5
+  const MIN_CARD_W = 48
+  /** 列数上限还要受「卡宽不能低于这个值」约束：48 节点在 726px 宽的矮容器里
+   *  曾选出 9 列 × 61px 的细条，字挤成一条竖线，不如少几列、让它纵向滚动。 */
+  const MIN_COL_W = 96
 
   const { layers, order } = layerize(nodes, props.edges)
+  const layerSizes = order.map((l) => layers.get(l)!.length)
+
+  /** 给定精度与列数，算出真实渲染后的卡宽、带高、画布尺寸 */
+  function measure(scale: number, cols: number) {
+    const p = displayProfile(scale)
+    const gapX = gapXFor(dense, p)
+    const gapY = gapYFor(dense, p)
+    const gapBand = gapBandFor(dense, p)
+    const padX = padXFor(dense, p)
+    const padY = padYFor(dense, p)
+    const cwCap = Math.floor((avail - padX * 2 - (cols - 1) * gapX) / cols)
+    const cwProfile = Math.min(Math.round((avail / cols) * FILL), Math.round(scale * MAX_ASPECT))
+    const cw = Math.max(MIN_CARD_W, Math.min(cwProfile, Math.max(MIN_CARD_W, cwCap)))
+    const cardH = (n: EvidenceNode) => cardHeight(n, p, cw, MAX_CARD_H)
+    const rowsPerLayer = layerSizes.map((n) => Math.ceil(n / cols))
+    const bandH = layerSizes.map((size, li) => {
+      const group = layers.get(order[li])!
+      let h = 0
+      for (let r = 0; r < rowsPerLayer[li]; r++) {
+        const slice = group.slice(r * cols, (r + 1) * cols)
+        h = Math.max(h, ...slice.map(cardH))
+      }
+      return h
+    })
+    let canvas = padY
+    bandH.forEach((bh, li) => {
+      canvas += bh * rowsPerLayer[li] + (rowsPerLayer[li] - 1) * gapY
+      if (li < bandH.length - 1) canvas += gapBand
+    })
+    canvas += padY
+    const boxW = Math.min(avail, cw * cols + (cols - 1) * gapX + padX * 2)
+    const boxH = Math.max(0, canvas - padY * 2)
+    return { p, gapX, gapY, gapBand, padX, padY, cw, bandH, rowsPerLayer, rows: rowsPerLayer.reduce((a, b) => a + b, 0), canvas, boxW, boxH }
+  }
+
+  interface Fit {
+    cols: number
+    scale: number
+    m: ReturnType<typeof measure>
+    score: number
+  }
+
+  const colCap = Math.max(
+    1,
+    Math.min(Math.max(...layerSizes), Math.ceil(Math.sqrt(total * 1.6)), Math.floor(avail / MIN_COL_W)),
+  )
+  let best: Fit | null = null
+  for (let c = 1; c <= colCap; c++) {
+    // 二分「高度不溢出容器」的最大 scale；若最小精度都溢出（48 节点），就取最小精度
+    const mMin = measure(44, c)
+    let scale = 44
+    if (mMin.canvas <= availH + 1) {
+      let lo = 44
+      let hi = 300
+      for (let it = 0; it < 18; it++) {
+        const mid = (lo + hi) / 2
+        if (measure(mid, c).canvas <= availH + 1) lo = mid
+        else hi = mid
+      }
+      scale = lo
+    }
+    const m = measure(scale, c)
+    const fillW = Math.min(1, m.boxW / avail)
+    // 高向：放得下就是 1；放不下按超出比例处罚（1/(over-1)，over=2 时只剩 0.25 分），
+    // 惩罚饱和到 0 就是「允许滚动」，此时选列只看宽度铺得满不满。
+    const over = Math.max(1, m.canvas / Math.max(1, availH))
+    const fillH = over <= 1.0001 ? 1 : Math.max(0, 1 / (over - 1) - 0.02)
+    const score = 0.45 * fillW + 0.55 * Math.min(1, fillH)
+    const cand: Fit = { cols: c, scale, m, score }
+    if (!best || cand.score > best.score + 1e-6) best = cand
+  }
+  const fit = best!
+  const maxCols = fit.cols
   const rowCount = (l: number) => Math.ceil((layers.get(l)?.length ?? 0) / maxCols)
 
-  // 卡宽：全局统一（各层同宽），至少 138，最多 244；由「减去内边距后的可用宽」反推，
-  // 保证 maxCols 张卡 + 列间距 + 两侧内边距一定塞得进 avail。
-  const cw = Math.min(244, Math.max(138, Math.floor((usable - (maxCols - 1) * gapX) / maxCols)))
+  // 排版直接用选中候选实测出来的那一套参数，避免「评估一套、渲染另一套」
+  const prof = fit.m.p
+  const gapX = fit.m.gapX
+  const gapY = fit.m.gapY
+  const gapBand = fit.m.gapBand
+  const padX = fit.m.padX
+  const padY = fit.m.padY
+  const cw = fit.m.cw
   const contentW = () => maxCols * cw + (maxCols - 1) * gapX
-
-  // 卡高必须和 CSS 里的 --sg-pad-y/--sg-head/--sg-row/--sg-rowgap 完全一致：
-  // 2*(6px padding + 1px border) + 15px 标题行 + N*18px 键值行 + (N-1)*3px 行距
-  const CARD_BOX = 14
-  const HEAD_H = 15
-  const ROW_H = 18
-  const ROW_GAP = 3
-  const cardH = (n: EvidenceNode) => {
-    const rows = buildRows(n, dense).length
-    return CARD_BOX + HEAD_H + rows * ROW_H + Math.max(0, rows - 1) * ROW_GAP
-  }
+  const cardH = (n: EvidenceNode) => cardHeight(n, prof, cw, MAX_CARD_H)
   const bandH = new Map<number, number>()
-  for (const l of order) {
-    const group = layers.get(l)!
-    let h = 0
-    const rc = rowCount(l)
-    for (let r = 0; r < rc; r++) {
-      const slice = group.slice(r * maxCols, (r + 1) * maxCols)
-      h = Math.max(h, ...slice.map(cardH))
-    }
-    bandH.set(l, h)
-  }
+  order.forEach((l, li) => bandH.set(l, fit.m.bandH[li]))
 
-  const gapBand = dense ? 30 : 42
   // 画布宽度不再额外加内边距（padX 已经在 usable 里扣过），只在容器比内容宽时补足，
   // 这样画布永远不会超过容器的内容盒宽度。
   const cwTotal = Math.max(contentW() + padX * 2, avail)
@@ -539,7 +740,16 @@ const layout = computed(() => {
     bandTop.set(l, acc)
     acc += bandH.get(l)! * rowCount(l) + (rowCount(l) - 1) * gapY + gapBand
   }
-  const ch = acc - gapBand + padY
+  let ch = acc - gapBand + padY
+
+  // 内容比容器矮的时候：画布就按容器高，内容纵向居中。
+  // 这样「内容包围盒 ÷ 画布面积」不会被一段堆在底部的空白拉低，
+  // 视觉上也是居中的一簇卡片而不是贴着顶。
+  const vOffset = ch < availH ? Math.round((availH - ch) / 2) : 0
+  if (vOffset) {
+    for (const l of order) bandTop.set(l, (bandTop.get(l) ?? 0) + vOffset)
+    ch = availH
+  }
 
   const placed: Placed[] = []
   const byId = new Map<string, Placed>()
@@ -625,7 +835,18 @@ const layout = computed(() => {
       tx_id: e.dst_evidence_id,
     })
   }
-  return { placed, edges: list, near, cw: cwTotal, ch, rows: rowsPerCard }
+  return {
+    placed,
+    edges: list,
+    near,
+    cw: cwTotal,
+    cw2: cw,
+    ch,
+    prof,
+    dense,
+    cols: maxCols,
+    rows: fit.m.rows,
+  }
 })
 
 const nodeById = computed(() => {
@@ -642,17 +863,34 @@ const hoveredId = ref<string | null>(null)
 function styleOf(n: EvidenceNode | undefined) {
   return (n && TYPE_STYLE[n.node_type]) || TYPE_STYLE.Claim
 }
+/**
+ * 卡片的全部尺寸都通过 CSS 变量下发，卡宽/卡高/位置由 JS 定死。
+ * 这样「卡片变大」时字号、行高、内边距、徽标一起变大，不会出现大框小字。
+ */
 function cardStyle(p: Placed) {
+  const d = layout.value.prof
   return {
     left: `${p.x}px`,
     top: `${p.y}px`,
     width: `${p.w}px`,
     height: `${p.h}px`,
+    '--sg-pad-y': `${d.padY}px`,
+    '--sg-pad-x': `${d.padX}px`,
+    '--sg-head': `${d.head}px`,
+    '--sg-row': `${d.row}px`,
+    '--sg-rowgap': `${d.rowgap}px`,
+    '--sg-fs': `${d.fs}px`,
+    '--sg-fs-title': `${d.title}px`,
+    '--sg-fs-ref': `${d.ref}px`,
+    '--sg-badge': `${d.badge}px`,
   }
 }
 function rowsOf(n: EvidenceNode): Row[] {
-  return buildRows(n, layout.value.rows < 3)
+  const l = layout.value
+  return buildRows(n, l.prof, l.cw2)
 }
+/** 与 twoLineFor 同源：行高够大**且**卡宽够宽时才切「键一行、值一行」 */
+const twoLineRows = computed(() => twoLineFor(layout.value.prof ?? {}, layout.value.cw2 ?? 999))
 /** 悬停某张卡时，与之无连线关系的卡淡出，链路更清楚 */
 function isConnected(id: string): boolean {
   const h = hoveredId.value
@@ -706,6 +944,7 @@ const dotId = `sg-dots-${(sgSeq = (sgSeq + 1) % 1000)}-${Math.random().toString(
         :class="{
           'is-selected': selectedId === p.id,
           'is-dim': !!hoveredId && hoveredId !== p.id && !isConnected(p.id),
+          'is-2line': twoLineRows,
         }"
         :style="cardStyle(p)"
         :data-evidence-id="p.id"
@@ -721,12 +960,13 @@ const dotId = `sg-dots-${(sgSeq = (sgSeq + 1) % 1000)}-${Math.random().toString(
             {{ styleOf(nodeById.get(p.id)).icon }}
           </span>
           <span class="sg-title">{{ styleOf(nodeById.get(p.id)).label }}</span>
-          <span v-if="p.w >= 190" class="sg-ref">{{ nodeById.get(p.id)?.ref_key }}</span>
+          <span class="sg-ref">{{ nodeById.get(p.id)?.ref_key }}</span>
         </div>
         <dl class="sg-rows">
           <div v-for="(r, i) in rowsOf(nodeById.get(p.id)!)" :key="i" class="sg-row">
             <dt>{{ r.k }}</dt>
-            <dd :class="{ 'is-mono': r.mono !== false }" :title="r.v">{{ r.v }}</dd>          </div>
+            <dd :class="{ 'is-mono': r.mono !== false }" :title="r.v">{{ r.v }}</dd>
+          </div>
         </dl>
       </div>
     </div>
@@ -734,14 +974,13 @@ const dotId = `sg-dots-${(sgSeq = (sgSeq + 1) % 1000)}-${Math.random().toString(
 </template>
 
 <style scoped>
-/* 滚动容器：主界面主区的证据视图高度受限，48 张卡片比容器高，靠它纵向滚动；
-   落地页没有高度约束时它就是自然高度。
-   scrollbar-gutter: stable 是关键：滚动条出现/消失会改变 clientWidth，
-   而卡宽正是由 clientWidth 反推的——不留槽就会「变宽→出滚动条→变窄→…」抖动。
-   overflow-x: clip（不是 hidden）把横向滚动彻底关掉：hidden 仍然是一个可滚动的
-   溢出容器，差半个滚动条宽度就会多出一条横向滚动条，clip 不会。
-   卡行在画布里居中，左右各有 padX 内边距，差十几像素也不会被裁。 */
+/* 滚动容器：由它负责纵向滚动，并且**它的高度就是排版用的可用高度**。
+   注意必须写 flex: 1 + min-height: 0：调用方（MainPage 的 .graph-wrap）是
+   flex-direction: column，块级子元素在交叉轴（高度）上不会自动撑开，
+   漏了这两条 clientHeight 就是 0，availH 会一直退回兜底值、卡片永远长不大。 */
 .sg-shell {
+  flex: 1;
+  min-height: 0;
   width: 100%;
   max-width: 100%;
   overflow-x: clip;
@@ -769,16 +1008,21 @@ const dotId = `sg-dots-${(sgSeq = (sgSeq + 1) % 1000)}-${Math.random().toString(
   overflow: visible;
 }
 
-/* ── 卡片盒模型：JS 里的 cardH() 必须和这里的每个数字对齐 ──
-   （之前 cardH 估的是 32 + 行数*17 + 4，实际渲染 36 / 53 / 70，带高对不上，
-   行数一多就会在层里留下肉眼可见的缝。现在卡高全部由这几个常量决定，
-   并且卡片写死 height + overflow:hidden，估算值就是渲染值。） */
+/* ── 卡片盒模型：唯一的真值来源 ──
+ * cardH()（JS 算的带高）必须和 CSS 里 --sg-* 各个值完全一致，
+ * 所以这里只在 CSS 里放「1 行键值 + 标题行」的基准值，实际尺寸全部由
+ * layout() 算出的 --sg-*（含字号/行高/内边距/卡高）覆盖。
+ * 基准本身也要自洽，否则首帧（还没算完）会闪一下。 */
 .sg-card {
   --sg-pad-y: 6px;
   --sg-pad-x: 8px;
   --sg-head: 15px;
   --sg-row: 18px;
   --sg-rowgap: 3px;
+  --sg-fs: 9.5px;
+  --sg-fs-title: 11px;
+  --sg-fs-ref: 9px;
+  --sg-badge: 14px;
   position: absolute;
   z-index: 2;
   box-sizing: border-box;
@@ -821,23 +1065,23 @@ const dotId = `sg-dots-${(sgSeq = (sgSeq + 1) % 1000)}-${Math.random().toString(
   height: var(--sg-head);
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: calc(var(--sg-badge) * 0.35);
   min-width: 0;
 }
 .sg-badge {
   flex-shrink: 0;
-  width: 14px;
-  height: 14px;
-  border-radius: 4px;
+  width: var(--sg-badge);
+  height: var(--sg-badge);
+  border-radius: calc(var(--sg-badge) * 0.28);
   color: #ffffff;
-  font-size: 9px;
-  line-height: 14px;
+  font-size: calc(var(--sg-badge) * 0.62);
+  line-height: var(--sg-badge);
   text-align: center;
 }
 .sg-title {
   flex: 1;
   min-width: 0;
-  font-size: 11px;
+  font-size: var(--sg-fs-title);
   font-weight: 600;
   color: var(--color-text);
   white-space: nowrap;
@@ -846,9 +1090,9 @@ const dotId = `sg-dots-${(sgSeq = (sgSeq + 1) % 1000)}-${Math.random().toString(
 }
 .sg-ref {
   flex-shrink: 0;
-  max-width: 92px;
+  max-width: 40%;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 9px;
+  font-size: var(--sg-fs-ref);
   color: var(--color-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -861,19 +1105,34 @@ const dotId = `sg-dots-${(sgSeq = (sgSeq + 1) % 1000)}-${Math.random().toString(
   gap: var(--sg-rowgap);
   min-width: 0;
 }
+/* 键在左、值在右、两端对齐；卡片矮的时候（48 节点那种）键值同排，
+   卡片放大后（行高 ≥ 26px）键单独一行、值靠左，长值才有地方显示完整。 */
 .sg-row {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: calc(var(--sg-row) * 0.25);
   min-width: 0;
   height: var(--sg-row);
-  font-size: 9.5px;
+  font-size: var(--sg-fs);
   line-height: calc(var(--sg-row) - 2px);
   overflow: hidden;
 }
+.sg-card.is-2line .sg-row {
+  display: block;
+  height: auto;
+  min-height: var(--sg-row);
+}
+.sg-card.is-2line .sg-row dt {
+  max-width: none;
+  font-size: calc(var(--sg-fs) * 0.88);
+}
+.sg-card.is-2line .sg-row dd {
+  text-align: left;
+  font-size: calc(var(--sg-fs) * 1.04);
+}
 .sg-row dt {
   flex-shrink: 0;
-  max-width: 62px;
+  max-width: 38%;
   color: var(--color-muted);
   white-space: nowrap;
   overflow: hidden;

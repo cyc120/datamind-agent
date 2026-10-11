@@ -479,8 +479,10 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
-/* 证据轨迹正文：宽屏「图 + 详情」两列，未选中节点时图占满整宽；
-   窄屏（≤980px）改成上下排，图在上、详情在下。 */
+/* 证据轨迹正文：宽屏「图 + 详情」两列，未选中节点时图占满整宽。
+   ≤1180px 改成上下排：1000 视口下两列会把图挤到 ~350px，卡片放不下、
+   字号掉到最小档（实测 48 节点在那里会横向溢出 50px）。
+   上下排之后图拿整宽、详情在图下方，两边都能读。 */
 .graph-body {
   flex: 1;
   min-height: 0;
@@ -490,6 +492,16 @@ onMounted(async () => {
 }
 .graph-body.has-detail {
   grid-template-columns: minmax(0, 1fr) 372px;
+}
+@media (max-width: 1180px) {
+  .graph-body.has-detail {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(200px, 42%);
+  }
+  .detail-col {
+    border-left: none;
+    border-top: 1px solid var(--color-line);
+  }
 }
 .graph-wrap {
   position: relative;
@@ -576,9 +588,10 @@ onMounted(async () => {
   padding: 0 16px 16px;
 }
 
-/* ── 窄屏（≤980px）：侧边栏仍在，主区变窄，证据轨迹改上下排 ──
+/* ── 窄屏（≤1100px）：侧边栏仍在，主区变窄 ──
    没有抽屉、没有遮罩、没有浮动按钮：切换式在两个视图之间切，
-   本身就适配窄屏，不需要第二套入口。 */
+   本身就适配窄屏，不需要第二套入口。
+   （证据轨迹在图 + 详情两列的断点在上面的 1180px 处。） */
 @media (max-width: 1100px) {
   .topbar {
     padding: 12px 16px;
@@ -591,16 +604,6 @@ onMounted(async () => {
   }
   .graph-wrap {
     padding: 12px;
-  }
-}
-@media (max-width: 980px) {
-  .graph-body.has-detail {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) minmax(180px, 44%);
-  }
-  .detail-col {
-    border-left: none;
-    border-top: 1px solid var(--color-line);
   }
 }
 </style>
