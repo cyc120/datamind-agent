@@ -8,6 +8,8 @@ import RotatingText from '../components/bits/RotatingText/RotatingText.vue'
 import TrueFocus from '../components/bits/TrueFocus/TrueFocus.vue'
 import PixelSwap from '../components/bits/PixelSwap/PixelSwap.vue'
 import Folder from '../components/bits/Folder/Folder.vue'
+import Topography from '../components/bits/Topography/Topography.vue'
+import SpecularButton from '../components/bits/SpecularButton/SpecularButton.vue'
 import FlipCard from '../components/FlipCard.vue'
 import ConstellationGraph from '../components/stargraph/ConstellationGraph.vue'
 import { useReveal } from '../composables/useReveal'
@@ -214,18 +216,60 @@ const sampleEdges: EvidenceEdge[] = [
       </div>
     </section>
 
-    <!-- 能力：模糊文字 + 三卡 -->
-    <section id="features" class="section soft">
-      <div class="sec-head">
-        <div class="eyebrow">Capabilities</div>
-        <BlurText text="三个关键词" :delay="120" animate-by="words" direction="top"
-                  class="blur-heading" />
+    <!-- 能力：等高线背景 + 玻璃表面 + 三个镜面按钮
+         背景用 Vue Bits 的 Topography（等高线），三张卡用 Vue Bits 的
+         SpecularButton（镜面高光描边）+ 玻璃底（tint + backdrop-filter）。 -->
+    <section id="features" class="section soft feat-band">
+      <!-- 等高线画布垫在最底层，只做视觉。bands 越小等高线越疏（密了会像等高线地瓜图） -->
+      <div class="feat-bg" aria-hidden="true">
+        <Topography
+          :bands="1.05"
+          :thickness="0.007"
+          :scale="1.18"
+          :glow="0.18"
+          :opacity="0.62"
+          :speed="0.26"
+          :morph-amount="2.2"
+          :mouse-strength="0.28"
+          low-color="#aab4c4"
+          mid-color="#7c8798"
+          high-color="#c8d0dc"
+        />
       </div>
-      <div class="feat-grid">
-        <div v-for="(f, i) in features" :key="f.title" class="feat glass reveal" :style="{ transitionDelay: i * 90 + 'ms' }">
-          <div class="feat-icon">{{ f.icon }}</div>
-          <h3>{{ f.title }}</h3>
-          <p>{{ f.desc }}</p>
+      <!-- 两团很淡的径向色，让玻璃背后有东西可折射，不然玻璃看起来像白纸 -->
+      <div class="feat-wash" aria-hidden="true"></div>
+
+      <div class="feat-inner">
+        <div class="sec-head">
+          <div class="eyebrow">Capabilities</div>
+          <BlurText text="三个关键词" :delay="120" animate-by="words" direction="top"
+                    class="blur-heading" />
+        </div>
+        <div class="feat-grid">
+          <SpecularButton
+            v-for="(f, i) in features"
+            :key="f.title"
+            as="div"
+            size="lg"
+            align="start"
+            :radius="16"
+            :tint-opacity="0.5"
+            :blur="10"
+            :text-color="'#0b1220'"
+            line-color="#1e293b"
+            base-color="#cbd5e1"
+            :intensity="1.5"
+            :shine-size="14"
+            :shine-fade="36"
+            :auto-animate="true"
+            :proximity="300"
+            class="feat-card reveal"
+            :style="{ transitionDelay: i * 90 + 'ms' }"
+          >
+            <span class="feat-icon" aria-hidden="true">{{ f.icon }}</span>
+            <span class="feat-title">{{ f.title }}</span>
+            <span class="feat-desc">{{ f.desc }}</span>
+          </SpecularButton>
         </div>
       </div>
     </section>
@@ -728,31 +772,92 @@ const sampleEdges: EvidenceEdge[] = [
   font-weight: 500;
 }
 
-/* ── 能力卡 ── */
+/* ── 能力区：等高线背景 + 玻璃表面 + 镜面按钮卡 ── */
+/* 这一节自己铺背景，所以把 .soft 的灰底让出来：透一点冷白，等高线才透得出来 */
+.section.feat-band {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, #ffffff 0%, #f4f6fa 55%, #eef1f6 100%);
+}
+/* 等高线层：只做视觉，别抢鼠标（下面还有卡片要交互） */
+.feat-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+/* 两团很淡的径向色：玻璃背后要有东西可折射，纯白背景上玻璃跟白纸没区别 */
+.feat-wash {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(680px 320px at 12% 8%, rgba(37, 99, 235, 0.10), transparent 70%),
+    radial-gradient(520px 300px at 88% 92%, rgba(124, 58, 237, 0.10), transparent 72%);
+}
+.feat-inner {
+  position: relative;
+  z-index: 2;
+  max-width: 1360px;
+  margin: 0 auto;
+}
 .feat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(288px, 1fr));
+  gap: 26px;
+  /* 镜面高光层比卡片大 20px，靠内边距让它在节内不被裁 */
+  padding: 8px 0;
 }
-.feat {
-  border-radius: 14px;
-  padding: 26px 24px;
+/* 卡片本体：用 SpecularButton 渲染成 div。
+   padding 由 .is-lg 给，这里覆盖成卡片需要的量。
+   ⚠ 必须显式写 display: flex —— 组件里是 inline-flex，外层 grid 的 stretch 不会
+   把 inline-level 盒子拉满宽，内容也就不会换行（实测卡片被压成 90px 高的一条）。 */
+.feat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
+  min-height: 172px;
+  padding: 26px 26px 28px;
+  border-radius: 16px;
 }
+/* 组件里 .sb-content 是 block，会连带把里面的行内元素也变成块级；
+   这里显式声明，保证「图标 / 标题 / 说明」三行是自己控制的。
+   min-width: 0 是必需的：flex 子项默认 min-width:auto，长中文段会把卡片撑破
+   （实测 1000px 视口下卡片内容溢出 20px）。 */
 .feat-icon {
-  font-size: 22px;
+  display: block;
+  min-width: 0;
+  font-size: 24px;
+  line-height: 1;
   color: var(--color-accent);
-  margin-bottom: 12px;
+  margin-bottom: 2px;
 }
-.feat h3 {
-  margin: 0 0 8px;
-  font-size: 17px;
+.feat-title {
+  display: block;
+  min-width: 0;
+  font-size: 19px;
   font-weight: 700;
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+  line-height: 1.3;
 }
-.feat p {
+.feat-desc {
+  display: block;
+  min-width: 0;
   margin: 0;
   color: var(--color-body);
-  font-size: 14px;
-  line-height: 1.85;
+  font-size: 14.5px;
+  line-height: 1.9;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+/* 卡片内容也是 flex 子项，同样要能收缩 */
+.feat-card > :deep(.sb-content) {
+  min-width: 0;
 }
 
 /* ── 星图 ── */
