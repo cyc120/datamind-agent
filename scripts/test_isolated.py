@@ -41,6 +41,10 @@ def main():
         dump=subprocess.run(docker+['pg_dump','-U','postgres','-Fc','--exclude-table-data=app_settings',
                                    '--exclude-table-data=auth_users','--exclude-table-data=auth_sessions',
                                    '--exclude-table-data=auth_login_limits',
+                                   # chat_sessions.user_id FK-references auth_users, whose DATA is
+                                   # excluded above; keeping session rows would make pg_restore fail
+                                   # when it re-adds the FK (owner missing), aborting the whole run.
+                                   '--exclude-table-data=chat_sessions',
                                    '--exclude-table-data=source_authority_rules','--exclude-table-data=source_authority_events',
                                    '--exclude-table-data=cad_assets','--exclude-table-data=cad_versions',
                                    '--exclude-table-data=cad_association_reviews',

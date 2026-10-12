@@ -223,6 +223,10 @@ CREATE TABLE IF NOT EXISTS runs (
     started_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     ended_at        TIMESTAMPTZ
 );
+-- 应用层按 conversation_id 过滤 runs 来还原会话逐轮问答（question=用户轮、answer=助手轮）。
+-- runs 由 postgres 拥有，本文件正以 postgres 身份执行，所以这个索引只能放在这里：
+-- db/migrations/*.sql 以 datamind_app 身份执行，对 runs 建索引会报 must be owner of table runs。
+CREATE INDEX IF NOT EXISTS runs_conversation_idx ON runs(conversation_id);
 
 CREATE TABLE IF NOT EXISTS trace_events (
     event_id        VARCHAR(64) PRIMARY KEY,

@@ -7,14 +7,14 @@
 | 项 | 值 |
 |---|---|
 | 代码 API | **0.39.0**；仓库只保留 `main` 分支，与远端同步 |
-| 完整隔离回归 | **1666/1666**（**这是分母口径**：最近一次全量执行 1666 项；是否全绿只看 [reports/latest_regression.json](reports/latest_regression.json) 的 `failures`/`errors`；源库未修改；由 `scripts/test_isolated.py` 在克隆库上执行）。**新增测试会改变这个分母，每次都要同步本表** |
-| 验证基线 | 提交 `252f0eb` 由 `scripts/test_isolated.py` 在克隆元数据库上运行 |
+| 完整隔离回归 | **1658/1658**（**这是分母口径**：最近一次全量执行 1658 项；是否全绿只看 [reports/latest_regression.json](reports/latest_regression.json) 的 `failures`/`errors`；源库未修改；由 `scripts/test_isolated.py` 在克隆库上执行）。**新增测试会改变这个分母，每次都要同步本表** |
+| 验证基线 | 提交 `dab1233` 由 `scripts/test_isolated.py` 在克隆元数据库上运行 |
 | 审计缺陷 | **原审计反例（F01–F12）已修复**（F10 曾延后，已于 0.36.0 修复；另含修复过程中自查发现的 F12 与我自己引入并修复的回归 R1），见 [docs/AUDIT_FIXES.md](docs/AUDIT_FIXES.md) 与 [reports/audit_fix_verification.json](reports/audit_fix_verification.json)。**这不表示缺陷类别已穷尽**：2026-10-09 的独立复查（[reports/project_audit_20261009_561316c.md](reports/project_audit_20261009_561316c.md)）在同一基线上又复现了 R01–R05（SQL 作用域/表达式校验、待复核契约匿名可读、任务代次、审批≠可检索），正按批次修复 |
 | 模型接入 | **直连上游**（`https://api.deepseek.com/v1`，配置存于 `app_settings`）；**不依赖本地网关**，仓库内的 `gateway/`（vendored New API，997 个文件）与 `new-api-local` 容器已移除 |
 | 未决外部依赖 | T6 授权真实输入；V-CAR 真实视觉载荷与模型规模对比（上游仅文本模型、无本地权重目录） |
 | 设计主入口 | [V1.3 技术设计说明书](技术文档/DataMind_Agent_技术设计说明书_V1.3.md)（0.39.0 基线）；历史阶段记录保留在 [V1.2 说明书](技术文档/DataMind_Agent_技术设计说明书_V1.2.md) §18.12–18.33 |
 
-**分母口径**：上表 1666/1666 是**当前唯一权威值**（分母）；它的分子/分母都等于执行数，**不等于"全绿"**——是否全绿看 `reports/latest_regression.json` 的 `failures`/`errors`（该文件是唯一记录源，**会被任何 `--pattern` 运行覆写**，因此权威值只认最后一次全量；本条随基线行收敛到此段）。各阶段历史分母与原始失败分别保留在对应报告中（例如 `reports/vcar_ablation_verification.json`、`reports/parse_contract_verification.json`、`reports/audit_fix_verification.json` 的 `previous_stage_tests` 链），**不跨轮拼接为模型成绩**，也不得把任一历史值当作当前值。
+**分母口径**：上表 1658/1658 是**当前唯一权威值**（分母）；它的分子/分母都等于执行数，**不等于"全绿"**——是否全绿看 `reports/latest_regression.json` 的 `failures`/`errors`（该文件是唯一记录源，**会被任何 `--pattern` 运行覆写**，因此权威值只认最后一次全量；本条随基线行收敛到此段）。各阶段历史分母与原始失败分别保留在对应报告中（例如 `reports/vcar_ablation_verification.json`、`reports/parse_contract_verification.json`、`reports/audit_fix_verification.json` 的 `previous_stage_tests` 链），**不跨轮拼接为模型成绩**，也不得把任一历史值当作当前值。
 
 ## 阶段流水（新→旧，详细实现见 V1.3 §18.x 与提交记录）
 **本轮（第 5 项：真实材料评测与能力证据）**：三条线并行。**①多轮上下文**——`/v1/chat` 与 `/v1/chat/stream` 接受客户端自带 `history`（≤20 条、单条≤2000 字符、合计≤8000；**超限拒绝不截断**），历史以 `trust="untrusted"` 边界区块送入模型并附防注入声明，响应如实给出 `turns_used`；**不传历史时提示词与结果逐字节不变**（三种独立证明：提示词 sha256 常量复算、用 `git show HEAD:` 加载旧引擎并排对照、API 调用面精确断言）；实测把 `DROP TABLE orders` 放进历史后执行的 SQL 与参数**完全不变**。**②多规模性能**（官方 E7/F6）——`scripts/eval_scale.py` + `reports/scale_v1.json`：4 个 CAD 规模点（100/1000/5000/20000 实体）与 4 个检索规模点（选 1/2/5/8 份），**每规模独立子进程**测耗时与峰值内存，含 4 条免责。**③CAD 能力分层冻结验收集**——`data/evaluation/cad_capability_v1/`（31 份合成材料 + 先写后评的冻结标签 + 确定性生成器 + `--check`）：6 个能力层（unit/version/handle/entity/layout/rejected）**31/31 通过、365 条断言**；材料篡改→退出码 2 且不写报告；标签修订记录如实登记（首轮 28/31 失败**全是评测器自身缺陷**，只改评测器、标签只加强不放宽）。**并把两份真实图纸登记为开发样本**（`data/cad_demo/DEVELOPMENT_SAMPLES.md`）：它们被用来修复 CRLF、位置身份与 LEADER 崩溃，**不得**当泛化成绩；报告 `is_independent_factory_data=false`。**本轮由测量发现并修复的真实缺口**：块上限硬编码且**不在 `manifest.limits`** 里（消费方无法从结果得知上限）→ 改为可配置（参数 > `DATAMIND_CAD_MAX_BLOCKS` > 默认 2000，非法值 fail-safe 回退）并在**所有形态**（含 `unsupported`）暴露 `max_blocks`。另修我自己的两处测量缺陷（`ru_maxrss` 单位、检索「读全部再切片」）。官方要求映射据此更新：E7/F6 → 部分实现、E10 → 已实现（限定）。

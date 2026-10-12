@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 import uuid
 from datetime import datetime, timezone
@@ -31,6 +32,12 @@ MODEL_ERROR_MESSAGES = {
     "MODEL_EMPTY_RESPONSE": "模型返回了空内容（可能是模型名或推理参数不匹配），请检查模型配置。",
     "MODEL_UPSTREAM_ERROR": "上游模型服务返回错误，请稍后重试。",
 }
+
+
+#: Session ids are minted by ``datamind.sessions`` as "sess-" + uuid4().hex[:24]. The run path
+#: validates against this shape defensively (see ``DataMindAgent.run``): an id that cannot name a
+#: real session must never reach the runs INSERT or the bookkeeping hook.
+_SESSION_ID_RE = re.compile(r"^sess-[0-9a-f]{24}$")
 
 
 def _plain(value):
@@ -319,13 +326,24 @@ class DataMindAgent:
     def run(self, question: str, *, database_sources: list[str] | None = None,
             document_collections: list[str] | None = None, document_refs: list[dict] | None = None, mode: str = "auto",
             history: list[dict] | None = None, generator=None, rag_generator=None, retriever=None,
-            cross_source_evidence: dict | None = None) -> dict:
+            cross_source_evidence: dict | None = None,
+            conversation_id: str | None = None) -> dict:
         """Run one request. ``history`` is optional client-supplied multi-turn context.
 
-        The agent keeps no session: the transcript belongs to this call only. ``scope`` is never
-        inherited from an earlier call — a request without a scope uses the default scope, exactly
-        as it did before multi-turn support existed.
+        A run may optionally be *attributed* to a persisted chat session via ``conversation_id``
+        (the row is stamped and the session's title/updated_at are touched best-effort). That
+        attribution is bookkeeping only: the multi-turn transcript is STILL client-supplied per
+        request through ``history``, and ``scope`` is never inherited from an earlier call — a
+        request without a scope uses the default scope, exactly as it did before multi-turn
+        support existed.
         """
+        # A malformed session id is treated as ABSENT rather than raising: attributing a run to a
+        # session is side bookkeeping, and a stale/bad id from a client must never cost the user an
+        # answer. The run still executes and persists, just without a conversation_id. (The safer
+        # option, and consistent with the soft-delete/no-oracle stance of the sessions API.)
+        if conversation_id is not None and not (isinstance(conversation_id, str)
+                                                and _SESSION_ID_RE.match(conversation_id)):
+            conversation_id = None
         history = normalize_history(history)
         sources = database_sources if database_sources is not None else list(DATABASE_SOURCES)
         # WP7: frame the turn *before* routing/clarification/retrieval. Only a history-bearing
@@ -359,9 +377,21 @@ class DataMindAgent:
                            {'task_id':'compare','kind':'rules.compare','depends_on':['production']},
                            {'task_id':'answer','kind':'answer.template','depends_on':['compare']}]
         with self.conn.cursor() as cur:
-            cur.execute("""INSERT INTO runs(run_id, question, status, plan, versions)
-                           VALUES (%s,%s,'PLANNED',%s,%s)""",
-                        (self.run_id, question, Json(plan), Json({"prompt": RAG_PROMPT_VERSION if route == "rag" else PROMPT_VERSION})))
+            cur.execute("""INSERT INTO runs(run_id, question, status, plan, versions, conversation_id)
+                           VALUES (%s,%s,'PLANNED',%s,%s,%s)""",
+                        (self.run_id, question, Json(plan), Json({"prompt": RAG_PROMPT_VERSION if route == "rag" else PROMPT_VERSION}),
+                         conversation_id))
+        if conversation_id:
+            # Session bookkeeping is best-effort and deliberately AFTER the run row is committed
+            # (this connection is autocommit). The hook opens its OWN connection on the write DSN,
+            # so it cannot touch self.conn's transaction, and every failure — including this file
+            # running before ``datamind.sessions`` ships — is swallowed: the answer the user already
+            # paid for must never depend on whether the session title got refreshed.
+            try:
+                from .sessions import touch as touch_session
+                touch_session(conversation_id, question, _write_dsn())
+            except Exception:
+                logging.exception("Session touch failed for run %s / session %s", self.run_id, conversation_id)
         self._event("run.started", "orchestrator", "succeeded", input_summary={"question_length": len(question)})
         if route == "cross_source":
             # WP2: the cross-source branch now runs the typed evidence-graph engine. It stays

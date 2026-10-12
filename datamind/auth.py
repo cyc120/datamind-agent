@@ -210,7 +210,11 @@ def lock_identity(cur,identity,permission):
         FOR SHARE OF u,s''',(identity['user_id'],identity['_session_hash']))
     row=cur.fetchone()
     if not row:fail('SESSION_INVALID')
-    if permission not in row['roles'] and 'admin' not in row['roles']:fail('PERMISSION_DENIED',403)
+    # ``permission and`` mirrors the demo branch above and ``current()``: None means
+    # "any authenticated user", not "a user literally holding a role named None".
+    # Without the guard, passing None locked every non-admin out (403 PERMISSION_DENIED),
+    # which made the two branches disagree about what None means.
+    if permission and permission not in row['roles'] and 'admin' not in row['roles']:fail('PERMISSION_DENIED',403)
     return dict(row)
 
 
