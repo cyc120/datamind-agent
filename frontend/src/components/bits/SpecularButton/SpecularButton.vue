@@ -44,6 +44,11 @@ interface SpecularButtonProps {
   /** 内容对齐：卡片式用法传 'start' */
   align?: 'center' | 'start'
   /**
+   * 方向性高光强弱（0–1，默认 0 = 与原版一致的两道对称亮纹）。
+   * >0 时把背光那半边压暗，只剩朝向指针的一道弧 —— 「反光跟着鼠标走」的观感。
+   */
+  directional?: number
+  /**
    * 渲染成什么元素。默认 button；**纯展示、并没有点击行为时请传 'div'**，
    * 否则会做出一个点了没反应的按钮（本项目刚修过一批「按钮点了没用」）。
    */
@@ -81,6 +86,8 @@ uniform float uShineSize;
 uniform float uShineFade;
 uniform float uThickness;
 uniform float uBaseWidth;
+uniform float uDirectional;
+uniform float uBaseLevel;
 
 out vec4 fragColor;
 
@@ -102,14 +109,20 @@ void main() {
   float d = shapeSDF(p);
   vec2 L = vec2(cos(uAngle), sin(uAngle));
 
-  // 贴着边缘的暗色底描边，给一点厚度感
-  float base = (1.0 - smoothstep(0.0, uBaseWidth, abs(d))) * 0.45;
+  // 贴着边缘的暗色底描边，给一点厚度感；强度随指针靠近一起提升
+  float base = (1.0 - smoothstep(0.0, uBaseWidth, abs(d))) * uBaseLevel;
 
-  // 对称高光：朝向/背向光源的两条边都吃到一道亮纹。
-  // 用椭圆法线量角度窗口，直边上也能连续变化。
+  // 对称高光：朝向/背向光源的两条边都吃到一道亮纹（原版行为）。
   vec2 nEll = normalize(p / (uHalfSize * uHalfSize) + 1e-6);
   float phi = acos(clamp(abs(dot(nEll, L)), 0.0, 1.0));
   float rim = 1.0 - smoothstep(uShineSize - uShineFade, uShineSize + uShineFade + 1e-4, phi);
+
+  // 方向性加权（opt-in）：把「背光那半边」压暗，亮部就只剩朝向指针的一道弧，
+  // 看起来才是「反光跟着鼠标走」。uDirectional=0 时 1.0-0.85*0=1，与原版完全一致。
+  float side = dot(nEll, L);
+  float dirW = 1.0 - 0.85 * smoothstep(-0.35, 0.35, -side);
+  rim *= mix(1.0, dirW, uDirectional);
+
   float line = gaussianLine(d, uThickness);
   float edgeClamp = 1.0 - smoothstep(0.5 * uPx, 3.0 * uPx, abs(d));
   float hi = line * rim * edgeClamp * uIntensity;
@@ -140,11 +153,14 @@ const props = withDefaults(defineProps<SpecularButtonProps>(), {
   disabled: false,
   type: 'button',
   align: 'center',
+  directional: 0,
   as: 'button',
 })
 
 const btnRef = ref<HTMLElement | null>(null)
 const fxRef = ref<HTMLSpanElement | null>(null)
+/** 悬停标记：驱动 CSS 那一档「亮起来 + 微微抬起」（shader 那档由 loop 里的 proximityT 负责） */
+const hovering = ref(false)
 
 const sizeStyle = computed(() => SIZES[props.size] || SIZES.md)
 
@@ -165,7 +181,14 @@ onMounted(() => {
   if (!btn || !fx) return
 
   const dpr = window.devicePixelRatio || 1
-  const renderer = new Renderer({ alpha: true, premultipliedAlpha: true, antialias: true, dpr })
+  const renderer = new Renderer({
+    alpha: true,
+    premultipliedAlpha: true,
+    antialias: true,
+    // 让合成器之外也能读回像素（截图/自检时读 canvas 才有内容）
+    preserveDrawingBuffer: true,
+    dpr,
+  })
   const gl = renderer.gl
   gl.clearColor(0, 0, 0, 0)
   gl.enable(gl.BLEND)
@@ -190,6 +213,8 @@ onMounted(() => {
       uShineFade: { value: 0.7 },
       uThickness: { value: 1 },
       uBaseWidth: { value: dpr },
+      uDirectional: { value: 0 },
+      uBaseLevel: { value: 0.45 },
     },
   })
 
@@ -212,9 +237,11 @@ onMounted(() => {
   ro.observe(btn)
   resize()
 
-  // 光的方向跟着指针走（全页面范围），指针还没动过时用慢速自转兜底
+  // 光的方向跟着指针走；指针在卡片里时，亮部的方位直接由指针相对卡心的角度决定
+  // —— 于是「亮部会随鼠标移动」；指针在卡片外时只取它所在的方向（近距离才点亮）。
   let pointerAngle: number | null = null
   let proximityT = 0
+  let hoverInside = false
   const onPointerMove = (e: PointerEvent) => {
     const rect = btn.getBoundingClientRect()
     const cx = rect.left + rect.width / 2
@@ -223,16 +250,39 @@ onMounted(() => {
     const dy = Math.max(rect.top - e.clientY, 0, e.clientY - rect.bottom)
     const dist = Math.hypot(dx, dy)
     if (dist === 0) {
-      const nx = (e.clientX - cx) / (rect.width / 2)
-      const ny = (cy - e.clientY) / (rect.height / 2)
-      pointerAngle = Math.atan2(2 / rect.height, -2 / rect.width) + nx * 0.3 + ny * 0.15
+      // 指针在卡内：直接用它相对卡心的方位角，亮部跟着走
+      const nx = (e.clientX - cx) / Math.max(1, rect.width / 2)
+      const ny = (cy - e.clientY) / Math.max(1, rect.height / 2)
+      const m = Math.hypot(nx, ny)
+      pointerAngle = m < 0.12 ? idleAngle : Math.atan2(ny, nx)
     } else {
+      // 卡外：只借一个方向（光从指针那边照过来）
       pointerAngle = Math.atan2(cy - e.clientY, e.clientX - cx)
     }
     const t = Math.max(0, 1 - dist / Math.max(props.proximity, 1))
     proximityT = t * t * (3 - 2 * t)
   }
   window.addEventListener('pointermove', onPointerMove)
+  // 悬停状态直接用元素自身的 enter/leave：pointermove 还得自己判断内外，
+  // 而且指针从卡片移到子元素上会触发 leave，用 relatedTarget 兜一下。
+  const setHover = (v: boolean) => {
+    hoverInside = v
+    hovering.value = v
+  }
+  const onEnter = () => setHover(true)
+  const onLeave = (e: PointerEvent) => {
+    const to = e.relatedTarget as Node | null
+    if (to && btn.contains(to)) return
+    setHover(false)
+  }
+  const onLeaveWindow = () => {
+    proximityT = 0
+    setHover(false)
+  }
+  btn.addEventListener('pointerenter', onEnter)
+  btn.addEventListener('pointerleave', onLeave)
+  window.addEventListener('pointerleave', onLeaveWindow)
+  document.addEventListener('mouseleave', onLeaveWindow)
 
   let angle = 2.4
   let idleAngle = 2.4
@@ -249,11 +299,21 @@ onMounted(() => {
     last = now
 
     idleAngle += props.speed * dt
-    const steer = props.followMouse && pointerAngle != null && (!props.autoAnimate || proximityT > 0)
-    const target = steer ? pointerAngle! : idleAngle
+    // 指针在卡内用指针方位；在卡外只朝它转一定角度（保留自转，指针离得远时不强行对齐）
+    const steerTarget =
+      pointerAngle == null
+        ? idleAngle
+        : hoverInside
+          ? pointerAngle
+          : pointerAngle * 0.55 + idleAngle * 0.45
+    const steer = props.followMouse && (!props.autoAnimate || proximityT > 0)
+    const target = steer ? steerTarget : idleAngle
+    // 鼠标在卡里时转得更快（1024 帧），在卡外慢慢转（e^-4）
+    const k = hoverInside ? 10 : 4
     const diff = ((target - angle + Math.PI * 3) % (Math.PI * 2)) - Math.PI
-    angle += diff * (1 - Math.exp(-dt * 7))
+    angle += diff * (1 - Math.exp(-dt * k))
 
+    // 亮度：鼠标靠近就亮起来（autoAnimate 时保持常亮）
     const brightTarget = props.autoAnimate ? 1 : proximityT
     bright += (brightTarget - bright) * (1 - Math.exp(-dt * 8))
 
@@ -263,10 +323,16 @@ onMounted(() => {
     program.uniforms.uRadius.value = Math.min(props.radius, Math.min(sizeRef.w, sizeRef.h) / 2) * dpr
     program.uniforms.uLineColor.value = [lineC.r, lineC.g, lineC.b]
     program.uniforms.uBaseColor.value = [baseC.r, baseC.g, baseC.b]
-    program.uniforms.uIntensity.value = props.intensity * bright
+    // 底描边也参与「亮起来」：鼠标靠近时整圈边缘一起变清晰（原版是恒定的）
+    const baseLevel = 0.45 + 0.55 * bright
+    program.uniforms.uBaseLevel.value = baseLevel
+    // 卡内再加一档，让「亮起来」这件事看得更明确
+    const boost = hoverInside ? 1.35 : 1
+    program.uniforms.uIntensity.value = props.intensity * bright * boost
     program.uniforms.uShineSize.value = (props.shineSize * Math.PI) / 180
     program.uniforms.uShineFade.value = (props.shineFade * Math.PI) / 180
     program.uniforms.uThickness.value = props.thickness * dpr
+    program.uniforms.uDirectional.value = Math.min(1, Math.max(0, props.directional))
     renderer.render({ scene: mesh })
   }
   raf = requestAnimationFrame(update)
@@ -275,6 +341,8 @@ onMounted(() => {
     cancelAnimationFrame(raf)
     ro.disconnect()
     window.removeEventListener('pointermove', onPointerMove)
+    window.removeEventListener('pointerleave', onLeaveWindow)
+    document.removeEventListener('mouseleave', onLeaveWindow)
     if (gl.canvas.parentNode === fx) fx.removeChild(gl.canvas)
     gl.getExtension('WEBGL_lose_context')?.loseContext()
   })
@@ -286,7 +354,7 @@ onMounted(() => {
     :is="as"
     ref="btnRef"
     class="specular-btn"
-    :class="[`is-${size}`, `align-${align}`, as === 'div' ? 'is-static is-block' : '']"
+    :class="[`is-${size}`, `align-${align}`, as === 'div' ? 'is-static is-block' : '', hovering ? 'is-hover' : '']"
     :type="as === 'button' ? type : undefined"
     :disabled="as === 'button' ? disabled : undefined"
     :style="buttonStyle"
@@ -322,7 +390,16 @@ onMounted(() => {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.55),
     0 8px 24px rgba(15, 23, 42, 0.08);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    background-color 0.22s ease;
+}
+/* 鼠标悬停：玻璃更实、阴影更开，配合 shader 里那档亮度提升 */
+.specular-btn.is-hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    0 14px 34px rgba(15, 23, 42, 0.14);
 }
 /* 块级用法：卡片式内容需要盒子占满一行、内部能正常换行。
    调用方（如落地页的能力卡）用 .feat-card 覆盖成 flex 列即可，
