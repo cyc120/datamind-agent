@@ -184,35 +184,38 @@ const sampleEdges: EvidenceEdge[] = [
                   font-weight="800" color="#0b1220" :duration="0.6" :stagger="0.06" trigger="scroll" />
       </div>
 
-      <div class="flip-wrap reveal">
-        <FlipCard auto-flip class="flipcard">
-          <template #front>
-            <div class="face-content">
-              <div class="big">AI 黑箱？</div>
-              <p>一句话进去，一个答案出来——<br />中间发生了什么，没人知道。</p>
-              <span class="hint">点击翻转</span>
-            </div>
-          </template>
-          <template #back>
-            <div class="face-content">
-              <div class="big light">看看我们</div>
-              <ul class="checks">
-                <li>✓ SQL 全文可见</li>
-                <li>✓ 检索片段可点回原文</li>
-                <li>✓ 冲突来源并陈</li>
-                <li>✓ 推理链路可回放</li>
-              </ul>
-            </div>
-          </template>
-        </FlipCard>
+      <!-- 参考 Dify 那版：标题在上，下面一个大圆角边框容器装住两栏内容 -->
+      <div class="principle-box reveal">
+        <div class="flip-wrap">
+          <FlipCard auto-flip class="flipcard">
+            <template #front>
+              <div class="face-content">
+                <div class="big">AI 黑箱？</div>
+                <p>一句话进去，一个答案出来——<br />中间发生了什么，没人知道。</p>
+                <span class="hint">点击翻转</span>
+              </div>
+            </template>
+            <template #back>
+              <div class="face-content">
+                <div class="big light">看看我们</div>
+                <ul class="checks">
+                  <li>✓ SQL 全文可见</li>
+                  <li>✓ 检索片段可点回原文</li>
+                  <li>✓ 冲突来源并陈</li>
+                  <li>✓ 推理链路可回放</li>
+                </ul>
+              </div>
+            </template>
+          </FlipCard>
 
-        <div class="principle-text reveal">
-          <h3>答案，必须经得起追问</h3>
-          <p>
-            传统大模型问答像一张不透明的底片；DataMind 把它显影成一幅星图：SQL、检索、核验、冲突，
-            每一步都摆上台面，每一条证据都可点击、可回溯。
-          </p>
-          <a class="link" href="#starmap" @click.prevent="scrollTo('starmap')">看看星图长什么样 ↓</a>
+          <div class="principle-text">
+            <h3>答案，必须经得起追问</h3>
+            <p>
+              传统大模型问答像一张不透明的底片；DataMind 把它显影成一幅星图：SQL、检索、核验、冲突，
+              每一步都摆上台面，每一条证据都可点击、可回溯。
+            </p>
+            <a class="link" href="#starmap" @click.prevent="scrollTo('starmap')">看看星图长什么样 ↓</a>
+          </div>
         </div>
       </div>
     </section>
@@ -740,6 +743,13 @@ const sampleEdges: EvidenceEdge[] = [
 }
 
 /* ── 原理 ── */
+/* 参考 Dify 那版：标题在上，下面一个大的圆角边框容器，里面分两栏。 */
+.principle-box {
+  border: 1px solid var(--color-line);
+  border-radius: 20px;
+  background: #ffffff;
+  padding: 44px 40px;
+}
 .flip-wrap {
   display: grid;
   grid-template-columns: minmax(280px, 380px) 1fr;
