@@ -10,6 +10,21 @@ import { onBeforeUnmount, onMounted } from 'vue'
  */
 const REVEAL_FALLBACK_MS = 1500
 
+/**
+ * 显现状态写**行内样式**，不写 class —— 这里踩过坑：
+ * 原来是 `el.classList.add('is-visible')`，而「三个关键词」那三张卡是
+ * SpecularButton 渲染出来的元素，鼠标悬停要切换 class（加 is-hover）。
+ * Vue 重新 patch 整条 class 属性时会把外部加上的 `is-visible` 一起抹掉：
+ * 实测悬停第 1 张卡后它的 class 变回 `specular-btn ... feat-card reveal`，
+ * 只剩 `.reveal` 的基础规则 `opacity: 0; transform: translateY(28px)`
+ * —— 于是卡片在鼠标放上去的一瞬间消失（用户看到的就是「卡片不见了」）。
+ * 行内样式优先级同样最高，而且 Vue 不会去动它没有绑定的属性，稳定得多。
+ */
+function revealNow(el: HTMLElement) {
+  el.style.opacity = '1'
+  el.style.transform = 'translateY(0)'
+}
+
 export function useReveal() {
   let io: IntersectionObserver | null = null
   let fallback: ReturnType<typeof setTimeout> | null = null
@@ -19,7 +34,7 @@ export function useReveal() {
     if (!targets.length) return
 
     const revealAll = () => {
-      for (const el of targets) el.classList.add('is-visible')
+      for (const el of targets) revealNow(el)
     }
 
     if (typeof IntersectionObserver === 'undefined') {
@@ -31,7 +46,7 @@ export function useReveal() {
       (entries) => {
         for (const e of entries) {
           if (e.isIntersecting) {
-            e.target.classList.add('is-visible')
+            revealNow(e.target as HTMLElement)
             io!.unobserve(e.target)
           }
         }
