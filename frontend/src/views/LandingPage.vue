@@ -8,9 +8,6 @@ import RotatingText from '../components/bits/RotatingText/RotatingText.vue'
 import TrueFocus from '../components/bits/TrueFocus/TrueFocus.vue'
 import PixelSwap from '../components/bits/PixelSwap/PixelSwap.vue'
 import Folder from '../components/bits/Folder/Folder.vue'
-import Topography from '../components/bits/Topography/Topography.vue'
-import GlassSurface from '../components/bits/GlassSurface/GlassSurface.vue'
-import SpecularButton from '../components/bits/SpecularButton/SpecularButton.vue'
 import FlipCard from '../components/FlipCard.vue'
 import ConstellationGraph from '../components/stargraph/ConstellationGraph.vue'
 import { useReveal } from '../composables/useReveal'
@@ -217,92 +214,22 @@ const sampleEdges: EvidenceEdge[] = [
       </div>
     </section>
 
-    <!-- 能力：等高线通栏背景 + 玻璃表面 + 三个镜面按钮卡
-         背景 Vue Bits Topography（等高线，浅蓝），卡片 = Vue Bits GlassSurface（液态玻璃）
-         + SpecularButton（镜面高光描边）。 -->
-    <section id="features" class="feat-band">
-      <!-- 通栏背景层：宽度锁到 100vw 并居中，从网页最左蔓延到最右，形成一条横带 -->
-      <div class="feat-bleed" aria-hidden="true">
-        <div class="feat-bg">
-          <!-- bands 越小等高线越疏（密了像等高线地瓜图） -->
-          <Topography
-            :bands="1.15"
-            :thickness="0.0075"
-            :scale="1.2"
-            :glow="0.2"
-            :opacity="0.8"
-            :speed="0.26"
-            :morph-amount="2.2"
-            :mouse-strength="0.3"
-            low-color="#7fb2e5"
-            mid-color="#5b93cd"
-            high-color="#bcd9f2"
-          />
-        </div>
-        <!-- 两团淡蓝径向色：玻璃背后要有东西可折射，纯白背景上玻璃跟白纸没区别 -->
-        <div class="feat-wash"></div>
+    <!-- 能力：模糊文字 + 三卡 -->
+    <section id="features" class="section soft">
+      <div class="sec-head">
+        <div class="eyebrow">Capabilities</div>
+        <BlurText text="三个关键词" :delay="120" animate-by="words" direction="top"
+                  class="blur-heading" />
       </div>
-
-      <div class="feat-inner">
-        <div class="sec-head">
-          <div class="eyebrow">Capabilities</div>
-          <BlurText text="三个关键词" :delay="120" animate-by="words" direction="top"
-                    class="blur-heading" />
-        </div>
-        <div class="feat-grid">
-          <div
-            v-for="(f, i) in features"
-            :key="f.title"
-            class="feat-card reveal"
-            :style="{ transitionDelay: i * 90 + 'ms' }"
-          >
-            <!-- 液态玻璃底：边缘做真实折射。
-                 distortionScale 是位移量（负值向外扩），-180 会拉出很重的彩色撕裂，
-                 这里收到 -55；三通道 offset 控制色散，10/20 会出现明显虹边，收到 4/8。
-                 brightness/opacity 决定玻璃「内在的雾面厚度」，太高会把背景糊掉。 -->
-            <GlassSurface
-              class="feat-glass"
-              :border-radius="18"
-              :border-width="0.06"
-              :brightness="92"
-              :opacity="0.85"
-              :blur="9"
-              :displace="0.5"
-              :background-opacity="0.58"
-              :saturation="1.5"
-              :glass-blur="18"
-              :distortion-scale="-60"
-              :red-offset="0"
-              :green-offset="4"
-              :blue-offset="8"
-            />
-            <!-- 镜面高光层：透明底，只画边框反光；鼠标靠近亮起、亮部随指针移动 -->
-            <SpecularButton
-              as="div"
-              size="lg"
-              align="start"
-              :radius="18"
-              :tint-opacity="0"
-              :blur="0"
-              :text-color="'#0b1220'"
-              line-color="#1e293b"
-              base-color="#93b4d6"
-              :intensity="1.9"
-              :shine-size="14"
-              :shine-fade="36"
-              :directional="1"
-              :proximity="300"
-              :speed="0.3"
-              class="feat-btn"
-            >
-              <span class="feat-icon" aria-hidden="true">{{ f.icon }}</span>
-              <span class="feat-title">{{ f.title }}</span>
-              <span class="feat-desc">{{ f.desc }}</span>
-            </SpecularButton>
-          </div>
+      <div class="feat-grid">
+        <div v-for="(f, i) in features" :key="f.title" class="feat glass reveal" :style="{ transitionDelay: i * 90 + 'ms' }">
+          <div class="feat-icon">{{ f.icon }}</div>
+          <h3>{{ f.title }}</h3>
+          <p>{{ f.desc }}</p>
         </div>
       </div>
     </section>
+
     <!-- 星图：落差文字做小字说明 -->
     <section id="starmap" class="section">
       <div class="sec-head">
@@ -801,123 +728,31 @@ const sampleEdges: EvidenceEdge[] = [
   font-weight: 500;
 }
 
-/* ── 能力区：等高线通栏背景 + 玻璃表面 + 镜面按钮卡 ──
-   这一节自己铺背景，所以不再用 .soft 的灰底：改成很淡的冷蓝渐变，等高线透得出来。 */
-.feat-band {
-  position: relative;
-  /* 通栏：宽度锁到视口宽再居中，左右两侧就没有内边距把它夹住 */
-  width: 100vw;
-  margin-left: calc(50% - 50vw);
-  padding: 84px 0 92px;
-  overflow: hidden;
-  background: linear-gradient(180deg, #ffffff 0%, #f2f7fd 48%, #e9f1fb 100%);
-}
-/* 通栏背景层：绝对定位铺满这一节，不参与内容宽度约束 */
-.feat-bleed {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-}
-/* 等高线层：只做视觉，别抢鼠标（下面还有卡片要交互） */
-.feat-bg {
-  position: absolute;
-  /* 超出 20px 是为了盖住 100vw 在带滚动条时可能差的那几像素，避免右侧露白边 */
-  inset: 0 -20px;
-}
-/* 两团淡蓝径向色：玻璃背后要有东西可折射，纯白背景上玻璃跟白纸没区别 */
-.feat-wash {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  background:
-    radial-gradient(760px 340px at 10% 6%, rgba(59, 130, 246, 0.13), transparent 70%),
-    radial-gradient(620px 320px at 90% 94%, rgba(14, 165, 233, 0.12), transparent 72%);
-}
-.feat-inner {
-  position: relative;
-  z-index: 2;
-  max-width: 1360px;
-  margin: 0 auto;
-  padding: 0 40px;
-}
+/* ── 能力卡 ── */
 .feat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(288px, 1fr));
-  gap: 26px;
-  /* 镜面高光层比卡片大 20px，靠内边距让它在节内不被裁 */
-  padding: 8px 0;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
 }
-/* 卡片：外层只管布局与圆角；玻璃底与镜面高光是两张叠起来的层。
-   ⚠ 必须显式写 display: flex —— 组件里是 inline-flex，外层 grid 的 stretch 不会
-   把 inline-level 盒子拉满宽，内容也就不会换行（实测卡片被压成 90px 高的一条）。 */
-.feat-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  min-height: 172px;
-  border-radius: 18px;
-  /* 玻璃边缘的位移会把内容推出圆角，裁掉才不会在卡片外露出彩边 */
-  overflow: hidden;
+.feat {
+  border-radius: 14px;
+  padding: 26px 24px;
 }
-/* GlassSurface 铺满整张卡；内部由自己决定 padding */
-.feat-glass {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  border-radius: inherit;
-}
-/* 镜面高光层：透明底（tint 0 / blur 0），玻璃交给下面的 GlassSurface */
-.feat-btn {
-  position: relative;
-  z-index: 1;
-  flex: 1;
-  width: 100%;
-  padding: 26px 26px 28px;
-  border-radius: 18px;
-  background: transparent;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  box-shadow: none;
-}
-.feat-btn:active {
-  transform: none;
-}
-/* 组件里 .sb-content 是 block，会连带把里面的行内元素也变成块级；
-   这里显式声明，保证「图标 / 标题 / 说明」三行是自己控制的。
-   min-width: 0 是必需的：flex 子项默认 min-width:auto，长中文段会把卡片撑破
-   （实测 1000px 视口下卡片内容溢出 20px）。 */
 .feat-icon {
-  display: block;
-  min-width: 0;
-  font-size: 24px;
-  line-height: 1;
+  font-size: 22px;
   color: var(--color-accent);
-  margin-bottom: 2px;
+  margin-bottom: 12px;
 }
-.feat-title {
-  display: block;
-  min-width: 0;
-  font-size: 19px;
+.feat h3 {
+  margin: 0 0 8px;
+  font-size: 17px;
   font-weight: 700;
-  color: var(--color-text);
-  letter-spacing: -0.01em;
-  line-height: 1.3;
 }
-.feat-desc {
-  display: block;
-  min-width: 0;
+.feat p {
   margin: 0;
   color: var(--color-body);
-  font-size: 14.5px;
-  line-height: 1.9;
-  font-weight: 400;
-  overflow-wrap: anywhere;
-}
-/* 卡片内容也是 flex 子项，同样要能收缩 */
-.feat-btn > :deep(.sb-content) {
-  min-width: 0;
+  font-size: 14px;
+  line-height: 1.85;
 }
 
 /* ── 星图 ── */
