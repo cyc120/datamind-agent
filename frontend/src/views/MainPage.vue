@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import SideNav from '../components/SideNav.vue'
 import ChatPanel from '../components/chat/ChatPanel.vue'
@@ -7,7 +7,8 @@ import ConstellationGraph from '../components/stargraph/ConstellationGraph.vue'
 import NodeDetail from '../components/stargraph/NodeDetail.vue'
 import { streamChat, getEvidence } from '../api/client'
 import { useModelAccess } from '../composables/useModelAccess'
-import type { ChatMessage, ChatPayload, EvidenceGraph, EvidenceNode } from '../api/types'
+import { useSessions } from '../composables/useSessions'
+import type { ChatMessage, ChatPayload, EvidenceGraph, EvidenceNode, SessionMessage } from '../api/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -40,6 +41,98 @@ watch(activeView, (v) => {
   if (v === 'graph') evidenceHint.value = false
 })
 
+/**
+ * 会话状态与侧边栏共用同一份（useSessions 是模块级单例）。
+ * 这里只读 activeId：侧边栏点行、深链进入、删除活动会话，都会让 activeId 变化，
+ * 于是「换会话」只有 watch(activeId) 这一条路径，不存在两套切换逻辑。
+ */
+const {
+  activeId: sessionId,
+  bootstrap: bootstrapSessions,
+  refresh: refreshSessions,
+  loadTranscript,
+  create: createSession,
+  setBusyGuard,
+} = useSessions()
+
+/** 会话归属字段由 types.ts 补（另一位同学负责），这里按可选字段传 */
+type ChatPayloadWithSession = ChatPayload & { conversation_id?: string }
+
+/**
+ * 切换会话 = 换一段对话 + 换一份证据，两件事必须同时做。
+ * 此前证据图只在 newChat 里被清空过；如果切会话不动它，就会出现
+ * 「消息是 B 的、星图还停在 A 的」这种最容易骗人的状态。
+ */
+function resetEvidence() {
+  graph.nodes = []
+  graph.edges = []
+  graph.claims = []
+  selectedNode.value = null
+  evidenceHint.value = false
+}
+
+/** 把「一个 run 一条」的服务端投影摊平成「用户气泡 + 助手气泡」，顺序即 started_at 顺序 */
+function rebuildMessages(rows: SessionMessage[]) {
+  const next: ChatMessage[] = []
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const runId = String(row?.run_id ?? '')
+    const answer = typeof row?.answer === 'string' ? row.answer : ''
+    const status = String(row?.status ?? '').toUpperCase()
+    // 历史里可能有「还没产出 answer」的 run：仍在跑的渲染成进行中，已结束的按失败呈现，
+    // 不能因为 answer 为空就把它显示成一条正常答案。
+    const pending = status === 'RUNNING' || status === 'PENDING' || status === 'QUEUED'
+    next.push({
+      id: `hist-${runId}-u`,
+      role: 'user',
+      content: typeof row?.question === 'string' ? row.question : '',
+    })
+    next.push({
+      id: `hist-${runId}-a`,
+      role: 'assistant',
+      content: answer,
+      status: pending ? 'running' : answer ? 'done' : 'error',
+      runId: runId || undefined,
+      runStatus: (row?.status as ChatMessage['runStatus']) ?? undefined,
+      confidence: typeof row?.confidence_level === 'string' ? row.confidence_level : undefined,
+    })
+  }
+  messages.value = next
+}
+
+/**
+ * 读某个会话的 transcript 并铺进消息区。
+ * loadTranscript 内部按会话 id 合并并发请求，watch 与 onMounted 同时调用也只发一次。
+ */
+async function showTranscript(id: string) {
+  const rows = await loadTranscript(id)
+  // 期间又切走了、或正在流式写答案：绝不覆盖本地 messages
+  // （取舍理由见 setBusyGuard 的注释）。
+  if (sessionId.value !== id || running.value) return
+  rebuildMessages(rows)
+}
+
+/**
+ * 运行中禁止切换/删除会话 —— 守卫注册进 useSessions，侧边栏的行点击也要过这一关。
+ * 取舍：**阻塞切换**而不是「快照后丢弃」。流式回答期间 assistant 那一条还在被
+ * SSE 回调持续写入，中途重建 messages 会让已产出的内容凭空消失；阻塞只多一句提示。
+ */
+setBusyGuard(() => running.value)
+onBeforeUnmount(() => setBusyGuard(null))
+
+// activeId 是唯一的切换信号：侧边栏选中、深链启动、删除活动会话都会走到这里
+watch(
+  sessionId,
+  (id) => {
+    resetEvidence()
+    if (!id) {
+      messages.value = []
+      return
+    }
+    void showTranscript(id)
+  },
+  { immediate: true },
+)
+
 function buildPayload(question: string, mode: string): ChatPayload {
   switch (mode) {
     case 'retail':
@@ -62,15 +155,17 @@ function buildPayload(question: string, mode: string): ChatPayload {
   }
 }
 
-/** 新对话：清空消息与证据图（运行中不清，避免把正在写的回答丢掉） */
-function newChat() {
+/**
+ * 新对话：真在服务端建一个新会话并切过去（不再是只清空本地数组），
+ * 于是新会话立刻出现在侧边栏且处于选中态。运行中不建（同 setBusyGuard 的理由）。
+ */
+async function newChat() {
   if (running.value) return
   messages.value = []
-  graph.nodes = []
-  graph.edges = []
-  graph.claims = []
-  selectedNode.value = null
-  evidenceHint.value = false
+  resetEvidence()
+  // 失败（接口未就绪/网络）时组合式函数只写 error，不抛：这里保持「本地已清空」，
+  // 不会把上一段对话留在屏幕上，用户可以继续提问（send 会再试一次建会话）。
+  await createSession()
 }
 
 function selectNode(node: EvidenceNode | null) {
@@ -80,6 +175,14 @@ function selectNode(node: EvidenceNode | null) {
 async function send(payload: { question: string; mode: string }) {
   if (running.value || !payload.question.trim()) return
   const question = payload.question.trim()
+
+  // 会话归属：没有活动会话就先建一个 —— 每个 run 都必须挂在某个会话下，
+  // 否则这段问答在侧边栏里永远看不到（runs.conversation_id 为空）。
+  let conversationId = sessionId.value
+  if (!conversationId) {
+    const created = await createSession()
+    conversationId = created?.session_id ?? null
+  }
 
   messages.value.push({ id: uid(), role: 'user', content: question })
   const assistant = reactive<ChatMessage>({
@@ -91,15 +194,17 @@ async function send(payload: { question: string; mode: string }) {
   })
   messages.value.push(assistant)
 
-  graph.nodes = []
-  graph.edges = []
-  graph.claims = []
-  selectedNode.value = null
+  // 新一问清空上一问的证据（与 resetEvidence 同一套语义，别再抄一遍）
+  resetEvidence()
   running.value = true
-  evidenceHint.value = false
+
+  // conversation_id 只在真有会话时才写进 body：没有会话时请求体与旧版逐字节一致
+  //（后端也只在收到该键时才给 run() 传 conversation_id，见 api.py::_chat_kwargs）。
+  const body: ChatPayloadWithSession = buildPayload(question, payload.mode)
+  if (conversationId) body.conversation_id = conversationId
 
   try {
-    const final = await streamChat(buildPayload(question, payload.mode), (ev) => {
+    const final = await streamChat(body, (ev) => {
       assistant.thinking!.push(ev)
     })
 
@@ -130,6 +235,8 @@ async function send(payload: { question: string; mode: string }) {
     assistant.content = e?.message || '请求失败，请确认后端服务已启动。'
   } finally {
     running.value = false
+    // 让侧边栏拿到自动命名后的标题、更新后的排序与轮数；失败也不影响对话展示
+    if (conversationId) void refreshSessions()
   }
 }
 
@@ -151,6 +258,10 @@ const uid = () => `m-${Date.now()}-${uidSeq++}`
 onMounted(async () => {
   // 服务健康 + 模型配置 + 读回上次连通性检测（三件事各自独立）
   void bootstrapModelAccess()
+
+  // 先把会话状态就位（含 localStorage 里记住的活动会话）再处理深链提问，
+  // 这样 ?q= 那一次运行会挂进已有会话，而不是又新建一个。
+  await bootstrapSessions()
 
   // 深链提问：#/app?q=…&mode=retail —— 与旧版控制台的 hash 深链同一套用法
   const q = route.query.q

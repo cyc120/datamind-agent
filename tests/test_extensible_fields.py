@@ -228,7 +228,10 @@ class OriginalDomainRegressionTest(unittest.TestCase):
         #   ① 白名单外出现任何迁移条目 → 失败（未经批准的 DDL 一律拦截）；
         #   ② 白名单内也只允许「新增」（??），改动/删除既有迁移 → 失败；
         #   ③ 白名单只能由协调者按轮次显式批准后扩充，本功能不得自行添加。
-        approved_new_migrations = {"019_evidence_graph.sql"}  # WP2 证据图，本轮已批准
+        # 本轮协调者已显式批准服务端会话 DDL（db/migrations/020_chat_sessions.sql），
+        # 故按轮次把白名单扩充一项；本功能自身依旧不引入任何 DDL。
+        approved_new_migrations = {"019_evidence_graph.sql",  # WP2 证据图，本轮已批准
+                                   "020_chat_sessions.sql"}  # 会话表，本轮协调者批准
         status = subprocess.run(["git", "status", "--porcelain", "--", "db/migrations"],
                                 cwd=str(ROOT), capture_output=True, text=True)
         for line in (line for line in status.stdout.splitlines() if line.strip()):

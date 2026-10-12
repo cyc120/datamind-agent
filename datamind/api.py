@@ -63,6 +63,11 @@ class ChatRequest(BaseModel):
     #: below, which answers 422 + a stable ``HISTORY_*`` error code for a structural violation
     #: instead of a framework-shaped validation error.
     history: Any = None
+    #: 可选会话归属：非空时该 run 通过 `runs.conversation_id` 关联到已有会话。格式与
+    #: sessions.py 生成的 `sess-` + uuid4 hex[:24] 一致；不传时**完全不出现**在 agent
+    #: kwargs 里，保证无会话调用的提示词与调用签名与多轮之前逐字节相同。
+    conversation_id: str | None = Field(default=None, max_length=64,
+                                        pattern=r'^sess-[0-9a-f]{24}$')
 
 
 def _chat_kwargs(payload: ChatRequest) -> dict:
@@ -72,6 +77,10 @@ def _chat_kwargs(payload: ChatRequest) -> dict:
     calls ``DataMindAgent.run`` with exactly the pre-multi-turn keyword set — and therefore builds
     exactly the same prompts and returns the same result payload (apart from the new
     ``turns_used: 0``). A history over the contract is rejected, never truncated.
+
+    ``conversation_id`` follows the same rule: the key is added **only when the caller supplied
+    one**. An absent session must not turn into ``conversation_id=None`` in the ``run()`` kwarg
+    set, or every existing call site changes shape for no reason.
     """
     try:
         history = normalize_history(payload.history)
@@ -83,6 +92,8 @@ def _chat_kwargs(payload: ChatRequest) -> dict:
               "document_refs":[r.model_dump() for r in payload.scope.document_refs] if payload.scope and payload.scope.document_refs is not None else None}
     if history:
         kwargs["history"] = history
+    if payload.conversation_id is not None:
+        kwargs["conversation_id"] = payload.conversation_id
     return kwargs
 
 
@@ -195,6 +206,18 @@ class ProfileImportRequest(BaseModel):
     activate_first: bool = False
 
 
+class SessionCreateRequest(BaseModel):
+    """新建会话：标题可省略，省略即用服务端默认标题（首轮提问会自动命名）。"""
+    model_config = {'extra':'forbid'}
+    title: str | None = Field(default=None, max_length=200)
+
+
+class SessionRenameRequest(BaseModel):
+    """重命名会话：标题必填；全空白由 sessions.py 归一化后按 SESSION_TITLE_REQUIRED 拒绝。"""
+    model_config = {'extra':'forbid'}
+    title: str = Field(min_length=1, max_length=200)
+
+
 app = FastAPI(title="DataMind Agent", version="0.39.0")
 
 
@@ -223,7 +246,18 @@ SENSITIVE_READ_PREFIXES = ('/v1/model/profiles', '/v1/model/config')
 PUBLIC_WRITE_PATHS = frozenset({'/v1/chat', '/v1/chat/stream'})
 _NO_STORE_PREFIXES = ('/v1/pdf-snapshots', '/v1/pdf-knowledge', '/v1/drawings',
                       '/v1/dimensions', '/v1/files', '/v1/uploads', '/v1/plans',
-                      '/v1/model/profiles', '/v1/model/config')
+                      '/v1/model/profiles', '/v1/model/config',
+                      # 会话列表/详情就是聊天记录本身（问题与答案），一旦被浏览器或中间代理
+                      # 缓存，下一位使用同一台机器的用户就能读到别人的对话，因此永不缓存。
+                      '/v1/sessions',
+                      # 根路径的 index.html 是**指向内容哈希产物的指针**：`npm run deploy`
+                      # 带 --emptyOutDir，每次重建都会删掉旧哈希文件。若浏览器按启发式缓存
+                      # 住旧 index.html，它就会去请求已被删除的旧 bundle → 404 → 白屏，
+                      # 或者继续跑旧代码（表现为「界面上没有新功能的按钮」）。所以入口
+                      # HTML 必须每次回源校验；带哈希的产物本身可以放心长期缓存。
+                      # 注意 '/' 在这里只会命中根路径：_no_store_path 用 prefix+'/' 匹配，
+                      # 即 '//'，正常路径不会以它开头。
+                      '/')
 
 
 def _public_chat_enabled() -> bool:
@@ -1160,6 +1194,48 @@ def chat_stream(request: ChatRequest):
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
+# ---------- chat sessions ----------
+#
+# 会话只是对 `runs` 行的命名分组，没有消息表：transcript 由 `runs` 推导（question=用户轮次、
+# answer=助手轮次，按 started_at 排序），run 通过 `runs.conversation_id` 入组（见
+# `ChatRequest.conversation_id` / `_chat_kwargs`）。
+#
+# 授权：这里不列进 PUBLIC_PATHS / PUBLIC_READ_PREFIXES / PUBLIC_WRITE_PATHS，所以默认拒绝
+# 保证必须有身份，变更还自动带 origin + CSRF；`_required_permission` 也不为 /v1/sessions
+# 返回任何角色，即“任意已登录用户只管理自己的会话”。越权与不存在统一由服务层回 404
+# SESSION_NOT_FOUND，避免泄露会话是否存在。
+
+@app.post('/v1/sessions')
+def session_create(payload: SessionCreateRequest,request: Request):
+    from .sessions import create
+    return jsonable_encoder({'session':create(payload.model_dump(),_write_dsn(),request.state.identity)})
+
+
+@app.get('/v1/sessions')
+def session_list(request: Request,limit: int=Query(default=20,ge=1,le=50),
+                 offset: int=Query(default=0,ge=0,le=10000),q: str | None=Query(default=None)):
+    from .sessions import listing
+    return jsonable_encoder(listing(_write_dsn(),request.state.identity,q=q,limit=limit,offset=offset))
+
+
+@app.get('/v1/sessions/{session_id}')
+def session_detail(session_id: str,request: Request):
+    from .sessions import detail
+    return jsonable_encoder(detail(session_id,_write_dsn(),request.state.identity))
+
+
+@app.patch('/v1/sessions/{session_id}')
+def session_rename(session_id: str,payload: SessionRenameRequest,request: Request):
+    from .sessions import rename
+    return jsonable_encoder(rename(session_id,payload.model_dump(),_write_dsn(),request.state.identity))
+
+
+@app.delete('/v1/sessions/{session_id}')
+def session_remove(session_id: str,request: Request):
+    from .sessions import remove
+    return jsonable_encoder(remove(session_id,_write_dsn(),request.state.identity))
+
+
 def _document_asset(document_id: str) -> dict | None:
     """The raw `document_assets` row, published or not; None when the id is unknown.
 
@@ -1472,13 +1548,25 @@ def _run_exists(cur, run_id: str):
 
 
 @app.get("/v1/runs")
-def list_runs(limit: int = Query(default=20, ge=1, le=200)):
-    """Recent runs for the 「运行记录」 view."""
+def list_runs(limit: int = Query(default=20, ge=1, le=200),
+              offset: int = Query(default=0, ge=0, le=100000)):
+    """Recent runs for the 「运行记录」 view.
+
+    ``conversation_id`` is projected so the client can tell which session (if any) a run
+    belongs to: runs created before the session feature existed carry NULL there, and the
+    UI has to be able to say "尚未归属会话" honestly instead of guessing.
+    Pagination follows the house `limit+1` / `has_more` idiom so 「运行记录」 can page
+    through the whole history rather than only the newest page.
+    """
     with psycopg2.connect(_read_dsn()) as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute("""SELECT run_id, question, status, confidence_level, started_at, ended_at
-                       FROM runs ORDER BY started_at DESC LIMIT %s""", (limit,))
+        cur.execute("""SELECT run_id, conversation_id, question, status, confidence_level,
+                              started_at, ended_at
+                       FROM runs ORDER BY started_at DESC, run_id DESC LIMIT %s OFFSET %s""",
+                    (limit + 1, offset))
         rows = [dict(r) for r in cur.fetchall()]
-    return {"runs": jsonable_encoder(rows)}
+    has_more = len(rows) > limit
+    return {"runs": jsonable_encoder(rows[:limit]), "limit": limit, "offset": offset,
+            "has_more": has_more}
 
 
 @app.get("/v1/runs/{run_id}")

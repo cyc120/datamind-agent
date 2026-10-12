@@ -7,17 +7,21 @@ const router = createRouter({
   routes: [
     { path: '/', name: 'landing', component: () => import('../views/LandingPage.vue') },
     { path: '/app', name: 'app', component: () => import('../views/MainPage.vue') },
-    /**
-     * 兜底路由：**没有它就会白屏**。
-     * 新前端只实现了 / 与 /app 两个页面，而侧边栏沿用旧版控制台的深链
-     * （#/runs、#/model、#/fields、#/authority、#/cad、#/dimensions、#/files），
-     * 旧控制台（web/index.html）在 retire legacy UI 那次提交里已经删掉，
-     * 这些 hash 变成「匹配不到任何路由」——vue-router 不渲染任何组件，
-     * #app 里空掉，用户看到的就是整页白屏（实测 childCount 0、bodyText 空）。
-     * 老书签 / 浏览器前进后退同样会命中这里，所以兜底重定向到主界面，
-     * 而不是留一个空页面。
-     */
-    { path: '/:pathMatch(.*)*', name: 'not-found', redirect: '/app' },
+    { path: '/runs', name: 'runs', component: () => import('../views/RunsPage.vue') },
+
+    // 以下六项原先只有侧栏里的旧版 hash 深链（/#model、/#fields …），点进去是白屏。
+    // 现在它们都是真正的站内路由：全部 lazy import，保持首屏体积不变。
+    { path: '/model', name: 'model', component: () => import('../views/ModelPage.vue') },
+    { path: '/fields', name: 'fields', component: () => import('../views/FieldsPage.vue') },
+    { path: '/authority', name: 'authority', component: () => import('../views/AuthorityPage.vue') },
+    { path: '/cad', name: 'cad', component: () => import('../views/CadPage.vue') },
+    { path: '/dimensions', name: 'dimensions', component: () => import('../views/DimensionsPage.vue') },
+    { path: '/files', name: 'files', component: () => import('../views/FilesPage.vue') },
+
+    // 兜底必须留在最后：旧版深链（/#runs、/#model、/#fields …）没有前导斜杠，会被
+    // 解析成 /runs、/model 这类路径；真正未知的路径也要给出**明确说明**而不是渲染
+    // 一个空 <router-view>（那就是白屏，用户只会以为页面坏了）。
+    { path: '/:pathMatch(.*)*', name: 'not-migrated', component: () => import('../views/NotMigrated.vue') },
   ],
 })
 

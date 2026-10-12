@@ -57,6 +57,8 @@ $env:NEW_API_KEY = "<你的 API Key>"
 
 默认协议为 OpenAI 兼容接口；使用 Anthropic Messages 时设置 `NEW_API_PROTOCOL=anthropic`。也可先启动基础服务，再通过受认证保护的 `/v1/model/config`、`/v1/model/profiles` 管理配置，通过 `/v1/model/config/test` 测试连接。**带密钥的启用存储配置优先于环境变量**；真实密钥不要提交到仓库。
 
+同一认证面下还提供 `/v1/sessions` 会话管理：会话是对既有 run 的命名分组（只存标题与归属，transcript 由 run 推导），仅元数据、不向模型提供历史，契约见 [会话接口契约](docs/SESSIONS.md)。
+
 ### macOS / Linux
 
 先启动 Docker，再构建前端并启动服务：
@@ -87,6 +89,8 @@ Windows 下 Python 命令使用 `.venv\Scripts\python.exe`；下文 `.venv/bin/p
 | 问数工作台 | [http://127.0.0.1:8000/#/app](http://127.0.0.1:8000/#/app) |
 | API 文档 | [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) |
 | 服务健康 | [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health) |
+
+六个治理页面（模型接入、字段复核、来源权威规则、图纸与实体、尺寸核验、我的文件）已由 Vue 应用提供，入口分别为 `/#/model`、`/#/fields`、`/#/authority`、`/#/cad`、`/#/dimensions`、`/#/files`；接口契约与各页的诚实边界见 [前端六视图契约](docs/FRONTEND_VIEWS.md)。
 
 `/health` 成功只说明服务及基础设施状态，不能证明上游模型可调用。后台日志位于 `.cache/api/server.log` 与 `.cache/api/upload_worker.log`。脚本检测到已有 API 时会复用进程；更新后端代码或环境变量后，应先停止原 API 再启动。
 
@@ -165,8 +169,8 @@ SQL、RAG 与扫描 OCR 的核心依赖由启动脚本安装。严格复现已�
 | 记录项 | 值 |
 | --- | --- |
 | 代码 API | **0.39.0** |
-| 完整隔离回归 | **1666/1666**（最近存档的全量执行口径，结果以机读记录为准） |
-| 验证基线 | 提交 `252f0eb` 由 `scripts/test_isolated.py` 在克隆元数据库上运行 |
+| 完整隔离回归 | **1658/1658**（最近存档的全量执行口径，结果以机读记录为准） |
+| 验证基线 | 提交 `dab1233` 由 `scripts/test_isolated.py` 在克隆元数据库上运行 |
 
 此回归记录对应**旧前端退役前的提交**，不能作为当前 Vue 页面迁移完成或当前 HEAD 已全量验收的证明。阶段评测、真实模型结果与合成样本边界见 [PROGRESS](PROGRESS.md) 及对应的 `reports/` 文件；不要跨阶段拼接成绩。
 
