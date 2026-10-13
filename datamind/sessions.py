@@ -24,6 +24,7 @@
 * `create`   -> 裸的 public session dict（api.py 需包一层 ``{'session': ...}``）
 * `listing`  -> ``{'sessions': [...], 'limit': int, 'offset': int, 'has_more': bool}``
 * `detail`   -> ``{'session': {...}, 'messages': [...], 'turns': [...]}``
+* `results`  -> ``{'session_id': str, 'results': [...], 'limit': int, 'offset': int, 'has_more': bool}``
 * `rename`   -> ``{'session': {...}}``
 * `remove`   -> ``{'session': {...}}``
 
@@ -273,6 +274,59 @@ def _turns(rows):
         turns.append({**common, 'role': 'user', 'text': row['question']})
         turns.append({**common, 'role': 'assistant', 'text': row['answer']})
     return turns
+
+
+#: run 的**终态**事件类型：`agent.py::_answer` 按 status 挑一个写进去
+#: （COMPLETED→answer.completed、ABSTAINED→answer.abstained、
+#: FAILED_WITH_EVIDENCE→run.failed、其余→answer.clarification）。这份 `final` 字典
+#: 就是流式接口最后推给前端的那个对象，因此它是历史富内容的**唯一真相**，不需要另存一份。
+_TERMINAL_EVENTS = ('answer.completed', 'answer.abstained', 'run.failed', 'answer.clarification')
+
+
+def _result(row):
+    """One run's terminal payload, verbatim (None when the run never reached a terminal event)."""
+    return {'run_id': row['run_id'], 'result': row['result']}
+
+
+def results(session_id, dsn, identity, *, limit=20, offset=0):
+    """Recent runs of one owned live session, each with its terminal result payload.
+
+    为什么是**独立接口**而不是塞进 `detail`：单个终态 `output_summary` 实测平均 14 kB、
+    最大 140 kB，而真实库里最大的会话有 221 轮 → 全量富内容一次就是 3.9 MB；`detail`
+    的响应会从「几百 kB 的正文」变成「几 MB 的正文 + 结果表」，这是不可接受的。
+    所以这里按 run 分页（默认 20，上限 50），前端先渲染正文、再按同一套 limit+1/has_more
+    口径取最近若干轮的富内容。
+
+    顺序：**与 `detail` 相反**，按 `started_at DESC, run_id DESC`（最近优先）翻页，
+    `offset` 从最新的 run 开始算。响应里也是这个倒序——前端按 `run_id` 合并，
+    不依赖顺序。`result` 为 null 表示该 run 没走到终态事件（仍在跑、或早于事件落库），
+    这种行也**照样返回**，好让「第 offset 页」与 transcript 的时间窗口一一对齐。
+
+    `result` 是终态事件的 `output_summary` **原样**（与流式 `final` 逐字段一致，含
+    `sql_result` / `rag_result.citations` / `industrial_result` / `cross_source_result`）。
+    刻意不做字段裁剪：裁剪等于在读取路径上再维护一份投影，迟早与写入侧漂移。
+    """
+    _no_nul(session_id, 'SESSION_NOT_FOUND', 404)
+    _bounds(limit, offset)
+    user_id = _user(identity)
+    with psycopg2.connect(dsn) as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+        # 归属检查与 detail 同一条口径：别人的会话与不存在的会话不可区分。
+        cur.execute('''SELECT session_id FROM chat_sessions
+            WHERE session_id=%s AND user_id=%s AND deleted_at IS NULL''', (session_id, user_id))
+        if not cur.fetchone():
+            fail('SESSION_NOT_FOUND', 404)
+        cur.execute('''SELECT r.run_id, e.output_summary AS result
+            FROM runs r
+            LEFT JOIN LATERAL (
+                SELECT t.output_summary FROM trace_events t
+                WHERE t.run_id=r.run_id AND t.event_type IN %s
+                ORDER BY t.event_id DESC LIMIT 1) e ON true
+            WHERE r.conversation_id=%s
+            ORDER BY r.started_at DESC,r.run_id DESC LIMIT %s OFFSET %s''',
+                    (_TERMINAL_EVENTS, session_id, limit + 1, offset))
+        rows = cur.fetchall()
+    return {'session_id': session_id, 'results': [_result(row) for row in rows[:limit]],
+            'limit': limit, 'offset': offset, 'has_more': len(rows) > limit}
 
 
 def rename(session_id, payload, dsn, identity):

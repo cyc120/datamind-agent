@@ -511,5 +511,194 @@ class ChatSessionAPITest(unittest.TestCase):
                 self.assert_error(response, status, code)
 
 
+    # ---------- 13. 历史富内容（GET /v1/sessions/{id}/results） ----------
+    #
+    # 为什么单独一个接口：终态负载平均 14 kB、最大 140 kB，真实库里最大的会话 221 轮
+    # → 全量约 3.9 MB，塞进 detail 会让「打开一个会话」变成几 MB 的响应。
+
+    def insert_event(self, run_id, payload, event_type="answer.completed", sequence=1):
+        """按 agent.py::_event 的真实形状插事件：event_id 里的序号是零填充的。"""
+        event_id = f"evt-{run_id[4:]}-{sequence:04d}"
+        with psycopg2.connect(self.dsn) as conn, conn.cursor() as cur:
+            cur.execute("""INSERT INTO trace_events(event_id,run_id,event_type,status,started_at,
+                input_summary,output_summary,agent_name) VALUES (%s,%s,%s,%s,now(),%s,%s,%s)""",
+                        (event_id, run_id, event_type, "succeeded", Json({}), Json(payload),
+                         "orchestrator"))
+        return event_id
+
+    def rich(self, session_id, client=None, **params):
+        response = (client or self.owner).get("/v1/sessions/" + session_id + "/results", params=params)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assert_private(response)
+        return response.json()
+
+    def test_results_return_the_terminal_payload_verbatim_and_null_without_one(self):
+        session = self.create(title="富内容")
+        with_sql = self.insert_run(session["session_id"], "销售额是多少", answer="见结果表")
+        without = self.insert_run(session["session_id"], "还在跑的问题", answer=None, status="RUNNING")
+        payload = {"run_id": with_sql, "status": "COMPLETED", "answer": "见结果表",
+                   "sql_result": {"sql": "SELECT 1", "columns": ["a"], "rows": [[1]]}}
+        self.insert_event(with_sql, payload)
+
+        body = self.rich(session["session_id"])
+        self.assertEqual(body["session_id"], session["session_id"])
+        self.assertEqual((body["limit"], body["offset"], body["has_more"]), (20, 0, False))
+        # 最近优先：与 detail.messages（正序）相反，前端按 run_id 合并，不依赖顺序。
+        self.assertEqual([item["run_id"] for item in body["results"]], [without, with_sql])
+        # 原样返回：不是裁剪过的投影，字段一个不少。
+        self.assertEqual(body["results"][1]["result"], payload)
+        # 没走到终态事件的 run 也**返回这一行**（result=None），好让分页窗口与 transcript 对齐。
+        self.assertIsNone(body["results"][0]["result"])
+
+    def test_results_ignore_non_terminal_events_and_prefer_the_last_terminal_one(self):
+        """只有终态事件才是「最后推给前端的那份 final」。
+
+        非终态事件（如 `sql.executed`）的 output_summary 里也可能有同名键，不能拿来充数；
+        同一 run 有多个终态事件时按 event_id 取最后一个——event_id 的序号是零填充的
+        （`evt-<run>-0001`），所以字典序即先后序。
+        """
+        session = self.create(title="终态事件")
+        run_id = self.insert_run(session["session_id"], "问题", answer="答案")
+        self.insert_event(run_id, {"sql_result": {"sql": "不是终态"}}, event_type="sql.executed")
+        self.insert_event(run_id, {"answer": "旧的终态", "sql_result": {"sql": "SELECT old"}},
+                          event_type="answer.completed", sequence=2)
+        self.insert_event(run_id, {"answer": "新的终态", "sql_result": {"sql": "SELECT new"}},
+                          event_type="answer.abstained", sequence=5)
+
+        body = self.rich(session["session_id"])
+        self.assertEqual(body["results"][0]["result"]["answer"], "新的终态")
+        self.assertEqual(body["results"][0]["result"]["sql_result"]["sql"], "SELECT new")
+
+    def test_results_paginate_newest_first_with_has_more(self):
+        session = self.create(title="富内容分页")
+        base = datetime(2026, 10, 12, 9, 0, tzinfo=timezone.utc)
+        runs = [self.insert_run(session["session_id"], "第 %d 轮" % index,
+                                started_at=base + timedelta(minutes=index))
+                for index in range(5)]
+
+        first = self.rich(session["session_id"], limit=2)
+        self.assertEqual([item["run_id"] for item in first["results"]], [runs[4], runs[3]])
+        self.assertTrue(first["has_more"])
+        second = self.rich(session["session_id"], limit=2, offset=2)
+        self.assertEqual([item["run_id"] for item in second["results"]], [runs[2], runs[1]])
+        self.assertTrue(second["has_more"])
+        last = self.rich(session["session_id"], limit=2, offset=4)
+        self.assertEqual([item["run_id"] for item in last["results"]], [runs[0]])
+        self.assertFalse(last["has_more"])
+
+    def test_results_hide_foreign_and_missing_sessions_identically(self):
+        mine = self.create(title="我的富内容")
+        theirs = self.create(title="别人的富内容", client=self.other)
+        self.rich(mine["session_id"])
+        for client, session_id in ((self.other, mine["session_id"]),
+                                   (self.owner, theirs["session_id"]),
+                                   (self.owner, "sess-" + "0" * 24)):
+            with self.subTest(session_id=session_id):
+                self.assert_error(client.get("/v1/sessions/" + session_id + "/results"),
+                                  404, "SESSION_NOT_FOUND")
+
+    def test_results_deleted_session_is_not_found(self):
+        session = self.create(title="待删除富内容")
+        self.insert_run(session["session_id"], "问题")
+        self.rich(session["session_id"])
+        self.assertEqual(self.owner.delete("/v1/sessions/" + session["session_id"]).status_code, 200)
+        self.assert_error(self.owner.get("/v1/sessions/" + session["session_id"] + "/results"),
+                          404, "SESSION_NOT_FOUND")
+
+    def test_results_pagination_bounds_and_nul_are_stable(self):
+        session = self.create(title="富内容边界")
+        for params in ({"limit": 0}, {"limit": 51}, {"offset": -1}, {"offset": 10001}):
+            with self.subTest(params=params):
+                self.assertEqual(
+                    self.owner.get("/v1/sessions/" + session["session_id"] + "/results",
+                                   params=params).status_code, 422)
+        self.assert_error(self.owner.get("/v1/sessions/sess-%00abc/results"),
+                          404, "SESSION_NOT_FOUND")
+
+    def test_results_service_layer_validates_like_the_route(self):
+        """绕过路由直调服务层时也要给出稳定错误码（与 listing 的防御口径一致）。"""
+        identity = self.identity(self.owner)
+        for limit, offset, code in ((0, 0, "SESSION_PAGINATION_INVALID"),
+                                    (51, 0, "SESSION_PAGINATION_INVALID"),
+                                    (20, -1, "SESSION_PAGINATION_INVALID"),
+                                    (20, 10001, "SESSION_PAGINATION_INVALID")):
+            with self.subTest(limit=limit, offset=offset):
+                with self.assertRaises(HTTPException) as caught:
+                    service.results("sess-" + "0" * 24, self.dsn, identity,
+                                    limit=limit, offset=offset)
+                self.assertEqual(caught.exception.detail["error_code"], code)
+
+class SessionSearchPlanTest(unittest.TestCase):
+    """搜索子查询必须保留 `OFFSET 0` —— 它是唯一能挡住 hashed SubPlan 改写的开关。
+
+    WHY 用「捕获真实执行的 SQL」而不是 `EXPLAIN`：开发库只有几百条 run，规划器在两种
+    写法下**都**选惰性 SubPlan（实测：带/不带 OFFSET 0 都是 `SubPlan 1`），所以计划断言
+    在这个数据量上是假绿；而 2 万行档位的计划形态（hashed vs 惰性）才是要守住的东西——
+    见 datamind/sessions.py 中 `listing()` 的注释与 docs/SESSIONS.md §6.1。
+
+    也不能用 `LIMIT 1` 替代：实测它在 2 万行档位**仍然**是 hashed SubPlan（85.6 ms）。
+    """
+
+    class _Cursor:
+        def __init__(self, captured):
+            self._captured = captured
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def execute(self, sql, params=None):
+            self._captured.append((sql, params))
+
+        def fetchall(self):
+            return []
+
+    class _Conn:
+        def __init__(self, captured):
+            self._captured = captured
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def cursor(self, *args, **kwargs):
+            return SessionSearchPlanTest._Cursor(self._captured)
+
+    def _captured(self, **kwargs):
+        captured = []
+        with patch.object(service.psycopg2, "connect", return_value=self._Conn(captured)):
+            service.listing("postgresql://unused", {"user_id": "user-1"}, **kwargs)
+        self.assertEqual(len(captured), 1, "listing 只应执行一条 SQL")
+        return captured[0]
+
+    def test_search_keeps_the_anti_hashed_subplan_offset(self):
+        sql, _ = self._captured(q="风机")
+        self.assertIn("OFFSET 0", sql,
+                      "OFFSET 0 被删掉了：搜索会退回「整表扫 runs 算哈希表」的计划")
+
+    def test_search_still_escapes_wildcards_and_passes_three_patterns(self):
+        """`OFFSET 0` 不能顺手改坏转义：占位符仍是 3 个 pattern（标题 + 问 + 答）。
+
+        `100%` 里的 `%` 是**字面量**，注入的 pattern 必须是 `%100\\%%`（首尾是通配符、
+        中间那个被转义），否则 `100X` 会被一起命中。
+        """
+        sql, params = self._captured(q="100%")
+        self.assertIn("ESCAPE '\\'", sql)
+        pattern = "%100\\%%"
+        self.assertEqual(params, ("user-1", pattern, pattern, pattern, 21, 0))
+        self.assertEqual(sql.count("%s"), 6, "user_id 1 + 标题 1 + EXISTS 内 3 + limit/offset 2")
+
+    def test_no_search_omits_the_exists_clause_entirely(self):
+        """没有 q 时不该出现 EXISTS：翻第一页不该为搜索付任何代价。"""
+        sql, params = self._captured()
+        self.assertNotIn("EXISTS", sql)
+        self.assertNotIn("OFFSET 0", sql)
+        self.assertEqual(params, ("user-1", 21, 0))
+
+
 if __name__ == "__main__":
     unittest.main()
