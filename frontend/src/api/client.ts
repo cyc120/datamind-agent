@@ -54,6 +54,7 @@ import type {
   RunListResult,
   SessionDetail,
   SessionListResult,
+  SessionResultsPage,
   SessionSummary,
   TraceEvent,
   UploadApproveResult,
@@ -356,6 +357,28 @@ export async function listSessions(
 export async function getSession(sessionId: string): Promise<SessionDetail> {
   const res = await fetch(`/v1/sessions/${encodeURIComponent(sessionId)}`)
   if (!res.ok) throw await sessionError(res, 'getSession')
+  return res.json()
+}
+
+/**
+ * 历史会话的富内容：GET /v1/sessions/{id}/results（最近优先，按 run 分页）。
+ *
+ * 为什么与 getSession 分开：终态负载平均 14 kB/轮、最大 140 kB，把全量富内容塞进详情
+ * 会让一个 221 轮的会话返回约 4 MB（见 datamind/sessions.py::results）。这里只取窗口，
+ * 前端按 run_id 合并到已经渲染的正文气泡上。
+ */
+export async function listSessionResults(
+  sessionId: string,
+  params: { limit?: number; offset?: number } = {},
+): Promise<SessionResultsPage> {
+  const search = new URLSearchParams()
+  if (params.limit != null) search.set('limit', String(params.limit))
+  if (params.offset != null) search.set('offset', String(params.offset))
+  const suffix = search.toString()
+  const res = await fetch(
+    `/v1/sessions/${encodeURIComponent(sessionId)}/results${suffix ? `?${suffix}` : ''}`,
+  )
+  if (!res.ok) throw await sessionError(res, 'listSessionResults')
   return res.json()
 }
 

@@ -41,6 +41,10 @@ PROFILE_EDITOR = FRONTEND / 'components' / 'model' / 'ProfileEditor.vue'
 FILES_PAGE = FRONTEND / 'views' / 'FilesPage.vue'
 AUTHORITY_PAGE = FRONTEND / 'views' / 'AuthorityPage.vue'
 FIELDS_PAGE = FRONTEND / 'views' / 'FieldsPage.vue'
+MAIN_PAGE = FRONTEND / 'views' / 'MainPage.vue'
+SESSIONS_COMPOSABLE = FRONTEND / 'composables' / 'useSessions.ts'
+LANDING_PAGE = FRONTEND / 'views' / 'LandingPage.vue'
+RUNS_PAGE = FRONTEND / 'views' / 'RunsPage.vue'
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -505,6 +509,319 @@ class HonestyCopyTests(unittest.TestCase):
         # reviewer_user_id 为空的复核是历史未认证记录，不能显示成一次正常复核，
         # 也不能作为审批依据。
         self.assertIn('历史未认证', read(FIELDS_PAGE))
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 7) 历史会话的富内容：打开旧会话不能只剩纯文本
+# ══════════════════════════════════════════════════════════════════════════
+
+#: 历史重建时必须从终态负载里补回来的三块富内容（与 send() 流式路径同名同源）。
+HISTORY_RICH_FIELDS = ('sqlResult', 'citations', 'industrialResult')
+
+
+def history_rich_fields_restored(source):
+    """``rebuildMessages`` 是否把三块富内容从 run 的终态负载里补进气泡。
+
+    只认**重建函数体内**的赋值：写在别处（例如只在流式路径里赋值）等于历史会话
+    打开后仍然只剩纯文本——那正是这条护栏要防的回归。
+    """
+    body = function_body(source, 'rebuildMessages')
+    if not body:
+        return False
+    return all(re.search(r'\b' + re.escape(field) + r'\s*:', body) for field in HISTORY_RICH_FIELDS)
+
+
+class HistoryRichContentTests(unittest.TestCase):
+    """历史会话的富内容必须真的被还原，而不是「接口有了、页面没用」。"""
+
+    def setUp(self):
+        self.source = read(MAIN_PAGE)
+
+    def test_rebuild_messages_restores_the_three_rich_fields(self):
+        self.assertTrue(history_rich_fields_restored(self.source),
+                        'rebuildMessages 没有再挂回 sqlResult / citations / industrialResult：'
+                        '打开历史会话会退回纯文本')
+
+    def test_the_rich_field_check_is_not_vacuous(self):
+        """删掉任意一块赋值，判据必须变红——否则这条断言只是恰好为真。"""
+        for field in HISTORY_RICH_FIELDS:
+            with self.subTest(field=field):
+                mutated = re.sub(r'\b' + re.escape(field) + r'\s*:', 'removedField:', self.source)
+                self.assertNotEqual(mutated, self.source, '变异没有生效，判据失去意义')
+                self.assertFalse(history_rich_fields_restored(mutated),
+                                 f'{field} 被删掉后判据仍为真，说明它没有真正检查这一项')
+
+    def test_rich_content_is_fetched_from_the_results_endpoint(self):
+        """富内容只能来自 /results（终态事件），不能在客户端凭正文重新拼一个。"""
+        composable = read(SESSIONS_COMPOSABLE)
+        self.assertIn('listSessionResults', composable)
+        self.assertRegex(composable, r'Promise\.all')
+
+    def test_history_evidence_only_lights_runs_that_reached_a_terminal_state(self):
+        """证据图只点亮「有终态负载」的最近一个 run。
+
+        没有这条限定，空图的会话会退化成「对每个 run 各发一次 evidence 请求」，
+        打开一个 200 轮的会话就是 200 次请求。
+        """
+        body = function_body(self.source, 'showEvidenceForHistory')
+        self.assertIn('withResult', body, '缺少「只取走到终态的那个 run」的限定')
+        self.assertIn('for ', body, '必须显式从最近往回找')
+        self.assertNotRegex(
+            body, r'\.map\([^)]*getEvidence',
+            '不得对每个 run 都发一次证据请求：那是打开长会话时的请求爆炸')
+
+    def test_history_evidence_write_is_guarded_against_session_switching(self):
+        """证据请求回来时会话可能已经切走：写 graph 之前必须重新校验 activeId。
+
+        没有这道校验就是「消息是 B 的、星图停在 A 的」；而在 showTranscript 末尾补一次
+        resetEvidence 兜底又会把 B 刚点亮的证据一起清掉——两步组合的净效果是**空图**。
+        所以这里同时钉住「有校验」与「不靠事后 reset 兜底」。
+        """
+        body = function_body(self.source, 'showEvidenceForHistory')
+        self.assertRegex(body, r'sessionId\.value\s*!==\s*id',
+                         '写 graph 之前没有重新校验会话归属')
+        # 校验必须落在 getEvidence 之后、写 graph 之前，否则等于没校验。
+        self.assertLess(body.index('getEvidence'), body.index('sessionId.value'))
+        self.assertLess(body.index('sessionId.value'), body.index('graph.nodes'))
+        self.assertNotIn('resetEvidence()', function_body(self.source, 'showTranscript'),
+                         'showTranscript 不得用事后 resetEvidence 兜底：会清掉新会话的证据')
+
+
+def history_bucket_uses_calendar_days(source):
+    """时间分档是否按**本地日历日**算（`getDate() - n`），而不是减固定毫秒数。
+
+    WHY 这是一条红线：减 `n * 86400000` 在夏令时切换那天会把「昨天」算错一档；
+    而这两种写法在**功能测试里都看不出来**（只有那一天、那个时区才暴露）。
+    """
+    body = function_body(source, 'historyBucket')
+    if not body:
+        return False
+    if 'getDate() - offsetDays' not in body:
+        return False
+    return '86400000' not in body.replace('_', '')
+
+
+class ConversationHistoryTests(unittest.TestCase):
+    """历史对话的 P0 四项：入口与命名 / 重命名 / 时间分组 / 深链。
+
+    设计依据：docs/CONVERSATION_HISTORY_DESIGN.md（验收 A1–A5）。
+    """
+
+    def setUp(self):
+        self.side_nav = read(SIDE_NAV)
+        self.composable = read(SESSIONS_COMPOSABLE)
+        self.main_page = read(MAIN_PAGE)
+        self.landing = read(LANDING_PAGE)
+        self.runs = read(RUNS_PAGE)
+
+    # ---------- A1 入口与命名 ----------
+
+    def test_sidebar_calls_it_history_and_offers_a_collapse_toggle(self):
+        self.assertIn('历史对话', self.side_nav)
+        self.assertIn('data-testid="history-toggle"', self.side_nav)
+        # 折叠是持久偏好：落盘键必须存在，否则刷新后总是回到展开/折叠之一
+        self.assertIn('COLLAPSED_STORAGE_KEY', self.composable)
+        self.assertIn('datamind.sessions.collapsed', self.composable)
+
+    def test_landing_page_links_to_history_without_rendering_any_session(self):
+        """落地页只能放**跳转按钮**：它是对外页面，渲染会话标题等于把私有记录搬上公开入口。"""
+        self.assertIn('data-testid="landing-history"', self.landing)
+        self.assertIn("panel: 'history'", self.landing)
+        # 红线：落地页不得取会话列表/引用会话状态（变异见下一条）
+        for forbidden in ('useSessions', 'listSessions', 'session_id'):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, strip_comments(self.landing),
+                                 f'落地页不得出现 {forbidden}：那是私有会话数据')
+
+    def test_the_nav_has_a_real_history_button(self):
+        """导航里的「历史对话」是**动作型**入口，不是路由。
+
+        它与「问数与问答」同为 `/app`：若也给一个 `to`，两个条目会同时高亮，
+        看着像有两个页面。所以它只做「回到工作台 + 展开历史 + 聚焦搜索」。
+        """
+        items = re.findall(r"\{[^{}]*key:\s*'history'[^{}]*\}", strip_comments(self.side_nav))
+        self.assertTrue(items, '侧栏导航里缺少「历史对话」入口')
+        self.assertIn("action: 'history'", items[0])
+        self.assertNotIn('to:', items[0])
+        self.assertIn('data-testid="nav-history"', self.side_nav)
+        body = function_body(self.side_nav, 'openHistory')
+        self.assertIn("route.path === '/app'", body)
+        self.assertIn('revealHistory()', body)
+
+    def test_the_landing_page_privacy_rule_is_not_vacuous(self):
+        mutated = self.landing + '\nconst rows = useSessions().rows\n'
+        self.assertIn('useSessions', mutated)
+        with self.assertRaises(AssertionError):
+            self.assertNotIn('useSessions', strip_comments(mutated))
+
+    # ---------- A2 重命名 ----------
+
+    def test_rename_is_reachable_from_the_sidebar(self):
+        """后端 PATCH、组合式函数的 rename() 都早已存在，此前**界面零入口**。"""
+        self.assertIn('rename: renameSession', self.side_nav)
+        self.assertIn('data-testid="session-rename"', self.side_nav)
+        self.assertIn('data-testid="session-rename-input"', self.side_nav)
+        self.assertIn('commitRename', self.side_nav)
+        # 改名必须真的调用组合式函数，而不是只改本地数组
+        self.assertIn('await renameSession(id, next)', self.side_nav)
+
+    def test_esc_cancels_rename_without_saving(self):
+        """Esc 取消后那次 blur 不能再保存一次（否则「取消」会变成「保存」）。"""
+        body = function_body(self.side_nav, 'commitRename')
+        self.assertTrue(body)
+        # 开头就用 editingId 兜住「已经取消过」的那次 blur
+        self.assertRegex(body, r'if\s*\(!id\)\s*return')
+        self.assertLess(body.index('if (!id) return'), body.index('renameSession'))
+
+    def test_row_menu_replaces_the_always_visible_delete_button(self):
+        """行内动作收进 ⋯ 菜单，删除保留两步确认（数据安全不降级）。"""
+        self.assertIn('data-testid="session-menu"', self.side_nav)
+        self.assertIn('data-testid="session-delete-confirm"', self.side_nav)
+        self.assertNotIn('class="sess-del"', self.side_nav)
+
+    # ---------- A3 时间分组 ----------
+
+    def test_history_groups_and_search_state_are_both_present(self):
+        for name in ('今天', '昨天', '前 7 天', '更早'):
+            with self.subTest(group=name):
+                self.assertIn(f"'{name}'", self.composable)
+        body = function_body(self.composable, 'useSessions')
+        grouped = re.search(r'groupedRows\s*=\s*computed', self.composable)
+        self.assertIsNotNone(grouped, '缺少 groupedRows 计算属性')
+        self.assertIn('query.value.trim()', self.composable,
+                      '搜索态必须绕过分组（结果顺序是 updated_at，不是相关度）')
+        self.assertIsNotNone(body)
+
+    def test_history_buckets_use_calendar_days_not_fixed_milliseconds(self):
+        self.assertTrue(history_bucket_uses_calendar_days(self.composable),
+                        '时间分档必须按本地日历日算（夏令时那天才不会错一档）')
+
+    def test_the_calendar_day_rule_is_not_vacuous(self):
+        mutated = self.composable.replace('getDate() - offsetDays', 'getDate()')
+        self.assertNotEqual(mutated, self.composable, '变异没有生效，判据失去意义')
+        self.assertFalse(history_bucket_uses_calendar_days(mutated))
+        mutated = self.composable.replace('getDate() - offsetDays',
+                                          'getDate() - offsetDays * 86400000')
+        self.assertFalse(history_bucket_uses_calendar_days(mutated))
+
+    # ---------- A4 深链 ----------
+
+    def test_main_page_accepts_a_session_deep_link_and_clears_it(self):
+        self.assertIn('route.query.session', self.main_page)
+        self.assertRegex(self.main_page, r'SESSION_ID_RE\s*=\s*/\^sess-')
+        self.assertIn('router.replace({ path: \'/app\' })', self.main_page)
+        # 深链必须先于 bootstrap 写入 activeId，否则会被 localStorage 里的旧会话盖掉
+        self.assertLess(self.main_page.index('sessionId.value = deepLink'),
+                        self.main_page.index('await bootstrapSessions()'))
+
+    def test_main_page_expands_history_for_the_landing_entry(self):
+        self.assertIn("route.query.panel === 'history'", self.main_page)
+        self.assertIn('revealHistory()', self.main_page)
+
+    def test_runs_page_can_open_the_owning_session(self):
+        body = function_body(self.runs, 'openSession')
+        self.assertTrue(body, '运行记录缺少「打开该会话」的入口')
+        self.assertIn("path: '/app'", body)
+        self.assertIn('session: conversationId', body)
+        self.assertIn('data-testid="open-session"', self.runs)
+
+
+#: 侧栏历史区的可用高度下限（CSS 里是 216px；这里只要求「不是 0」这类明显退化）
+HISTORY_MIN_HEIGHT_RE = re.compile(r'\.sessions\s*\{[^}]*min-height:\s*(\d+)px', re.S)
+
+
+def history_min_height(source):
+    """`.sessions` 的最小高度（px）；没有声明或退化成 0 都返回 0。"""
+    block = re.search(r'\.sessions\s*\{([^}]*)\}', source, re.S)
+    if not block:
+        return 0
+    matched = re.search(r'min-height:\s*(\d+)px', block.group(1))
+    return int(matched.group(1)) if matched else 0
+
+
+class SidebarLayoutRegressionTests(unittest.TestCase):
+    """钉住两个**真实发生过**的侧栏布局缺陷（源码级判据 + 浏览器级脚本）。
+
+    源码判据只是快筛，真正的判据在 `scripts/verify_frontend_layout.py`：它用无头 Chrome
+    量高度、做命中测试、发真实鼠标事件。原因见下面每条测试的 docstring —— 这两个缺陷
+    **元素都在 DOM 里**，源码与 DOM 断言全都看不出来。
+    """
+
+    def setUp(self):
+        self.side_nav = read(SIDE_NAV)
+
+    def test_history_area_cannot_be_squeezed_to_nothing(self):
+        """缺陷一：历史区被 flex 压成 4px，连「历史对话」标题都被裁掉。
+
+        侧栏里导航（449px）与底部状态区（298px）的 `min-height` 都是 auto、缩不动，
+        空间不足时压力全落在 `.sessions` 上；`min-height: 0` 等于允许它变成 0。
+        实测 1440x900 与 800x600 **都是 4px、完整可见行 0**。
+        """
+        self.assertGreaterEqual(history_min_height(self.side_nav), 120,
+                                '`.sessions` 必须有可用的 min-height，否则会被压没')
+
+    def test_the_min_height_guard_is_not_vacuous(self):
+        self.assertEqual(history_min_height(''), 0)
+        self.assertEqual(history_min_height('.sessions { min-height: 0; }'), 0)
+        mutated = re.sub(r'(\.sessions\s*\{[^}]*min-height:\s*)216px', r'\g<1>0px',
+                         self.side_nav, count=1, flags=re.S)
+        self.assertNotEqual(mutated, self.side_nav, '变异没有生效，判据失去意义')
+        self.assertLess(history_min_height(mutated), 120)
+
+    def test_sidebar_scrolls_instead_of_clipping_the_bottom(self):
+        """缺陷一的下半段：`overflow: hidden` 让底部状态区在矮窗口永远够不到。"""
+        block = re.search(r'\.sidenav\s*\{([^}]*)\}', self.side_nav, re.S).group(1)
+        self.assertRegex(block, r'overflow-y:\s*auto',
+                         '侧栏必须可滚：否则矮窗口下底部状态区被裁掉且无法到达')
+
+    def test_row_menu_flips_up_near_the_bottom_of_the_list(self):
+        """缺陷二：列表底部那几行的 `⋯` 菜单被滚动容器裁掉，**真实鼠标点不到**。
+
+        `elementFromPoint(菜单项中心)` 返回的是侧栏本身，`Input.dispatchMouseEvent`
+        点下去没有任何反应。程序化 `.click()` 会绕过命中测试，所以它测不出这个问题。
+        """
+        self.assertIn('is-up', self.side_nav)
+        self.assertRegex(self.side_nav, r'\.sess-menu\.is-up\s*\{[^}]*bottom:')
+        body = function_body(self.side_nav, 'toggleMenu')
+        self.assertIn('elementFromPoint', read(ROOT / 'scripts' / 'verify_frontend_layout.py'),
+                      '浏览器级验证脚本必须保留命中测试（这是唯一能发现该缺陷的判据）')
+        self.assertIn('getBoundingClientRect', body,
+                      '打开菜单时要量一次几何，才能决定向上还是向下展开')
+
+    def test_history_header_stays_outside_the_scroll_container(self):
+        """标题与搜索框必须钉在滚动容器**之外**，否则列表一滚就滚没了。"""
+        head = self.side_nav.index('class="sess-head"')
+        body = self.side_nav.index('class="sess-body"')
+        self.assertLess(head, body, '标题应在滚动容器之前（同级，不在其中）')
+        block = re.search(r'\.sess-body\s*\{([^}]*)\}', self.side_nav, re.S).group(1)
+        self.assertRegex(block, r'overflow-y:\s*auto', '.sess-body 才是滚动容器')
+        sessions_block = re.search(r'\.sessions\s*\{([^}]*)\}', self.side_nav, re.S).group(1)
+        self.assertRegex(sessions_block, r'overflow:\s*hidden',
+                         '外层历史区不滚：两层各司其职，避免嵌套滚动条')
+
+    def test_collapsing_the_history_actually_reclaims_the_space(self):
+        """缺陷四：折叠只是藏掉内容，`min-height` 还在，216px 空白照样占着。
+
+        用户看到的就是「点了收不起来」。判据不能只看「搜索框消失 / aria-expanded=false」
+        —— 那些在**有 bug 的版本上也是绿的**（实测：注入缺陷后那两条仍然 PASS）。
+        必须同时钉住「折叠态有取消最小高度的规则」与「模板真的挂了这个类」。
+        """
+        # 模板必须把折叠态挂到容器上，否则 CSS 无从感知
+        self.assertRegex(self.side_nav, r'class="sessions"[^>]*:class="\{[^}]*is-collapsed',
+                         '折叠态必须挂到 .sessions 上（CSS 不知道 Vue 状态）')
+        block = re.search(r'\.sessions\.is-collapsed\s*\{([^}]*)\}', self.side_nav, re.S)
+        self.assertIsNotNone(block, '缺少 .sessions.is-collapsed 规则：折叠不会收回空间')
+        self.assertRegex(block.group(1), r'min-height:\s*0', '折叠态必须取消 min-height')
+        self.assertRegex(block.group(1), r'flex:\s*0\s+0\s+auto', '折叠态不应再参与 flex 增长')
+
+    def test_the_collapse_rule_check_is_not_vacuous(self):
+        block = re.search(r'\.sessions\.is-collapsed\s*\{([^}]*)\}', self.side_nav, re.S)
+        mutated = self.side_nav[:block.start()] + self.side_nav[block.end():]
+        self.assertIsNone(re.search(r'\.sessions\.is-collapsed\s*\{', mutated),
+                          '变异没有生效，判据失去意义')
+        # 只有展开态的 min-height 时，折叠就会留下空白 —— 这正是被修掉的缺陷
+        sessions_block = re.search(r'\.sessions\s*\{([^}]*)\}', mutated, re.S).group(1)
+        self.assertIn('min-height', sessions_block)
 
 
 if __name__ == '__main__':
