@@ -228,6 +228,16 @@ CREATE TABLE IF NOT EXISTS runs (
 -- db/migrations/*.sql 以 datamind_app 身份执行，对 runs 建索引会报 must be owner of table runs。
 CREATE INDEX IF NOT EXISTS runs_conversation_idx ON runs(conversation_id);
 
+-- 历史记录列表（GET /v1/runs：「运行记录」页与会话归属推断）固定按
+-- `ORDER BY started_at DESC, run_id DESC LIMIT/OFFSET` 翻页。没有这个索引时**每一页**都要
+-- 全表 Seq Scan `runs` 再 top-N 排序：20 800 行实测首页 12.79 ms、offset=20000 深翻页 9.22 ms，
+-- 耗时线性于 runs 总行数（与返回的 20 行无关）；而该接口是**公开读前缀**（无身份），
+-- 任何人都能按页触发这次全表扫。建成与排序键同序的复合索引后首页转为 Index Scan
+-- （实测 0.066 ms，×194），深翻页 1.40 ms，`LIMIT` 取满即停、不再读完整表。
+-- 显式写 DESC：与 ORDER BY 逐列同序，规划器才会选正向 Index Scan（而不是反向扫 + 排序）。
+-- 存量库升级见 scripts/start_local.sh（本文件只在容器首次初始化时执行）。
+CREATE INDEX IF NOT EXISTS runs_recent_idx ON runs(started_at DESC, run_id DESC);
+
 CREATE TABLE IF NOT EXISTS trace_events (
     event_id        VARCHAR(64) PRIMARY KEY,
     run_id          VARCHAR(64) NOT NULL REFERENCES runs(run_id) ON DELETE CASCADE,

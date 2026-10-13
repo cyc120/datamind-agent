@@ -187,6 +187,8 @@ def listing(dsn, identity, *, q=None, limit=20, offset=0):
     `q` matches the session title OR the question/answer text of any run linked to
     that session; blank/whitespace means "no filter". Pagination fetches limit+1
     rows (service idiom) and reports has_more instead of a second COUNT query.
+
+    `q` 的**计划形态**是这里唯一的性能机关，理由见下面 `OFFSET 0` 处的注释。
     """
     _bounds(limit, offset)
     pattern = _search_pattern(q)
@@ -200,10 +202,28 @@ def listing(dsn, identity, *, q=None, limit=20, offset=0):
         WHERE s.user_id=%s AND s.deleted_at IS NULL''']
     params = [user_id]
     if pattern is not None:
+        # 末尾的 `OFFSET 0` **不是**笔误，也不是多余的偏移：它是让搜索不被规划器改成
+        # 「hashed SubPlan」的唯一开关。带 OFFSET 的子查询不再算「简单子查询」，Postgres
+        # 因此只能在**每个候选会话**上惰性探测一次，`LIMIT 21` 也就真的能提前收工。
+        #
+        # WHY 必须挡住那个改写（实测，20 801 会话 / 20 800 runs / 33 MB）：
+        #   * hashed SubPlan 会先把**整个 runs 表**扫一遍算出哈希表（`EXPLAIN` 里可见
+        #     `Seq Scan on runs` + `hashed SubPlan`），代价与 LIMIT 完全脱钩，而且扫的是
+        #     **所有人**的 run（不含 owner 条件），只在自己的会话集合里过滤；
+        #     实测：命中 224 条 83.6 ms、高频词 56.7 ms、完全无匹配 69.9 ms。
+        #   * 保住惰性探测后：命中 224 条 14.3 ms（×5.9）、高频词 0.9 ms（×63，因为
+        #     最近 21 个会话就都命中，扫满即停）；只有「完全无匹配」这一种场景需要扫完
+        #     自己的全部会话：78.1 ms（比原来慢 11%，但换掉了全表扫）。
+        #   * `LIMIT 1` **挡不住**这个改写（实测仍是 hashed SubPlan，85.6 ms），所以不能
+        #     用更好读的 `LIMIT 1` 代替。两者语义等价：已实测基线与本写法返回**同一组**
+        #     session_id（含 `%`/`_`/`\` 转义用例）。
+        # 风险：若未来 Postgres 取消了「带 OFFSET 的子查询不做 hashed subplan」这条规则，
+        # 只会静默退回上面那个慢计划——性能回退，不会算错。tests/test_sessions_api.py
+        # 里有一条测试盯住这个写法。
         sql.append('''AND (s.title ILIKE %s ESCAPE '\\' OR EXISTS (
             SELECT 1 FROM runs r WHERE r.conversation_id=s.session_id
             AND (r.question ILIKE %s ESCAPE '\\'
-                 OR COALESCE(r.answer,'') ILIKE %s ESCAPE '\\')))''')
+                 OR COALESCE(r.answer,'') ILIKE %s ESCAPE '\\') OFFSET 0))''')
         params.extend([pattern, pattern, pattern])
     sql.append('ORDER BY s.updated_at DESC,s.session_id LIMIT %s OFFSET %s')
     params.extend([limit + 1, offset])

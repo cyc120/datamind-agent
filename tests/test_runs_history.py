@@ -17,6 +17,7 @@
 import unittest
 import uuid
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import psycopg2
 from fastapi.testclient import TestClient
@@ -190,6 +191,48 @@ class RunsHistoryAPITest(unittest.TestCase):
         response = self.client.get('/v1/runs/run-does-not-exist-0000')
         self.assertEqual(response.status_code, 404, response.text)
         self.assertEqual(response.json()['detail']['error_code'], 'RUN_NOT_FOUND')
+
+
+INDEX_NAME = 'runs_recent_idx'
+INDEX_DDL = f'CREATE INDEX IF NOT EXISTS {INDEX_NAME} ON runs(started_at DESC, run_id DESC);'
+
+
+class RunsRecencyIndexTest(unittest.TestCase):
+    """历史列表的翻页索引必须真的在库里，且排序方向与 ORDER BY 逐列同序。
+
+    为什么钉死**方向**：`ORDER BY started_at DESC, run_id DESC` 只有配上同为 DESC 的复合
+    索引才是正向 Index Scan（LIMIT 取满即停）。若被改成默认的 ASC，规划器要么反向扫再排序、
+    要么干脆退回全表 Seq Scan，而**功能测试全绿**——分页结果一模一样，只是慢。
+    实测（20 800 行）：全表扫 12.79 ms → 该索引 0.066 ms。
+
+    为什么不在这里断言执行计划不含 Seq Scan：`runs` 在真实库里只有几百行，规划器选 Seq Scan
+    是**正确**的代价决策，钉它会变成一条假红。这里只钉 DDL 契约，性能数字由
+    docs/PERFORMANCE.md 与 §4 的复现步骤承载。
+    """
+
+    def test_index_exists_with_descending_sort_keys(self):
+        dsn = _write_dsn()
+        with psycopg2.connect(dsn) as conn, conn.cursor() as cur:
+            cur.execute("""SELECT indexdef FROM pg_indexes
+                           WHERE schemaname='public' AND tablename='runs' AND indexname=%s""",
+                        (INDEX_NAME,))
+            row = cur.fetchone()
+        self.assertIsNotNone(row, f'{INDEX_NAME} 缺失：历史列表会退回全表扫 + 排序')
+        definition = row[0]
+        for fragment in ('started_at DESC', 'run_id DESC'):
+            self.assertIn(fragment, definition, definition)
+
+    def test_both_ddl_locations_share_one_statement(self):
+        """`runs` 归 postgres 所有，索引只能写在 deploy/init；而已存在的库卷不会重跑 init，
+        所以 start_local.sh / start_local.ps1 里还有一份给存量库的补丁。两处一旦漂移，
+        新库与老库就会有**不同**的索引——这里要求它们逐字一致。"""
+        root = Path(__file__).resolve().parents[1]
+        for relative in ('deploy/init/02_metadata.sql', 'scripts/start_local.sh',
+                         'scripts/start_local.ps1'):
+            with self.subTest(path=relative):
+                text = (root / relative).read_text(encoding='utf-8')
+                self.assertIn(INDEX_DDL, text,
+                              f'{relative} 缺少与其它位置逐字一致的 {INDEX_NAME} 语句')
 
 
 if __name__ == '__main__':

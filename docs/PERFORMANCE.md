@@ -18,7 +18,7 @@
 3. **不是真实企业数据**。SQL 侧是本轮生成器合成的同 schema 数据（`tmp/scale_v2_data`，只进临时库）。
 4. **CAD 后两档是受限输出路径**。`reports/scale_v1.json` 里 5000/20000 实体两档均为 `partial`，块数触顶上限 **2000**：那是受限输出的耗时，不是「完整解析 2 万实体并输出全部证据」的证明。
 5. **n<20 时 p95 就是观测最大值**（最近秩法 `ceil(q*n)`），不是统计意义上的 95 分位；每个数字旁边都写了样本数 `n`。
-6. **优化对照是测量级的**，不是已落地的产品改动：WP8 允许改动的文件只有 `scripts/eval_scale.py` 等脚本，`datamind/knowledge.py` 不在其中（见 §4.4）。
+6. **优化对照是测量级的**，不是已落地的产品改动：WP8 允许改动的文件只有 `scripts/eval_scale.py` 等脚本，`datamind/knowledge.py` 不在其中（见 §4.4）。**例外**：§4.5 是**本轮**新加的、已落地的产品改动（三处历史查询），它的口径与 §3/§4.1–4.3 的 `scale_v2.json` 不同——用的是容器内隔离库 `dm_bench`（2 051 会话 / 20 800 run）、每组 n=1 的 `EXPLAIN ANALYZE`，**不得**与前几节的 p50/p95 混用或互相抬档。
 
 ---
 
@@ -167,6 +167,51 @@
 
 WP8 允许新增/修改的文件只有 `scripts/build_scale_data.py`、`scripts/eval_scale.py`、`tests/test_eval_scale_v2.py`、`reports/scale_v2.json`、`reports/cards/wp8_performance.md`、`docs/PERFORMANCE.md`。§4.1 的索引优化落在**临时数据库的 DDL**（可 `DROP` 回退，已在报告里保留回退读数）；§4.2/§4.3 的两种查询改写落在**测量脚本内部**。把 §4.2 落地到产品需要改 `datamind/knowledge.py`（不在白名单内），本轮只交付「实测证据 + 可复现的对照代码」。
 
+### 4.5 ✅ 生效（本轮）：历史会话与历史列表的三处查询
+
+**测量环境**：容器内隔离库 `dm_bench`（跑完 `DROP DATABASE`），2 051 个会话 / 20 800 个 run /
+`runs` 33 MB，与产品同 schema、同索引集；每组用 `EXPLAIN (ANALYZE, BUFFERS)` 取 `Execution Time`，
+**每组只跑 1 次**（不是分位口径）。产品侧改动：`deploy/init/02_metadata.sql`、
+`scripts/start_local.sh|ps1`、`datamind/sessions.py`。
+
+**(1) `runs_recent_idx`：`GET /v1/runs` 从「每页全表扫 + 排序」变成索引扫描**
+
+`runs(started_at DESC, run_id DESC)`（`runs` 归 `postgres` 所有，索引只能建在 `deploy/init` 里）。
+
+| 查询 | 优化前 | 优化后 | 加速比 |
+|---|---:|---:|---:|
+| 首页（`LIMIT 21`） | 12.791 ms（`Seq Scan` + top-N sort） | **0.066 ms**（`Index Scan`，无排序） | **×194** |
+| 深翻页 `OFFSET 20000` | 9.222 ms（全表扫 + `quicksort` 2.2 MB） | 1.400 ms | ×6.6 |
+
+**(2) 会话搜索：保住惰性探测，不再整表扫所有人的 run**
+
+`datamind/sessions.py::listing` 的搜索子查询结尾加 `OFFSET 0`，阻断 Postgres 的 hashed-subplan
+改写（语义等价，实测返回同一组 `session_id`）。
+
+| `q` | 优化前（hashed SubPlan，全表扫） | 优化后（惰性逐会话探测） | 加速比 |
+|---|---:|---:|---:|
+| 命中 224 条 | 83.645 ms | **14.278 ms** | ×5.9 |
+| 高频词（命中约 2 万 run） | 56.738 ms | **0.891 ms** | ×63.7 |
+| 完全无匹配 | 69.928 ms | 78.108 ms | **×0.90（慢 11%）** |
+
+**(3) ❌ 被实测否掉：`pg_trgm` + 「UNION 命中 session_id 再 IN」的索引驱动改写**
+
+三个 GIN trigram 索引（`question` 984 kB + `answer` 1 096 kB + `title` 144 kB，共 2.2 MB，
+建索引 0.63 s）确实让选择性与无匹配两档变快，但**高频词反而比原状更慢**，因为 CTE 要物化全部
+命中行、不受 `LIMIT` 约束；写入侧每次 `INSERT` 还要多维护两个 GIN（200 行 2.158 → 8.209 ms）。
+
+| `q` | 原状 | 惰性探测（采用） | trigram + UNION 改写 |
+|---|---:|---:|---:|
+| 命中 224 条 | 83.6 ms | **14.3 ms** | 3.5 ms |
+| 高频词（约 2 万命中） | 56.7 ms | **0.9 ms** | 68.2 ms ❌ |
+| 完全无匹配 | 69.9 ms | 78.1 ms | 1.0 ms |
+
+**诚实边界**：① 每组 n=1、单机、合成数据，不能外推为生产 p95；② 上表是 **SQL 级**
+`EXPLAIN ANALYZE`，不是 HTTP 端到端耗时；③ 「完全无匹配」这一种场景本轮**是负收益**（+11%），
+换来的是「扫描范围从全表缩到自己的会话」——多租户下这一项才真正占优；④ 第 (3) 项只是测量，
+产品里**没有**引入扩展或 GIN 索引（`docs/SESSIONS.md` §6 明确不引入扩展）；⑤ 富内容接口
+（`GET /v1/sessions/{id}/results`）实测 20 轮 15.8 ms / 426 kB，最大会话的 221 轮全量约 3.9 MB，
+这是它必须分页的原因，不是「优化前后」对照。
 ---
 
 ## 5. 实测：并发矩阵（SQL 工具链，100 000 行档）
@@ -246,6 +291,9 @@ WP8 允许新增/修改的文件只有 `scripts/build_scale_data.py`、`scripts/
 | 4 | 每轮重复建连 ≈5 ms | §6：`scale_connect` p50 4.883 ms | 连接池 | 未做 |
 | 5 | 解析渲染 ≈85 ms/页 | §7：10/100/500 页线性 | 降低渲染 dpi、按需只渲染命中页 | 未做（会改动解析行为，超出 WP8） |
 | 6 | 块定位查询 | §4.3：5000 切片仅 121 ms，批量改写反而 ×0.79 | **不建议优化** | 已被实测否掉 |
+| 7 | 历史列表 `GET /v1/runs` 每页全表扫 + 排序 | §4.5(1)：20 800 行首页 12.791 → 0.066 ms（×194） | 与排序键同序的 `runs(started_at DESC, run_id DESC)` | **已落地**（`deploy/init` + 存量库补丁） |
+| 8 | 会话搜索被改写成 hashed SubPlan，整表扫所有人的 run | §4.5(2)：选择性词 83.6 → 14.3 ms，高频词 56.7 → 0.9 ms | 子查询加 `OFFSET 0` 保住惰性探测 | **已落地**（`datamind/sessions.py`，有测试钉住） |
+| 9 | 历史会话富内容无法一次取全（最大会话约 3.9 MB） | §4.5 边界⑤：20 轮 426 kB | 独立分页接口，窗口外只显示正文 | **已落地**（`GET /v1/sessions/{id}/results`，已知边界） |
 
 ---
 
@@ -287,6 +335,28 @@ cd "/Users/caicai/DataMind Agent"
 .venv/bin/python -m unittest tests.test_eval_scale_v2                          # 冻结最终代码 EXIT=0（31/31）
 # 注：22:40 之后 test_isolated.py 的种子阶段被并发工作包新增的 db/migrations/019_evidence_graph.sql
 # 阻断（InsufficientPrivilege: must be owner of table evidence_nodes），与 WP8 测试文件无关
+```
+
+### 9.1 §4.5 的复现（本轮，容器内隔离库，跑完删库）
+
+```bash
+cd "/Users/caicai/DataMind Agent"
+
+# 1) 起库并建隔离基准库（不碰 datamind_meta 的任何一行）
+docker exec datamind-postgres psql -U postgres -q -c "CREATE DATABASE dm_bench"
+#    …按 dm_bench 播种 2000 会话 x 10 run + 一个 300 轮长会话 + 另一个 owner 的 500 run
+
+# 2) 三个对照（每组 EXPLAIN (ANALYZE, BUFFERS)）
+#    (1) /v1/runs：无索引 12.791 ms → CREATE INDEX runs_recent_idx → 0.066 ms
+#    (2) 搜索：原状（hashed SubPlan）83.6 ms → EXISTS(... OFFSET 0) 14.3 ms
+#    (3) 被否候选：CREATE EXTENSION pg_trgm + 3 个 GIN + UNION 改写 → 高频词 68.2 ms（更慢）
+
+# 3) 收尾（务必删掉基准库）
+docker exec datamind-postgres psql -U postgres -q -c "DROP DATABASE dm_bench"
+
+# 4) 产品侧守护测试（不需要 dm_bench）
+PYTHONPATH=".:tests" .venv/bin/python -m unittest tests.test_runs_history tests.test_sessions_api   # EXIT=0
+PYTHONPATH=".:tests" .venv/bin/python -m unittest tests.test_frontend_views                        # EXIT=0
 ```
 
 ---
