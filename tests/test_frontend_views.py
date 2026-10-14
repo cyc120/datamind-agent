@@ -287,25 +287,44 @@ class RouterMigrationTests(unittest.TestCase):
 # 3) 侧栏：不再有指向退役旧版控制台的深链
 # ══════════════════════════════════════════════════════════════════════════
 
-SIX_NAV_ITEMS = (
+#: 侧栏里**直接指向站内路由**的入口。
+#:
+#: 这里原先列的是 6 条：数据治理的 4 屏（/fields、/authority、/cad、/dimensions）各占一行。
+#: 现在它们合并成 1 条 `/governance`，四个板块改为该页**页内分栏**（见 GovernancePageTests）。
+#: 注意：四条旧路由本身仍然保留在路由表里，那属于 RouterMigrationTests 的断言，不在这里删。
+NAV_ROUTE_ITEMS = (
     ('model', '/model', '模型接入'),
-    ('fields', '/fields', '字段复核'),
-    ('authority', '/authority', '来源权威规则'),
-    ('cad', '/cad', '图纸与实体'),
-    ('dimensions', '/dimensions', '尺寸核验'),
+    ('governance', '/governance', '数据治理'),
     ('files', '/files', '我的文件'),
+)
+
+#: 合并之后，这四个 key **不得**再作为独立导航条目出现在侧栏里。
+MERGED_GOVERNANCE_KEYS = ('fields', 'authority', 'cad', 'dimensions')
+
+GOVERNANCE_PAGE = FRONTEND / 'views' / 'GovernancePage.vue'
+
+#: `/governance` 页内的四个分栏：(`?tab` 取值, 分栏标题, 被复用的页面组件)
+GOVERNANCE_TABS = (
+    ('fields', '字段复核', 'FieldsPage'),
+    ('authority', '来源权威规则', 'AuthorityPage'),
+    ('cad', '图纸与实体', 'CadPage'),
+    ('dimensions', '尺寸核验', 'DimensionsPage'),
 )
 
 
 class SideNavMigrationTests(unittest.TestCase):
-    """侧栏八个入口全部改走站内路由，旧 ``/#…`` 深链与「未迁移」标签不得再对它们生效。"""
+    """侧栏各入口全部走站内路由，旧 ``/#…`` 深链与「未迁移」标签不得再对它们生效。
+
+    数据治理那 4 条已合并成 1 条（分栏在 GovernancePageTests 里钉）；这里钉的是
+    「导航条目本身必须是站内路由」，以及合并之后那 4 个条目真的不再各占一行。
+    """
 
     def setUp(self):
         self.source = read(SIDE_NAV)
         self.code = strip_comments(self.source)
 
-    def test_the_six_entries_are_router_targets_not_legacy_hrefs(self):
-        for key, path, label in SIX_NAV_ITEMS:
+    def test_the_nav_entries_are_router_targets_not_legacy_hrefs(self):
+        for key, path, label in NAV_ROUTE_ITEMS:
             items = re.findall(r"\{[^{}]*key:\s*'%s'[^{}]*\}" % re.escape(key), self.code)
             self.assertTrue(items, '侧栏缺少 %s 入口（key=%s）' % (label, key))
             item = items[0]
@@ -314,11 +333,34 @@ class SideNavMigrationTests(unittest.TestCase):
             # 只要还带 href，就会回落到旧版控制台的深链。
             self.assertNotIn('href', item, item)
 
-    def test_the_un_migrated_badge_cannot_reach_the_six_entries(self):
-        # 「未迁移」只能挂在兜底分支上；上面已断言六个入口都有 to:，
-        # 模板里 `v-if="it.to"` 优先，因此这六个入口永远走不到带「未迁移」的 v-else。
+    def test_the_four_governance_entries_are_merged_into_one_nav_item(self):
+        # 合并的反向判据：这 4 条若还在侧栏里各占一行，导航就又堆回 4 行（本次改动的前提）。
+        for key in MERGED_GOVERNANCE_KEYS:
+            with self.subTest(key=key):
+                items = re.findall(r"\{[^{}]*key:\s*'%s'[^{}]*\}" % re.escape(key), self.code)
+                self.assertEqual(items, [],
+                                 '侧栏仍有独立的 %s 条目：它应与「数据治理」合并成一个入口' % key)
+        # 合并的正面判据：那 4 条现在只剩 1 个入口，且指向 /governance。
+        governance = re.findall(r"\{[^{}]*key:\s*'governance'[^{}]*\}", self.code)
+        self.assertEqual(len(governance), 1, '「数据治理」入口应恰好有 1 条：%r' % (governance,))
+        self.assertIn("to: '/governance'", governance[0], governance[0])
+
+    def test_there_is_no_data_governance_group_container_left(self):
+        """侧栏里不得再有「数据治理」**分组标题**：条目已经是平级的，标题只会与它同名重复。
+
+        只认 GROUPS 里的 `title:` 字段（NavItem 用的是 `label`，模板用的是 `title=`），
+        所以这条不会误伤条目本身或历史区。
+        """
+        titles = re.findall(r"title:\s*'([^']*)'", self.code)
+        # 先证明这个正则真的取到了分组标题（否则「不含数据治理」是空转）。
+        self.assertIn('工作台', titles, titles)
+        self.assertNotIn('数据治理', titles, titles)
+
+    def test_the_un_migrated_badge_cannot_reach_the_route_entries(self):
+        # 「未迁移」只能挂在兜底分支上；上面已断言这些入口都有 to:，
+        # 模板里 `v-if="it.to"` 优先，因此它们永远走不到带「未迁移」的 v-else。
         self.assertRegex(self.code, r'v-if="it\.to"')
-        for key, _path, _label in SIX_NAV_ITEMS:
+        for key, _path, _label in NAV_ROUTE_ITEMS:
             items = re.findall(r"\{[^{}]*key:\s*'%s'[^{}]*\}" % re.escape(key), self.code)
             self.assertNotIn('未迁移', items[0], items[0])
 
@@ -329,6 +371,65 @@ class SideNavMigrationTests(unittest.TestCase):
                 if re.search(r'href\s*[=:]\s*["\']?/#', line)]
         self.assertEqual(hits, [],
                          '仍有指向退役旧版控制台的 /# 深链（行号, 内容）：%r' % (hits,))
+
+
+class GovernancePageTests(unittest.TestCase):
+    """合并后的 ``/governance``：四个板块必须是**页内分栏**，不是从界面上消失。
+
+    只钉「侧栏有 1 个数据治理入口」是不够的 —— 入口在、点进去却少了三个板块时，
+    用户丢掉的正是那三屏的能力。所以这里同时钉住「四个分栏各自可在地址栏寻址」与
+    「复用的是原来那四个页面组件（没有另写一份）」。
+    """
+
+    def setUp(self):
+        self.source = read(GOVERNANCE_PAGE)
+        self.code = strip_comments(self.source)
+
+    def test_the_page_reuses_the_four_existing_view_components(self):
+        for key, label, component in GOVERNANCE_TABS:
+            with self.subTest(tab=key):
+                # 分栏条目必须**自己**指向原来那个页面组件。只断言「组件名在本文件里出现过」
+                # 是不够的：把 cad 换成 FieldsPage 时 import 行仍带着 CadPage.vue，那种
+                # 张冠李戴查不出来（实测变异为绿）。
+                entry = re.search(r"\{\s*key:\s*'%s'[^}]*\}" % re.escape(key), self.code)
+                self.assertIsNotNone(entry, '缺少 %s 分栏（?tab=%s）' % (label, key))
+                self.assertIn('component: %s' % component, entry.group(0), entry.group(0))
+                self.assertIn(label, entry.group(0), entry.group(0))
+                # 组件确实来自 views/ 下那个文件（不是同名的别的东西）。
+                self.assertIn('%s.vue' % component, self.code, component)
+
+    def test_the_governance_route_really_exists(self):
+        # 侧栏入口指向 /governance；路由表里没有它，点进去就会掉进兜底页（「尚未迁移」）。
+        router = strip_comments(read(ROUTER_TS))
+        entry = re.search(r"\{\s*path:\s*'/governance'[^}]*\}", router)
+        self.assertIsNotNone(entry, '缺少 /governance 路由：侧栏入口会落到兜底页')
+        self.assertIn('GovernancePage.vue', entry.group(0), entry.group(0))
+
+    def test_the_active_section_comes_from_the_query_so_a_link_can_share_it(self):
+        # 初始分栏必须**取自** query：写死成默认值也能让 'route.query.tab' 出现在 watch 里，
+        # 那种写法在刷新页面或打开分享链接时会回到默认板块（地址栏与内容不一致）。
+        self.assertRegex(self.code, r"ref\(\s*normalizeTab\(\s*route\.query\.tab\s*\)\s*\)")
+        # 地址栏变化（手输、前进/后退）时也要跟着走。
+        self.assertRegex(self.code, r"watch\(\s*\(\)\s*=>\s*route\.query\.tab")
+        self.assertIn("query: { tab:", self.code)
+        # 缺失/非法的 tab 必须有明确定义的回落，并把地址栏改写成实际显示的那个分栏。
+        self.assertIn('router.replace', self.code)
+        self.assertRegex(self.code, r"path:\s*'/governance'")
+
+    def test_the_old_deep_links_still_reach_their_own_pages(self):
+        """四条旧路由保留可访问性：仍直接指向原页面，或显式 redirect 到 /governance。
+
+        WHY 单列一条：合并入口最容易的「顺手清理」就是把旧路由删掉，而它们被
+        docs/FRONTEND_VIEWS.md、README 与用户书签引用着（RouterMigrationTests 另有一组）。
+        """
+        router = strip_comments(read(ROUTER_TS))
+        for key, _label, component in GOVERNANCE_TABS:
+            with self.subTest(path='/' + key):
+                entry = re.search(r"\{\s*path:\s*'/%s'[^}]*\}" % re.escape(key), router)
+                self.assertIsNotNone(entry, '旧路由 /%s 被删掉了：深链会白屏' % key)
+                self.assertRegex(entry.group(0),
+                                 r"(redirect|%s\.vue)" % re.escape(component),
+                                 '/%s 既没指向 %s，也没有 redirect' % (key, component))
 
 
 # ══════════════════════════════════════════════════════════════════════════

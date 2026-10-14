@@ -114,13 +114,14 @@ const {
 } = useSessions()
 
 /**
- * 导航入口沿用旧版控制台（web/index.html）的八项，一个都不少。
+ * 导航入口沿用旧版控制台（web/index.html）的那几项，能力一个都不少。
  * 旧版是后端的根页面（GET /），用 hash 深链切换视图：/#runs、/#fields …
  * 这里只做「图标 + 文字 + 分组小标题」的版式改造，入口本身保持可用。
  *
- * 现在八项**全部**是站内路由（to）：六个 legacy 视图（模型接入/字段复核/来源权威规则/
- * 图纸与实体/尺寸核验/我的文件）已经迁移进新前端，所以再没有 href 深链了 —— 那些
- * 深链指向的旧版控制台视图正是「点进去白屏」的根因。
+ * 现在**全部**是站内路由（to）：legacy 视图（模型接入/字段复核/来源权威规则/图纸与实体/
+ * 尺寸核验/我的文件）都已经迁移进新前端，所以再没有 href 深链了 —— 那些深链指向的旧版
+ * 控制台视图正是「点进去白屏」的根因。数据治理那 4 项后来又并成了 1 项（见 GROUPS），
+ * 但四条路由仍然各自独立存在，深链照旧可用。
  */
 interface NavItem {
   key: string
@@ -134,7 +135,7 @@ interface NavItem {
    */
   action?: 'history'
   /**
-   * 旧版控制台的 hash 深链。八项已全部迁移，当前没有任何条目再用它；
+   * 旧版控制台的 hash 深链。所有条目都已迁移，当前没有任何条目再用它；
    * 字段与模板里的兜底分支一起保留，作为「万一又被塞进一个未迁移入口」时的
    * 安全网 —— 宁可显式禁用并标注，也不能让用户撞上白屏。
    */
@@ -151,15 +152,16 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
       { key: 'history', label: '历史对话', icon: '☰', action: 'history' },
       { key: 'runs', label: '运行记录', icon: '↺', to: '/runs' },
       { key: 'model', label: '模型接入', icon: '⚙', to: '/model' },
-    ],
-  },
-  {
-    title: '数据治理',
-    items: [
-      { key: 'fields', label: '字段复核', icon: '▤', to: '/fields' },
-      { key: 'authority', label: '来源权威规则', icon: '◇', to: '/authority' },
-      { key: 'cad', label: '图纸与实体', icon: '⌖', to: '/cad' },
-      { key: 'dimensions', label: '尺寸核验', icon: '↔', to: '/dimensions' },
+      /**
+       * 数据治理：原先它自成一个分组，下面挂 4 条（字段复核 / 来源权威规则 / 图纸与实体 /
+       * 尺寸核验）。那 4 条各占一行只让导航变长，多不出任何信息 —— 现在收成 **1 个平级条目**，
+       * 四个板块改为**页面顶部的分栏导航**（/governance?tab=…，见 GovernancePage.vue）。
+       *
+       * WHY 直接并进本组、不再单立分组：分组标题只能又叫「数据治理」，标题 + 同名条目是重复。
+       * 侧栏里现在就是一个和「运行记录」「模型接入」同级的条目。
+       * 旧深链（/fields、/authority、/cad、/dimensions）仍然保留可用，见 router/index.ts。
+       */
+      { key: 'governance', label: '数据治理', icon: '⬡', to: '/governance' },
     ],
   },
   {
@@ -563,7 +565,7 @@ onBeforeUnmount(() => {
       <template v-for="g in GROUPS" :key="g.title">
         <div class="group-title">{{ g.title }}</div>
         <template v-for="it in g.items" :key="it.key">
-          <!-- 八项现在都走站内路由，并对当前路由高亮（isActive 精确比较 route.path）。
+          <!-- 各入口现在都走站内路由，并对当前路由高亮（isActive 精确比较 route.path）。
                v-else 的兜底分支已无可渲染的条目，但刻意保留：它只会出现在「又有人加了一个
                只有 href 的入口」时，那时必须显式禁用并标注，而不是让用户撞上一个白屏。 -->
           <RouterLink v-if="it.to" class="nav-item" :class="{ active: isActive(it.to) }"

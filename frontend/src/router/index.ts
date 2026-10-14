@@ -18,6 +18,15 @@ const router = createRouter({
     { path: '/dimensions', name: 'dimensions', component: () => import('../views/DimensionsPage.vue') },
     { path: '/files', name: 'files', component: () => import('../views/FilesPage.vue') },
 
+    // 数据治理：侧栏那 4 条（/fields、/authority、/cad、/dimensions）合并后的唯一入口，
+    // 四个板块在页内用分栏切换，当前板块写在 query 上（/governance?tab=cad），
+    // 因此刷新与分享链接都能停在同一个分栏。
+    //
+    // WHY 上面四条旧路由原样保留、不 redirect：它们是深链，可能被书签、docs/ 与测试引用，
+    // 「合并入口」不应该以让旧链接失效为代价。旧链接进去仍然渲染原来那一屏（只是它自己的
+    // 侧栏已经只剩 1 个「数据治理」入口），与新入口并存。
+    { path: '/governance', name: 'governance', component: () => import('../views/GovernancePage.vue') },
+
     // 兜底必须留在最后：旧版深链（/#runs、/#model、/#fields …）没有前导斜杠，会被
     // 解析成 /runs、/model 这类路径；真正未知的路径也要给出**明确说明**而不是渲染
     // 一个空 <router-view>（那就是白屏，用户只会以为页面坏了）。
