@@ -230,8 +230,13 @@ class OriginalDomainRegressionTest(unittest.TestCase):
         #   ③ 白名单只能由协调者按轮次显式批准后扩充，本功能不得自行添加。
         # 本轮协调者已显式批准服务端会话 DDL（db/migrations/020_chat_sessions.sql），
         # 故按轮次把白名单扩充一项；本功能自身依旧不引入任何 DDL。
+        # 本轮（Wiki 知识图谱 P1）协调者显式批准知识表 DDL
+        # （db/migrations/021_wiki_knowledge.sql）：8 张 wiki_* 表全部新表、全部
+        # REVOKE ... FROM PUBLIC, readonly_user，且不含任何对既有表（含 postgres 持有的
+        # runs/trace_events/evidence_*）的 ALTER；本功能自身依旧不引入任何 DDL。
         approved_new_migrations = {"019_evidence_graph.sql",  # WP2 证据图，本轮已批准
-                                   "020_chat_sessions.sql"}  # 会话表，本轮协调者批准
+                                   "020_chat_sessions.sql",   # 会话表，本轮协调者批准
+                                   "021_wiki_knowledge.sql"}  # Wiki 知识表，本轮协调者批准
         status = subprocess.run(["git", "status", "--porcelain", "--", "db/migrations"],
                                 cwd=str(ROOT), capture_output=True, text=True)
         for line in (line for line in status.stdout.splitlines() if line.strip()):
