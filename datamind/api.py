@@ -250,6 +250,10 @@ _NO_STORE_PREFIXES = ('/v1/pdf-snapshots', '/v1/pdf-knowledge', '/v1/drawings',
                       # 会话列表/详情就是聊天记录本身（问题与答案），一旦被浏览器或中间代理
                       # 缓存，下一位使用同一台机器的用户就能读到别人的对话，因此永不缓存。
                       '/v1/sessions',
+                      # Wiki 词条正文、证据引用定位与运行摘要都是私有内容
+                      # （`docs/WIKI_API.md` §2.3）：成功与失败的响应都必须 no-store，
+                      # 导出另带 `Content-Disposition: attachment`（由服务层给）。
+                      '/v1/wiki',
                       # 根路径的 index.html 是**指向内容哈希产物的指针**：`npm run deploy`
                       # 带 --emptyOutDir，每次重建都会删掉旧哈希文件。若浏览器按启发式缓存
                       # 住旧 index.html，它就会去请求已被删除的旧 bundle → 404 → 白屏，
@@ -282,6 +286,34 @@ def _no_store_path(path: str) -> bool:
     return any(path == prefix or path.startswith(prefix + '/') for prefix in _NO_STORE_PREFIXES)
 
 
+#: `/v1/wiki/*` 的五条**写**路由：完整路径形状（`*` = 一个路径段，不是后缀匹配）→ 契约
+#: `docs/WIKI_API.md` §3.1 矩阵里的权限字符串。逐条列名的理由是实测缺陷：写路由里只有
+#: #13 恰好命中下面 `POST + /reviews` 的通用兜底，`#9`/`#11`/`#12` 和以 `/publications`
+#: 结尾的 **#14 全部落到 `None`（= "任意已登录身份"）**，也就是默认放开。`reviewer` 与
+#: `approver` 互不继承（`auth.py:195` 只给 `admin` 旁路），所以这里不能互相兜底。
+WIKI_WRITE_PERMISSIONS = (
+    (('v1', 'wiki', 'builds'), 'reviewer'),                       # #9  POST /v1/wiki/builds
+    (('v1', 'wiki', 'builds', '*', 'retry'), 'reviewer'),         # #11 POST /v1/wiki/builds/{id}/retry
+    (('v1', 'wiki', 'entries', '*', 'revisions'), 'reviewer'),    # #12 POST /v1/wiki/entries/{id}/revisions
+    (('v1', 'wiki', 'entries', '*', 'reviews'), 'reviewer'),      # #13 POST /v1/wiki/entries/{id}/reviews
+    (('v1', 'wiki', 'entries', '*', 'publications'), 'approver'),  # #14 POST /v1/wiki/entries/{id}/publications
+)
+
+
+def _wiki_write_permission(path: str) -> str | None:
+    """`/v1/wiki/*` 写路由的权限；没有列名的路径返回 `None`（由调用方兜底成 `admin`）。
+
+    `*` 只吃**非空**路径段（空段不是路径段）：形状不匹配就当作"没列名"，落到默认拒绝。
+    """
+    segments=path.strip('/').split('/')
+    for route_segments,permission in WIKI_WRITE_PERMISSIONS:
+        if len(segments)==len(route_segments) and all(
+                actual and (expected=='*' or expected==actual)
+                for expected,actual in zip(route_segments,segments)):
+            return permission
+    return None
+
+
 def _required_permission(request) -> str | None:
     path=request.url.path
     authority_path=path.startswith('/v1/authority/')
@@ -292,7 +324,15 @@ def _required_permission(request) -> str | None:
     pdf_snapshot_path=path=='/v1/pdf-snapshots' or path.startswith('/v1/pdf-snapshots/')
     pdf_knowledge_path=path=='/v1/pdf-knowledge' or path.startswith('/v1/pdf-knowledge/')
     plan_path=path.startswith('/v1/plans')
-    return ('admin' if plan_path or files_path or upload_path or pdf_snapshot_path or pdf_knowledge_path else
+    wiki_path=path=='/v1/wiki' or path.startswith('/v1/wiki/')
+    # 契约 §2/§3.1：`/v1/wiki/*` 的五条写路由走上表；**读接口不做角色门**（落到最后的
+    # `None` = 任意已登录身份，与 `/v1/sessions` 同款）。没被上表列名的 wiki 写方法落到
+    # 下面的 `admin` 兜底而不是"默认放开"，且放在两条通用后缀兜底之前，避免被
+    # `/reviews` 之类的规则意外接住——漏一条规则必须是误拒，绝不能是越权。
+    wiki_write=_wiki_write_permission(path) if request.method=='POST' else None
+    return (wiki_write if wiki_write else
+            'admin' if wiki_path and request.method=='POST' else
+            'admin' if plan_path or files_path or upload_path or pdf_snapshot_path or pdf_knowledge_path else
             'approver' if dimension_path and request.method=='POST' and path.endswith('/approvals') else
             'admin' if dimension_path and (request.method=='POST' or path.endswith('/sources')) else
             'reviewer' if cad_path and request.method=='POST' and path.endswith('/reviews') else
@@ -1624,3 +1664,179 @@ def get_conflicts(run_id: str):
         _run_exists(cur,run_id)
         cur.execute('SELECT payload FROM conflict_records WHERE run_id=%s ORDER BY conflict_id',(run_id,))
         return {'conflicts':[r['payload'] for r in cur.fetchall()]}
+
+
+# ---------- wiki knowledge graph (docs/WIKI_API.md, 14 routes) ----------
+#
+# 接线纪律（三条都是实测出来的，不是风格偏好）：
+#
+# 1. **读也必须用应用角色连接**：迁移 `021:605-607` 已把 8 张 `wiki_*` 表从 `readonly_user`
+#    REVOKE（实测 42501），传 `_read_dsn()` 会让这 14 条全部 500。先例：`/v1/sessions`
+#    用 `_write_dsn()` 读 `chat_sessions`。
+# 2. **权限走 `WIKI_WRITE_PERMISSIONS`**：五条写路由逐条列名（#14 以 `/publications` 结尾，
+#    不命中任何通用兜底），读接口不做角色门。`/v1/wiki` 不进 `PUBLIC_PATHS` /
+#    `PUBLIC_READ_PREFIXES` / `PUBLIC_WRITE_PATHS`：中间件保证"必须有身份"，POST 另外
+#    自动带 CSRF + 同源检查（契约 §1）。
+# 3. **不动服务层**：授权投影（`wiki.resolve_space` / `authorized_entry` / `_load_job`）与
+#    错误信封（`wiki.fail` → `{"detail":{"error_code",…}}`）都在冻结层里，本层只做参数透传
+#    与 `jsonable_encoder`；越权与不存在统一 404，本层**不**翻译成 403。
+#
+# 参数边界只在契约 §4 明说"框架 422"的数字（`limit` / `depth`）上用 `Query` 收口；文本与
+# 枚举一律透传给服务层校验，两层各写一套会漂移（服务层已有稳定错误码）。
+
+@app.get('/v1/wiki/entries')
+def wiki_entry_catalogue(request: Request,q: str | None=Query(default=None),
+                         type: list[str] | None=Query(default=None),
+                         status: list[str] | None=Query(default=None),
+                         category: str | None=Query(default=None),
+                         updated_since: str | None=Query(default=None),
+                         space_id: str | None=Query(default=None),
+                         limit: int=Query(default=20,ge=1,le=50),
+                         cursor: str | None=Query(default=None)):
+    """#1 授权词条目录与关键词搜索（契约 §5.1）。`type` / `status` 可重复，`q` 覆盖标题/别名/分类。"""
+    from .wiki_query import entry_catalogue
+    return jsonable_encoder(entry_catalogue(_write_dsn(),request.state.identity,q=q,entry_type=type,
+                                            status=status,category=category,
+                                            updated_since=updated_since,space_id=space_id,
+                                            limit=limit,cursor=cursor))
+
+
+@app.get('/v1/wiki/spaces/{space_id}/graph')
+def wiki_space_graph(space_id: str,request: Request,layer: str | None=Query(default=None),
+                     q: str | None=Query(default=None),type: list[str] | None=Query(default=None),
+                     status: list[str] | None=Query(default=None),
+                     category: str | None=Query(default=None),limit: int=Query(default=50,ge=1,le=50),
+                     cursor: str | None=Query(default=None)):
+    """#2 当前授权范围图（契约 §5.2；每批固定 50 节点，累计上限由服务层给 `limit_reached`）。
+
+    请求别人的 `space_id` → 404 `WIKI_SPACE_NOT_FOUND`（`entry_catalogue` 同一个授权投影）。
+    """
+    from .wiki_query import space_graph
+    return jsonable_encoder(space_graph(space_id,_write_dsn(),request.state.identity,layer=layer,q=q,
+                                        entry_type=type,status=status,category=category,
+                                        limit=limit,cursor=cursor))
+
+
+@app.get('/v1/wiki/entries/{entry_id}')
+def wiki_entry_detail(entry_id: str,request: Request,revision_id: str | None=Query(default=None)):
+    """#3 当前发布版本 / 指定版本（契约 §5.3；草稿需编辑权限，否则与不存在一致的 404）。"""
+    from .wiki import entry_detail
+    return jsonable_encoder(entry_detail(entry_id,_write_dsn(),request.state.identity,
+                                         revision_id_value=revision_id))
+
+
+@app.get('/v1/wiki/entries/{entry_id}/revisions')
+def wiki_entry_revisions(entry_id: str,request: Request,limit: int=Query(default=20,ge=1,le=50),
+                         cursor: str | None=Query(default=None)):
+    """#4 可见版本历史（契约 §5.4；每条一个不含正文的摘要，带 `body_sha256`）。"""
+    from .wiki import revision_history
+    return jsonable_encoder(revision_history(entry_id,_write_dsn(),request.state.identity,
+                                             limit=limit,cursor=cursor))
+
+
+@app.get('/v1/wiki/entries/{entry_id}/revisions/{revision_id}')
+def wiki_revision_detail(entry_id: str,revision_id: str,request: Request,
+                         expected_body_sha256: str | None=Query(default=None),
+                         expected_base_revision_id: str | None=Query(default=None)):
+    """#5 固定版本详情（契约 §5.5；`expected_*` 不一致 → 409 `WIKI_VERSION_CONFLICT`）。
+
+    `expected_body_sha256` 的格式校验留给服务层：它同时接受裸 hex64 与 `sha256:<hex64>`
+    （`wiki.strip_sha256_prefix`），在路由上写死 `pattern` 会把后者误拒。
+    """
+    from .wiki import revision_detail
+    return jsonable_encoder(revision_detail(entry_id,revision_id,_write_dsn(),request.state.identity,
+                                            expected_body_sha256=expected_body_sha256,
+                                            expected_base_revision_id=expected_base_revision_id))
+
+
+@app.get('/v1/wiki/entries/{entry_id}/graph')
+def wiki_entry_neighborhood(entry_id: str,request: Request,depth: int=Query(default=1,ge=1,le=2),
+                            limit: int=Query(default=50,ge=1,le=100),
+                            layer: str | None=Query(default=None),
+                            direction: str | None=Query(default=None)):
+    """#6 授权关系邻域（契约 §5.6；`truncated` / `unreached_neighbors` 由服务层给）。"""
+    from .wiki_query import entry_neighborhood
+    return jsonable_encoder(entry_neighborhood(entry_id,_write_dsn(),request.state.identity,
+                                               depth=depth,limit=limit,layer=layer,
+                                               direction=direction))
+
+
+@app.get('/v1/wiki/entries/{entry_id}/provenance')
+def wiki_entry_provenance(entry_id: str,request: Request,revision_id: str | None=Query(default=None),
+                          limit: int=Query(default=50,ge=1,le=200),
+                          cursor: str | None=Query(default=None),
+                          layer: str | None=Query(default=None)):
+    """#7 固定版本的证据与执行事件摘要（契约 §5.7；轨迹读取失败时保留可用部分并显式标注）。
+
+    刻意**不**把 `events_unavailable` 升级成 502：契约 §8.2 的硬要求是"不得显示成无数据"，
+    服务层用 `summary.events_unavailable` + `error_summary.unavailable` + `WIKI_LOAD_FAILED`
+    警告三条满足它，比整单失败更有用（`wiki_query.py` 的 docstring 已把这个判断摆在明面上）。
+    """
+    from .wiki_query import entry_provenance
+    return jsonable_encoder(entry_provenance(entry_id,_write_dsn(),request.state.identity,
+                                             revision_id=revision_id,limit=limit,cursor=cursor,
+                                             layer=layer))
+
+
+@app.get('/v1/wiki/entries/{entry_id}/export')
+def wiki_entry_export(entry_id: str,request: Request,revision_id: str | None=Query(default=None),
+                      expected_body_sha256: str | None=Query(default=None)):
+    """#8 带状态与引用的 Markdown（契约 §5.8；`no-store` + `attachment` 由服务层的头给）。"""
+    from .wiki_query import entry_export
+    export=entry_export(entry_id,_write_dsn(),request.state.identity,revision_id=revision_id,
+                        expected_body_sha256=expected_body_sha256)
+    return Response(export['markdown'],media_type=export['media_type'],headers=export['headers'])
+
+
+@app.post('/v1/wiki/builds',status_code=202)
+def wiki_build_submit(payload: dict,request: Request):
+    """#9 从指定运行创建候选草稿（契约 §5.9；权限 `reviewer`，按 `(owner, request_id)` 幂等）。
+
+    返回任务状态、不阻塞：整理由 `wiki_jobs` 的任务行承载（`queued`），失败只记在任务行上，
+    绝不改写原问答的 `runs` / `claims` / `trace_events`。
+    """
+    from .wiki_jobs import submit_build
+    return jsonable_encoder(submit_build(payload,_write_dsn(),request.state.identity))
+
+
+@app.get('/v1/wiki/builds/{build_id}')
+def wiki_build_read(build_id: str,request: Request):
+    """#10 查看自己的整理任务（契约 §5.10；无角色门，owner 校验在服务层的 SQL 里）。"""
+    from .wiki_jobs import read_build
+    return jsonable_encoder(read_build(build_id,_write_dsn(),request.state.identity))
+
+
+@app.post('/v1/wiki/builds/{build_id}/retry')
+def wiki_build_retry(build_id: str,request: Request,payload: dict | None=None):
+    """#11 原请求失败重试（契约 §5.11；权限 `reviewer` + 原 owner）。
+
+    `{"request_id": …}` 是**可选**体（省略即在原行上重试、`attempts+1`），所以这里声明为
+    `dict | None`：一个必填体参数会让"不带 body 的重试"变成框架 422，与契约 §5.11 不符。
+    """
+    from .wiki_jobs import retry_build
+    return jsonable_encoder(retry_build(build_id,payload,_write_dsn(),request.state.identity))
+
+
+@app.post('/v1/wiki/entries/{entry_id}/revisions',status_code=201)
+def wiki_revision_create(entry_id: str,payload: dict,request: Request):
+    """#12 以基线创建新版本（契约 §5.12；权限 `reviewer`，只追加、不覆盖已存版本）。"""
+    from .wiki import create_revision
+    return jsonable_encoder(create_revision(entry_id,payload,_write_dsn(),request.state.identity))
+
+
+@app.post('/v1/wiki/entries/{entry_id}/reviews',status_code=201)
+def wiki_review_submit(entry_id: str,payload: dict,request: Request):
+    """#13 对指定版本追加复核结果（契约 §5.13；权限 `reviewer`，复核记录只追加不改删）。"""
+    from .wiki import submit_review
+    return jsonable_encoder(submit_review(entry_id,payload,_write_dsn(),request.state.identity))
+
+
+@app.post('/v1/wiki/entries/{entry_id}/publications',status_code=201)
+def wiki_publication_create(entry_id: str,payload: dict,request: Request):
+    """#14 发布指定版本并检查旧发布头（契约 §5.14；权限 `approver`，CAS 冲突 → 409）。
+
+    权限**不是** `reviewer`：`reviewer` 与 `approver` 互不继承（`auth.py:195` 只给 `admin`
+    旁路），发布是 `approver` 独有的写操作。
+    """
+    from .wiki import publish
+    return jsonable_encoder(publish(entry_id,payload,_write_dsn(),request.state.identity))
