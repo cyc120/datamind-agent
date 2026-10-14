@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Windows 启动脚本 —— scripts/start_local.sh 的等价实现。
 
@@ -38,7 +38,11 @@ param(
     [string]$BindAddress,
     #: 额外 origin（逗号分隔）。用隧道/反向代理时把对外域名填进来，例如
     #: -AllowedOrigins 'https://demo.example.com'，否则浏览器同源检查会 403。
-    [string]$AllowedOrigins
+    [string]$AllowedOrigins,
+    #: 停止由 -Background 启动的 API 与上传队列 worker。
+    [switch]$Stop,
+    #: 只报告运行状态，不做任何改动。
+    [switch]$Status
 )
 
 $ErrorActionPreference = 'Stop'
@@ -46,6 +50,53 @@ Set-StrictMode -Version Latest
 
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
+
+# ── 0a. -Stop / -Status：必须在任何引导动作（Docker / 迁移 / 摄取）之前短路 ─────
+# 这两个开关只做管理，不该顺带把整套环境初始化跑一遍——早期版本插在引导之后，
+# 结果 -Status 会先执行迁移与文档摄取，既慢又出乎意料。
+$CacheDir = Join-Path $Root '.cache/api'
+
+function Get-ManagedProcesses {
+    # start_api_background.py 会把 API 与上传队列 worker 的 pid 写进 .cache/api/。
+    # 少了 worker，上传会永远停在 queued，所以两个一起管。
+    $found = @()
+    foreach ($name in @('server', 'upload_worker')) {
+        $pidFile = Join-Path $CacheDir "$name.pid"
+        if (-not (Test-Path $pidFile)) { continue }
+        $pidText = Get-Content $pidFile -ErrorAction SilentlyContinue | Select-Object -First 1
+        if (-not $pidText -or $pidText -notmatch '^\d+$') { continue }
+        $proc = Get-Process -Id ([int]$pidText) -ErrorAction SilentlyContinue
+        if ($proc) { $found += [pscustomobject]@{ Name = $name; Id = $proc.Id } }
+    }
+    return $found
+}
+
+function Test-ApiUp {
+    try {
+        $h = Invoke-RestMethod -Uri 'http://127.0.0.1:8000/health' -TimeoutSec 3
+        return $h.agent -in @('sql-only', 'sql+rag')
+    } catch { return $false }
+}
+
+if ($Stop -or $Status) {
+    $procs = @(Get-ManagedProcesses)
+    if ($Stop) {
+        if (-not $procs) { Write-Host '没有由本脚本启动的进程在运行。'; exit 0 }
+        foreach ($item in $procs) {
+            Stop-Process -Id $item.Id -Force -ErrorAction SilentlyContinue
+            Write-Host "已停止 $($item.Name)（PID $($item.Id)）"
+        }
+        Remove-Item (Join-Path $CacheDir 'server.pid'), (Join-Path $CacheDir 'upload_worker.pid') -Force -ErrorAction SilentlyContinue
+        exit 0
+    }
+    if ($procs) {
+        foreach ($item in $procs) { Write-Host "$($item.Name) 运行中，PID $($item.Id)" }
+    } else {
+        Write-Host '没有由本脚本启动的进程在运行。'
+    }
+    if (Test-ApiUp) { Write-Host '服务可达：http://127.0.0.1:8000/' } else { Write-Host '服务不可达。' }
+    exit 0
+}
 
 # ── 0. 平台前提 ───────────────────────────────────────────────────────────────
 $env:PYTHONUTF8 = '1'          # 见文件头说明 1
