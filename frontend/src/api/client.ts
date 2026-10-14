@@ -63,6 +63,14 @@ import type {
   UploadListParams,
   UploadListResult,
   UploadProvenance,
+  WikiEntriesData,
+  WikiEntryGraphParams,
+  WikiEntryListParams,
+  WikiEnvelope,
+  WikiGraphData,
+  WikiProvenanceData,
+  WikiProvenanceParams,
+  WikiSpaceGraphParams,
 } from './types'
 
 // 统一走相对路径：开发时由 Vite 代理到 127.0.0.1:8000，生产时与后端同源。
@@ -918,4 +926,179 @@ export async function getUpload(uploadId: string): Promise<UploadDetail> {
     它和 searchable 都为 false 时不能说「已可检索」（通常是没有 chunks）。 */
 export async function approveUpload(uploadId: string): Promise<UploadApproveResult> {
   return write<UploadApproveResult>(`/v1/uploads/${encodeURIComponent(uploadId)}/approve`)
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   7) Wiki 知识图谱（/v1/wiki/*，契约 docs/WIKI_API.md）
+
+   四件必须照实处理的事：
+
+     (a) **信封是 `{data, meta, paging, warnings}`**，不是裸对象。`request<T>` 直接透传，
+         所以类型参数一律是 `WikiEnvelope<...>`。
+     (b) `/v1/wiki` **不在** `PUBLIC_READ_PREFIXES` 里（契约 §2.2 明令不得加入），
+         所以这些 GET 也需要身份；未登录是 401 LOGIN_REQUIRED，不是"没有数据"。
+         错误信封仍是 `{"detail":{"error_code":…}}`，`request()` 已经按它解析。
+     (c) **`limit` 不许越界**：目录 ≤ 50、空间图固定 ≤ 50、邻域 ≤ 100、证据 ≤ 200。
+         这里只做"不主动超发"，真正的判定在服务端（越界是框架 422）。
+     (d) `layer` 或筛选变化时**服务端会忽略 cursor 并返回第一批**（`warnings` 里带
+         `CURSOR_RESET_ON_FILTER_CHANGE`）。调用方**必须同时清空已加载集合**，
+         否则"继续加载绕过上限"会在客户端侧发生（契约 §4 语义 4）。下面每个函数都
+         把 `cursor` 原样透传，重置的责任在调用方，函数不替它猜。
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** 契约 §4 的四个上限（服务端同一组数字；前端只用它来"不主动超发"与显示说明）。 */
+export const WIKI_PAGE_LIMITS = {
+  entries: { default: 20, max: 50 },
+  graph: { default: 50, max: 50 },
+  neighborhood: { default: 50, max: 100 },
+  provenance: { default: 50, max: 200 },
+} as const
+
+function cappedLimit(value: number | undefined, fallback: number, max: number): string {
+  const n = Number.isFinite(value) ? Math.floor(value as number) : fallback
+  return String(Math.min(max, Math.max(1, n)))
+}
+
+/** 「可重复」查询参数：同一个键出现多次（FastAPI 的 `list[str]`）。空数组 = 不传。 */
+function appendRepeated(search: URLSearchParams, key: string, values?: string[] | string | null): void {
+  if (values == null) return
+  const list = Array.isArray(values) ? values : [values]
+  for (const value of list) {
+    const text = String(value).trim()
+    if (text !== '') search.append(key, text)
+  }
+}
+
+function trimOrNull(value?: string | null): string | null {
+  if (value == null) return null
+  const text = String(value).trim()
+  return text === '' ? null : text
+}
+
+/**
+ * #1 词条目录与关键词搜索：`GET /v1/wiki/entries`。
+ *
+ * `search.body_searched=false` 时**正文没有被搜过**（中文正文检索策略未定，
+ * 响应里的 `search` 段会如实声明本次覆盖的字段），界面必须原样呈现这句话，
+ * 否则用户会以为搜了正文。空白 `q` 等于不传（沿用 `/v1/sessions` 的语义）。
+ */
+export async function listWikiEntries(
+  params: WikiEntryListParams = {},
+): Promise<WikiEnvelope<WikiEntriesData>> {
+  const search = new URLSearchParams()
+  const q = trimOrNull(params.q)
+  if (q != null) search.set('q', q)
+  appendRepeated(search, 'type', params.type)
+  const status = trimOrNull(params.status)
+  if (status != null) search.set('status', status)
+  const category = trimOrNull(params.category)
+  if (category != null) search.set('category', category)
+  const updatedSince = trimOrNull(params.updated_since)
+  if (updatedSince != null) search.set('updated_since', updatedSince)
+  const spaceId = trimOrNull(params.space_id)
+  if (spaceId != null) search.set('space_id', spaceId)
+  search.set('limit', cappedLimit(params.limit, WIKI_PAGE_LIMITS.entries.default, WIKI_PAGE_LIMITS.entries.max))
+  if (params.cursor) search.set('cursor', params.cursor)
+  return request<WikiEnvelope<WikiEntriesData>>(`/v1/wiki/entries?${search.toString()}`)
+}
+
+/**
+ * #2 当前授权范围图：`GET /v1/wiki/spaces/{space_id}/graph`。
+ *
+ * ⚠ 这个接口**不是**"全库全图"，界面标题必须用响应里的 `scope_description`。
+ * `limit` 是**每批节点数**（服务端固定上限 50）；累计到 100 节点 / 300 关系后
+ * `next_cursor` 变 null、`limit_reached` 非空 —— 那时不要再请求下一页。
+ *
+ * `q`/`type`/`category`/`status` **只对 `layer=entries` 有意义**：对另外两层传它们
+ * 后端会 422（它拒绝静默忽略）。所以这里只在 `layer` 为 entries（或缺省）时才带上，
+ * 避免调用方无意间触发一个看不懂的 422。
+ */
+export async function wikiSpaceGraph(
+  spaceId: string,
+  params: WikiSpaceGraphParams = {},
+): Promise<WikiEnvelope<WikiGraphData>> {
+  const search = new URLSearchParams()
+  const layer = params.layer ?? 'entries'
+  search.set('layer', layer)
+  if (layer === 'entries') {
+    const q = trimOrNull(params.q)
+    if (q != null) search.set('q', q)
+    const type = trimOrNull(params.type)
+    if (type != null) search.set('type', type)
+    const category = trimOrNull(params.category)
+    if (category != null) search.set('category', category)
+    const status = trimOrNull(params.status)
+    if (status != null) search.set('status', status)
+  }
+  search.set('limit', cappedLimit(params.limit, WIKI_PAGE_LIMITS.graph.default, WIKI_PAGE_LIMITS.graph.max))
+  if (params.cursor) search.set('cursor', params.cursor)
+  return request<WikiEnvelope<WikiGraphData>>(
+    `/v1/wiki/spaces/${encodeURIComponent(spaceId)}/graph?${search.toString()}`,
+  )
+}
+
+/**
+ * #6 授权关系邻域：`GET /v1/wiki/entries/{entry_id}/graph`。
+ *
+ * `depth` 只接受 1..2（超出是框架 422），`limit` ≤ 100 且仍受 100 节点 / 300 关系约束。
+ * `truncated=true` 时**必带** `truncated_reason`；`unreached_neighbors` **只**统计
+ * 当前授权范围内因截断而未返回的邻居数（非授权对象不计入）。
+ */
+export async function wikiEntryGraph(
+  entryId: string,
+  params: WikiEntryGraphParams = {},
+): Promise<WikiEnvelope<WikiGraphData>> {
+  const search = new URLSearchParams()
+  const depth = Number.isFinite(params.depth) ? Math.floor(params.depth as number) : 1
+  search.set('depth', String(Math.min(2, Math.max(1, depth))))
+  search.set(
+    'limit',
+    cappedLimit(params.limit, WIKI_PAGE_LIMITS.neighborhood.default, WIKI_PAGE_LIMITS.neighborhood.max),
+  )
+  search.set('layer', params.layer ?? 'entries')
+  search.set('direction', params.direction ?? 'both')
+  return request<WikiEnvelope<WikiGraphData>>(
+    `/v1/wiki/entries/${encodeURIComponent(entryId)}/graph?${search.toString()}`,
+  )
+}
+
+/**
+ * #7 证据与执行事件摘要：`GET /v1/wiki/entries/{entry_id}/provenance`。
+ *
+ * 它**不依赖**图数据（契约 §5.7 约束 4：窄屏必须能在不加载完整图谱的前提下单独调用）。
+ * `error_summary` 的三种形状（有错误 / `{error_code:null,none:true}` / `{unavailable:true}`）
+ * 语义各不相同，界面不得把它们合并成"无错误"。
+ */
+export async function wikiEntryProvenance(
+  entryId: string,
+  params: WikiProvenanceParams = {},
+): Promise<WikiEnvelope<WikiProvenanceData>> {
+  const search = new URLSearchParams()
+  const revisionId = trimOrNull(params.revision_id)
+  if (revisionId != null) search.set('revision_id', revisionId)
+  search.set(
+    'limit',
+    cappedLimit(params.limit, WIKI_PAGE_LIMITS.provenance.default, WIKI_PAGE_LIMITS.provenance.max),
+  )
+  if (params.cursor) search.set('cursor', params.cursor)
+  if (params.layer) search.set('layer', params.layer)
+  const suffix = search.toString()
+  return request<WikiEnvelope<WikiProvenanceData>>(
+    `/v1/wiki/entries/${encodeURIComponent(entryId)}/provenance?${suffix}`,
+  )
+}
+
+/**
+ * #8 Markdown 导出**的 URL**（`<a href>` 下载，不是 fetch）。
+ *
+ * 刻意不返回 `Promise<Response>`：导出体是带 `Content-Disposition: attachment` 的
+ * `text/markdown`，用 fetch 取回来只会拿到一段文本、丢掉浏览器的下载语义。
+ * 省略 `revision_id` = 导出**当前发布头**。
+ */
+export function wikiEntryExportUrl(entryId: string, revisionId?: string | null): string {
+  const search = new URLSearchParams()
+  const rev = trimOrNull(revisionId)
+  if (rev != null) search.set('revision_id', rev)
+  const suffix = search.toString()
+  return `/v1/wiki/entries/${encodeURIComponent(entryId)}/export${suffix ? `?${suffix}` : ''}`
 }

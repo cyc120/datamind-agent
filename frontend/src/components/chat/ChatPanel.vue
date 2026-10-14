@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import VerificationTable from '../industrial/VerificationTable.vue'
+import { csrf } from '../../api/client'
 import type { ChatMessage, Citation, TraceEvent } from '../../api/types'
 
 const props = defineProps<{
@@ -10,7 +12,21 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'send', payload: { question: string; mode: string }): void
+  /**
+   * 「整理为知识词条」的生命周期事件。
+   *
+   * WHY 要 emit 而不是纯内部状态：整理任务是一个**跨页面的对象**（提交后落在
+   * `/#/wiki/:entryId` 的草稿上，状态还要靠轮询 `GET /v1/wiki/builds/{id}`），
+   * 外壳（例如侧栏的「知识图谱」入口）可能需要据此提示或刷新。
+   * 本组件**自己**完成请求、状态与轮询 —— 父组件 MainPage 不在本次改动范围内，
+   * 也没有必要让父组件替每条消息记住整理状态；emit 只作通知，没有监听者时
+   * 什么也不会发生（Vue 对无人监听的 emit 是静默的）。
+   */
+  (e: 'organize', payload: { messageId: string; runId: string; phase: BuildPhase; buildId: string }): void
 }>()
+
+/** 路由实例：整理成功后「查看草稿」要跳到 `/#/wiki/:entryId?revision=…` 的深链。 */
+const router = useRouter()
 
 const input = ref('')
 const mode = ref('auto')
@@ -200,6 +216,378 @@ onMounted(() => {
   window.addEventListener('resize', markOverflow)
 })
 onBeforeUnmount(() => window.removeEventListener('resize', markOverflow))
+
+/* ══════════════════════════════════════════════════════════════════════════
+   「整理为知识词条」——把一条**已完成的回答**（按它的 `run_id`）交给
+   `POST /v1/wiki/builds` 生成候选草稿（契约 §5.9），成功后链接到草稿深链。
+
+   五条刻意的设计（每一条都对应一个会撒谎的地方）：
+
+   1. **挂载点**：与 `.meta` 同级、在助手气泡的最后。对所有助手回答统一可见 ——
+      不只是有正文的那条，SQL / 工业核验 / 证据不足（ABSTAINED）的回答同样能看到入口。
+      WHY：整理的对象是**这次运行**，不是"答案那段文字"；把入口贴在正文里会让人以为
+      整理的是文案。
+   2. **排队中就是排队中**：后端 `execute_build()` 目前**没有生产调用方**（整理 worker
+      正在接入），提交后任务会停在 `queued`。界面如实显示"排队中（尚未开始）"，
+      **不**假装完成、**不**把 queued 说成失败、也不无限轮询后编一个结论。
+   3. **契约 §8.4 的七类失败逐条有话说**（`BUILD_ERROR_TEXT`）：加载失败 / 无权限 /
+      无证据 / 引用失效 / 定位不可用 / 整理失败 / 版本冲突 —— 每一类都给中文解释与
+      "接下来该怎么办"，而不是一句"操作失败"。
+   4. **参数不足就明说**：回答没有 `run_id`（或还在生成）时按钮不可用，并写清楚为什么；
+      不做一个点了没反应、或者发一个空 `run_id` 去撞 422 的入口。
+   5. **幂等**：`request_id` 由 `消息 id + run_id` 派生。重复点击 = 同一次整理意图，
+      服务端按 `(owner, request_id)` 幂等返回首次结果，不会生成重复版本（§5.9）。
+   ══════════════════════════════════════════════════════════════════════════ */
+
+type BuildPhase = 'idle' | 'submitting' | 'queued' | 'running' | 'succeeded' | 'failed' | 'blocked'
+
+interface BuildObject {
+  build_id?: string
+  status?: string
+  run_id?: string
+  result_entry_id?: string | null
+  result_revision_id?: string | null
+  candidate_entry_id?: string | null
+  error_code?: string | null
+  error_detail?: string | null
+  attempts?: number | null
+  suggested_merges?: Array<{ entry_id?: string; reason?: string; requires_human_confirmation?: boolean }>
+}
+
+interface BuildState {
+  phase: BuildPhase
+  buildId: string
+  /** 服务端原样返回的任务状态（queued/running/succeeded/failed），前端不改词 */
+  status: string
+  resultEntryId: string
+  resultRevisionId: string
+  errorCode: string
+  /** 服务端给的说明（error_detail / 请求错误消息） */
+  detail: string
+  reused: boolean
+  attempts: number | null
+  polls: number
+  suggestMerges: string[]
+}
+
+function blankState(): BuildState {
+  return {
+    phase: 'idle', buildId: '', status: '', resultEntryId: '', resultRevisionId: '',
+    errorCode: '', detail: '', reused: false, attempts: null, polls: 0, suggestMerges: [],
+  }
+}
+
+/** 服务端错误码 → 人能看懂的一句话 + 下一步。覆盖契约 §8.1 的七类场景（见文件头第 3 条）。 */
+const BUILD_ERROR_TEXT: Record<string, string> = {
+  WIKI_PERMISSION_DENIED: '无权限：整理需要 reviewer（或 admin）角色。重试不会改变结果。',
+  WIKI_SOURCE_FORBIDDEN: '来源不可访问：这次回答引用的来源不在当前授权范围内。',
+  WIKI_RUN_FORBIDDEN: '运行不可访问：这条运行不属于当前身份。',
+  WIKI_RUN_NOT_FOUND: '目标运行不存在（可能已被清理）。',
+  WIKI_NO_EVIDENCE: '这条运行没有可投影的证据，无法整理成词条。这是"确实没有"，不是重试能解决的。',
+  WIKI_ENTRY_NOT_FOUND: '目标词条不存在，或当前身份无权写入它（服务端对两者返回同一结果）。',
+  WIKI_REFERENCE_INVALID: '引用的证据引用已失效：需要移除该引用后再整理。',
+  WIKI_LOCATOR_UNAVAILABLE: '某个来源的定位不可用（bbox 缺失 / 页号越界 / 记录已删）：摘要仍会保留，定位不猜测。',
+  WIKI_BUILD_FAILED: '整理失败：失败详情在任务对象的 error_code / error_detail 里；原问答不受影响。',
+  WIKI_BUILD_NOT_RETRYABLE: '该任务不是 failed 状态，不能重试；刷新任务状态即可。',
+  WIKI_BUILD_REQUEST_INVALID: '整理请求载荷不合法（例如 run_id 为空）。',
+  WIKI_IDEMPOTENCY_CONFLICT: '这个 request_id 已经描述过另一份载荷：需要换一个 request_id 再提交。',
+  WIKI_VERSION_CONFLICT: '版本冲突：词条基线已经前进（有人发布了新版本）。要以最新版本为基线重新整理，不是重试同一个请求。',
+  WIKI_REVIEW_REQUIRED: '发布前需要先有复核记录。',
+  WIKI_ENTRY_IDENTITY_PENDING: '实体键还是 pending：发布前必须先人工确认实体键。',
+  LOGIN_REQUIRED: '未登录：/v1/wiki/* 不做匿名放行。',
+  CSRF_REQUIRED: 'CSRF 令牌失效：重新取一次令牌后再试。',
+  WIKI_LOAD_FAILED: '服务端读取失败（WIKI_LOAD_FAILED）：可以重试；界面不会把它显示成"没有数据"。',
+}
+
+function buildErrorText(code: string): string {
+  if (BUILD_ERROR_TEXT[code]) return BUILD_ERROR_TEXT[code]
+  if (/^HTTP_5\d\d$/.test(code)) return '服务端错误：这次整理请求失败了（不是"没有可整理的内容"）。可以重试。'
+  if (/^HTTP_4\d\d$/.test(code)) return '请求被拒绝：服务端返回了契约错误码表之外的状态码，原值保留在这里。'
+  return '未在契约 §8 错误码表里的错误码：原值保留，不翻译成更好听的说法。'
+}
+
+/** 与 client.ts 的 `apiError` 同形（本组件不 import 私有内核；`csrf()` 是 client.ts 的公开导出）。 */
+async function buildError(res: Response, name: string): Promise<Error & { errorCode?: string }> {
+  let message = ''
+  let code = ''
+  try {
+    const body = await res.json()
+    const detail = body?.detail
+    if (typeof detail === 'string') {
+      message = detail
+    } else if (Array.isArray(detail)) {
+      code = 'VALIDATION_ERROR'
+      message = detail.map((item: any) => String(item?.msg ?? JSON.stringify(item))).join('; ')
+    } else if (detail && typeof detail === 'object') {
+      code = typeof detail.error_code === 'string' ? detail.error_code : ''
+      const hint = typeof detail.hint === 'string' && detail.hint ? ` ${detail.hint}` : ''
+      message = `${code || (typeof detail.message === 'string' ? detail.message : JSON.stringify(detail))}${hint}`
+    }
+  } catch {
+    /* 空体 / 非 JSON：回落到状态码 */
+  }
+  const err = new Error(message || `${name} HTTP ${res.status}`) as Error & { errorCode?: string }
+  err.errorCode = code || `HTTP_${res.status}`
+  return err
+}
+
+/** 写内核：POST + `X-CSRF-Token`（令牌来自 client.ts 的 `csrf()`，它缓存自 GET /v1/auth/me）。 */
+async function wikiPost<T>(path: string, body?: unknown): Promise<T> {
+  const token = await csrf()
+  const headers: Record<string, string> = { 'X-CSRF-Token': token }
+  const init: RequestInit = { method: 'POST', headers }
+  if (body !== undefined) {
+    headers['Content-Type'] = 'application/json'
+    init.body = JSON.stringify(body)
+  }
+  const res = await fetch(path, init)
+  if (!res.ok) throw await buildError(res, `POST ${path}`)
+  return res.json() as Promise<T>
+}
+
+async function wikiGet<T>(path: string): Promise<T> {
+  const res = await fetch(path, { headers: { Accept: 'application/json' } })
+  if (!res.ok) throw await buildError(res, path)
+  return res.json() as Promise<T>
+}
+
+/* ── 每条消息各自的整理状态（同一页里可以同时整理多条回答）────────────────── */
+const buildStates = ref<Record<string, BuildState>>({})
+const buildTimers = new Map<string, number>()
+
+const POLL_INTERVAL_MS = 3000
+/** 最多自动轮询 40 次（约 2 分钟）。到点就**停下并说出来**，而不是一直转圈。 */
+const MAX_POLLS = 40
+
+function stateOf(messageId: string): BuildState {
+  return buildStates.value[messageId] ?? blankState()
+}
+
+function setState(messageId: string, patch: Partial<BuildState>): void {
+  const next = { ...stateOf(messageId), ...patch }
+  buildStates.value = { ...buildStates.value, [messageId]: next }
+}
+
+function clearTimer(messageId: string): void {
+  const timer = buildTimers.get(messageId)
+  if (timer != null) {
+    window.clearTimeout(timer)
+    buildTimers.delete(messageId)
+  }
+}
+
+onBeforeUnmount(() => {
+  buildTimers.forEach((timer) => window.clearTimeout(timer))
+  buildTimers.clear()
+})
+
+/** `request_id` 幂等键：同一条消息 + 同一次运行 = 同一次整理意图。 */
+function requestIdFor(m: ChatMessage): string {
+  const raw = `ui-wiki-${m.id}-${m.runId ?? ''}`
+  return raw.replace(/[^A-Za-z0-9._-]/g, '').slice(0, 64)
+}
+
+function organizeBlockedReason(m: ChatMessage): string {
+  if (m.status === 'running') return '这次运行还在进行中：等回答结束、证据落库之后再整理。'
+  if (!m.runId) return '这条回答没有运行标识（run_id），无法按运行整理 —— 界面不提供没有依据的整理入口。'
+  return ''
+}
+
+const busyPhases: BuildPhase[] = ['submitting', 'queued', 'running']
+
+function organizeBusy(m: ChatMessage): boolean {
+  return busyPhases.includes(stateOf(m.id).phase)
+}
+
+function organizeLabel(m: ChatMessage): string {
+  const state = stateOf(m.id)
+  if (state.phase === 'submitting') return '提交中…'
+  if (state.phase === 'queued') return '排队中…'
+  if (state.phase === 'running') return '整理中…'
+  if (state.phase === 'succeeded') return '重新整理'
+  if (state.phase === 'failed') return '再提交一次'
+  return '整理为知识词条'
+}
+
+/** 状态行：每一句都是**这次**任务的实情（排队中不会被说成完成） */
+function organizeStateText(m: ChatMessage): string {
+  const state = stateOf(m.id)
+  switch (state.phase) {
+    case 'submitting':
+      return '正在提交整理任务（POST /v1/wiki/builds）…'
+    case 'queued':
+      return `已提交：状态 queued（排队中，整理 worker 尚未开始）。任务 id ${state.buildId || '（未返回）'}。`
+    case 'running':
+      return `整理中（running）…任务 id ${state.buildId}`
+    case 'succeeded':
+      return `整理完成（succeeded）：已生成版本 ${state.resultRevisionId || '（未返回）'}。草稿仍需复核与发布。`
+    case 'failed':
+      return `整理失败（failed）：${state.errorCode || '未给出错误码'}`
+    case 'blocked':
+      return state.detail
+    default:
+      return ''
+  }
+}
+
+function organizeDetailText(m: ChatMessage): string {
+  const state = stateOf(m.id)
+  if (state.phase === 'failed') {
+    const code = state.errorCode || 'HTTP_ERROR'
+    return `${buildErrorText(code)}${state.detail ? `　服务端说明：${state.detail}` : ''}`
+  }
+  if (state.phase === 'queued' && state.polls >= MAX_POLLS) {
+    return `已连续轮询 ${MAX_POLLS} 次仍停在 queued：停止自动刷新。任务仍在队列里（不是失败），点「刷新状态」可以再查一次。`
+  }
+  if (state.phase === 'succeeded') {
+    const merges = state.suggestMerges.length
+      ? `　合并建议（${state.suggestMerges.join('、')}）：只是建议，必须人工确认后才会合并。`
+      : ''
+    return `整理只生成候选版本：它不会自动发布，也不会改动原问答。若正文读取返回 404，那是权限或存在性被隐藏，不是"没有这条词条"。${merges}`
+  }
+  if (state.reused) {
+    return '这次请求命中了同一个 request_id 的首次结果（幂等）：没有创建重复任务。'
+  }
+  return ''
+}
+
+function applyBuild(messageId: string, build: BuildObject, reused: boolean): void {
+  const status = String(build.status || '')
+  const phase: BuildPhase =
+    status === 'succeeded' ? 'succeeded'
+      : status === 'failed' ? 'failed'
+        : status === 'running' ? 'running'
+          : 'queued'
+  const merges = (build.suggested_merges || [])
+    .filter((item) => item && item.entry_id)
+    .map((item) => `${item.entry_id}（${item.reason || '未给理由'}，需人工确认=${item.requires_human_confirmation ? 'true' : 'false'}）`)
+  setState(messageId, {
+    phase,
+    status,
+    buildId: String(build.build_id || ''),
+    resultEntryId: String(build.result_entry_id || ''),
+    resultRevisionId: String(build.result_revision_id || ''),
+    errorCode: String(build.error_code || ''),
+    detail: String(build.error_detail || ''),
+    reused,
+    attempts: build.attempts ?? null,
+    suggestMerges: merges,
+  })
+}
+
+/**
+ * 轮询任务状态。**只在 queued / running 时**继续；到上限就停并说明。
+ * 用 `setTimeout` 链而不是 `setInterval`：一次慢请求不会叠出多个并发轮询。
+ */
+function schedulePoll(m: ChatMessage): void {
+  clearTimer(m.id)
+  const tick = async () => {
+    buildTimers.delete(m.id)
+    let state = stateOf(m.id)
+    if (!state.buildId || !busyPhases.includes(state.phase)) return
+    const polls = state.polls + 1
+    // 到上限：停下并**说出来**（任务仍在队列里，不是失败，也不是完成）。
+    if (polls > MAX_POLLS) {
+      setState(m.id, { polls: MAX_POLLS })
+      return
+    }
+    setState(m.id, { polls })
+    try {
+      const body = await wikiGet<{ build?: BuildObject }>(`/v1/wiki/builds/${encodeURIComponent(state.buildId)}`)
+      applyBuild(m.id, body?.build ?? {}, false)
+    } catch (e: any) {
+      const code = String(e?.errorCode || 'HTTP_ERROR')
+      // 读取任务状态失败**不**把任务说成失败：任务本身可能还在跑。
+      setState(m.id, { detail: `读取任务状态失败（${code}）：${buildErrorText(code)} 任务本身的状态没有被这次失败改变。` })
+    }
+    state = stateOf(m.id)
+    if (busyPhases.includes(state.phase)) {
+      buildTimers.set(m.id, window.setTimeout(tick, POLL_INTERVAL_MS))
+    }
+  }
+  buildTimers.set(m.id, window.setTimeout(tick, POLL_INTERVAL_MS))
+}
+
+/** 提交整理（POST /v1/wiki/builds）。失败按错误码给中文解释，不吞掉服务端的话。 */
+async function organize(m: ChatMessage): Promise<void> {
+  const blocked = organizeBlockedReason(m)
+  if (blocked) {
+    setState(m.id, { phase: 'blocked', detail: blocked })
+    emit('organize', { messageId: m.id, runId: '', phase: 'blocked', buildId: '' })
+    return
+  }
+  if (organizeBusy(m)) return
+  clearTimer(m.id)
+  setState(m.id, { ...blankState(), phase: 'submitting' })
+  emit('organize', { messageId: m.id, runId: String(m.runId), phase: 'submitting', buildId: '' })
+  try {
+    const body = await wikiPost<{ build?: BuildObject; reused?: boolean }>('/v1/wiki/builds', {
+      request_id: requestIdFor(m),
+      run_id: m.runId,
+      mode: 'template',
+    })
+    applyBuild(m.id, body?.build ?? {}, !!body?.reused)
+    const phase = stateOf(m.id).phase
+    emit('organize', {
+      messageId: m.id, runId: String(m.runId), phase, buildId: stateOf(m.id).buildId,
+    })
+    if (busyPhases.includes(phase)) schedulePoll(m)
+  } catch (e: any) {
+    const code = String(e?.errorCode || 'HTTP_ERROR')
+    setState(m.id, {
+      phase: 'failed',
+      status: 'failed',
+      errorCode: code,
+      detail: String(e?.message || ''),
+    })
+    emit('organize', { messageId: m.id, runId: String(m.runId), phase: 'failed', buildId: '' })
+  }
+}
+
+/** 手动刷新一次状态（排队中停留太久时的出口） */
+async function refreshBuild(m: ChatMessage): Promise<void> {
+  const state = stateOf(m.id)
+  if (!state.buildId) return
+  try {
+    const body = await wikiGet<{ build?: BuildObject }>(`/v1/wiki/builds/${encodeURIComponent(state.buildId)}`)
+    applyBuild(m.id, body?.build ?? {}, false)
+    const after = stateOf(m.id)
+    emit('organize', { messageId: m.id, runId: String(m.runId), phase: after.phase, buildId: after.buildId })
+    if (busyPhases.includes(after.phase)) schedulePoll(m)
+  } catch (e: any) {
+    const code = String(e?.errorCode || 'HTTP_ERROR')
+    setState(m.id, { detail: `刷新任务状态失败（${code}）：${buildErrorText(code)}` })
+  }
+}
+
+/** 重试（POST /v1/wiki/builds/{id}/retry，仅 failed 可重试；其它状态服务端给 409） */
+async function retryBuild(m: ChatMessage): Promise<void> {
+  const state = stateOf(m.id)
+  if (!state.buildId) return
+  setState(m.id, { phase: 'submitting', detail: '' })
+  try {
+    const body = await wikiPost<{ build?: BuildObject }>(
+      `/v1/wiki/builds/${encodeURIComponent(state.buildId)}/retry`,
+      { request_id: `${requestIdFor(m)}-r${(state.attempts ?? 0) + 1}`.slice(0, 64) },
+    )
+    applyBuild(m.id, body?.build ?? {}, false)
+    const after = stateOf(m.id)
+    emit('organize', { messageId: m.id, runId: String(m.runId), phase: after.phase, buildId: after.buildId })
+    if (busyPhases.includes(after.phase)) schedulePoll(m)
+  } catch (e: any) {
+    const code = String(e?.errorCode || 'HTTP_ERROR')
+    setState(m.id, { phase: 'failed', errorCode: code, detail: String(e?.message || '') })
+  }
+}
+
+/** 打开草稿：深链 + 版本 query（刷新后仍停在同一词条与同一版本） */
+function openDraft(m: ChatMessage): void {
+  const state = stateOf(m.id)
+  if (!state.resultEntryId) return
+  const query: Record<string, string> = {}
+  if (state.resultRevisionId) query.revision = state.resultRevisionId
+  void router.push({ name: 'wiki-entry', params: { entryId: state.resultEntryId }, query })
+}
 </script>
 
 <template>
@@ -318,6 +706,66 @@ onBeforeUnmount(() => window.removeEventListener('resize', markOverflow))
                   <span :class="['st', m.status === 'error' ? 'err' : 'ok']">{{ statusText(m) }}</span>
                   <span v-if="m.runId" class="runid">{{ m.runId }}</span>
                 </div>
+
+                <!-- 「整理为知识词条」：与 .meta 同级、在助手气泡末尾 —— 对所有助手回答
+                     （SQL / 工业核验 / 证据不足 / 普通问答）统一可见，因为整理的对象是
+                     这次**运行**，不是答案那段文字。失败、排队、成功都如实写在这里；
+                     `organizeStateText` / `organizeDetailText` 的每一句都对应一个真实状态。 -->
+                <div class="org" data-testid="organize-actions">
+                  <button
+                    class="org-btn"
+                    type="button"
+                    data-testid="organize-entry"
+                    :disabled="organizeBusy(m) || m.status === 'running'"
+                    :title="organizeBlockedReason(m) || '按这条回答的运行生成候选知识词条（不自动发布）'"
+                    @click="organize(m)"
+                  >
+                    {{ organizeLabel(m) }}
+                  </button>
+
+                  <button
+                    v-if="stateOf(m.id).phase === 'queued' || stateOf(m.id).phase === 'running'"
+                    class="org-btn org-btn-ghost"
+                    type="button"
+                    data-testid="organize-refresh"
+                    @click="refreshBuild(m)"
+                  >
+                    刷新状态
+                  </button>
+
+                  <button
+                    v-if="stateOf(m.id).phase === 'failed' && stateOf(m.id).buildId"
+                    class="org-btn"
+                    type="button"
+                    data-testid="organize-retry"
+                    @click="retryBuild(m)"
+                  >
+                    重试整理
+                  </button>
+
+                  <button
+                    v-if="stateOf(m.id).phase === 'succeeded' && stateOf(m.id).resultEntryId"
+                    class="org-btn org-btn-primary"
+                    type="button"
+                    data-testid="organize-open-draft"
+                    @click="openDraft(m)"
+                  >
+                    查看草稿 →
+                  </button>
+
+                  <span
+                    v-if="organizeStateText(m)"
+                    class="org-state"
+                    :class="`is-${stateOf(m.id).phase}`"
+                    data-testid="organize-state"
+                  >{{ organizeStateText(m) }}</span>
+                </div>
+                <p
+                  v-if="organizeDetailText(m)"
+                  class="org-detail"
+                  :class="{ 'is-error': stateOf(m.id).phase === 'failed' }"
+                  data-testid="organize-detail"
+                >{{ organizeDetailText(m) }}</p>
               </div>
             </div>
           </template>
@@ -903,6 +1351,94 @@ tr:last-child td {
 .runid {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   color: var(--color-muted);
+}
+
+/* ── 「整理为知识词条」操作区 ──
+   类名用 `org-` 前缀：Tailwind v4 的 @layer utilities 会生成一批同名工具类，
+   `.collapse`（visibility:collapse）与 `.result-caption` / `.table-caption`
+   （display:table-caption）已经各坑过一次 —— `org-` 不落在任何工具类的名字空间里
+   （工具类里只有 `order-*`，没有 `org-*`），构建产物里也已核对无同名规则。 */
+.org {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--color-line);
+}
+
+.org-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background: var(--color-panel);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.org-btn:hover:not(:disabled) {
+  border-color: rgba(37, 99, 235, 0.45);
+  color: var(--color-accent);
+}
+
+.org-btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.org-btn:disabled {
+  cursor: not-allowed;
+  color: var(--color-muted);
+  background: var(--color-ink);
+}
+
+.org-btn-ghost {
+  background: var(--color-ink);
+}
+
+.org-btn-primary {
+  border-color: rgba(37, 99, 235, 0.45);
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--color-accent);
+}
+
+/* 状态文字：排队中 ≠ 完成 ≠ 失败 —— 用文字说清，不靠颜色；颜色只做辅助 */
+.org-state {
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--color-muted);
+}
+
+.org-state.is-queued,
+.org-state.is-running,
+.org-state.is-submitting {
+  color: #92400e;
+}
+
+.org-state.is-succeeded {
+  color: #15803d;
+}
+
+.org-state.is-failed,
+.org-state.is-blocked {
+  color: #b91c1c;
+}
+
+.org-detail {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.65;
+  color: var(--color-body);
+  word-break: break-word;
+}
+
+.org-detail.is-error {
+  color: #b91c1c;
 }
 
 @media (max-width: 900px) {

@@ -27,6 +27,20 @@ const router = createRouter({
     // 侧栏已经只剩 1 个「数据治理」入口），与新入口并存。
     { path: '/governance', name: 'governance', component: () => import('../views/GovernancePage.vue') },
 
+    // Wiki 知识图谱（契约 docs/WIKI_API.md §9.1 的路由冻结行）。
+    //
+    // 两条路由的分工是**有意反转**过并被确认的（WIKI_DOMAIN.md §8 第 8 条）：
+    //   `/#/wiki`            → 默认展示**关系图**（当前授权范围图 + 图外可聚焦的词条目录）
+    //   `/#/wiki/:entryId`   → 词条深链，**直接展示正文**，并提供返回关系图的入口
+    // 版本写在 query 上（`?revision=wrev-…`）。WHY 不放在路径里：`entryId` 是深链的
+    // 主体，版本只是它的一个可选项；放在 query 上，刷新与分享链接都能停在同一个词条、
+    // 同一个版本（契约 §8.1），而 path 保持"一个词条一个地址"。
+    //
+    // 顺序要求：这两条必须排在下面的兜底之前，否则 `/#/wiki` 会被 `/:pathMatch(.*)*`
+    // 吃掉，用户看到的是「尚未迁移」页（见本文件顶部与 RouterMigrationTests）。
+    { path: '/wiki', name: 'wiki', component: () => import('../views/WikiPage.vue') },
+    { path: '/wiki/:entryId', name: 'wiki-entry', component: () => import('../views/WikiEntryPage.vue') },
+
     // 兜底必须留在最后：旧版深链（/#runs、/#model、/#fields …）没有前导斜杠，会被
     // 解析成 /runs、/model 这类路径；真正未知的路径也要给出**明确说明**而不是渲染
     // 一个空 <router-view>（那就是白屏，用户只会以为页面坏了）。

@@ -39,7 +39,7 @@ param(
     #: 额外 origin（逗号分隔）。用隧道/反向代理时把对外域名填进来，例如
     #: -AllowedOrigins 'https://demo.example.com'，否则浏览器同源检查会 403。
     [string]$AllowedOrigins,
-    #: 停止由 -Background 启动的 API 与上传队列 worker。
+    #: 停止由 -Background 启动的 API、上传队列 worker 与 Wiki 整理 worker。
     [switch]$Stop,
     #: 只报告运行状态，不做任何改动。
     [switch]$Status
@@ -57,10 +57,10 @@ Set-Location $Root
 $CacheDir = Join-Path $Root '.cache/api'
 
 function Get-ManagedProcesses {
-    # start_api_background.py 会把 API 与上传队列 worker 的 pid 写进 .cache/api/。
-    # 少了 worker，上传会永远停在 queued，所以两个一起管。
+    # start_api_background.py 会把 API、上传队列 worker 与 Wiki 整理 worker 的 pid 写进 .cache/api/。
+    # 少了 worker，对应的队列会永远停在 queued，所以三个一起管。
     $found = @()
-    foreach ($name in @('server', 'upload_worker')) {
+    foreach ($name in @('server', 'upload_worker', 'wiki_build_worker')) {
         $pidFile = Join-Path $CacheDir "$name.pid"
         if (-not (Test-Path $pidFile)) { continue }
         $pidText = Get-Content $pidFile -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -86,7 +86,7 @@ if ($Stop -or $Status) {
             Stop-Process -Id $item.Id -Force -ErrorAction SilentlyContinue
             Write-Host "已停止 $($item.Name)（PID $($item.Id)）"
         }
-        Remove-Item (Join-Path $CacheDir 'server.pid'), (Join-Path $CacheDir 'upload_worker.pid') -Force -ErrorAction SilentlyContinue
+        Remove-Item (Join-Path $CacheDir 'server.pid'), (Join-Path $CacheDir 'upload_worker.pid'), (Join-Path $CacheDir 'wiki_build_worker.pid') -Force -ErrorAction SilentlyContinue
         exit 0
     }
     if ($procs) {

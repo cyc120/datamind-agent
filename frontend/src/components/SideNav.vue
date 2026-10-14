@@ -162,6 +162,12 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
        * 旧深链（/fields、/authority、/cad、/dimensions）仍然保留可用，见 router/index.ts。
        */
       { key: 'governance', label: '数据治理', icon: '⬡', to: '/governance' },
+      /**
+       * 知识图谱：`/#/wiki` 是**当前授权范围图**的入口（界面不得把它说成全库全图），
+       * 词条正文是它的深链 `/#/wiki/:entryId`（见 router/index.ts 与 WikiPage.vue）。
+       * 与上面几条同级、同样指向站内路由 —— 不是旧版控制台的 hash 深链。
+       */
+      { key: 'wiki', label: '知识图谱', icon: '◈', to: '/wiki' },
     ],
   },
   {

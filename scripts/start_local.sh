@@ -95,12 +95,47 @@ stop_upload_worker() {
   fi
 }
 
+# Wiki 整理队列同理：`POST /v1/wiki/builds` 只落一行 queued 的任务（WIKI_API.md §5.9），
+# 推进它的唯一时钟是 scripts/wiki_build_worker.py。没有这个 worker，任务永远停在 queued，
+# `GET /v1/wiki/builds/{id}` 也就永远看不到 succeeded/failed。
+wiki_worker_log='.cache/api/wiki_build_worker.log'
+wiki_worker_pid=''
+start_wiki_worker() {
+  mkdir -p .cache/api
+  # 身份：本机（回环）部署用无登录演示身份，与 API 在同一台机器上给每个请求的身份一致；
+  # 非本机部署必须显式给出 owner 的会话 token，否则任务会落 WIKI_WORKER_IDENTITY_UNAVAILABLE。
+  wiki_worker_identity=(--demo-identity)
+  if [[ -n "${DATAMIND_WIKI_WORKER_SESSION:-}" ]]; then
+    wiki_worker_identity=(--session-token "$DATAMIND_WIKI_WORKER_SESSION")
+  elif ! curl -fsS --max-time 1 http://127.0.0.1:8000/health >/dev/null 2>&1; then
+    wiki_worker_identity=(--no-demo-identity)
+  fi
+  .venv/bin/python scripts/wiki_build_worker.py --watch \
+    --interval "${DATAMIND_WIKI_WORKER_INTERVAL:-2}" \
+    "${wiki_worker_identity[@]+"${wiki_worker_identity[@]}"}" >>"$wiki_worker_log" 2>&1 &
+  wiki_worker_pid=$!
+  echo "Wiki 整理 worker 已启动（PID $wiki_worker_pid，日志 $wiki_worker_log）"
+}
+stop_wiki_worker() {
+  if [[ -n "$wiki_worker_pid" ]] && kill -0 "$wiki_worker_pid" 2>/dev/null; then
+    # SIGTERM 不会打断已领取的整理：worker 跑完当前任务后退出，并把没落终态的任务补写成失败。
+    kill -TERM "$wiki_worker_pid" 2>/dev/null || true
+    wait "$wiki_worker_pid" 2>/dev/null || true
+  fi
+}
+stop_workers() {
+  stop_upload_worker
+  stop_wiki_worker
+}
+
 if curl -fsS --max-time 2 http://127.0.0.1:8000/health 2>/dev/null | grep -Eq '"agent":"(sql-only|sql\+rag)"'; then
   echo 'DataMind Agent 已运行：http://127.0.0.1:8000/（代码更新后请重启原服务进程）'
   if [[ "$rag_enabled" == 1 ]]; then
     echo '若上传任务停在 queued，说明后台处理器未运行；请另开终端执行：'
     echo '  .venv/bin/python -m ingestion.upload_worker --watch'
   fi
+  echo '若 Wiki 整理任务停在 queued，说明整理 worker 未运行；请另开终端执行：'
+  echo '  .venv/bin/python scripts/wiki_build_worker.py --watch --demo-identity'
   exit 0
 fi
 
@@ -119,7 +154,8 @@ fi
 if [[ "$rag_enabled" == 1 ]]; then
   start_upload_worker
 fi
-trap stop_upload_worker EXIT
+start_wiki_worker
+trap stop_workers EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 

@@ -1576,3 +1576,500 @@ export interface AuthMe {
   user: AuthUser | null
   csrf_token: string | null
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Wiki 知识图谱（契约 docs/WIKI_API.md；后端 datamind/wiki_query.py + wiki.py）
+
+   五条已经上线的读接口共用同一个信封：
+
+     { "data": {...}, "meta": {...}, "paging": {...}, "warnings": [...] }
+
+   字段名**照抄后端 JSON**，不重命名、不脑补默认值。三条必须照实呈现的事实：
+
+     1. **界面称之为"当前授权范围图"，不得描述为全库全图**（契约 §5.2 第 4 条）。
+        服务端为此专门下发 `scope_note` / `scope_description`，前端直接显示它，
+        不要自己另写一句更"好听"的话。
+     2. `meta.authorized_scope.nodes_considered !== nodes_visible` 时必须给出原因码
+        （`warnings` 里的 `AUTHORIZATION_FILTERED`）：**"我看不到"不等于"不存在"**。
+     3. `paging.truncated=true` 是**因为上限而截断**，不是"没有更多"；
+        `limit_reached` 非空时 `next_cursor` 必为 null —— 不许靠继续加载绕过上限。
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** 契约 §5.1 的四个词条类型（后端 `wiki.ENTRY_TYPES`）。 */
+export type WikiEntryType = 'business_entity' | 'metric' | 'norm' | 'conclusion'
+
+/** **发布流程**状态。⚠ 它不是核验状态，也不是来源有效性（三套状态见 §7.1）。 */
+export type WikiPublicationStatus = 'draft' | 'in_review' | 'published' | 'archived'
+
+/** 主张的核验状态（契约 §7.1 的第二套状态）。 */
+export type WikiAssertionStatus = 'unverified' | 'verified' | 'insufficient' | 'conflicted'
+
+/** 来源有效性（契约 §7.1 的第三套状态 / §7.5 的判定）。 */
+export type WikiSourceValidity = 'current' | 'stale' | 'unavailable'
+
+/** 契约 §5.2 的三个图层。`q`/`type`/`category`/`status` **只对 `entries` 有意义**，
+ *  对另外两层传这些参数后端会 422（它拒绝静默忽略，这是刻意的）。 */
+export type WikiLayer = 'entries' | 'evidence' | 'runs'
+
+/**
+ * 三套状态**必须分别显示，任何接口都不得只给一个合并状态**（契约 §7.1）。
+ * 因此这里刻意不提供任何"总状态"派生字段。
+ */
+export interface WikiStatus {
+  publication: WikiPublicationStatus | string
+  assertion: WikiAssertionStatus | string
+  source_validity: WikiSourceValidity | string
+}
+
+export interface WikiBusinessKey {
+  space_id: string
+  namespace: string
+  entry_type: WikiEntryType | string
+  /** 业务键的值部分（库里的分隔符是 `\x1f`，原样透传，不在前端重新拼） */
+  key_part: string
+  /** 业务键的人工确认状态；`pending` 不等于"已确认" */
+  confirmation: string
+}
+
+/** 连接数统计。`scope` 恒为 `authorized_loaded`。 */
+export interface WikiRelationCounts {
+  visible: number
+  truncated: boolean
+  /** 恒为 `authorized_loaded`：当前授权 + 当前图层 + **已加载**，不是全库度数 */
+  scope: string
+}
+
+/** 目录 / 详情 / 图节点三处共用的同一份投影（契约 §5.1，字段一字不差）。 */
+export interface WikiEntry {
+  entry_id: string
+  entry_type: WikiEntryType | string
+  title: string
+  aliases: string[]
+  category: string
+  business_key: WikiBusinessKey | null
+  confirmation: string
+  summary: string
+  status: WikiStatus
+  head_revision_id: string | null
+  revision_count: number
+  evidence_ref_count: number
+  relation_counts: WikiRelationCounts
+  updated_at: string
+  /** 本库全部数据都是合成演示数据；`true` 时界面**必须**标出来（需求 §1 第 20 行） */
+  demo_data: boolean
+  [key: string]: unknown
+}
+
+/**
+ * 本次检索**实际覆盖**了哪些字段（契约 §5.1）。
+ * `body_searched=false` 时正文**没有被搜过**，界面不能让人以为搜了正文：
+ * 中文正文检索策略未定（`reason_code` 会给出原因）。
+ */
+export interface WikiSearchInfo {
+  q: string | null
+  scope: string[]
+  body_searched: boolean
+  uncovered_fields: string[]
+  reason_code: string | null
+  [key: string]: unknown
+}
+
+export interface WikiEntriesData {
+  entries: WikiEntry[]
+  search: WikiSearchInfo
+  [key: string]: unknown
+}
+
+/**
+ * 授权投影的自证（契约 §5 的统一信封）。
+ * 两者不等 = 有对象被授权过滤掉了，"我看不到"不等于"不存在"。
+ */
+export interface WikiAuthorizedScope {
+  nodes_considered: number
+  nodes_visible: number
+}
+
+export interface WikiMeta {
+  space_id: string
+  as_of: string
+  authorized_scope: WikiAuthorizedScope
+  [key: string]: unknown
+}
+
+/** 分页四件套（契约 §4：读接口**恒带**这四个字段）。 */
+export interface WikiPaging {
+  limit: number
+  has_more: boolean
+  /** 不透明字符串，客户端**不得**解析（契约 §4 语义 1）；null = 没有下一页 */
+  next_cursor: string | null
+  /** true = **因为上限**被截断，不是"没有更多" */
+  truncated: boolean
+}
+
+/** 统一信封。`warnings` 是原因码数组（`AUTHORIZATION_FILTERED` / `WIKI_GRAPH_LIMIT_REACHED` …）。 */
+export interface WikiEnvelope<T> {
+  data: T
+  meta: WikiMeta
+  paging: WikiPaging
+  warnings: string[]
+}
+
+/**
+ * 图节点。`node_kind` 是判别键：`entries` 图层恒为 `entry`，
+ * `evidence` 图层为 `evidence_ref`，`runs` 图层是 `run` 与 `evidence_ref` 混合
+ * （`wiki_query._runs_layer_candidates`）。所以 `entry` / `run` / `evidence_ref`
+ * 三个载荷字段都是可选，读之前必须先看 `node_kind`。
+ */
+export interface WikiGraphNode {
+  /** `entry` / `evidence_ref` / `run` */
+  node_kind: string
+  /** 节点自身 id（与关系两端 `src`/`dst` 同一命名空间） */
+  node_id: string
+  entry?: WikiEntry | null
+  run?: WikiRunSummary | null
+  evidence_ref?: WikiEvidenceRef | null
+  /** **只统计当前授权 + 当前图层 + 已加载**的连接数；不返回隐藏内容的总度数 */
+  degree?: number
+  /** 恒为 `authorized_loaded` */
+  degree_scope?: string
+  position_hint?: unknown
+  [key: string]: unknown
+}
+
+/**
+ * 关系的依据（契约 §5.6 / §5.2 `basis`）。键随来源表而变，故按开放字典处理——
+ * 界面只展示**存在**的键，不替它补一个看起来正常的默认值。
+ */
+export interface WikiRelationBasis {
+  source_table?: string
+  provenance_link_id?: string
+  run_id?: string
+  evidence_id?: string
+  claim_id?: string | null
+  event_id?: string | null
+  revision_id?: string | null
+  assertion_id?: string | null
+  [key: string]: unknown
+}
+
+/**
+ * 一条关系。`label` 是投影层的展示词表：**未支持的类型**会被写成
+ * "未支持关系类型"（契约 §3.4 规则 3/4），不是最近似的已知类型。
+ */
+export interface WikiGraphRelation {
+  relation_id: string
+  src: string
+  dst: string
+  src_kind?: string
+  dst_kind?: string
+  relation_type: string
+  /** `directed` / `undirected`（无向关系在 in/out/both 三种方向下都返回） */
+  direction: 'directed' | 'undirected' | string
+  origin?: string
+  raw_type?: string | null
+  supported: boolean
+  unsupported_reason?: string | null
+  rule_version?: string | null
+  basis_note?: string | null
+  basis?: WikiRelationBasis | null
+  derivation?: unknown
+  provenance_incomplete?: { applies?: boolean; [key: string]: unknown } | null
+  created_at?: string | null
+  /** 展示词；未支持类型为"未支持关系类型" */
+  label?: string
+  /** 运行图层的出处映射边会带它（`provenance_link`） */
+  link_kind?: string
+  [key: string]: unknown
+}
+
+/** `limit_reached` 非空 = **已达到** 100 节点 / 300 关系上限（此时 `next_cursor` 必为 null）。 */
+export interface WikiGraphLimitReached {
+  nodes: number
+  relations: number
+}
+
+export interface WikiGraphLoaded {
+  nodes: number
+  relations: number
+}
+
+export interface WikiGraphLimits {
+  nodes: number
+  relations: number
+}
+
+/** 契约 §5.2 / §5.6 的图数据。字段是两处共用的，邻域接口额外多四个。 */
+export interface WikiGraphData {
+  nodes: WikiGraphNode[]
+  relations: WikiGraphRelation[]
+  layer: WikiLayer | string
+  /** 累计已加载（**不是**全库）的节点与关系数 */
+  loaded: WikiGraphLoaded
+  limits: WikiGraphLimits
+  limit_reached: WikiGraphLimitReached | null
+  /** `NODE_LIMIT` / `RELATION_LIMIT` / `DEPTH_LIMIT`，优先级同序 */
+  truncated_reason: string | null
+  /** 恒为 `CURRENT_AUTHORIZED_SCOPE_GRAPH` */
+  scope_note: string
+  /** 服务端写好的范围说明（"当前授权范围图（不是全库全图）…"）——界面直接显示它 */
+  scope_description: string
+  /** 只有邻域接口（#6）才有的四个字段 */
+  root?: string
+  truncated?: boolean
+  unreached_neighbors?: number
+  [key: string]: unknown
+}
+
+/** 运行图层节点里的运行摘要（`wiki_query.run_object`）。 */
+export interface WikiRunSummary {
+  run_id: string
+  question: string | null
+  route?: string | null
+  status: string | null
+  confidence_level?: string | null
+  started_at?: string | null
+  ended_at?: string | null
+  elapsed_ms?: number | null
+  /** 三种形状：有错误 / 显式无错误 `{error_code:null,none:true}` / 读不到 `{unavailable:true}` */
+  error_summary?: Record<string, unknown> | null
+  event_count?: number
+  event_types?: string[]
+  /** false = `runs` 行已经不在了（`wiki_provenance_links` 刻意没有外键） */
+  run_row_present?: boolean
+  conversation_id?: string | null
+  [key: string]: unknown
+}
+
+/**
+ * 一条证据引用（契约 §5.7）。`excerpt_withheld=true` 表示**有原文但被授权扣留**，
+ * 与"检索到但没有可引用原文"（`excerpt_available=false`）是两件事，不得合并。
+ */
+export interface WikiEvidenceRef {
+  evidence_ref_id: string
+  fingerprint: string | null
+  source_kind: string | null
+  source_ref: string | null
+  source_version?: {
+    document_version?: number | null
+    source_sha256?: string | null
+    source_snapshot_id?: string | null
+    source_publication_id?: string | null
+    [key: string]: unknown
+  } | null
+  locator?: Record<string, unknown> | null
+  content_sha256: string | null
+  excerpt: string
+  excerpt_available: boolean
+  excerpt_withheld: boolean
+  /** `current` / `stale` / `unavailable`（读时复查，不缓存） */
+  source_validity: WikiSourceValidity | string | null
+  raw_node_types: string[]
+  supported: boolean
+  unsupported_reason?: string | null
+  run_scoped?: boolean
+  run_scoped_run_id?: string | null
+  provenance_incomplete?: { applies?: boolean; [key: string]: unknown } | null
+  created_at?: string | null
+  [key: string]: unknown
+}
+
+/**
+ * `provenance_incomplete`（契约 §6）。`applies=true` 时必须原样渲染理由码与缺失字段，
+ * **不得**推测补全，也不得因为它在 Markdown 里就省略。
+ */
+export interface WikiProvenanceIncomplete {
+  applies: boolean
+  missing_fields?: string[]
+  reason_code?: string
+  detected_at?: string
+  [key: string]: unknown
+}
+
+export interface WikiProvenanceIncompleteSummary {
+  applies: boolean
+  missing_fields?: string[]
+  reason_code?: string
+  detected_at?: string
+}
+
+export interface WikiProvenanceSummary {
+  evidence_ref_count: number
+  run_count: number
+  event_count: number
+  error_count: number
+  source_validity: Record<string, number>
+  provenance_complete: boolean
+  provenance_incomplete: WikiProvenanceIncompleteSummary | null
+  [key: string]: unknown
+}
+
+/** 一次运行的执行事件摘要（`/runs` 与 `/events` 两个接口共用的形状） */
+export interface WikiTraceEventSummary {
+  event_id: string
+  run_id: string
+  event_type: string
+  status: string
+  agent_name?: string | null
+  tool_name?: string | null
+  started_at?: string | null
+  ended_at?: string | null
+  duration_ms?: number | null
+  input_summary?: Record<string, unknown> | null
+  output_summary?: Record<string, unknown> | null
+  error_code?: string | null
+  retry_index?: number
+  visibility?: string
+  [key: string]: unknown
+}
+
+export interface WikiProvenanceData {
+  summary: WikiProvenanceSummary
+  evidence_refs: WikiEvidenceRef[]
+  runs: WikiRunSummary[]
+  events: WikiTraceEventSummary[]
+  [key: string]: unknown
+}
+
+/** 版本摘要（契约 §5.4）。正文不在这里，要按 `revision_id` 再取 #5。 */
+export interface WikiRevisionSummary {
+  revision_id: string
+  base_revision_id: string | null
+  status: WikiPublicationStatus | string
+  title: string
+  author?: { user_id?: string; display_name?: string | null } | null
+  generation_method?: string | null
+  citation_count?: number
+  assertion_count?: number
+  /** 用来判断"两版正文是否真的不同"，不必拉全文 */
+  body_sha256?: string | null
+  created_at?: string | null
+  events?: Array<{ event: string; at?: string; actor?: string }>
+  [key: string]: unknown
+}
+
+export interface WikiRevisionListData {
+  revisions: WikiRevisionSummary[]
+  [key: string]: unknown
+}
+
+/** 版本对象（契约 §5.3）。**不可变**：同一 revision_id 的正文与引用逐字节一致。 */
+export interface WikiRevision {
+  revision_id: string
+  entry_id: string
+  /** 首版为 null；后端**不接受**"以当前头为基线"的隐式语义 */
+  base_revision_id: string | null
+  title: string
+  body_markdown?: string | null
+  body_sha256?: string | null
+  citations: Array<{ evidence_ref_id: string; marker: string; [key: string]: unknown }>
+  assertions: WikiAssertion[]
+  author?: { user_id?: string; display_name?: string | null } | null
+  generation?: { method?: string | null; template_version?: string | null; model_id?: string | null } | null
+  change_note?: string | null
+  publication_status?: WikiPublicationStatus | string | null
+  created_at?: string | null
+  [key: string]: unknown
+}
+
+/** 一条主张。`verification` 的五项记账（契约 §7.2）必须逐项显示，不得合并成一句"已核验"。 */
+export interface WikiAssertion {
+  assertion_id: string
+  comparison_key?: string | null
+  entity_key?: Record<string, unknown> | null
+  metric?: string | null
+  raw_value?: string | null
+  raw_unit?: string | null
+  normalized_value?: string | null
+  normalized_unit?: string | null
+  time_scope?: Record<string, unknown> | null
+  applicability?: Record<string, unknown> | null
+  record_scope?: Record<string, unknown> | null
+  statistic?: string | null
+  evidence_refs?: string[]
+  verification?: {
+    status?: string
+    checked_at?: string | null
+    checked_by?: { user_id?: string; method?: string } | null
+    coverage?: Record<string, unknown> | null
+    rule_version?: string | null
+    accounting?: Record<string, unknown> | null
+    [key: string]: unknown
+  } | null
+  [key: string]: unknown
+}
+
+/** #3 `GET /v1/wiki/entries/{id}` 的 `data`：版本对象 + 该版本的关系与核验记录。 */
+export interface WikiEntryDetailData {
+  entry: WikiEntry
+  revision: WikiRevision
+  relations: WikiGraphRelation[]
+  review_events: WikiReviewEvent[]
+  provenance_summary: WikiProvenanceSummary | null
+  [key: string]: unknown
+}
+
+export interface WikiReviewEvent {
+  review_event_id: string
+  action: string
+  actor?: { user_id?: string } | null
+  at?: string | null
+  expected_head_revision_id?: string | null
+  based_on_head_revision_id?: string | null
+  scope?: unknown
+  verdict?: { assertion?: string } | null
+  basis?: unknown
+  conflicted_assertions?: string[]
+  note?: string | null
+  [key: string]: unknown
+}
+
+/* ── 请求参数（契约 §4 / §5 的冻结边界，前端不越界）─────────────────────── */
+
+/** #1 词条目录：`limit` 默认 20、上限 50；`cursor` 不透明。 */
+export interface WikiEntryListParams {
+  q?: string
+  /** 可重复；这里用单值数组表达"可重复"的查询参数 */
+  type?: string[]
+  /** **只**过滤 `publication`（核验状态要另传 assertion_status，本期不做） */
+  status?: string
+  category?: string
+  /** ISO8601 最近更新窗口 */
+  updated_since?: string
+  space_id?: string
+  limit?: number
+  cursor?: string | null
+}
+
+/** #2 空间图：`limit` 固定 50（后端不接受更大值）；累加上限 100 节点 / 300 关系。 */
+export interface WikiSpaceGraphParams {
+  layer?: WikiLayer
+  q?: string
+  type?: string
+  category?: string
+  status?: string
+  limit?: number
+  cursor?: string | null
+}
+
+/** #6 邻域：`depth` 1..2（超出 422）；`limit` 默认 50、上限 100。 */
+export interface WikiEntryGraphParams {
+  depth?: number
+  limit?: number
+  layer?: WikiLayer
+  direction?: 'in' | 'out' | 'both'
+}
+
+/** #7 证据与事件：`limit` 默认 50、**上限 200**。 */
+export interface WikiProvenanceParams {
+  revision_id?: string
+  limit?: number
+  cursor?: string | null
+  layer?: 'evidence' | 'runs' | 'both'
+}
+
+/** 服务端写好的原因码（`warnings` 数组里的取值），只列读接口会遇到的。 */
+export type WikiWarningCode =
+  | 'AUTHORIZATION_FILTERED'
+  | 'CURSOR_RESET_ON_FILTER_CHANGE'
+  | 'WIKI_GRAPH_LIMIT_REACHED'
+  | string
