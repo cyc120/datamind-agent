@@ -256,6 +256,8 @@ export interface FinalResult {
   sql_result?: SqlResult
   rag_result?: RagResult
   industrial_result?: IndustrialResult
+  /** 跨源核验结果。流式接口与历史接口都会原样带上；当前只做透传，页面尚未渲染。 */
+  cross_source_result?: Record<string, any>
 }
 
 export type NodeType =
@@ -358,6 +360,22 @@ export interface SessionListResult {
 export interface SessionDetail {
   session: SessionSummary
   messages: SessionMessage[]
+}
+
+/** 历史会话的富内容单元：一个 run 一条，`result` 就是流式接口最后那份 `final`。
+    `result` 为 null = 该 run 没走到终态事件（仍在跑，或早于事件落库），不是错误。 */
+export interface SessionRunResult {
+  run_id: string
+  result: FinalResult | null
+}
+
+/** GET /v1/sessions/{id}/results：按 run 分页、**最近优先**（与 detail.messages 相反） */
+export interface SessionResultsPage {
+  session_id: string
+  results: SessionRunResult[]
+  limit: number
+  offset: number
+  has_more: boolean
 }
 
 /* ── 运行记录（GET /v1/runs，后端 datamind/api.py::list_runs）────────────────

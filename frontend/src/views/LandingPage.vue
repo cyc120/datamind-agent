@@ -29,6 +29,17 @@ function scrollTo(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
+/**
+ * 去历史对话：跳工作台并带 `?panel=history`，由 MainPage 展开历史区并把焦点放进搜索框
+ * （见 docs/CONVERSATION_HISTORY_DESIGN.md P0-1）。
+ *
+ * WHY 只是一个跳转参数：落地页拿不到、也不应该拿会话列表 —— 它是对外页面，
+ * 在这里渲染会话标题等于把私有的对话记录搬到公开入口上。
+ */
+function openHistory() {
+  void router.push({ path: '/app', query: { panel: 'history' } })
+}
+
 /** Hero 副标题里轮换的能力词。 */
 const rotating = ['精准问数', '文档问答', '跨源核验']
 
@@ -113,7 +124,15 @@ const sampleEdges: EvidenceEdge[] = [
         <a href="#starmap" @click.prevent="scrollTo('starmap')">星图</a>
         <a href="#how" @click.prevent="scrollTo('how')">流程</a>
       </nav>
-      <button class="cta" @click="router.push('/app')">进入体验</button>
+      <div class="nav-actions">
+        <!-- 历史对话：首页到历史的入口（此前是断头路，只能点「进入体验」再自己找）。
+             这里**只放一个跳转按钮**，绝不渲染任何会话标题/摘要 —— 落地页是对外页面，
+             会话内容是私有的（见 docs/CONVERSATION_HISTORY_DESIGN.md P0-1 的红线）。 -->
+        <button class="ghost-cta" data-testid="landing-history" @click="openHistory">
+          历史对话
+        </button>
+        <button class="cta" @click="router.push('/app')">进入体验</button>
+      </div>
     </header>
 
     <!-- Hero -->
@@ -459,6 +478,27 @@ const sampleEdges: EvidenceEdge[] = [
 }
 .cta:hover {
   opacity: 0.85;
+}
+/* 顶栏右侧的两个按钮：历史对话（次要）与进入体验（主要）并排 */
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ghost-cta {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--color-line);
+  background: transparent;
+  color: var(--color-body);
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+.ghost-cta:hover {
+  border-color: rgba(37, 99, 235, 0.45);
+  color: #2563eb;
 }
 
 /* ── Hero ── */

@@ -8,7 +8,15 @@ import NodeDetail from '../components/stargraph/NodeDetail.vue'
 import { streamChat, getEvidence } from '../api/client'
 import { useModelAccess } from '../composables/useModelAccess'
 import { useSessions } from '../composables/useSessions'
-import type { ChatMessage, ChatPayload, EvidenceGraph, EvidenceNode, SessionMessage } from '../api/types'
+import type {
+  ChatMessage,
+  ChatPayload,
+  EvidenceGraph,
+  EvidenceNode,
+  FinalResult,
+  SessionMessage,
+  SessionRunResult,
+} from '../api/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -53,7 +61,11 @@ const {
   loadTranscript,
   create: createSession,
   setBusyGuard,
+  revealHistory,
 } = useSessions()
+
+/** 会话 id 的严格形状：`sess-` + uuid4().hex[:24]（与后端 sessions._session_id 一致） */
+const SESSION_ID_RE = /^sess-[0-9a-f]{24}$/
 
 /** 会话归属字段由 types.ts 补（另一位同学负责），这里按可选字段传 */
 type ChatPayloadWithSession = ChatPayload & { conversation_id?: string }
@@ -72,7 +84,13 @@ function resetEvidence() {
 }
 
 /** 把「一个 run 一条」的服务端投影摊平成「用户气泡 + 助手气泡」，顺序即 started_at 顺序 */
-function rebuildMessages(rows: SessionMessage[]) {
+function rebuildMessages(rows: SessionMessage[], rich: SessionRunResult[] = []) {
+  // 富内容按 run_id 建索引：响应是**最近优先**（与 rows 相反），所以只能按 id 对齐，
+  // 不能按下标 zip —— 那是这套接口最容易写错、又最难在页面上看出来的一处。
+  const payloads = new Map<string, FinalResult>()
+  for (const item of Array.isArray(rich) ? rich : []) {
+    if (item && typeof item.run_id === 'string' && item.result) payloads.set(item.run_id, item.result)
+  }
   const next: ChatMessage[] = []
   for (const row of Array.isArray(rows) ? rows : []) {
     const runId = String(row?.run_id ?? '')
@@ -81,6 +99,7 @@ function rebuildMessages(rows: SessionMessage[]) {
     // 历史里可能有「还没产出 answer」的 run：仍在跑的渲染成进行中，已结束的按失败呈现，
     // 不能因为 answer 为空就把它显示成一条正常答案。
     const pending = status === 'RUNNING' || status === 'PENDING' || status === 'QUEUED'
+    const final = runId ? payloads.get(runId) : undefined
     next.push({
       id: `hist-${runId}-u`,
       role: 'user',
@@ -89,14 +108,56 @@ function rebuildMessages(rows: SessionMessage[]) {
     next.push({
       id: `hist-${runId}-a`,
       role: 'assistant',
+      // 正文以 `runs.answer` 为准（它与富内容里的 answer 同源；取 run 行能让「有正文但
+      // 没有终态事件」的老 run 照常显示），富内容只补它拿不到的那几块。
       content: answer,
       status: pending ? 'running' : answer ? 'done' : 'error',
       runId: runId || undefined,
       runStatus: (row?.status as ChatMessage['runStatus']) ?? undefined,
       confidence: typeof row?.confidence_level === 'string' ? row.confidence_level : undefined,
+      // 历史富内容：SQL 结果表 / 引用 / 工业核验表。这是「打开历史会话只剩纯文本」
+      // 的修复点——流式路径在 send() 里做同样三件事（见下面的 final.* 赋值）。
+      sqlResult: final?.sql_result,
+      citations: final?.rag_result?.citations,
+      industrialResult: final?.industrial_result,
+      error: final?.error_code ?? undefined,
     })
   }
   messages.value = next
+}
+
+/**
+ * 历史会话的证据星图：只点亮**最近一个走到终态的 run**。
+ *
+ * 为什么是「最近一个」而不是全部：星图一次只画一张（与流式路径一致——每次提问都会
+ * resetEvidence 再画当前这一轮）。窗口外的更早轮次不再单独取证据，否则打开一个长会话
+ * 会变成几十次请求。取不到（该 run 没有证据/接口失败）就保持空图，不猜。
+ *
+ * 竞态：请求回来的那一刻会话可能已经切走了（`id` 不再是 activeId，或用户已经开始新一轮
+ * 流式回答）。这时**必须不写**——否则会出现「消息是 B 的、星图停在 A 的」这种最容易骗人的
+ * 状态；调用方也不能在事后补一次 resetEvidence 兜底，那会把 B 刚点亮的证据一起清掉。
+ */
+async function showEvidenceForHistory(id: string, rows: SessionMessage[], rich: SessionRunResult[]) {
+  const withResult = new Set(
+    (Array.isArray(rich) ? rich : [])
+      .filter((item) => item && item.result)
+      .map((item) => item.run_id),
+  )
+  for (let index = rows.length - 1; index >= 0; index -= 1) {
+    const runId = String(rows[index]?.run_id ?? '')
+    if (!runId || !withResult.has(runId)) continue
+    try {
+      const evidence = await getEvidence(runId)
+      if (sessionId.value !== id || running.value) return
+      graph.nodes = evidence.nodes ?? []
+      graph.edges = evidence.edges ?? []
+      graph.claims = evidence.claims ?? []
+      if (graph.nodes.length) evidenceHint.value = true
+    } catch {
+      /* 证据图不可用不阻断历史浏览 */
+    }
+    return
+  }
 }
 
 /**
@@ -104,11 +165,12 @@ function rebuildMessages(rows: SessionMessage[]) {
  * loadTranscript 内部按会话 id 合并并发请求，watch 与 onMounted 同时调用也只发一次。
  */
 async function showTranscript(id: string) {
-  const rows = await loadTranscript(id)
+  const history = await loadTranscript(id)
   // 期间又切走了、或正在流式写答案：绝不覆盖本地 messages
   // （取舍理由见 setBusyGuard 的注释）。
   if (sessionId.value !== id || running.value) return
-  rebuildMessages(rows)
+  rebuildMessages(history.messages, history.results)
+  await showEvidenceForHistory(id, history.messages, history.results)
 }
 
 /**
@@ -259,15 +321,36 @@ onMounted(async () => {
   // 服务健康 + 模型配置 + 读回上次连通性检测（三件事各自独立）
   void bootstrapModelAccess()
 
+  // 会话深链：#/app?session=<sess-id>（运行记录里的「会话 xxx」、收藏、外部跳转都用它）。
+  // 必须在 bootstrapSessions() 之前写 activeId —— 那个函数只在 activeId 为空时才读
+  // localStorage，所以「先写」就等于让深链**优先于**上次记住的会话。
+  // 刻意**不落盘**：深链是一次性导航，刷新后应当回到用户自己的上次会话，而不是被这个
+  // 参数永久劫持（下面 replace 清掉参数，同一道理）。
+  const deepLink = typeof route.query.session === 'string' ? route.query.session : ''
+  if (SESSION_ID_RE.test(deepLink)) sessionId.value = deepLink
+
   // 先把会话状态就位（含 localStorage 里记住的活动会话）再处理深链提问，
   // 这样 ?q= 那一次运行会挂进已有会话，而不是又新建一个。
   await bootstrapSessions()
+
+  // #/app?panel=history：落地页的「历史对话」按钮。展开历史区并把焦点放进搜索框
+  //（revealHistory 只发信号，DOM 聚焦在 SideNav 里做）。
+  let consumedQuery = false
+  if (route.query.panel === 'history') {
+    revealHistory()
+    consumedQuery = true
+  }
 
   // 深链提问：#/app?q=…&mode=retail —— 与旧版控制台的 hash 深链同一套用法
   const q = route.query.q
   const m = route.query.mode
   if (typeof q === 'string' && q.trim()) {
+    consumedQuery = true
     await send({ question: q, mode: typeof m === 'string' ? m : 'auto' })
+  }
+  if (deepLink || consumedQuery) {
+    // 清掉一次性参数：否则刷新会重新套用深链、把用户手动切走的会话又拽回来。
+    await router.replace({ path: '/app' })
   }
 })
 </script>

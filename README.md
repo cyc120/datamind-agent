@@ -156,6 +156,9 @@ SQL、RAG 与扫描 OCR 的核心依赖由启动脚本安装。严格复现已�
 # 基础设施、只读权限与数据库/知识库不变量
 .venv/bin/python scripts/verify.py
 
+# 前端布局与可点性（无头 Chrome + 真实鼠标事件；没有 Chrome 时明确跳过）
+.venv/bin/python scripts/verify_frontend_layout.py
+
 # 在临时元数据库副本运行完整回归
 .venv/bin/python scripts/test_isolated.py
 

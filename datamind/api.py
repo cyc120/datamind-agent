@@ -1224,6 +1224,20 @@ def session_detail(session_id: str,request: Request):
     return jsonable_encoder(detail(session_id,_write_dsn(),request.state.identity))
 
 
+@app.get('/v1/sessions/{session_id}/results')
+def session_results(session_id: str,request: Request,limit: int=Query(default=20,ge=1,le=50),
+                    offset: int=Query(default=0,ge=0,le=10000)):
+    """历史会话的富内容（SQL 结果表 / 引用 / 工业核验），按 run 分页、最近优先。
+
+    独立于 `detail` 的理由（体积）见 `datamind/sessions.py::results`。授权面与
+    `/v1/sessions` 完全一致：默认拒绝、必须有身份、不限角色、只读自己的会话；
+    `/v1/sessions` 已在 `_NO_STORE_PREFIXES` 里，这条子路径同样恒为 no-store。
+    """
+    from .sessions import results
+    return jsonable_encoder(results(session_id,_write_dsn(),request.state.identity,
+                                   limit=limit,offset=offset))
+
+
 @app.patch('/v1/sessions/{session_id}')
 def session_rename(session_id: str,payload: SessionRenameRequest,request: Request):
     from .sessions import rename

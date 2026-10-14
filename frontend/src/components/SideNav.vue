@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { me } from '../api/client'
 import type { AuthUser } from '../api/types'
@@ -92,6 +92,7 @@ const {
  */
 const {
   rows: sessionRows,
+  groupedRows: sessionGroups,
   query: sessionQuery,
   loading: sessionLoading,
   error: sessionError,
@@ -100,11 +101,16 @@ const {
   creating: sessionCreating,
   isEmpty: sessionsEmpty,
   noResults: sessionsNoResults,
+  historyCollapsed,
+  historyFocusSeq,
   bootstrap: bootstrapSessionList,
   refresh: refreshSessions,
   loadMore: loadMoreSessions,
   select: selectSession,
+  rename: renameSession,
   remove: removeSession,
+  toggleHistory,
+  revealHistory,
 } = useSessions()
 
 /**
@@ -123,6 +129,11 @@ interface NavItem {
   /** 站内路由：问数与问答就是本页 */
   to?: string
   /**
+   * 站内**动作**而不是路由。目前只有 `'history'`：它和「问数与问答」是同一个路由
+   * （/app），若也给一个 `to`，两个条目会同时高亮，看着像有两个页面。
+   */
+  action?: 'history'
+  /**
    * 旧版控制台的 hash 深链。八项已全部迁移，当前没有任何条目再用它；
    * 字段与模板里的兜底分支一起保留，作为「万一又被塞进一个未迁移入口」时的
    * 安全网 —— 宁可显式禁用并标注，也不能让用户撞上白屏。
@@ -135,6 +146,9 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
     title: '工作台',
     items: [
       { key: 'chat', label: '问数与问答', icon: '◎', to: '/app' },
+      // 侧栏那块历史区是**常驻列表**（主流 AI 应用也是这样，历史不该藏在按钮后面），
+      // 这个入口解决的是「一眼扫导航却找不到历史」：点它=回到工作台 + 展开历史 + 聚焦搜索。
+      { key: 'history', label: '历史对话', icon: '☰', action: 'history' },
       { key: 'runs', label: '运行记录', icon: '↺', to: '/runs' },
       { key: 'model', label: '模型接入', icon: '⚙', to: '/model' },
     ],
@@ -153,6 +167,121 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
     items: [{ key: 'files', label: '我的文件', icon: '⇈', to: '/files' }],
   },
 ]
+
+/* ── 历史区：折叠 / 行内重命名 / 行菜单 ─────────────────────────────── */
+
+const searchEl = ref<HTMLInputElement | null>(null)
+
+/**
+ * 「展开并聚焦搜索框」的请求（落地页按钮、外部深链）。
+ * 组合式函数只发序号信号，DOM 在这里处理：`revealHistory()` 已先把折叠态置为展开，
+ * 所以这里只需 nextTick 之后聚焦——否则会聚焦一个还没渲染出来的输入框。
+ */
+watch(historyFocusSeq, async () => {
+  await nextTick()
+  searchEl.value?.focus()
+})
+
+/** 行菜单（⋯）当前展开的行：同一时刻只允许一行，点别处或 Esc 收起 */
+const menuId = ref<string | null>(null)
+/**
+ * 菜单是否**向上**展开。
+ *
+ * WHY 需要它（实测 bug）：`.sess-menu` 是行内的 `position: absolute`，而列表容器
+ * `.sessions` 是 `overflow-y: auto`（滚动裁剪容器）。靠近列表底部的行，菜单向下展开会
+ * 被容器裁掉——`document.elementFromPoint(菜单项中心)` 返回的是侧栏本身，真实鼠标点击
+ * 落不到「重命名/删除」上（实测最底部那行点了没有任何反应）。所以打开时量一次：
+ * 下方放不下且上方放得下，就翻到行上方。
+ *
+ * 不把它 teleport 到 body 用 fixed 定位：那样滚动时菜单会脱开它所属的行；
+ * 留在行内则菜单跟着行走（滚出视野一起消失），行为更可预期。
+ */
+const menuUp = ref(false)
+/** 正在改名的行与草稿标题 */
+const editingId = ref<string | null>(null)
+const editTitle = ref('')
+/** 改名前的原标题：内容没变就不发 PATCH（省一次往返，也避免空改名制造 updated_at 抖动） */
+let editOriginal = ''
+
+async function toggleMenu(id: string) {
+  if (menuId.value === id) {
+    menuId.value = null
+    return
+  }
+  menuId.value = id
+  menuUp.value = false
+  await nextTick()
+  const container = listEl.value
+  const row = container?.querySelector('.sess-row[data-menu="true"]') ?? null
+  const popup = container?.querySelector<HTMLElement>('[data-testid="session-menu-popup"]') ?? null
+  if (container && row && popup) {
+    const box = container.getBoundingClientRect()
+    const item = popup.getBoundingClientRect()
+    menuUp.value = item.bottom > box.bottom && row.getBoundingClientRect().top - item.height >= box.top
+  }
+}
+
+/**
+ * 导航里的「历史对话」按钮。
+ *
+ * 已经在工作台就地展开并把焦点放进搜索框（不跳转、不刷新，省一次往返）；
+ * 不在工作台则跳到 `?panel=history`，由 MainPage 统一处理展开与聚焦——同一条路径，
+ * 不在这里重复一遍「展开 + 聚焦」的逻辑。
+ */
+function openHistory() {
+  if (route.path === '/app') {
+    revealHistory()
+    return
+  }
+  void router.push({ path: '/app', query: { panel: 'history' } })
+}
+
+async function startRename(id: string, title: string) {
+  menuId.value = null
+  armedId.value = null
+  editingId.value = id
+  editTitle.value = title
+  editOriginal = title
+  await nextTick()
+  // 用查询取输入框而不是模板 ref：这个 input 在 v-for 里，模板 ref 会变成数组，
+  // 而同一时刻只可能有一个，查询反而更直白。
+  const input = listEl.value?.querySelector<HTMLInputElement>('.sess-edit') ?? null
+  input?.focus()
+  input?.select()
+}
+
+function cancelRename() {
+  editingId.value = null
+  editTitle.value = ''
+  editOriginal = ''
+}
+
+/**
+ * 保存改名。`rename()` 自己会做空白/超长校验并写中文提示（`ERROR_TEXT`），这里不重复实现。
+ * 失焦也保存（主流应用的行为）；「Esc 取消」不受影响 —— cancelRename 先把 editingId 清空，
+ * 随后那次 blur 会在这行开头直接返回。
+ */
+async function commitRename() {
+  const id = editingId.value
+  if (!id) return
+  const next = editTitle.value
+  editingId.value = null
+  editTitle.value = ''
+  if (next.trim() === editOriginal.trim()) return
+  await renameSession(id, next)
+}
+
+function onEditKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter') {
+    e.preventDefault()
+    void commitRename()
+    return
+  }
+  if (e.key === 'Escape') {
+    e.preventDefault()
+    cancelRename()
+  }
+}
 
 /* ── 会话列表：搜索 + 两步删除 ────────────────────────────────────────── */
 
@@ -174,6 +303,8 @@ watch(sessionQuery, () => {
 function newChat() {
   sessionQuery.value = ''
   armedId.value = null
+  menuId.value = null
+  cancelRename()
   emit('new-chat')
 }
 
@@ -193,8 +324,9 @@ function disarmRow() {
 }
 
 function onRowClick(id: string) {
-  // 已进入确认态的行不响应「切换会话」，免得确认过程中误触
-  if (armedId.value === id) return
+  // 已进入确认态或正在改名的行不响应「切换会话」，免得确认/输入过程中误触
+  if (armedId.value === id || editingId.value === id) return
+  menuId.value = null
   void selectSession(id)
 }
 
@@ -203,22 +335,29 @@ async function confirmDelete(id: string) {
   await removeSession(id)
 }
 
-/** 点击别处取消确认（捕获阶段先判断，再轮到按钮自己的 @click.stop） */
+/** 点击别处收起行菜单并取消删除确认（捕获阶段先判断，再轮到按钮自己的 @click.stop） */
 function onDocClick(e: MouseEvent) {
+  if (menuId.value) {
+    const owner = listEl.value?.querySelector('.sess-row[data-menu="true"]') ?? null
+    if (!(owner && e.target instanceof Node && owner.contains(e.target))) menuId.value = null
+  }
   if (!armedId.value) return
   const armed = listEl.value?.querySelector('.sess-row[data-armed="true"]') ?? null
   if (armed && e.target instanceof Node && armed.contains(e.target)) return
   armedId.value = null
 }
 
-/** Ctrl/⌘ + K：与按钮上标注的快捷键一致；Esc 先用来取消删除确认 */
+/** Ctrl/⌘ + K：与按钮上标注的快捷键一致；Esc 依次收起菜单 / 取消改名 / 取消删除确认 */
 function onKeydown(e: KeyboardEvent) {
   if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'k' || e.key === 'K')) {
     e.preventDefault()
     newChat()
     return
   }
-  if (e.key === 'Escape' && armedId.value) armedId.value = null
+  if (e.key !== 'Escape') return
+  if (menuId.value) menuId.value = null
+  else if (editingId.value) cancelRename()
+  else if (armedId.value) armedId.value = null
 }
 
 onMounted(() => {
@@ -260,95 +399,164 @@ onBeforeUnmount(() => {
       <span class="nc-kbd">Ctrl K</span>
     </button>
 
-    <!-- 会话列表：夹在「新对话」与主导航之间。列表自己滚动（.sessions），
-         侧栏整体不再滚动，底部「接入状态 / 用户区」始终钉住。 -->
-    <section ref="listEl" class="sessions" data-testid="session-list">
-      <div class="sess-title">会话</div>
-      <div class="sess-search">
-        <span class="sess-search-ico" aria-hidden="true">⌕</span>
-        <input
-          v-model="sessionQuery"
-          class="sess-search-input"
-          type="search"
-          data-testid="session-search"
-          placeholder="搜索会话…"
-          maxlength="200"
-          autocomplete="off"
-          aria-label="搜索会话"
-        />
-      </div>
-
-      <p v-if="sessionError" class="sess-error" data-testid="session-error">{{ sessionError }}</p>
-
-      <div v-if="sessionRows.length" class="sess-rows">
-        <div
-          v-for="row in sessionRows"
-          :key="row.id"
-          class="sess-row"
-          :class="{ 'is-active': row.active }"
-          data-testid="session-row"
-          :data-armed="armedId === row.id ? 'true' : 'false'"
-          :title="row.tip"
-          role="button"
-          tabindex="0"
-          @click="onRowClick(row.id)"
-          @keydown.enter.prevent="onRowClick(row.id)"
-          @keydown.space.prevent="onRowClick(row.id)"
-        >
-          <span class="sess-row-txt">
-            <span class="sess-row-title">{{ row.title }}</span>
-            <span class="sess-row-meta">
-              <span class="sess-row-time">{{ row.whenText }}</span>
-              <span v-if="row.runCount" class="sess-row-count">{{ row.runCount }} 轮</span>
-            </span>
-          </span>
-
-          <!-- 未进入确认态：一个「✕」；进入确认态：确认/取消两个按钮 -->
-          <button
-            v-if="armedId !== row.id"
-            class="sess-del"
-            type="button"
-            data-testid="session-delete"
-            title="删除会话"
-            aria-label="删除会话"
-            :disabled="sessionRemovingId === row.id"
-            @click.stop="armRow(row.id)"
-          >
-            ✕
-          </button>
-          <span v-else class="sess-confirm">
-            <button
-              class="sess-confirm-yes"
-              type="button"
-              data-testid="session-delete-confirm"
-              :disabled="sessionRemovingId === row.id"
-              @click.stop="confirmDelete(row.id)"
-            >
-              确认删除
-            </button>
-            <button class="sess-confirm-no" type="button" @click.stop="disarmRow">取消</button>
-          </span>
-        </div>
-
+    <!-- 历史对话：夹在「新对话」与主导航之间。
+         结构上分两层：`.sessions` 只负责占位（**不滚动**），标题与搜索框钉在里面，
+         `.sess-body` 才是滚动容器。WHY 要分层：标题与搜索框原来跟列表在同一个滚动
+         容器里，列表一往下滚，「历史对话」和搜索框就一起滚没了——找一个旧会话得先滚回
+         顶部才能搜。现在只有列表滚，搜索框始终在手边。
+         标题写「历史对话」而不是「会话」：用户找的就是这个词（接口与文档仍叫 session/会话，
+         只是界面文案对齐心智）。折叠开关给「这一屏只想来问问题」的用户让出导航空间。 -->
+    <section class="sessions" :class="{ 'is-collapsed': historyCollapsed }"
+             data-testid="session-list">
+      <div class="sess-head">
+        <span class="sess-title">历史对话</span>
         <button
-          v-if="sessionHasMore"
-          class="sess-more"
+          class="sess-fold"
           type="button"
-          :disabled="sessionLoading"
-          @click="loadMoreSessions"
+          data-testid="history-toggle"
+          :aria-expanded="!historyCollapsed"
+          :title="historyCollapsed ? '展开历史对话' : '折叠历史对话'"
+          :aria-label="historyCollapsed ? '展开历史对话' : '折叠历史对话'"
+          @click="toggleHistory"
         >
-          {{ sessionLoading ? '加载中…' : '加载更多' }}
+          {{ historyCollapsed ? '⌄' : '⌃' }}
         </button>
       </div>
 
-      <!-- 「还没有会话」与「搜索无结果」是两件事，文案分开 -->
-      <p v-else-if="sessionLoading" class="sess-hint">会话加载中…</p>
-      <p v-else-if="sessionsNoResults" class="sess-hint" data-testid="session-no-results">
-        没有匹配的会话
-      </p>
-      <p v-else-if="sessionsEmpty" class="sess-hint" data-testid="session-empty">
-        还没有会话，点上方「新对话」开始
-      </p>
+      <template v-if="!historyCollapsed">
+        <div class="sess-search">
+          <span class="sess-search-ico" aria-hidden="true">⌕</span>
+          <input
+            ref="searchEl"
+            v-model="sessionQuery"
+            class="sess-search-input"
+            type="search"
+            data-testid="session-search"
+            placeholder="搜索对话…"
+            maxlength="200"
+            autocomplete="off"
+            aria-label="搜索对话"
+          />
+        </div>
+
+        <p v-if="sessionError" class="sess-error" data-testid="session-error">{{ sessionError }}</p>
+
+        <!-- 只有这一层滚：`.sess-head` / `.sess-search` 钉在外面，滚动列表不会把它们带走。
+             listEl 也改指这里 —— 菜单翻向与「改名输入框」的查询都以这个裁剪容器为界。 -->
+        <div ref="listEl" class="sess-body">
+        <div v-if="sessionRows.length" class="sess-rows">
+          <template v-for="group in sessionGroups" :key="group.title || 'all'">
+            <!-- 时间分组只在非搜索态出现；分组标题不参与行点击 -->
+            <div v-if="group.title" class="sess-group" role="presentation">{{ group.title }}</div>
+            <div
+              v-for="row in group.rows"
+              :key="row.id"
+              class="sess-row"
+              :class="{ 'is-active': row.active }"
+              data-testid="session-row"
+              :data-armed="armedId === row.id ? 'true' : 'false'"
+              :data-menu="menuId === row.id ? 'true' : 'false'"
+              :title="row.tip"
+              role="button"
+              tabindex="0"
+              @click="onRowClick(row.id)"
+              @keydown.enter.prevent="onRowClick(row.id)"
+              @keydown.space.prevent="onRowClick(row.id)"
+            >
+              <span class="sess-row-txt">
+                <!-- 改名：行内输入，Enter 保存 / Esc 取消 / 失焦保存（见 commitRename） -->
+                <input
+                  v-if="editingId === row.id"
+                  v-model="editTitle"
+                  class="sess-edit"
+                  data-testid="session-rename-input"
+                  maxlength="200"
+                  aria-label="会话标题"
+                  @click.stop
+                  @keydown="onEditKeydown"
+                  @blur="commitRename"
+                />
+                <template v-else>
+                  <span class="sess-row-title">{{ row.title }}</span>
+                  <span class="sess-row-meta">
+                    <span class="sess-row-time">{{ row.whenText }}</span>
+                    <span v-if="row.runCount" class="sess-row-count">{{ row.runCount }} 轮</span>
+                  </span>
+                </template>
+              </span>
+
+              <!-- 删除保留两步内联确认：第一下把按钮换成「确认删除」，第二下才真删 -->
+              <span v-if="armedId === row.id" class="sess-confirm">
+                <button
+                  class="sess-confirm-yes"
+                  type="button"
+                  data-testid="session-delete-confirm"
+                  :disabled="sessionRemovingId === row.id"
+                  @click.stop="confirmDelete(row.id)"
+                >
+                  确认删除
+                </button>
+                <button class="sess-confirm-no" type="button" @click.stop="disarmRow">取消</button>
+              </span>
+
+              <!-- 行内动作收进 ⋯ 菜单：改名前每行常驻一个 ✕，视觉噪声大又容易误触 -->
+              <template v-else-if="editingId !== row.id">
+                <button
+                  class="sess-more-btn"
+                  type="button"
+                  data-testid="session-menu"
+                  title="更多操作"
+                  aria-label="更多操作"
+                  :aria-expanded="menuId === row.id"
+                  @click.stop="toggleMenu(row.id)"
+                >
+                  ⋯
+                </button>
+                <span v-if="menuId === row.id" class="sess-menu" :class="{ 'is-up': menuUp }"
+                      data-testid="session-menu-popup">
+                  <button
+                    class="sess-menu-item"
+                    type="button"
+                    data-testid="session-rename"
+                    @click.stop="startRename(row.id, row.title)"
+                  >
+                    重命名
+                  </button>
+                  <button
+                    class="sess-menu-item is-danger"
+                    type="button"
+                    data-testid="session-delete"
+                    :disabled="sessionRemovingId === row.id"
+                    @click.stop="armRow(row.id)"
+                  >
+                    删除
+                  </button>
+                </span>
+              </template>
+            </div>
+          </template>
+
+          <button
+            v-if="sessionHasMore"
+            class="sess-more"
+            type="button"
+            :disabled="sessionLoading"
+            @click="loadMoreSessions"
+          >
+            {{ sessionLoading ? '加载中…' : '加载更多' }}
+          </button>
+        </div>
+
+        <!-- 「还没有会话」与「搜索无结果」是两件事，文案分开 -->
+        <p v-else-if="sessionLoading" class="sess-hint">会话加载中…</p>
+        <p v-else-if="sessionsNoResults" class="sess-hint" data-testid="session-no-results">
+          没有匹配的对话（按最近活动排序，不是相关度）
+        </p>
+        <p v-else-if="sessionsEmpty" class="sess-hint" data-testid="session-empty">
+          还没有历史对话，点上方「新对话」开始
+        </p>
+        </div>
+      </template>
     </section>
 
     <nav class="nav">
@@ -363,6 +571,14 @@ onBeforeUnmount(() => {
             <span class="ico" aria-hidden="true">{{ it.icon }}</span>
             <span class="txt">{{ it.label }}</span>
           </RouterLink>
+          <!-- 动作型入口：「历史对话」回到工作台并展开历史区，见 openHistory()。
+               它不做高亮 —— active 归「问数与问答」，同一路由不该亮两个。 -->
+          <button v-else-if="it.action === 'history'" class="nav-item" type="button"
+                  :title="it.label" :data-nav="it.key" data-testid="nav-history"
+                  @click="openHistory">
+            <span class="ico" aria-hidden="true">{{ it.icon }}</span>
+            <span class="txt">{{ it.label }}</span>
+          </button>
           <span v-else class="nav-item is-legacy" :title="`${it.label}：新前端尚未迁移（旧版入口）`"
                 :data-nav="it.key" data-testid="nav-legacy">
             <span class="ico" aria-hidden="true">{{ it.icon }}</span>
@@ -440,9 +656,17 @@ onBeforeUnmount(() => {
   padding: 14px 12px 12px;
   background: var(--color-ink);
   border-right: 1px solid var(--color-line);
-  /* 侧栏本身不再滚动：滚动交给 .sessions 一个区域，
-     否则会出现「会话列表 + 整栏」两层嵌套滚动条。 */
-  overflow: hidden;
+  /* 侧栏整体可滚。
+     WHY 改掉了原来的 `overflow: hidden`（实测 bug，不是风格偏好）：侧栏的固定高度块
+     加起来约 880px（主导航 449 + 底部状态区 298 + 顶部与「新对话」约 80 + 间距 56），
+     比任何常见视口都高。`overflow: hidden` 会把它裁掉，而 flex 又把中间的历史区压到
+     4px —— 实测 1440×900 与 800×600 **都是 4px、完整可见行 0 行**，连「历史对话」这个
+     标题都被裁没了（`overflow-y: auto` 的 4px 容器）。也就是说用户**根本看不到历史**，
+     同时矮窗口下连底部状态区也点不到。
+     现在：窗口够高时内容刚好放得下，侧栏不出现滚动条（只有历史列表自己滚，维持原设计）；
+     窗口不够高时整体滚动，而不是把中间压没、把底部裁掉。 */
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .side-head {
@@ -719,20 +943,79 @@ onBeforeUnmount(() => {
    容器类名按约定叫 .sessions，只承担「占满剩余高度并自己滚动」这一件事。 */
 .sessions {
   flex: 1;
+  /* 历史区**永远**留出可读高度。`min-height: 0`（修 bug 之前的值）等于允许它被压成 0：
+     侧栏里比它「硬」的兄弟（导航、底部状态区）`min-height` 都是 auto，缩不动，于是空间
+     不足时全部压力都落在历史区上，实测被压到 4px —— 用户看到的就是「没有历史」。
+     216px ≈ 标题 + 搜索框 + 3 行会话（每行实测 50px）。 */
+  min-height: 216px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 2px 0;
+  /* 这一层不滚：标题与搜索框钉住，滚动交给下面的 .sess-body */
+  overflow: hidden;
+}
+/*
+ * 折叠态必须**真的把空间还回去**。
+ *
+ * WHY 需要这条（实测 bug）：`min-height: 216px` 是为展开态定的（保证历史区不被压没），
+ * 但它对折叠态一样生效——折叠后只剩标题一行，那块 216px 的空白照样占着，底部导航并不会
+ * 上移，看起来就是「点了没反应 / 收不起来」。CSS 不知道 Vue 的状态，所以由模板挂
+ * `.is-collapsed`：折叠时取消最小高度、也不参与 flex 增长，高度回到标题那一行。
+ */
+.sessions.is-collapsed {
+  min-height: 0;
+  flex: 0 0 auto;
+}
+.sess-head,
+.sess-search,
+.sess-error {
+  flex: 0 0 auto;
+}
+.sess-body {
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 2px 0;
 }
 
 /* 搜索框：焦点态沿用 ChatPanel 的 .composer:focus-within（同一种「正在输入」的强调） */
+.sess-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 4px 0;
+}
 .sess-title {
   font-size: 10.5px;
   letter-spacing: 0.08em;
   color: var(--color-muted);
-  padding: 2px 4px 0;
+}
+/* 折叠开关：默认展开，折叠后整块只剩标题一行 */
+.sess-fold {
+  border: none;
+  background: transparent;
+  color: var(--color-muted);
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.sess-fold:hover {
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--color-body);
+}
+
+/* 时间分组小标题：只做视觉分隔，不参与点击 */
+.sess-group {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--color-muted);
+  padding: 8px 8px 2px;
 }
 .sess-search {
   display: flex;
@@ -822,9 +1105,23 @@ onBeforeUnmount(() => {
   padding-left: 6px;
   white-space: nowrap;
 }
-.sess-del {
+/* 行内改名输入框：与标题同字号，占满文字区，避免改名时行高跳动 */
+.sess-edit {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(37, 99, 235, 0.45);
+  border-radius: 7px;
+  padding: 2px 6px;
+  font-family: inherit;
+  font-size: 12.5px;
+  color: var(--color-text);
+  background: #ffffff;
+  outline: none;
+}
+/* ⋯ 行菜单：平时隐藏，悬停该行或已聚焦时才现身，避免列表噪声 */
+.sess-more-btn {
   flex-shrink: 0;
-  width: 20px;
+  width: 22px;
   height: 20px;
   display: grid;
   place-items: center;
@@ -833,21 +1130,76 @@ onBeforeUnmount(() => {
   background: transparent;
   color: var(--color-muted);
   font-family: inherit;
-  font-size: 11px;
+  font-size: 13px;
+  line-height: 1;
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.15s, background 0.15s, color 0.15s;
 }
-/* 删除按钮平时隐藏，悬停该行或已聚焦时才现身，避免列表噪声 */
-.sess-row:hover .sess-del,
-.sess-row.is-active .sess-del,
-.sess-del:focus-visible {
+.sess-row:hover .sess-more-btn,
+.sess-row.is-active .sess-more-btn,
+.sess-more-btn:focus-visible,
+.sess-row[data-menu='true'] .sess-more-btn {
   opacity: 1;
 }
-.sess-del:hover {
-  background: rgba(225, 29, 72, 0.1);
+.sess-more-btn:hover {
+  background: rgba(15, 23, 42, 0.08);
+  color: var(--color-body);
+}
+.sess-more-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.sess-menu {
+  position: absolute;
+  right: 6px;
+  top: 30px;
+  z-index: 5;
+  min-width: 96px;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+/* 靠近列表底部的行翻到上方展开：`.sessions` 是 `overflow-y: auto` 的裁剪容器，
+   向下展开会被裁掉，菜单项就点不到了（见 menuUp 的注释）。 */
+.sess-menu.is-up {
+  top: auto;
+  bottom: 30px;
+}
+.sess-menu-item {
+  border: none;
+  border-radius: 7px;
+  padding: 5px 8px;
+  text-align: left;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--color-body);
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sess-menu-item:hover {
+  background: rgba(15, 23, 42, 0.06);
+}
+.sess-menu-item.is-danger {
   color: #e11d48;
 }
+.sess-menu-item.is-danger:hover {
+  background: rgba(225, 29, 72, 0.1);
+}
+.sess-menu-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+/* 菜单是绝对定位，需要一个定位祖先 */
+.sess-row {
+  position: relative;
+}
+/* 悬停/激活时不再需要旧的常驻 ✕ —— 已收进 ⋯ 菜单（见模板注释） */
 .sess-confirm {
   flex-shrink: 0;
   display: inline-flex;
@@ -870,8 +1222,7 @@ onBeforeUnmount(() => {
   background: rgba(225, 29, 72, 0.08);
   color: #e11d48;
 }
-.sess-confirm-yes:disabled,
-.sess-del:disabled {
+.sess-confirm-yes:disabled {
   cursor: not-allowed;
   opacity: 0.5;
 }

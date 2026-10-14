@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Windows 启动脚本 —— scripts/start_local.sh 的等价实现。
 
@@ -141,6 +141,10 @@ function Invoke-Psql([string]$Sql, [string]$Database = 'datamind_meta') {
 }
 
 Invoke-Psql 'CREATE SCHEMA IF NOT EXISTS demo_industrial AUTHORIZATION datamind_app; GRANT USAGE ON SCHEMA demo_industrial TO readonly_user;' | Out-Null
+# 存量库升级：deploy/init/*.sql 只在容器首次初始化时执行，已存在的卷不会重跑。`runs` 归 postgres
+# 所有，db/migrations 以 datamind_app 执行无法给它建索引，故在此补上与
+# deploy/init/02_metadata.sql 逐字一致的幂等语句（新库上是 no-op）。
+Invoke-Psql 'CREATE INDEX IF NOT EXISTS runs_recent_idx ON runs(started_at DESC, run_id DESC);' | Out-Null
 Write-Host '应用迁移 …'
 Invoke-Python db/migrate.py
 

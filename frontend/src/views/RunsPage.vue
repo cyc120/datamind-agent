@@ -55,6 +55,17 @@ function statusTone(status?: string | null): string {
   return 'muted'
 }
 
+/**
+ * 跳到工作台并选中这条 run 所属的会话（MainPage 的 `?session=` 深链）。
+ *
+ * 为什么不把行里那个「会话 xxx」徽章本身做成链接：整行是 `<button>`（点开详情），
+ * `<button>` 里不能再嵌 `<a>` —— 那是非法 HTML，点链接还会连带触发整行的 open()。
+ * 所以入口放在展开后的详情里，语义也更清楚：「打开这条 run 归属的那个会话」。
+ */
+function openSession(conversationId: string): void {
+  void router.push({ path: '/app', query: { session: conversationId } })
+}
+
 /** 后端给的是带时区的 ISO 串，直接交给浏览器按本机时区渲染。 */
 function whenText(iso?: string | null): string {
   if (!iso) return ''
@@ -165,6 +176,16 @@ onMounted(() => {
                 <div class="d-row">
                   <span class="d-key">会话归属</span>
                   <code class="d-val">{{ detail.conversation_id || '未归属会话（早于会话功能）' }}</code>
+                  <!-- 会话深链入口；见 openSession() 的注释（整行是 button，不能再嵌 a） -->
+                  <button
+                    v-if="detail.conversation_id"
+                    class="d-link"
+                    type="button"
+                    data-testid="open-session"
+                    @click="openSession(detail.conversation_id)"
+                  >
+                    打开该会话 →
+                  </button>
                 </div>
                 <div class="d-block">
                   <div class="d-key">回答</div>
@@ -360,6 +381,22 @@ onMounted(() => {
   font-size: 12.5px;
   color: var(--color-text);
   word-break: break-all;
+}
+/* 「打开该会话 →」：跳工作台的会话深链，样式做成次要按钮而不是链接色块 */
+.d-link {
+  border: 1px solid var(--color-line);
+  border-radius: 7px;
+  padding: 2px 8px;
+  font-family: inherit;
+  font-size: 11.5px;
+  color: var(--color-body);
+  background: #ffffff;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.d-link:hover {
+  border-color: rgba(37, 99, 235, 0.45);
+  color: #2563eb;
 }
 .d-block {
   margin-top: 10px;

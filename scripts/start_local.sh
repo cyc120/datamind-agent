@@ -31,6 +31,11 @@ for _ in {1..30}; do
 done
 docker exec datamind-postgres pg_isready -U postgres -d datamind_meta -q
 docker exec datamind-postgres psql -U postgres -d datamind_meta -q -v ON_ERROR_STOP=1 -c 'CREATE SCHEMA IF NOT EXISTS demo_industrial AUTHORIZATION datamind_app; GRANT USAGE ON SCHEMA demo_industrial TO readonly_user;'
+# 存量库升级：deploy/init/*.sql 只在容器**首次**初始化时执行，已存在的 pg_meta_data 卷不会重跑。
+# `runs` 由 postgres 拥有，而 db/migrate.py 以 datamind_app 执行、给它建索引会报
+# must be owner of table runs，所以这条 postgres 属主的 DDL 只能在这里补。语句与
+# deploy/init/02_metadata.sql 中的 runs_recent_idx **逐字一致**且幂等（新库上是 no-op）。
+docker exec datamind-postgres psql -U postgres -d datamind_meta -q -v ON_ERROR_STOP=1 -c 'CREATE INDEX IF NOT EXISTS runs_recent_idx ON runs(started_at DESC, run_id DESC);'
 .venv/bin/python db/migrate.py
 
 if [[ "$(docker exec datamind-postgres psql -U postgres -d postgres -tAc "SELECT count(*) FROM pg_database WHERE datname='chinook'")" == "0" ]]; then

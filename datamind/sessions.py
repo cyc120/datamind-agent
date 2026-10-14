@@ -24,6 +24,7 @@
 * `create`   -> 裸的 public session dict（api.py 需包一层 ``{'session': ...}``）
 * `listing`  -> ``{'sessions': [...], 'limit': int, 'offset': int, 'has_more': bool}``
 * `detail`   -> ``{'session': {...}, 'messages': [...], 'turns': [...]}``
+* `results`  -> ``{'session_id': str, 'results': [...], 'limit': int, 'offset': int, 'has_more': bool}``
 * `rename`   -> ``{'session': {...}}``
 * `remove`   -> ``{'session': {...}}``
 
@@ -187,6 +188,8 @@ def listing(dsn, identity, *, q=None, limit=20, offset=0):
     `q` matches the session title OR the question/answer text of any run linked to
     that session; blank/whitespace means "no filter". Pagination fetches limit+1
     rows (service idiom) and reports has_more instead of a second COUNT query.
+
+    `q` 的**计划形态**是这里唯一的性能机关，理由见下面 `OFFSET 0` 处的注释。
     """
     _bounds(limit, offset)
     pattern = _search_pattern(q)
@@ -200,10 +203,28 @@ def listing(dsn, identity, *, q=None, limit=20, offset=0):
         WHERE s.user_id=%s AND s.deleted_at IS NULL''']
     params = [user_id]
     if pattern is not None:
+        # 末尾的 `OFFSET 0` **不是**笔误，也不是多余的偏移：它是让搜索不被规划器改成
+        # 「hashed SubPlan」的唯一开关。带 OFFSET 的子查询不再算「简单子查询」，Postgres
+        # 因此只能在**每个候选会话**上惰性探测一次，`LIMIT 21` 也就真的能提前收工。
+        #
+        # WHY 必须挡住那个改写（实测，20 801 会话 / 20 800 runs / 33 MB）：
+        #   * hashed SubPlan 会先把**整个 runs 表**扫一遍算出哈希表（`EXPLAIN` 里可见
+        #     `Seq Scan on runs` + `hashed SubPlan`），代价与 LIMIT 完全脱钩，而且扫的是
+        #     **所有人**的 run（不含 owner 条件），只在自己的会话集合里过滤；
+        #     实测：命中 224 条 83.6 ms、高频词 56.7 ms、完全无匹配 69.9 ms。
+        #   * 保住惰性探测后：命中 224 条 14.3 ms（×5.9）、高频词 0.9 ms（×63，因为
+        #     最近 21 个会话就都命中，扫满即停）；只有「完全无匹配」这一种场景需要扫完
+        #     自己的全部会话：78.1 ms（比原来慢 11%，但换掉了全表扫）。
+        #   * `LIMIT 1` **挡不住**这个改写（实测仍是 hashed SubPlan，85.6 ms），所以不能
+        #     用更好读的 `LIMIT 1` 代替。两者语义等价：已实测基线与本写法返回**同一组**
+        #     session_id（含 `%`/`_`/`\` 转义用例）。
+        # 风险：若未来 Postgres 取消了「带 OFFSET 的子查询不做 hashed subplan」这条规则，
+        # 只会静默退回上面那个慢计划——性能回退，不会算错。tests/test_sessions_api.py
+        # 里有一条测试盯住这个写法。
         sql.append('''AND (s.title ILIKE %s ESCAPE '\\' OR EXISTS (
             SELECT 1 FROM runs r WHERE r.conversation_id=s.session_id
             AND (r.question ILIKE %s ESCAPE '\\'
-                 OR COALESCE(r.answer,'') ILIKE %s ESCAPE '\\')))''')
+                 OR COALESCE(r.answer,'') ILIKE %s ESCAPE '\\') OFFSET 0))''')
         params.extend([pattern, pattern, pattern])
     sql.append('ORDER BY s.updated_at DESC,s.session_id LIMIT %s OFFSET %s')
     params.extend([limit + 1, offset])
@@ -253,6 +274,59 @@ def _turns(rows):
         turns.append({**common, 'role': 'user', 'text': row['question']})
         turns.append({**common, 'role': 'assistant', 'text': row['answer']})
     return turns
+
+
+#: run 的**终态**事件类型：`agent.py::_answer` 按 status 挑一个写进去
+#: （COMPLETED→answer.completed、ABSTAINED→answer.abstained、
+#: FAILED_WITH_EVIDENCE→run.failed、其余→answer.clarification）。这份 `final` 字典
+#: 就是流式接口最后推给前端的那个对象，因此它是历史富内容的**唯一真相**，不需要另存一份。
+_TERMINAL_EVENTS = ('answer.completed', 'answer.abstained', 'run.failed', 'answer.clarification')
+
+
+def _result(row):
+    """One run's terminal payload, verbatim (None when the run never reached a terminal event)."""
+    return {'run_id': row['run_id'], 'result': row['result']}
+
+
+def results(session_id, dsn, identity, *, limit=20, offset=0):
+    """Recent runs of one owned live session, each with its terminal result payload.
+
+    为什么是**独立接口**而不是塞进 `detail`：单个终态 `output_summary` 实测平均 14 kB、
+    最大 140 kB，而真实库里最大的会话有 221 轮 → 全量富内容一次就是 3.9 MB；`detail`
+    的响应会从「几百 kB 的正文」变成「几 MB 的正文 + 结果表」，这是不可接受的。
+    所以这里按 run 分页（默认 20，上限 50），前端先渲染正文、再按同一套 limit+1/has_more
+    口径取最近若干轮的富内容。
+
+    顺序：**与 `detail` 相反**，按 `started_at DESC, run_id DESC`（最近优先）翻页，
+    `offset` 从最新的 run 开始算。响应里也是这个倒序——前端按 `run_id` 合并，
+    不依赖顺序。`result` 为 null 表示该 run 没走到终态事件（仍在跑、或早于事件落库），
+    这种行也**照样返回**，好让「第 offset 页」与 transcript 的时间窗口一一对齐。
+
+    `result` 是终态事件的 `output_summary` **原样**（与流式 `final` 逐字段一致，含
+    `sql_result` / `rag_result.citations` / `industrial_result` / `cross_source_result`）。
+    刻意不做字段裁剪：裁剪等于在读取路径上再维护一份投影，迟早与写入侧漂移。
+    """
+    _no_nul(session_id, 'SESSION_NOT_FOUND', 404)
+    _bounds(limit, offset)
+    user_id = _user(identity)
+    with psycopg2.connect(dsn) as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+        # 归属检查与 detail 同一条口径：别人的会话与不存在的会话不可区分。
+        cur.execute('''SELECT session_id FROM chat_sessions
+            WHERE session_id=%s AND user_id=%s AND deleted_at IS NULL''', (session_id, user_id))
+        if not cur.fetchone():
+            fail('SESSION_NOT_FOUND', 404)
+        cur.execute('''SELECT r.run_id, e.output_summary AS result
+            FROM runs r
+            LEFT JOIN LATERAL (
+                SELECT t.output_summary FROM trace_events t
+                WHERE t.run_id=r.run_id AND t.event_type IN %s
+                ORDER BY t.event_id DESC LIMIT 1) e ON true
+            WHERE r.conversation_id=%s
+            ORDER BY r.started_at DESC,r.run_id DESC LIMIT %s OFFSET %s''',
+                    (_TERMINAL_EVENTS, session_id, limit + 1, offset))
+        rows = cur.fetchall()
+    return {'session_id': session_id, 'results': [_result(row) for row in rows[:limit]],
+            'limit': limit, 'offset': offset, 'has_more': len(rows) > limit}
 
 
 def rename(session_id, payload, dsn, identity):

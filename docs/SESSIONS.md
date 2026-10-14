@@ -95,6 +95,36 @@ GET /v1/sessions?q=&limit=&offset=
   `text=answer`；run 尚未完成时 assistant 的 `text` 为 `null`，前端可据此渲染待完成气泡。
   每条 turn 还带 `run_id`、`at`（即 `started_at`）、`status`、`confidence_level`。
 
+### `GET /v1/sessions/{session_id}/results` —— 历史富内容（SQL 结果表 / 引用 / 工业核验）
+
+```
+GET /v1/sessions/{session_id}/results?limit=&offset=
+```
+
+`200` → `{"session_id": str, "results": [{"run_id", "result"}], "limit", "offset", "has_more"}`。
+
+* `limit` 默认 `20`，`ge=1 le=50`；`offset` 默认 `0`，`ge=0 le=10000`；分页沿用 `limit+1` /
+  `has_more` 口径，与 `listing` 一致。越界由框架返回 422（不是业务错误码）。
+* `result` = 该 run **终态** trace 事件的 `output_summary` **原样**，也就是流式接口最后推给
+  前端的那份 `final`：`sql_result` / `rag_result.citations` / `industrial_result` /
+  `cross_source_result` 都在里面。终态事件只有四种：`answer.completed`、`answer.abstained`、
+  `run.failed`、`answer.clarification`（`datamind/agent.py::_answer` 按 status 选一个）。
+  同一个 run 出现多个终态事件时取 `event_id` 最大的那个——`event_id` 形如
+  `evt-<run_id[4:]>-<sequence:04d>`，序号零填充，所以**字典序即先后序**。
+* `result` 为 `null` 表示该 run 没有走到终态事件（仍在跑、或早于事件落库）。**这种行照样返回**，
+  好让「第 offset 页」与 transcript 的时间窗口一一对齐；客户端按 `run_id` 合并，不依赖顺序。
+* **顺序与 `detail` 相反**：按 `started_at DESC, run_id DESC`（最近优先），`offset` 从最新的
+  run 开始算。
+
+**为什么不做成 `detail` 的一个字段**：终态负载实测平均 14 kB、最大 140 kB，而开发库里最大的
+会话有 221 轮 → 全量富内容一次约 **3.9 MB**。塞进 `detail` 会把「打开一个会话」从几百 kB 的
+正文变成几 MB 的响应。所以富内容单独分页，前端先渲染正文（`detail`）再取最近 20 轮的富内容。
+**已知边界**：窗口（默认最近 20 轮）之外的更早轮次只有正文，没有结果表 / 引用 / 证据图。
+
+授权面与 `/v1/sessions` 完全一致：默认拒绝、必须有身份、不限角色、只读自己的会话；别人的会话与
+不存在的会话同样返回 `404 SESSION_NOT_FOUND`。`/v1/sessions` 已在 `_NO_STORE_PREFIXES` 内，
+这条子路径同样恒为 `Cache-Control: no-store`。
+
 ### `PATCH /v1/sessions/{session_id}` —— 重命名
 
 ```jsonc
@@ -175,6 +205,33 @@ DELETE 只写 `deleted_at=now()`，所有读取（列表/详情/重命名/再次
 * 不引入任何 Postgres 扩展（本仓库没有 `CREATE EXTENSION`），也不用全文检索/`pg_trgm`；
   搜索就是一次带 `ESCAPE` 的 `ILIKE` + `EXISTS` 子查询。
 
+### 6.1 计划形态：`EXISTS (... OFFSET 0)` 里的 `OFFSET 0` 不是笔误
+
+搜索子查询结尾有一个 `OFFSET 0`。它不改变语义（`EXISTS (… OFFSET 0)` 与 `EXISTS (…)` 等价，
+已实测两者返回同一组 `session_id`），作用是**让这个子查询不再是「简单子查询」，从而阻断
+Postgres 的 hashed-subplan 改写**。改写后的计划会把**整个 `runs` 表**扫一遍算哈希表：
+代价与 `LIMIT` 完全脱钩，而且扫的是**所有人**的 run（不带 owner 条件），再逐会话过滤。
+
+实测（隔离库：2 051 个会话 / 20 800 个 run / `runs` 33 MB，`EXPLAIN ANALYZE`）：
+
+| `q` | 改写成 hashed SubPlan（原状） | 保住惰性探测（现状） |
+| --- | --- | --- |
+| 命中 224 条（选择性词） | 83.6 ms | **14.3 ms**（×5.9） |
+| 高频词（命中约 2 万 run） | 56.7 ms | **0.9 ms**（×63，最近 21 个会话都命中，扫满即停） |
+| 完全无匹配 | 69.9 ms | 78.1 ms（慢 11%，但扫的是**自己**的会话而非全表） |
+
+两条注意：
+
+* **不能用更好读的 `LIMIT 1` 代替**：实测它在同一档位上**仍然**是 hashed SubPlan（85.6 ms）。
+* **被实测否掉的另一种改法**：`pg_trgm` + 把查询改成「UNION 出命中的 session_id 再 `IN`」的
+  索引驱动形态，在选择性词上只要 3.5 ms、无匹配 1.0 ms，但**高频词反而 68.2 ms**（CTE 物化
+  全部命中行，不受 `LIMIT` 约束），比原状还慢；且要引入扩展、加三个 GIN 索引、给 `runs`
+  的写入路径加 30 µs/次。本仓库因此保留「无扩展 + 惰性探测」。
+* 风险：若未来 Postgres 取消「带 OFFSET 的子查询不做 hashed subplan」这条规则，只会静默退回
+  上面那个慢计划——**性能回退，不会算错**。`tests/test_sessions_api.py::SessionSearchPlanTest`
+  用「捕获真实执行的 SQL」钉住这个写法（开发库只有几百行，`EXPLAIN` 在两种写法下都是惰性
+  SubPlan，所以计划断言在那里是假绿）。
+
 ---
 
 ## 7. Schema
@@ -219,6 +276,9 @@ CREATE INDEX IF NOT EXISTS chat_sessions_owner_created_idx
 
 ```sql
 CREATE INDEX IF NOT EXISTS runs_conversation_idx ON runs(conversation_id);
+-- 历史列表（GET /v1/runs）固定按 ORDER BY started_at DESC, run_id DESC 翻页；
+-- 没有它时**每一页**都要全表扫 + top-N 排序（20 800 行实测首页 12.79 ms → 0.066 ms）
+CREATE INDEX IF NOT EXISTS runs_recent_idx ON runs(started_at DESC, run_id DESC);
 ```
 
 因为 `runs` 由 `postgres` 拥有，而 `db/migrate.py` 以 `datamind_app` 身份执行每个迁移文件，
@@ -230,6 +290,12 @@ ERROR:  must be owner of table runs
 
 同理，任何迁移里都不得对 `runs` / `trace_events` 做 `ALTER` / `CREATE INDEX` / `COMMENT` /
 `GRANT`。`deploy/init/02_metadata.sql` 以 `postgres` 身份执行，是唯一能建这个索引的位置。
+
+**存量库升级**：`deploy/init/*.sql` 只在容器**首次**初始化时执行（挂载进
+`docker-entrypoint-initdb.d`），已存在的 `pg_meta_data` 卷不会重跑。所以
+`scripts/start_local.sh` / `scripts/start_local.ps1` 在跑迁移之前，用**与 init 逐字一致**的
+幂等语句再补一次 `runs_recent_idx`（新库上是 no-op）。两处一旦漂移，新库与老库就会有**不同**
+的索引，因此有测试（`tests/test_runs_history.py::RunsRecencyIndexTest`）钉住「三处逐字一致」。
 
 ---
 
