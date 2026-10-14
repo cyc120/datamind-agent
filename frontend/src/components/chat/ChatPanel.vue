@@ -437,6 +437,8 @@ onBeforeUnmount(() => window.removeEventListener('resize', markOverflow))
   padding-bottom: 18px;
 }
 .composer {
+  /* 定位上下文，配合下面的 ::before 灰底板 */
+  position: relative;
   border: 1px solid var(--color-line);
   border-radius: 24px;
   background: var(--color-panel);
@@ -444,6 +446,21 @@ onBeforeUnmount(() => window.removeEventListener('resize', markOverflow))
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 28px rgba(15, 23, 42, 0.05);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
+/* 灰色底板：比输入框左右各宽 12px、下方露出一截，模仿参考图的层叠卡片效果。
+   ::before + z-index:-1 —— .composer 是 position:relative 且 z-index:auto，
+   不构成层叠上下文，所以伪元素落在它自己的背景之后、祖先背景之前。 */
+.composer::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  right: -12px;
+  top: 58%;
+  bottom: -14px;
+  z-index: -1;
+  background: var(--color-ink);
+  border-radius: 22px;
+}
+
 .composer:focus-within {
   border-color: rgba(37, 99, 235, 0.45);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 28px rgba(37, 99, 235, 0.10);
@@ -540,7 +557,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', markOverflow))
   flex-wrap: wrap;
   justify-content: center;
   gap: 8px;
-  margin-top: 16px;
+  margin-top: 30px;
 }
 .chip {
   display: inline-flex;
