@@ -821,7 +821,7 @@ function openDraft(m: ChatMessage): void {
             :disabled="running"
             @click="askChip(c)"
           >
-            <span class="chip-ico" aria-hidden="true">{{ c.icon }}</span>{{ c.label }}
+            {{ c.label }}
           </button>
         </div>
 
@@ -1018,26 +1018,18 @@ function openDraft(m: ChatMessage): void {
   border-radius: 999px;
   /* 标签绝不允许在胶囊内折行——宁可让整行略微超出，也不要两行文字 */
   white-space: nowrap;
-  border: 1px solid var(--color-line);
-  background: var(--color-ink);
-  color: var(--color-body);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 14px;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
-.chip:hover:not(:disabled) {
-  background: var(--color-panel);
-  border-color: rgba(15, 23, 42, 0.2);
-  color: var(--color-text);
-}
+.chip:hover:not(:disabled) { background: #1d4ed8; border-color: transparent; color: #ffffff; }
 .chip:disabled {
   opacity: 0.5;
   cursor: default;
-}
-.chip-ico {
-  color: var(--color-accent);
-  font-size: 13.5px;
 }
 .tip {
   margin: 14px 0 0;
