@@ -194,8 +194,9 @@ function headerSummary(profile: ModelProfile): string {
   border-color: var(--color-accent);
   background: rgba(37, 99, 235, 0.05);
 }
+/* 激活项：左侧竖线用主题蓝，与站内其它「当前/激活」保持同一套颜色语言。 */
 .mpl-card.is-active {
-  border-left: 3px solid rgba(22, 163, 74, 0.6);
+  border-left: 3px solid var(--color-accent);
 }
 .mpl-head {
   display: flex;
