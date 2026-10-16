@@ -44,9 +44,9 @@ const MODES = [
 
 /** 建议问题：沿用原有的示例问题，只补一个前置小图标。 */
 const CHIPS: { label: string; icon: string; question: string; mode: string }[] = [
-  { label: '销售额前三产品', icon: '▤', question: '2025年销售额最高的前三个产品是什么？', mode: 'retail' },
+  { label: '销售额前三', icon: '▤', question: '2025年销售额最高的前三个产品是什么？', mode: 'retail' },
   { label: 'VIP 客户数', icon: '◉', question: 'VIP客户有多少人？', mode: 'retail' },
-  { label: '各大区销售额', icon: '◫', question: '2024年每个大区的销售额分别是多少？', mode: 'retail' },
+  { label: '各大区销售', icon: '◫', question: '2024年每个大区的销售额分别是多少？', mode: 'retail' },
   { label: '退款条件', icon: '▢', question: '七天无理由退款的条件是什么？', mode: 'rag' },
   { label: '耳机续航', icon: '⌕', question: '无线降噪耳机Pro的续航时间是多少？', mode: 'rag' },
   {
@@ -1002,16 +1002,19 @@ function openDraft(m: ChatMessage): void {
 /* ── 建议胶囊 ── */
 .chips {
   display: flex;
-  flex-wrap: wrap;
+  /* 七个建议胶囊要保持**一行**（换行会让最后孤零零掉到第二行，很突兀）。
+     收紧内边距与间距、并缩短两个最长标签，使总宽留在可用宽度内；
+     nowrap 只是兜底——真的放不下时宁可整体略微超出，也不要出孤行。 */
+  flex-wrap: nowrap;
   justify-content: center;
-  gap: 8px;
+  gap: 7px;
   margin-top: 30px;
 }
 .chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
+  padding: 7px 11px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
   background: var(--color-ink);
