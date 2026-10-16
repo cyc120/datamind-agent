@@ -74,7 +74,7 @@ const NOT_MIGRATED = ['模型接入', '字段复核', '来源权威规则', '图
 }
 .nm-tag {
   display: inline-block;
-  font-size: 11px;
+  font-size: 12.5px;
   letter-spacing: 0.08em;
   padding: 3px 8px;
   border-radius: 999px;
@@ -89,18 +89,18 @@ const NOT_MIGRATED = ['模型接入', '字段复核', '来源权威规则', '图
 }
 .nm-path {
   margin: 0 0 14px;
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-muted);
 }
 .nm-body {
   margin: 0 0 22px;
-  font-size: 13.5px;
+  font-size: 15px;
   line-height: 1.8;
   color: var(--color-body);
 }
 .nm-h {
   margin: 0 0 8px;
-  font-size: 12px;
+  font-size: 13.5px;
   letter-spacing: 0.06em;
   color: var(--color-muted);
   font-weight: 500;
@@ -114,7 +114,7 @@ const NOT_MIGRATED = ['模型接入', '字段复核', '来源权威规则', '图
   gap: 8px;
 }
 .nm-link {
-  font-size: 13.5px;
+  font-size: 15px;
   color: var(--color-accent);
   text-decoration: none;
   border-bottom: 1px solid rgba(37, 99, 235, 0.3);
@@ -124,17 +124,17 @@ const NOT_MIGRATED = ['模型接入', '字段复核', '来源权威规则', '图
 }
 .nm-note {
   margin-left: 10px;
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-muted);
 }
 .nm-pending {
   margin: 0;
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-muted);
   line-height: 1.8;
 }
 code {
-  font-size: 12px;
+  font-size: 13.5px;
   padding: 1px 5px;
   border-radius: 5px;
   background: var(--color-ink);

@@ -307,18 +307,18 @@ onMounted(() => {
   min-width: 0;
 }
 .tb-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--color-text);
 }
 .tb-note {
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-muted);
 }
 .tb-action {
   margin-left: auto;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   padding: 6px 12px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -348,7 +348,7 @@ onMounted(() => {
   border: 1px solid var(--color-line);
   border-radius: 12px;
   background: var(--color-ink);
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.85;
   color: var(--color-body);
 }
@@ -358,7 +358,7 @@ onMounted(() => {
   border: 1px solid rgba(217, 119, 6, 0.35);
   border-radius: 12px;
   background: rgba(217, 119, 6, 0.07);
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.8;
   color: var(--color-body);
 }
@@ -366,20 +366,20 @@ onMounted(() => {
 .auth-failclosed code,
 .auth-sub code,
 .auth-empty code {
-  font-size: 11px;
+  font-size: 12.5px;
 }
 .auth-section {
   margin-bottom: 26px;
 }
 .auth-h2 {
   margin: 0 0 4px;
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--color-text);
 }
 .auth-sub {
   margin: 0 0 12px;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: var(--color-muted);
 }
@@ -392,7 +392,7 @@ onMounted(() => {
   flex: 1;
   min-width: 0;
   font: inherit;
-  font-size: 13px;
+  font-size: 14.5px;
   padding: 8px 11px;
   border-radius: 10px;
   border: 1px solid var(--color-line);
@@ -402,7 +402,7 @@ onMounted(() => {
 .auth-btn {
   flex-shrink: 0;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   padding: 8px 16px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -421,7 +421,7 @@ onMounted(() => {
 .auth-identity,
 .auth-anon {
   margin: 0 0 18px;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.75;
   color: var(--color-body);
 }
@@ -433,7 +433,7 @@ onMounted(() => {
 }
 .auth-hint,
 .auth-empty {
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.8;
   color: var(--color-muted);
 }
@@ -442,20 +442,20 @@ onMounted(() => {
 }
 .auth-warn {
   margin: 0 0 10px;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.8;
   color: #d97706;
 }
 .auth-ok {
   margin: 0 0 10px;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.8;
   color: #16a34a;
   word-break: break-all;
 }
 .auth-error {
   margin: 0 0 10px;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.8;
   color: #e11d48;
   word-break: break-word;

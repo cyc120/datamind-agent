@@ -556,7 +556,7 @@ const FORCE_ROWS: Array<{
   border: 1px solid var(--color-line);
   border-radius: 10px;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 8px 24px rgba(15, 23, 42, 0.06);
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-text);
 }
 
@@ -568,13 +568,13 @@ const FORCE_ROWS: Array<{
   margin: 0;
   padding: 8px 10px;
   border-bottom: 1px solid var(--color-line);
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 600;
   letter-spacing: 0.02em;
 }
 
 .wg-panel-head-note {
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 400;
   color: var(--color-muted);
 }
@@ -607,7 +607,7 @@ const FORCE_ROWS: Array<{
   content: '▸';
   flex: 0 0 auto;
   color: var(--color-muted);
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.6;
 }
 
@@ -628,7 +628,7 @@ const FORCE_ROWS: Array<{
 .wg-summary-note {
   flex: 1 1 auto;
   min-width: 0;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -663,7 +663,7 @@ const FORCE_ROWS: Array<{
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--color-body);
 }
@@ -682,7 +682,7 @@ const FORCE_ROWS: Array<{
   border-radius: 6px;
   background: var(--color-panel);
   color: var(--color-text);
-  font-size: 12px;
+  font-size: 13.5px;
   font-family: inherit;
 }
 
@@ -705,19 +705,19 @@ const FORCE_ROWS: Array<{
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-body);
 }
 
 .wg-note {
   margin: 0;
-  font-size: 11px;
+  font-size: 12.5px;
   line-height: 1.55;
   color: var(--color-body);
 }
 
 .wg-hint {
-  font-size: 10.5px;
+  font-size: 12.5px;
   line-height: 1.5;
   color: var(--color-muted);
 }
@@ -732,7 +732,7 @@ const FORCE_ROWS: Array<{
   border-radius: 6px;
   background: rgba(217, 119, 6, 0.1);
   color: #b45309;
-  font-size: 11px;
+  font-size: 12.5px;
   line-height: 1.5;
 }
 
@@ -748,7 +748,7 @@ const FORCE_ROWS: Array<{
   border-radius: 6px;
   background: var(--color-panel);
   color: var(--color-text);
-  font-size: 11.5px;
+  font-size: 13px;
   font-family: inherit;
   cursor: pointer;
 }
@@ -787,7 +787,7 @@ const FORCE_ROWS: Array<{
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: 12.5px;
 }
 
 .wg-swatch {

@@ -153,7 +153,7 @@ const exampleDeepLink = '/#/wiki/<entryId>?revision=<revisionId>'
 
 .wk-title {
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--color-text);
 }
@@ -166,14 +166,14 @@ const exampleDeepLink = '/#/wiki/<entryId>?revision=<revisionId>'
   border-radius: 999px;
   background: var(--color-ink);
   color: var(--color-body);
-  font-size: 11px;
+  font-size: 12.5px;
   line-height: 1.6;
 }
 
 .wk-note {
   margin: 5px 0 0;
   max-width: 1080px;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.75;
   color: var(--color-muted);
 }
@@ -189,7 +189,7 @@ const exampleDeepLink = '/#/wiki/<entryId>?revision=<revisionId>'
   background: var(--color-ink);
   color: var(--color-body);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11.5px;
+  font-size: 13px;
   word-break: break-all;
 }
 

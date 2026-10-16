@@ -121,7 +121,7 @@ function viewBBox(viewId: string): string {
 }
 .cad-sec-title {
   margin: 0 0 8px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--color-text);
   display: flex;
@@ -129,7 +129,7 @@ function viewBBox(viewId: string): string {
   gap: 10px;
 }
 .cad-sec-tag {
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--color-muted);
   border: 1px solid var(--color-line);
@@ -138,13 +138,13 @@ function viewBBox(viewId: string): string {
 }
 .cad-hint {
   margin: 0 0 8px;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.7;
   color: var(--color-muted);
 }
 .cad-hint code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11.5px;
+  font-size: 13px;
   background: var(--color-ink);
   border-radius: 5px;
   padding: 1px 5px;
@@ -156,7 +156,7 @@ function viewBBox(viewId: string): string {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-muted);
 }
 .cad-views code {
@@ -171,7 +171,7 @@ function viewBBox(viewId: string): string {
 .cad-table {
   border-collapse: collapse;
   width: 100%;
-  font-size: 12.5px;
+  font-size: 14px;
   min-width: 640px;
 }
 .cad-table th,
@@ -192,7 +192,7 @@ function viewBBox(viewId: string): string {
 }
 .cad-table code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-text);
 }
 .cad-geo {
@@ -202,7 +202,7 @@ function viewBBox(viewId: string): string {
   display: block;
   margin: 12px auto 0;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   padding: 7px 16px;
   border-radius: 999px;
   border: 1px solid var(--color-line);

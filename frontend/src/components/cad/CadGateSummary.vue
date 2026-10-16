@@ -85,7 +85,7 @@ defineProps<{
   flex-wrap: wrap;
   align-items: baseline;
   gap: 10px;
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-body);
 }
 .cad-gate-caption {
@@ -95,7 +95,7 @@ defineProps<{
 .cad-gate-status {
   padding: 1px 8px;
   border-radius: 999px;
-  font-size: 11.5px;
+  font-size: 13px;
   border: 1px solid var(--color-line);
 }
 .cad-gate-status.cad-is-ready {
@@ -113,7 +113,7 @@ defineProps<{
 }
 .cad-gate-reason {
   margin: 8px 0 0;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.7;
   color: #b45309;
 }
@@ -125,7 +125,7 @@ defineProps<{
 }
 .cad-gate-col h4 {
   margin: 0 0 6px;
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--color-text);
 }
@@ -147,26 +147,26 @@ defineProps<{
   border: 1px solid var(--color-line);
 }
 .cad-gate-meta {
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.6;
   color: var(--color-muted);
   word-break: break-word;
 }
 .cad-gate-foot {
   margin: 6px 0 0;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
   line-height: 1.6;
 }
 .cad-hint {
   margin: 0;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.7;
   color: var(--color-muted);
 }
 .cad-code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11.5px;
+  font-size: 13px;
   background: rgba(15, 23, 42, 0.06);
   border-radius: 5px;
   padding: 1px 5px;

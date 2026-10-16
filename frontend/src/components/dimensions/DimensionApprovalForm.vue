@@ -224,13 +224,13 @@ async function submit(): Promise<void> {
 }
 .dima-title {
   margin: 0;
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
   color: var(--color-text);
 }
 .dima-note {
   margin: 5px 0 0;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: var(--color-muted);
 }
@@ -250,11 +250,11 @@ async function submit(): Promise<void> {
 .dima-key {
   flex-shrink: 0;
   width: 160px;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
 }
 .dima-val {
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-text);
   word-break: break-all;
 }
@@ -264,7 +264,7 @@ async function submit(): Promise<void> {
   border: 1px solid rgba(225, 29, 72, 0.3);
   border-radius: 9px;
   background: rgba(225, 29, 72, 0.06);
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.7;
   color: #b91c1c;
 }
@@ -274,7 +274,7 @@ async function submit(): Promise<void> {
   border: 1px solid rgba(217, 119, 6, 0.3);
   border-radius: 9px;
   background: rgba(217, 119, 6, 0.06);
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.7;
   color: #b45309;
 }
@@ -289,12 +289,12 @@ async function submit(): Promise<void> {
   gap: 4px;
 }
 .dima-label {
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
 }
 .dima-input {
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   padding: 7px 9px;
   border: 1px solid var(--color-line);
   border-radius: 8px;
@@ -316,7 +316,7 @@ async function submit(): Promise<void> {
 .dima-submit {
   margin-top: 12px;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   padding: 7px 16px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -334,19 +334,19 @@ async function submit(): Promise<void> {
 }
 .dima-hint {
   margin: 8px 0 0;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: var(--color-muted);
 }
 .dima-error {
   margin: 8px 0 0;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.7;
   color: #e11d48;
 }
 .dima-ok {
   margin: 8px 0 0;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.7;
   color: #16a34a;
 }

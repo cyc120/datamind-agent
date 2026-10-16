@@ -29,7 +29,7 @@ defineProps<{
   border-radius: 10px;
   background: rgba(225, 29, 72, 0.06);
   color: #b91c1c;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.7;
   display: flex;
   flex-wrap: wrap;
@@ -39,7 +39,7 @@ defineProps<{
 .cad-errnote-code {
   flex-shrink: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11.5px;
+  font-size: 13px;
   padding: 1px 6px;
   border-radius: 6px;
   background: rgba(225, 29, 72, 0.12);

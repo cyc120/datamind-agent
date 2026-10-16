@@ -222,13 +222,13 @@ const withinRange = computed(() => comparison.value?.status === 'within_annotati
   gap: 10px;
 }
 .dimr-title {
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
   color: var(--color-text);
 }
 .dimr-badge {
   margin-left: auto;
-  font-size: 11.5px;
+  font-size: 13px;
   padding: 3px 9px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -249,12 +249,12 @@ const withinRange = computed(() => comparison.value?.status === 'within_annotati
 }
 .dimr-sub {
   margin: 4px 0 0;
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-muted);
 }
 .dimr-empty {
   margin: 10px 0 0;
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-muted);
   line-height: 1.7;
 }
@@ -272,23 +272,23 @@ const withinRange = computed(() => comparison.value?.status === 'within_annotati
 }
 .dimr-key {
   flex-shrink: 0;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
 }
 .dimr-code {
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-text);
   word-break: break-all;
 }
 .dimr-why {
   margin: 8px 0 0;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.7;
   color: var(--color-body);
 }
 .dimr-caveat {
   margin: 8px 0 0;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: var(--color-muted);
 }
@@ -302,7 +302,7 @@ const withinRange = computed(() => comparison.value?.status === 'within_annotati
   margin-bottom: 8px;
 }
 .dimr-val {
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-text);
   word-break: break-all;
 }
@@ -342,26 +342,26 @@ const withinRange = computed(() => comparison.value?.status === 'within_annotati
 }
 .dimr-fact-title {
   margin: 0;
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--color-text);
 }
 .dimr-fact-q {
   margin: 5px 0 0;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
   line-height: 1.7;
 }
 .dimr-fact-list {
   margin: 6px 0 0;
   padding-left: 18px;
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-body);
   line-height: 1.8;
 }
 .dimr-fact-line {
   margin: 6px 0 0;
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-body);
   line-height: 1.7;
   word-break: break-word;

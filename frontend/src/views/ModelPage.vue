@@ -776,18 +776,18 @@ onMounted(async () => {
   min-width: 0;
 }
 .tb-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--color-text);
 }
 .tb-note {
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-muted);
 }
 .tb-action {
   margin-left: auto;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   padding: 6px 12px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -813,7 +813,7 @@ onMounted(async () => {
 }
 .mp-notice {
   margin: 0 0 14px;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.7;
   padding: 9px 12px;
   border-radius: 10px;
@@ -857,7 +857,7 @@ onMounted(async () => {
 }
 .mp-h2 {
   margin: 0 0 6px;
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
   color: var(--color-text);
 }
@@ -865,7 +865,7 @@ onMounted(async () => {
   margin: 0;
 }
 .mp-chip {
-  font-size: 11px;
+  font-size: 12.5px;
   padding: 2px 8px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -889,7 +889,7 @@ onMounted(async () => {
 .mp-facts > li {
   position: relative;
   padding-left: 15px;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.7;
   color: var(--color-body);
   word-break: break-word;
@@ -905,7 +905,7 @@ onMounted(async () => {
   background: var(--color-accent);
 }
 .mp-facts > li.is-hint {
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
 }
 .mp-facts > li.is-hint::before { background: rgba(37, 99, 235, 0.4); }
@@ -913,7 +913,7 @@ onMounted(async () => {
 .mp-facts > li.is-warn::before { background: #d97706; }
 .mp-facts > li b { color: var(--color-text); font-weight: 600; margin-right: 6px; }
 .mp-facts > li code {
-  font-size: 11px;
+  font-size: 12.5px;
   padding: 1px 4px;
   border-radius: 4px;
   background: var(--color-ink);
@@ -923,26 +923,26 @@ onMounted(async () => {
 
 .mp-line {
   margin: 6px 0 0;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.75;
   color: var(--color-body);
   word-break: break-word;
 }
 .mp-hint {
   margin: 6px 0 0;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: var(--color-muted);
 }
 .mp-warn {
   margin: 6px 0 0;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: #d97706;
 }
 .mp-bad {
   margin: 6px 0 0;
-  font-size: 12.5px;
+  font-size: 14px;
   color: #e11d48;
   line-height: 1.7;
 }
@@ -954,7 +954,7 @@ onMounted(async () => {
   margin-top: 10px;
 }
 .mp-confirm {
-  font-size: 11.5px;
+  font-size: 13px;
   color: #e11d48;
 }
 .mp-tools {
@@ -966,7 +966,7 @@ onMounted(async () => {
 }
 .mp-btn {
   font: inherit;
-  font-size: 12px;
+  font-size: 13.5px;
   padding: 6px 12px;
   border-radius: 8px;
   border: 1px solid var(--color-line);
@@ -995,7 +995,7 @@ onMounted(async () => {
   display: block;
   margin-top: 8px;
   font: inherit;
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-body);
 }
 .mp-textarea {
@@ -1003,7 +1003,7 @@ onMounted(async () => {
   width: 100%;
   margin-top: 8px;
   font: inherit;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.6;
   padding: 8px 10px;
   border-radius: 8px;
@@ -1028,12 +1028,12 @@ onMounted(async () => {
 .mp-empty {
   margin: 8px 0 0;
   padding: 22px 0;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.8;
   color: var(--color-muted);
 }
 code {
-  font-size: 11.5px;
+  font-size: 13px;
   padding: 1px 5px;
   border-radius: 5px;
   background: var(--color-ink);

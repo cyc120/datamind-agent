@@ -710,7 +710,7 @@ async function lookupBindingHead(): Promise<void> {
   border: 1px solid rgba(217, 119, 6, 0.3);
   border-radius: 9px;
   background: rgba(217, 119, 6, 0.06);
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.7;
   color: #b45309;
 }
@@ -722,13 +722,13 @@ async function lookupBindingHead(): Promise<void> {
 }
 .dimg-title {
   margin: 0;
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
   color: var(--color-text);
 }
 .dimg-note {
   margin: 5px 0 0;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: var(--color-muted);
 }
@@ -754,11 +754,11 @@ async function lookupBindingHead(): Promise<void> {
 .dimg-key {
   flex-shrink: 0;
   width: 130px;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
 }
 .dimg-val {
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-text);
   word-break: break-word;
   line-height: 1.7;
@@ -768,7 +768,7 @@ async function lookupBindingHead(): Promise<void> {
 }
 .dimg-group-title {
   margin: 0 0 6px;
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--color-body);
 }
@@ -786,13 +786,13 @@ async function lookupBindingHead(): Promise<void> {
   grid-column: 1 / -1;
 }
 .dimg-label {
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
   line-height: 1.5;
 }
 .dimg-input {
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   padding: 7px 9px;
   border: 1px solid var(--color-line);
   border-radius: 8px;
@@ -813,14 +813,14 @@ async function lookupBindingHead(): Promise<void> {
   line-height: 1.6;
 }
 .dimg-field-error {
-  font-size: 11px;
+  font-size: 12.5px;
   color: #e11d48;
   line-height: 1.6;
 }
 .dimg-btn {
   margin-top: 10px;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   padding: 7px 16px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -841,25 +841,25 @@ async function lookupBindingHead(): Promise<void> {
 }
 .dimg-hint {
   margin: 8px 0 0;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: var(--color-muted);
 }
 .dimg-warn {
   margin: 8px 0 0;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: #b45309;
 }
 .dimg-error {
   margin: 8px 0 0;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.7;
   color: #e11d48;
 }
 .dimg-ok {
   margin: 8px 0 0;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.7;
   color: #16a34a;
 }

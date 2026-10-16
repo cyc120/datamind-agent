@@ -779,18 +779,18 @@ onMounted(async () => {
   flex-wrap: wrap;
 }
 .tb-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--color-text);
 }
 .tb-note {
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-muted);
 }
 .tb-action {
   margin-left: auto;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   padding: 6px 12px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -821,13 +821,13 @@ onMounted(async () => {
   border: 1px solid var(--color-line);
   border-radius: 10px;
   background: var(--color-ink);
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.75;
   color: var(--color-body);
 }
 .cad-ident code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11.5px;
+  font-size: 13px;
   background: rgba(15, 23, 42, 0.06);
   border-radius: 5px;
   padding: 1px 5px;
@@ -838,7 +838,7 @@ onMounted(async () => {
   border: 1px solid rgba(217, 119, 6, 0.35);
   border-radius: 10px;
   background: rgba(217, 119, 6, 0.06);
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.8;
   color: #b45309;
 }
@@ -850,14 +850,14 @@ onMounted(async () => {
 }
 .cad-declare code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11.5px;
+  font-size: 13px;
   background: rgba(217, 119, 6, 0.12);
   border-radius: 5px;
   padding: 1px 5px;
 }
 .cad-conflict-note {
   margin: 0 0 14px;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.75;
   color: var(--color-muted);
 }
@@ -870,7 +870,7 @@ onMounted(async () => {
 }
 .cad-sec-title {
   margin: 0 0 8px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--color-text);
   display: flex;
@@ -879,7 +879,7 @@ onMounted(async () => {
   flex-wrap: wrap;
 }
 .cad-sec-tag {
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--color-muted);
   border: 1px solid var(--color-line);
@@ -888,13 +888,13 @@ onMounted(async () => {
 }
 .cad-hint {
   margin: 0 0 8px;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.75;
   color: var(--color-muted);
 }
 .cad-hint code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11.5px;
+  font-size: 13px;
   background: var(--color-ink);
   border-radius: 5px;
   padding: 1px 5px;
@@ -930,12 +930,12 @@ onMounted(async () => {
   background: rgba(37, 99, 235, 0.06);
 }
 .cad-asset-title {
-  font-size: 13.5px;
+  font-size: 15px;
   color: var(--color-text);
 }
 .cad-asset-meta,
 .cad-asset-hashes {
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
   line-height: 1.6;
   word-break: break-word;
@@ -944,7 +944,7 @@ onMounted(async () => {
 .cad-asset-hashes code,
 .cad-vinfo code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
+  font-size: 12.5px;
   background: var(--color-ink);
   border-radius: 5px;
   padding: 1px 5px;
@@ -961,7 +961,7 @@ onMounted(async () => {
   flex-direction: column;
   gap: 2px;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   padding: 7px 12px;
   border-radius: 10px;
   border: 1px solid var(--color-line);
@@ -978,11 +978,11 @@ onMounted(async () => {
   background: rgba(37, 99, 235, 0.07);
 }
 .cad-version-tag {
-  font-size: 10.5px;
+  font-size: 12.5px;
   color: var(--color-muted);
 }
 .cad-version-when {
-  font-size: 10.5px;
+  font-size: 12.5px;
   color: var(--color-muted);
 }
 .cad-vinfo {
@@ -990,7 +990,7 @@ onMounted(async () => {
   border: 1px solid var(--color-line);
   border-radius: 10px;
   background: var(--color-ink);
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.8;
   color: var(--color-body);
 }
@@ -1003,7 +1003,7 @@ onMounted(async () => {
 .cad-foot {
   margin: 0;
   padding-top: 4px;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.8;
   color: var(--color-muted);
 }

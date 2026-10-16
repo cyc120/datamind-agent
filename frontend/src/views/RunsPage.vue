@@ -243,18 +243,18 @@ onMounted(() => {
   min-width: 0;
 }
 .tb-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--color-text);
 }
 .tb-note {
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-muted);
 }
 .tb-action {
   margin-left: auto;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   padding: 6px 12px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -309,7 +309,7 @@ onMounted(() => {
 }
 .run-when {
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-muted);
   font-variant-numeric: tabular-nums;
   width: 118px;
@@ -321,11 +321,11 @@ onMounted(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--color-text);
-  font-size: 13.5px;
+  font-size: 15px;
 }
 .run-badge {
   flex-shrink: 0;
-  font-size: 11.5px;
+  font-size: 13px;
   padding: 3px 8px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -350,7 +350,7 @@ onMounted(() => {
 }
 .run-owner {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -374,11 +374,11 @@ onMounted(() => {
 .d-key {
   flex-shrink: 0;
   width: 72px;
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-muted);
 }
 .d-val {
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-text);
   word-break: break-all;
 }
@@ -388,7 +388,7 @@ onMounted(() => {
   border-radius: 7px;
   padding: 2px 8px;
   font-family: inherit;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-body);
   background: #ffffff;
   cursor: pointer;
@@ -407,14 +407,14 @@ onMounted(() => {
 }
 .d-answer {
   margin: 0;
-  font-size: 13.5px;
+  font-size: 15px;
   line-height: 1.75;
   color: var(--color-body);
   white-space: pre-wrap;
 }
 .run-hint,
 .run-empty {
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-muted);
   line-height: 1.7;
 }
@@ -422,7 +422,7 @@ onMounted(() => {
   padding: 28px 0;
 }
 .run-error {
-  font-size: 12.5px;
+  font-size: 14px;
   color: #e11d48;
   padding: 10px 0;
 }
@@ -430,7 +430,7 @@ onMounted(() => {
   display: block;
   margin: 16px auto 0;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   padding: 8px 18px;
   border-radius: 999px;
   border: 1px solid var(--color-line);

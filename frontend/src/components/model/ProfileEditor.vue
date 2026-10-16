@@ -662,11 +662,11 @@ defineExpose({ load, applyModel, focusModel, buildPayload })
 }
 .mpe-title {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--color-text);
 }
 .mpe-sub {
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
 }
 .mpe-presets {
@@ -677,7 +677,7 @@ defineExpose({ load, applyModel, focusModel, buildPayload })
 }
 .mpe-preset {
   font: inherit;
-  font-size: 11.5px;
+  font-size: 13px;
   padding: 3px 9px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -708,12 +708,12 @@ defineExpose({ load, applyModel, focusModel, buildPayload })
   opacity: 0.6;
 }
 .mpe-label {
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
 }
 .mpe-input {
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   padding: 7px 9px;
   border-radius: 8px;
   border: 1px solid var(--color-line);
@@ -737,7 +737,7 @@ defineExpose({ load, applyModel, focusModel, buildPayload })
   resize: vertical;
 }
 .mpe-hint {
-  font-size: 11px;
+  font-size: 12.5px;
   line-height: 1.6;
   color: var(--color-muted);
 }
@@ -766,7 +766,7 @@ defineExpose({ load, applyModel, focusModel, buildPayload })
 }
 .mpe-h3 {
   margin: 0 0 4px;
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--color-text);
 }
@@ -781,7 +781,7 @@ defineExpose({ load, applyModel, focusModel, buildPayload })
   min-width: 0;
 }
 .mpe-key.is-code {
-  font-size: 11.5px;
+  font-size: 13px;
   padding: 6px 8px;
   border-radius: 8px;
   background: var(--color-ink);
@@ -798,7 +798,7 @@ defineExpose({ load, applyModel, focusModel, buildPayload })
 }
 .mpe-error {
   margin: 12px 0 0;
-  font-size: 12px;
+  font-size: 13.5px;
   color: #e11d48;
   line-height: 1.6;
 }
@@ -810,7 +810,7 @@ defineExpose({ load, applyModel, focusModel, buildPayload })
 }
 .mpe-btn {
   font: inherit;
-  font-size: 12px;
+  font-size: 13.5px;
   padding: 6px 12px;
   border-radius: 8px;
   border: 1px solid var(--color-line);

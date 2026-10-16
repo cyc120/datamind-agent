@@ -1250,14 +1250,14 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
 
 .wk-title {
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--color-text);
 }
 
 .wk-sub {
   margin: 4px 0 0 0;
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-muted);
   word-break: break-all;
 }
@@ -1269,7 +1269,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   border-radius: 999px;
   background: var(--color-ink);
   color: var(--color-body);
-  font-size: 11px;
+  font-size: 12.5px;
   line-height: 1.6;
   white-space: nowrap;
 }
@@ -1296,7 +1296,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
 }
 
 .wk-field-label {
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
 }
 
@@ -1308,7 +1308,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   background: var(--color-panel);
   color: var(--color-text);
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13.5px;
 }
 
 .wk-select:focus-visible {
@@ -1323,7 +1323,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   background: var(--color-panel);
   color: var(--color-text);
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13.5px;
   text-decoration: none;
   cursor: pointer;
   white-space: nowrap;
@@ -1349,7 +1349,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
 }
 
 .wk-hint-inline {
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
 }
 
@@ -1360,13 +1360,13 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   background: var(--color-ink);
   color: var(--color-body);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11.5px;
+  font-size: 13px;
   word-break: break-all;
 }
 
 .wk-mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11.5px;
+  font-size: 13px;
   word-break: break-all;
 }
 
@@ -1380,7 +1380,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
 
 .wk-loading {
   margin: 0;
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-muted);
 }
 
@@ -1403,13 +1403,13 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   background: var(--color-panel);
   color: var(--color-body);
   font-family: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   text-align: left;
   cursor: pointer;
 }
 
 .wk-step small {
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
 }
 
@@ -1447,7 +1447,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
 
 .wk-col-title {
   margin: 0;
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
   color: var(--color-text);
 }
@@ -1472,39 +1472,39 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   align-items: baseline;
   gap: 8px;
   margin: 0;
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
   color: var(--color-text);
 }
 
 .wk-card-note {
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 400;
   color: var(--color-muted);
 }
 
 .wk-sub-title {
   margin: 6px 0 0;
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--color-text);
 }
 
 .wk-note {
   margin: 0;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: var(--color-body);
 }
 
 .wk-note-inline {
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
 }
 
 .wk-error-msg {
   margin: 0;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.7;
   color: #b91c1c;
   word-break: break-word;
@@ -1516,7 +1516,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   border: 1px solid rgba(225, 29, 72, 0.35);
   border-radius: 8px;
   background: rgba(225, 29, 72, 0.06);
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: #b91c1c;
   word-break: break-word;
@@ -1528,7 +1528,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   border: 1px solid rgba(217, 119, 6, 0.35);
   border-radius: 8px;
   background: rgba(217, 119, 6, 0.07);
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: #92400e;
   word-break: break-word;
@@ -1541,7 +1541,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
 .wk-warn-list {
   margin: 0;
   padding-left: 18px;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: #92400e;
 }
@@ -1551,7 +1551,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   grid-template-columns: max-content minmax(0, 1fr);
   gap: 3px 10px;
   margin: 0;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
 }
 
@@ -1576,7 +1576,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   background: var(--color-ink);
   color: var(--color-text);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.75;
   white-space: pre-wrap;
   word-break: break-word;
@@ -1589,7 +1589,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: 11.5px;
+  font-size: 13px;
 }
 
 .wk-cite-btn {
@@ -1600,7 +1600,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   background: rgba(37, 99, 235, 0.08);
   color: var(--color-accent);
   font-family: inherit;
-  font-size: 11px;
+  font-size: 12.5px;
   cursor: pointer;
 }
 
@@ -1615,7 +1615,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   background: none;
   color: var(--color-accent);
   font-family: inherit;
-  font-size: 11.5px;
+  font-size: 13px;
   text-decoration: underline;
   cursor: pointer;
   word-break: break-all;
@@ -1654,13 +1654,13 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   align-items: baseline;
   gap: 8px;
   margin: 0;
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--color-text);
 }
 
 .wk-list-sub {
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 400;
   color: var(--color-muted);
 }
@@ -1669,7 +1669,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   margin: 6px 0 0;
   padding-left: 9px;
   border-left: 2px solid var(--color-line);
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: var(--color-body);
   white-space: pre-wrap;
@@ -1693,7 +1693,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
 
 .wk-assertion-head {
   margin: 0 0 4px;
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--color-text);
 }
@@ -1709,7 +1709,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   margin: 0;
   padding: 4px 8px;
   border-left: 3px solid var(--color-line);
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: var(--color-body);
   word-break: break-word;
@@ -1743,7 +1743,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   display: flex;
   gap: 8px;
   padding: 3px 0;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.6;
 }
 
@@ -1802,7 +1802,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   background: var(--color-ink);
   color: var(--color-body);
   font-family: inherit;
-  font-size: 11.5px;
+  font-size: 13px;
   cursor: pointer;
 }
 
@@ -1817,7 +1817,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
 }
 
 .wk-folds {
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-body);
 }
 

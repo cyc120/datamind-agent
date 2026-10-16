@@ -372,13 +372,13 @@ const checkIssues = computed(() => {
   margin-bottom: 10px;
 }
 .type {
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--color-accent);
   letter-spacing: 0.04em;
 }
 .ref {
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   overflow: hidden;
@@ -386,7 +386,7 @@ const checkIssues = computed(() => {
   white-space: nowrap;
 }
 .text {
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.7;
   color: var(--color-text);
   white-space: pre-wrap;
@@ -397,7 +397,7 @@ const checkIssues = computed(() => {
   border: 1px solid var(--color-line);
   border-radius: 10px;
   padding: 10px 12px;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.6;
   color: var(--color-text);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -410,7 +410,7 @@ const checkIssues = computed(() => {
   grid-template-columns: 88px 1fr;
   gap: 6px 10px;
   margin: 10px 0;
-  font-size: 12.5px;
+  font-size: 14px;
 }
 .kv dt {
   color: var(--color-muted);
@@ -422,7 +422,7 @@ const checkIssues = computed(() => {
 }
 .mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11.5px;
+  font-size: 13px;
 }
 .tablewrap {
   overflow-x: auto;
@@ -433,7 +433,7 @@ const checkIssues = computed(() => {
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 13.5px;
 }
 th,
 td {
@@ -455,7 +455,7 @@ tr:last-child td {
 }
 .link {
   color: var(--color-accent);
-  font-size: 12.5px;
+  font-size: 14px;
   text-decoration: none;
 }
 .link:hover {
@@ -469,11 +469,11 @@ tr:last-child td {
 }
 .sub {
   color: var(--color-muted);
-  font-size: 11.5px;
+  font-size: 13px;
 }
 .pill {
   display: inline-block;
-  font-size: 11px;
+  font-size: 12.5px;
   line-height: 1.6;
   border-radius: 4px;
   padding: 0 6px;
@@ -496,7 +496,7 @@ tr:last-child td {
   margin: 10px 0;
 }
 .refs-title {
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
   margin-bottom: 5px;
 }
@@ -506,7 +506,7 @@ tr:last-child td {
   gap: 7px;
   padding: 5px 0;
   border-top: 1px solid var(--color-line);
-  font-size: 11.5px;
+  font-size: 13px;
 }
 .ref-role {
   flex-shrink: 0;
@@ -515,7 +515,7 @@ tr:last-child td {
   border-radius: 4px;
   padding: 0 5px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10.5px;
+  font-size: 12.5px;
 }
 .ref-text {
   flex: 1;
@@ -528,18 +528,18 @@ tr:last-child td {
   font-weight: 600;
   color: var(--color-text);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10.5px;
+  font-size: 12.5px;
 }
 .ref-page {
   flex-shrink: 0;
   color: var(--color-muted);
-  font-size: 10.5px;
+  font-size: 12.5px;
 }
 .empty {
   text-align: center;
   padding: 34px 12px;
   color: var(--color-muted);
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.7;
 }
 .empty .dot {
@@ -550,6 +550,6 @@ tr:last-child td {
 }
 .muted {
   color: var(--color-muted);
-  font-size: 12.5px;
+  font-size: 14px;
 }
 </style>

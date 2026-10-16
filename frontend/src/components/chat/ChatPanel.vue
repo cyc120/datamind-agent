@@ -872,7 +872,7 @@ function openDraft(m: ChatMessage): void {
 }
 .brand-sub {
   margin: 16px 0 0;
-  font-size: 14.5px;
+  font-size: 15.5px;
   color: var(--color-muted);
 }
 
@@ -927,7 +927,7 @@ function openDraft(m: ChatMessage): void {
   resize: none;
   color: var(--color-text);
   font-family: inherit;
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.6;
   min-height: 34px;
   max-height: 180px;
@@ -943,7 +943,7 @@ function openDraft(m: ChatMessage): void {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 15px;
+  font-size: 16px;
   font-family: inherit;
   cursor: pointer;
   text-decoration: none;
@@ -971,7 +971,7 @@ function openDraft(m: ChatMessage): void {
   background: var(--color-ink);
   color: var(--color-body);
   font-family: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   padding: 8px 12px;
   max-width: 150px;
   cursor: pointer;
@@ -1016,11 +1016,13 @@ function openDraft(m: ChatMessage): void {
   gap: 6px;
   padding: 7px 11px;
   border-radius: 999px;
+  /* 标签绝不允许在胶囊内折行——宁可让整行略微超出，也不要两行文字 */
+  white-space: nowrap;
   border: 1px solid var(--color-line);
   background: var(--color-ink);
   color: var(--color-body);
   font-family: inherit;
-  font-size: 12.5px;
+  font-size: 13px;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
@@ -1035,12 +1037,12 @@ function openDraft(m: ChatMessage): void {
 }
 .chip-ico {
   color: var(--color-accent);
-  font-size: 12px;
+  font-size: 13.5px;
 }
 .tip {
   margin: 14px 0 0;
   text-align: center;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
 }
 
@@ -1076,7 +1078,7 @@ function openDraft(m: ChatMessage): void {
   color: var(--color-text);
   padding: 10px 15px;
   border-radius: 16px 16px 4px 16px;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.7;
   white-space: pre-wrap;
   word-break: break-word;
@@ -1088,7 +1090,7 @@ function openDraft(m: ChatMessage): void {
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 700;
   color: #ffffff;
   background: linear-gradient(135deg, #2563eb, #6366f1);
@@ -1096,10 +1098,10 @@ function openDraft(m: ChatMessage): void {
 .assistant .bubble {
   flex: 1;
   padding-top: 2px;
-  font-size: 14px;
+  font-size: 15px;
 }
 .thinking {
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-body);
   background: var(--color-ink);
   border: 1px solid var(--color-line);
@@ -1154,7 +1156,7 @@ function openDraft(m: ChatMessage): void {
 }
 .agent {
   margin-left: auto;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
 }
 .thinking-line {
@@ -1162,7 +1164,7 @@ function openDraft(m: ChatMessage): void {
   align-items: center;
   gap: 8px;
   color: var(--color-accent);
-  font-size: 13px;
+  font-size: 14.5px;
   margin-bottom: 8px;
 }
 .pulse-dot {
@@ -1192,7 +1194,7 @@ function openDraft(m: ChatMessage): void {
      这与 .collapse（visibility:collapse 让按钮永远不可见）是同一类事故。
      改名 + 显式声明 display 双保险。 */
   display: block;
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-muted);
   margin-bottom: 6px;
   white-space: nowrap;
@@ -1205,7 +1207,7 @@ function openDraft(m: ChatMessage): void {
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 13.5px;
 }
 th, td {
   padding: 6px 10px;
@@ -1231,7 +1233,7 @@ tr:last-child td {
   gap: 8px;
 }
 .cite-title {
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-muted);
 }
 .cite {
@@ -1248,7 +1250,7 @@ tr:last-child td {
   border-radius: 6px;
   background: rgba(37, 99, 235, 0.1);
   color: var(--color-accent);
-  font-size: 11px;
+  font-size: 12.5px;
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -1264,12 +1266,12 @@ tr:last-child td {
   gap: 6px;
 }
 .cite-doc {
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-text);
   font-weight: 600;
 }
 .cite-ver {
-  font-size: 10.5px;
+  font-size: 12.5px;
   color: var(--color-muted);
   border: 1px solid var(--color-line);
   border-radius: 4px;
@@ -1279,11 +1281,11 @@ tr:last-child td {
 .cite-page {
   margin-left: auto;
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
 }
 .cite-path {
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
   margin-top: 4px;
   word-break: break-word;
@@ -1292,7 +1294,7 @@ tr:last-child td {
   margin: 9px 0 0;
 }
 .cite-text {
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-body);
   line-height: 1.7;
   white-space: pre-wrap;
@@ -1314,7 +1316,7 @@ tr:last-child td {
   background: none;
   cursor: pointer;
   font-family: inherit;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-accent);
 }
 .cite-toggle:hover {
@@ -1327,7 +1329,7 @@ tr:last-child td {
   margin-top: 8px;
 }
 .cite-link {
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-accent);
   text-decoration: none;
   border-bottom: 1px solid rgba(37, 99, 235, 0.35);
@@ -1342,7 +1344,7 @@ tr:last-child td {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
 }
 .st.ok {
@@ -1378,7 +1380,7 @@ tr:last-child td {
   background: var(--color-panel);
   color: var(--color-text);
   font-family: inherit;
-  font-size: 11.5px;
+  font-size: 13px;
   cursor: pointer;
   white-space: nowrap;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
@@ -1412,7 +1414,7 @@ tr:last-child td {
 
 /* 状态文字：排队中 ≠ 完成 ≠ 失败 —— 用文字说清，不靠颜色；颜色只做辅助 */
 .org-state {
-  font-size: 11px;
+  font-size: 12.5px;
   line-height: 1.6;
   color: var(--color-muted);
 }
@@ -1434,7 +1436,7 @@ tr:last-child td {
 
 .org-detail {
   margin: 6px 0 0;
-  font-size: 11px;
+  font-size: 12.5px;
   line-height: 1.65;
   color: var(--color-body);
   word-break: break-word;

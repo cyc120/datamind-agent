@@ -574,11 +574,11 @@ function whenText(iso?: string | null): string {
 .fp-cur-key {
   flex-shrink: 0;
   width: 68px;
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-muted);
 }
 .fp-cur-val {
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-text);
 }
 .fp-cur-who {
@@ -588,7 +588,7 @@ function whenText(iso?: string | null): string {
   color: var(--color-muted);
 }
 .fp-badge {
-  font-size: 11.5px;
+  font-size: 13px;
   padding: 2px 8px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -613,7 +613,7 @@ function whenText(iso?: string | null): string {
 }
 .fp-honesty {
   margin: 6px 0 0;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: var(--color-muted);
 }
@@ -627,7 +627,7 @@ function whenText(iso?: string | null): string {
 }
 .fp-h {
   margin: 0 0 8px;
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--color-text);
 }
@@ -652,12 +652,12 @@ function whenText(iso?: string | null): string {
   flex-wrap: wrap;
 }
 .fp-item-decision {
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--color-text);
 }
 .fp-tag {
-  font-size: 10.5px;
+  font-size: 12.5px;
   color: var(--color-muted);
   border: 1px solid var(--color-line);
   border-radius: 999px;
@@ -673,26 +673,26 @@ function whenText(iso?: string | null): string {
 }
 .fp-item-when {
   margin-left: auto;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
   font-variant-numeric: tabular-nums;
 }
 .fp-item-meta {
   margin: 4px 0 0;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
   word-break: break-all;
 }
 .fp-item-reason {
   margin: 6px 0 0;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.7;
   color: var(--color-body);
   white-space: pre-wrap;
 }
 .fp-semantics {
   margin: 0 0 10px;
-  font-size: 10.5px;
+  font-size: 12.5px;
   line-height: 1.6;
   color: var(--color-muted);
   word-break: break-word;
@@ -706,13 +706,13 @@ function whenText(iso?: string | null): string {
 }
 .fp-form-title {
   margin: 0 0 6px;
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--color-text);
 }
 .fp-identity {
   margin: 0 0 8px;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
 }
 .fp-decisions {
@@ -723,7 +723,7 @@ function whenText(iso?: string | null): string {
 }
 .fp-decision {
   font: inherit;
-  font-size: 12px;
+  font-size: 13.5px;
   padding: 4px 10px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -740,7 +740,7 @@ function whenText(iso?: string | null): string {
   width: 100%;
   box-sizing: border-box;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.6;
   padding: 8px 10px;
   border: 1px solid var(--color-line);
@@ -756,38 +756,38 @@ function whenText(iso?: string | null): string {
 .fp-hint,
 .fp-empty {
   margin: 6px 0 0;
-  font-size: 11px;
+  font-size: 12.5px;
   line-height: 1.7;
   color: var(--color-muted);
 }
 .fp-error {
   margin: 6px 0 0;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.7;
   color: #e11d48;
 }
 .fp-notice {
   margin: 6px 0 0;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.7;
   color: #16a34a;
 }
 .fp-warn {
   margin: 0 0 8px;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: #d97706;
 }
 .fp-blocked-text {
   margin: 0 0 6px;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.75;
   color: var(--color-body);
 }
 .fp-submit {
   margin-top: 10px;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   padding: 6px 16px;
   border-radius: 999px;
   border: 1px solid var(--color-line);

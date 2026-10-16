@@ -334,7 +334,7 @@ function act(rule: AuthorityRule, decision: ApprovalDecision): void {
   border-radius: 12px;
   background: rgba(225, 29, 72, 0.06);
   color: #e11d48;
-  font-size: 12.5px;
+  font-size: 14px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   word-break: break-all;
 }
@@ -352,13 +352,13 @@ function act(rule: AuthorityRule, decision: ApprovalDecision): void {
   margin-bottom: 10px;
 }
 .art-id {
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-text);
   word-break: break-all;
 }
 .art-state,
 .art-payload {
-  font-size: 11.5px;
+  font-size: 13px;
   padding: 3px 8px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -401,13 +401,13 @@ function act(rule: AuthorityRule, decision: ApprovalDecision): void {
 .art-fact dt {
   flex-shrink: 0;
   width: 132px;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
 }
 .art-fact dd {
   margin: 0;
   min-width: 0;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: var(--color-body);
   word-break: break-word;
@@ -422,7 +422,7 @@ function act(rule: AuthorityRule, decision: ApprovalDecision): void {
 }
 .art-blocker {
   margin: 10px 0 0;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: #d97706;
 }
@@ -437,7 +437,7 @@ function act(rule: AuthorityRule, decision: ApprovalDecision): void {
   flex: 1;
   min-width: 220px;
   font: inherit;
-  font-size: 12px;
+  font-size: 13.5px;
   padding: 6px 9px;
   border-radius: 8px;
   border: 1px solid var(--color-line);
@@ -446,7 +446,7 @@ function act(rule: AuthorityRule, decision: ApprovalDecision): void {
 }
 .art-btn {
   font: inherit;
-  font-size: 12px;
+  font-size: 13.5px;
   padding: 6px 13px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -464,7 +464,7 @@ function act(rule: AuthorityRule, decision: ApprovalDecision): void {
 }
 .art-hint {
   margin: 8px 0 0;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: var(--color-muted);
 }

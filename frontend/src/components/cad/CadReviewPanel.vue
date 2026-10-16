@@ -350,19 +350,19 @@ const tuple = computed(() => [
 }
 .cad-sec-title {
   margin: 0 0 8px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--color-text);
 }
 .cad-sub {
   margin: 16px 0 6px;
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--color-text);
 }
 .cad-hint {
   margin: 0 0 8px;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.75;
   color: var(--color-muted);
 }
@@ -375,7 +375,7 @@ const tuple = computed(() => [
 .cad-hint code,
 .cad-code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11.5px;
+  font-size: 13px;
   background: rgba(15, 23, 42, 0.06);
   border-radius: 5px;
   padding: 1px 5px;
@@ -383,7 +383,7 @@ const tuple = computed(() => [
 }
 .cad-semantics {
   margin: 0 0 10px;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
 }
 .cad-warn {
@@ -392,7 +392,7 @@ const tuple = computed(() => [
   border: 1px solid rgba(217, 119, 6, 0.35);
   border-radius: 9px;
   background: rgba(217, 119, 6, 0.07);
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.75;
   color: #b45309;
 }
@@ -404,7 +404,7 @@ const tuple = computed(() => [
 .cad-table {
   border-collapse: collapse;
   width: 100%;
-  font-size: 12.5px;
+  font-size: 14px;
   min-width: 720px;
 }
 .cad-table th,
@@ -441,7 +441,7 @@ const tuple = computed(() => [
 .cad-meta {
   display: inline-block;
   margin-left: 6px;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
   line-height: 1.6;
 }
@@ -459,7 +459,7 @@ const tuple = computed(() => [
 }
 .cad-mini {
   font: inherit;
-  font-size: 11.5px;
+  font-size: 13px;
   padding: 4px 10px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -484,12 +484,12 @@ const tuple = computed(() => [
   border: 1px solid var(--color-line);
   border-radius: 9px;
   background: var(--color-ink);
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.7;
   color: var(--color-body);
 }
 .cad-hist-idx {
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
   margin-right: 6px;
 }
@@ -510,7 +510,7 @@ const tuple = computed(() => [
 }
 .cad-form h4 {
   margin: 0 0 10px;
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--color-text);
 }
@@ -524,13 +524,13 @@ const tuple = computed(() => [
   align-items: baseline;
 }
 .cad-field legend {
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   margin-bottom: 4px;
 }
 .cad-field label {
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-body);
   display: inline-flex;
   align-items: center;
@@ -543,14 +543,14 @@ const tuple = computed(() => [
 }
 .cad-textarea span {
   display: block;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
   margin-bottom: 4px;
 }
 .cad-textarea textarea {
   width: 100%;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.7;
   padding: 8px 10px;
   border: 1px solid var(--color-line);
@@ -562,7 +562,7 @@ const tuple = computed(() => [
 }
 .cad-tuple {
   margin: 0 0 10px;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
 }
 .cad-tuple summary {
@@ -587,7 +587,7 @@ const tuple = computed(() => [
   border: 1px solid rgba(217, 119, 6, 0.35);
   border-radius: 9px;
   background: rgba(217, 119, 6, 0.07);
-  font-size: 12px;
+  font-size: 13.5px;
   color: #b45309;
 }
 .cad-blocked p {
@@ -600,7 +600,7 @@ const tuple = computed(() => [
 }
 .cad-submit {
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   padding: 8px 18px;
   border-radius: 999px;
   border: 1px solid var(--color-accent);
@@ -624,7 +624,7 @@ const tuple = computed(() => [
   border: 1px solid rgba(22, 163, 74, 0.35);
   border-radius: 9px;
   background: rgba(22, 163, 74, 0.07);
-  font-size: 12px;
+  font-size: 13.5px;
   color: #15803d;
   line-height: 1.7;
 }

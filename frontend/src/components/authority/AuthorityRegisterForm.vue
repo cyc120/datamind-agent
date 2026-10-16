@@ -268,12 +268,12 @@ function onSelectSource(value: 'production' | 'report'): void {
   border: 1px solid rgba(217, 119, 6, 0.35);
   border-radius: 10px;
   background: rgba(217, 119, 6, 0.07);
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.75;
   color: var(--color-body);
 }
 .arf-form code {
-  font-size: 11.5px;
+  font-size: 13px;
   word-break: break-all;
 }
 .arf-grid {
@@ -295,13 +295,13 @@ function onSelectSource(value: 'production' | 'report'): void {
   margin: 0 0 12px;
 }
 .arf-label {
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
 }
 .arf-input,
 .arf-textarea {
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   padding: 6px 9px;
   border-radius: 8px;
   border: 1px solid var(--color-line);
@@ -319,10 +319,10 @@ function onSelectSource(value: 'production' | 'report'): void {
 }
 .arf-mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11.5px;
+  font-size: 13px;
 }
 .arf-help {
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: var(--color-muted);
 }
@@ -336,7 +336,7 @@ function onSelectSource(value: 'production' | 'report'): void {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-body);
 }
 .arf-link {
@@ -349,12 +349,12 @@ function onSelectSource(value: 'production' | 'report'): void {
 }
 .arf-error {
   margin: 0 0 10px;
-  font-size: 12.5px;
+  font-size: 14px;
   color: #e11d48;
 }
 .arf-submit {
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   padding: 8px 18px;
   border-radius: 999px;
   border: 1px solid var(--color-line);

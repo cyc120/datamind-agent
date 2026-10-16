@@ -160,12 +160,12 @@ function onApprove(): void {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--color-text);
 }
 .fur-type {
   flex-shrink: 0;
-  font-size: 10.5px;
+  font-size: 12.5px;
   color: var(--color-muted);
   max-width: 220px;
   overflow: hidden;
@@ -174,13 +174,13 @@ function onApprove(): void {
 }
 .fur-when {
   flex-shrink: 0;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
   font-variant-numeric: tabular-nums;
 }
 .fur-badge {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 12.5px;
   padding: 2px 8px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -205,13 +205,13 @@ function onApprove(): void {
 }
 .fur-caret {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
 }
 .fur-approve {
   flex-shrink: 0;
   font: inherit;
-  font-size: 12px;
+  font-size: 13.5px;
   padding: 5px 12px;
   border-radius: 999px;
   border: 1px solid rgba(37, 99, 235, 0.4);
@@ -228,7 +228,7 @@ function onApprove(): void {
 }
 .fur-gate {
   margin: 4px 0 0;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
 }
 .fur-fields {
@@ -238,7 +238,7 @@ function onApprove(): void {
   margin-top: 5px;
 }
 .fur-f {
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-body);
   line-height: 1.6;
 }
@@ -247,7 +247,7 @@ function onApprove(): void {
 .fur-error,
 .fur-notice {
   margin: 6px 0 0;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
 }
 .fur-note {

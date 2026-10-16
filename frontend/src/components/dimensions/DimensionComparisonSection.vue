@@ -276,13 +276,13 @@ onMounted(() => {
 }
 .dimc-title {
   margin: 0;
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
   color: var(--color-text);
 }
 .dimc-note {
   margin: 5px 0 0;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: var(--color-muted);
 }
@@ -295,7 +295,7 @@ onMounted(() => {
 }
 .dimc-btn {
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   padding: 7px 16px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -312,13 +312,13 @@ onMounted(() => {
   cursor: not-allowed;
 }
 .dimc-target {
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
   word-break: break-all;
 }
 .dimc-refuse {
   margin: 8px 0 0;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: var(--color-muted);
 }
@@ -328,7 +328,7 @@ onMounted(() => {
 }
 .dimc-subtitle {
   margin: 16px 0 6px;
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--color-text);
 }
@@ -348,7 +348,7 @@ onMounted(() => {
   border: 1px solid var(--color-line);
   border-radius: 9px;
   background: var(--color-ink);
-  font-size: 12px;
+  font-size: 13.5px;
 }
 .dimc-when {
   flex-shrink: 0;
@@ -358,7 +358,7 @@ onMounted(() => {
 }
 .dimc-badge {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 12.5px;
   padding: 2px 8px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -395,7 +395,7 @@ onMounted(() => {
 .dimc-replay {
   flex-shrink: 0;
   font: inherit;
-  font-size: 11.5px;
+  font-size: 13px;
   padding: 3px 10px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -415,7 +415,7 @@ onMounted(() => {
   display: block;
   margin: 12px auto 0;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   padding: 7px 18px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -434,7 +434,7 @@ onMounted(() => {
 .dimc-link {
   margin-top: 8px;
   font: inherit;
-  font-size: 11.5px;
+  font-size: 13px;
   border: none;
   background: none;
   color: var(--color-accent);
@@ -443,7 +443,7 @@ onMounted(() => {
 }
 .dimc-hint,
 .dimc-empty {
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.7;
   color: var(--color-muted);
 }
@@ -452,13 +452,13 @@ onMounted(() => {
 }
 .dimc-error {
   margin: 8px 0 0;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.7;
   color: #e11d48;
 }
 .dimc-ok {
   margin: 8px 0 0;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.7;
   color: #16a34a;
 }

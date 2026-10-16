@@ -671,7 +671,7 @@ onBeforeUnmount(() => {
   display: grid;
   place-items: center;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 14.5px;
   color: #ffffff;
   background: linear-gradient(135deg, #2563eb, #6366f1);
 }
@@ -688,7 +688,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--color-line);
   background: #ffffff;
   color: var(--color-text);
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 500;
   font-family: inherit;
   cursor: pointer;
@@ -700,7 +700,7 @@ onBeforeUnmount(() => {
   border-color: rgba(15, 23, 42, 0.2);
 }
 .nc-plus {
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--color-accent);
 }
 .new-chat:disabled {
@@ -712,7 +712,7 @@ onBeforeUnmount(() => {
   text-align: left;
 }
 .nc-kbd {
-  font-size: 10.5px;
+  font-size: 12.5px;
   color: var(--color-muted);
   border: 1px solid var(--color-line);
   border-radius: 6px;
@@ -730,7 +730,7 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 .group-title {
-  font-size: 11px;
+  font-size: 12.5px;
   letter-spacing: 0.08em;
   color: var(--color-muted);
   padding: 12px 10px 5px;
@@ -745,7 +745,7 @@ onBeforeUnmount(() => {
   border-radius: 10px;
   background: transparent;
   color: var(--color-body);
-  font-size: 13.5px;
+  font-size: 15px;
   font-family: inherit;
   text-align: left;
   text-decoration: none;
@@ -779,7 +779,7 @@ onBeforeUnmount(() => {
 }
 .legacy-tag {
   margin-left: auto;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1;
   padding: 3px 5px;
   border-radius: 5px;
@@ -790,7 +790,7 @@ onBeforeUnmount(() => {
 .ico {
   width: 16px;
   text-align: center;
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--color-muted);
 }
 .txt {
@@ -814,11 +814,11 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 6px;
   padding: 0 4px;
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-muted);
 }
 .st-title {
-  font-size: 10.5px;
+  font-size: 12.5px;
   letter-spacing: 0.08em;
   color: var(--color-muted);
   padding-bottom: 1px;
@@ -839,7 +839,7 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 1px;
   padding-left: 15px;
-  font-size: 10.5px;
+  font-size: 12.5px;
   line-height: 1.5;
 }
 .sub-model {
@@ -858,7 +858,7 @@ onBeforeUnmount(() => {
 .evidence {
   margin: 0;
   padding-left: 15px;
-  font-size: 10.5px;
+  font-size: 12.5px;
   line-height: 1.5;
   color: var(--color-body);
 }
@@ -869,7 +869,7 @@ onBeforeUnmount(() => {
 .hint {
   margin: 0;
   padding-left: 15px;
-  font-size: 10.5px;
+  font-size: 12.5px;
   line-height: 1.5;
   color: var(--color-muted);
 }
@@ -881,7 +881,7 @@ onBeforeUnmount(() => {
   background: #ffffff;
   color: var(--color-text);
   font-family: inherit;
-  font-size: 11.5px;
+  font-size: 13px;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
@@ -971,7 +971,7 @@ onBeforeUnmount(() => {
   padding: 2px 4px 0;
 }
 .sess-title {
-  font-size: 10.5px;
+  font-size: 12.5px;
   letter-spacing: 0.08em;
   color: var(--color-muted);
 }
@@ -981,7 +981,7 @@ onBeforeUnmount(() => {
   background: transparent;
   color: var(--color-muted);
   font-family: inherit;
-  font-size: 11px;
+  font-size: 12.5px;
   line-height: 1;
   padding: 2px 4px;
   border-radius: 6px;
@@ -994,7 +994,7 @@ onBeforeUnmount(() => {
 
 /* 时间分组小标题：只做视觉分隔，不参与点击 */
 .sess-group {
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.06em;
   color: var(--color-muted);
   padding: 8px 8px 2px;
@@ -1014,7 +1014,7 @@ onBeforeUnmount(() => {
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 28px rgba(37, 99, 235, 0.1);
 }
 .sess-search-ico {
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-muted);
 }
 .sess-search-input {
@@ -1024,7 +1024,7 @@ onBeforeUnmount(() => {
   outline: none;
   background: transparent;
   font-family: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-text);
 }
 .sess-search-input::placeholder {
@@ -1069,7 +1069,7 @@ onBeforeUnmount(() => {
   gap: 1px;
 }
 .sess-row-title {
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-body);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1079,7 +1079,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 10.5px;
+  font-size: 12.5px;
   color: var(--color-muted);
 }
 .sess-row-count {
@@ -1095,7 +1095,7 @@ onBeforeUnmount(() => {
   border-radius: 7px;
   padding: 2px 6px;
   font-family: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-text);
   background: #ffffff;
   outline: none;
@@ -1112,7 +1112,7 @@ onBeforeUnmount(() => {
   background: transparent;
   color: var(--color-muted);
   font-family: inherit;
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1;
   cursor: pointer;
   opacity: 0;
@@ -1158,7 +1158,7 @@ onBeforeUnmount(() => {
   padding: 5px 8px;
   text-align: left;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-body);
   background: transparent;
   cursor: pointer;
@@ -1194,7 +1194,7 @@ onBeforeUnmount(() => {
   border-radius: 7px;
   padding: 2px 6px;
   font-family: inherit;
-  font-size: 10.5px;
+  font-size: 12.5px;
   line-height: 1.6;
   cursor: pointer;
   white-space: nowrap;
@@ -1223,7 +1223,7 @@ onBeforeUnmount(() => {
   background: transparent;
   color: var(--color-muted);
   font-family: inherit;
-  font-size: 11.5px;
+  font-size: 13px;
   cursor: pointer;
 }
 .sess-more:hover:not(:disabled) {
@@ -1237,7 +1237,7 @@ onBeforeUnmount(() => {
 .sess-error {
   margin: 0;
   padding: 2px 4px;
-  font-size: 11px;
+  font-size: 12.5px;
   line-height: 1.6;
   color: var(--color-muted);
 }
@@ -1265,7 +1265,7 @@ onBeforeUnmount(() => {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 700;
   color: #ffffff;
   background: linear-gradient(135deg, #2563eb, #6366f1);
@@ -1276,12 +1276,12 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 .who strong {
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--color-text);
 }
 .who small {
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
 }
 </style>

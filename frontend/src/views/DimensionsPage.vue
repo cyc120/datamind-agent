@@ -601,18 +601,18 @@ onMounted(() => {
   min-width: 0;
 }
 .tb-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--color-text);
 }
 .tb-note {
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-muted);
 }
 .tb-action {
   margin-left: auto;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   padding: 6px 12px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -638,7 +638,7 @@ onMounted(() => {
 }
 .dim-identity {
   margin: 0 0 12px;
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-muted);
   line-height: 1.7;
 }
@@ -651,7 +651,7 @@ onMounted(() => {
 }
 .dim-contract-line {
   margin: 0 0 6px;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.75;
   color: var(--color-body);
 }
@@ -687,13 +687,13 @@ onMounted(() => {
 }
 .dim-panel-title {
   margin: 0;
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
   color: var(--color-text);
 }
 .dim-panel-note {
   margin: 5px 0 10px;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: var(--color-muted);
 }
@@ -712,7 +712,7 @@ onMounted(() => {
   width: 100%;
   text-align: left;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   padding: 8px 10px;
   border: 1px solid var(--color-line);
   border-radius: 9px;
@@ -737,7 +737,7 @@ onMounted(() => {
 }
 .dim-row-ver {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -754,18 +754,18 @@ onMounted(() => {
 .dim-k {
   flex-shrink: 0;
   width: 150px;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
 }
 .dim-v {
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-text);
   word-break: break-word;
   line-height: 1.7;
 }
 .dim-caveat {
   margin: 10px 0 0;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: var(--color-muted);
 }
@@ -776,7 +776,7 @@ onMounted(() => {
   padding: 8px 10px;
 }
 .dim-summary {
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-body);
   cursor: pointer;
 }
@@ -784,7 +784,7 @@ onMounted(() => {
   margin: 8px 0 0;
   max-height: 320px;
   overflow: auto;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.6;
   color: var(--color-body);
   white-space: pre-wrap;
@@ -809,7 +809,7 @@ onMounted(() => {
   border: 1px solid var(--color-line);
   border-radius: 9px;
   background: var(--color-ink);
-  font-size: 12px;
+  font-size: 13.5px;
 }
 .dim-approval-seq {
   flex-shrink: 0;
@@ -818,7 +818,7 @@ onMounted(() => {
 }
 .dim-approval-decision {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 12.5px;
   padding: 2px 8px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -853,7 +853,7 @@ onMounted(() => {
 }
 .dim-approval-id {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
 }
 .dim-admin {
@@ -867,7 +867,7 @@ onMounted(() => {
 .dim-toggle {
   margin-left: auto;
   font: inherit;
-  font-size: 12px;
+  font-size: 13.5px;
   padding: 5px 12px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -881,7 +881,7 @@ onMounted(() => {
 }
 .dim-hint,
 .dim-empty {
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.7;
   color: var(--color-muted);
 }
@@ -890,13 +890,13 @@ onMounted(() => {
 }
 .dim-warn {
   margin: 8px 0 0;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: #b45309;
 }
 .dim-error {
   margin: 8px 0 0;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.7;
   color: #e11d48;
 }

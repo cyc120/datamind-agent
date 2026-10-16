@@ -445,10 +445,10 @@ const sampleEdges: EvidenceEdge[] = [
   font-weight: 700;
   color: #ffffff;
   background: linear-gradient(135deg, #2563eb, #6366f1);
-  font-size: 13px;
+  font-size: 14.5px;
 }
 .brand strong {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
 }
 .links {
@@ -459,7 +459,7 @@ const sampleEdges: EvidenceEdge[] = [
 .links a {
   color: var(--color-body);
   text-decoration: none;
-  font-size: 14px;
+  font-size: 15px;
   transition: color 0.2s;
 }
 .links a:hover {
@@ -471,7 +471,7 @@ const sampleEdges: EvidenceEdge[] = [
   border: none;
   background: var(--color-text);
   color: #ffffff;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   cursor: pointer;
   transition: opacity 0.2s;
@@ -492,7 +492,7 @@ const sampleEdges: EvidenceEdge[] = [
   background: transparent;
   color: var(--color-body);
   font-family: inherit;
-  font-size: 14px;
+  font-size: 15px;
   cursor: pointer;
   transition: border-color 0.2s, color 0.2s;
 }
@@ -572,7 +572,7 @@ const sampleEdges: EvidenceEdge[] = [
    纸张点开后彼此重叠、可见面积比看上去小，所以纸上只放 4 字的特性名，
    放「标题 + 说明」实测说明会被截断。 */
 .folder-tilt :deep(div) {
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.3;
 }
 /* :deep 是必需的——.paper 经 slot 渲染进子组件内部，拿不到本组件的 scope 属性。
@@ -581,7 +581,7 @@ const sampleEdges: EvidenceEdge[] = [
    排成 2×2 的方块则任何角度都放得下。 */
 .folder-tilt :deep(.paper) {
   padding: 12px 10px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   line-height: 1.3;
   letter-spacing: 0.04em;
@@ -671,7 +671,7 @@ const sampleEdges: EvidenceEdge[] = [
   border-radius: 10px;
   background: var(--color-accent);
   color: #ffffff;
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s, transform 0.2s;
@@ -690,7 +690,7 @@ const sampleEdges: EvidenceEdge[] = [
   border: 1px solid var(--color-line);
   color: var(--color-text);
   text-decoration: none;
-  font-size: 17px;
+  font-size: 18px;
   background: #ffffff;
   transition: border-color 0.2s, background 0.2s;
 }
@@ -759,7 +759,7 @@ const sampleEdges: EvidenceEdge[] = [
   margin-bottom: 44px;
 }
 .eyebrow {
-  font-size: 12px;
+  font-size: 13.5px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--color-muted);
@@ -769,7 +769,7 @@ const sampleEdges: EvidenceEdge[] = [
   margin: 14px 0 0;
   max-width: 620px;
   color: var(--color-body);
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.8;
 }
 /* BlurText 根元素是 <p>，这里把它当标题用 */
@@ -817,11 +817,11 @@ const sampleEdges: EvidenceEdge[] = [
 .face-content p {
   margin: 0;
   color: var(--color-body);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.8;
 }
 .face-content .hint {
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-muted);
 }
 .checks {
@@ -829,7 +829,7 @@ const sampleEdges: EvidenceEdge[] = [
   padding: 0;
   list-style: none;
   color: var(--color-body);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 2;
 }
 .principle-text h3 {
@@ -840,13 +840,13 @@ const sampleEdges: EvidenceEdge[] = [
 .principle-text p {
   margin: 0 0 14px;
   color: var(--color-body);
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.9;
 }
 .link {
   color: var(--color-accent);
   text-decoration: none;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
 }
 
@@ -959,7 +959,7 @@ const sampleEdges: EvidenceEdge[] = [
   min-width: 0;
   margin: 0;
   color: var(--color-body);
-  font-size: 14.5px;
+  font-size: 15.5px;
   line-height: 1.9;
   font-weight: 400;
   overflow-wrap: anywhere;
@@ -998,7 +998,7 @@ const sampleEdges: EvidenceEdge[] = [
   justify-content: flex-start;
   margin-top: 20px;
   color: var(--color-body);
-  font-size: 13px;
+  font-size: 14.5px;
 }
 .legend span {
   display: inline-flex;
@@ -1025,20 +1025,20 @@ const sampleEdges: EvidenceEdge[] = [
   border: 1px solid var(--color-line);
 }
 .step-n {
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 700;
   color: var(--color-accent);
   letter-spacing: 0.08em;
 }
 .step h3 {
   margin: 10px 0 8px;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 700;
 }
 .step p {
   margin: 0;
   color: var(--color-body);
-  font-size: 13.5px;
+  font-size: 15px;
   line-height: 1.8;
 }
 
@@ -1080,7 +1080,7 @@ const sampleEdges: EvidenceEdge[] = [
 .final-note {
   margin: 12px 0 26px;
   color: var(--color-muted);
-  font-size: 12.5px;
+  font-size: 14px;
 }
 
 /* ── 页脚 ── */
@@ -1092,7 +1092,7 @@ const sampleEdges: EvidenceEdge[] = [
   gap: 8px 24px;
   justify-content: space-between;
   color: var(--color-muted);
-  font-size: 12.5px;
+  font-size: 14px;
 }
 
 @media (max-width: 900px) {

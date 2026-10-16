@@ -493,13 +493,13 @@ onMounted(async () => {
   flex: 1;
 }
 .tb-title {
-  font-size: 14.5px;
+  font-size: 15.5px;
   font-weight: 600;
   color: var(--color-text);
   white-space: nowrap;
 }
 .tb-note {
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -515,7 +515,7 @@ onMounted(async () => {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-body);
   border: 1px solid var(--color-line);
   background: var(--color-panel);
@@ -550,7 +550,7 @@ onMounted(async () => {
   border-radius: 999px;
   padding: 7px 14px;
   font-family: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.15s, border-color 0.15s;
@@ -582,7 +582,7 @@ onMounted(async () => {
   background: transparent;
   color: var(--color-body);
   font-family: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1;
   padding: 7px 15px;
   border-radius: 999px;
@@ -600,7 +600,7 @@ onMounted(async () => {
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.10);
 }
 .tab-count {
-  font-size: 10.5px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--color-accent);
   background: rgba(37, 99, 235, 0.10);
@@ -644,19 +644,19 @@ onMounted(async () => {
   gap: 10px;
 }
 .eyebrow {
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--color-muted);
 }
 .graph-head h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--color-text);
 }
 .count {
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
   border: 1px solid var(--color-line);
   border-radius: 999px;
@@ -666,7 +666,7 @@ onMounted(async () => {
 .gh-note {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -714,7 +714,7 @@ onMounted(async () => {
   justify-content: center;
   gap: 8px;
   color: var(--color-accent);
-  font-size: 13px;
+  font-size: 14.5px;
   pointer-events: none;
 }
 .overlay.static p {
@@ -723,7 +723,7 @@ onMounted(async () => {
   color: var(--color-muted);
   line-height: 1.7;
   margin: 0;
-  font-size: 12.5px;
+  font-size: 14px;
 }
 .pulse-dot {
   width: 8px;
@@ -756,7 +756,7 @@ onMounted(async () => {
 }
 .dh-title {
   flex: 1;
-  font-size: 11px;
+  font-size: 12.5px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--color-muted);
@@ -768,7 +768,7 @@ onMounted(async () => {
   border-radius: 999px;
   padding: 3px 10px;
   font-family: inherit;
-  font-size: 11px;
+  font-size: 12.5px;
   cursor: pointer;
 }
 .dh-clear:hover {

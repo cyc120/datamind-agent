@@ -161,14 +161,14 @@ function onProvenance(event: Event): void {
 }
 .fup-h2 {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--color-text);
 }
 .fup-pick {
   margin-left: auto;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   padding: 6px 14px;
   border-radius: 999px;
   border: 1px solid rgba(37, 99, 235, 0.4);
@@ -194,12 +194,12 @@ function onProvenance(event: Event): void {
   margin-top: 10px;
 }
 .fup-label {
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-muted);
 }
 .fup-select {
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   padding: 5px 8px;
   border-radius: 8px;
   border: 1px solid var(--color-line);
@@ -208,7 +208,7 @@ function onProvenance(event: Event): void {
   max-width: 340px;
 }
 .fup-hint {
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
 }
 .fup-facts {
@@ -219,12 +219,12 @@ function onProvenance(event: Event): void {
   gap: 4px;
 }
 .fup-facts li {
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: var(--color-body);
 }
 .fup-facts code {
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
 }
 .fup-chip {
@@ -237,7 +237,7 @@ function onProvenance(event: Event): void {
 }
 .fup-summary {
   margin: 10px 0 0;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: var(--color-body);
 }

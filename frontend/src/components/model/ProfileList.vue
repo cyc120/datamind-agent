@@ -204,11 +204,11 @@ function headerSummary(profile: ModelProfile): string {
   gap: 8px;
 }
 .mpl-name {
-  font-size: 13.5px;
+  font-size: 15px;
   color: var(--color-text);
 }
 .mpl-pill {
-  font-size: 11px;
+  font-size: 12.5px;
   padding: 2px 8px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -230,7 +230,7 @@ function headerSummary(profile: ModelProfile): string {
 }
 .mpl-model {
   margin: 8px 0 2px;
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-text);
   word-break: break-all;
 }
@@ -239,7 +239,7 @@ function headerSummary(profile: ModelProfile): string {
 }
 .mpl-meta {
   margin: 2px 0 0;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
   word-break: break-all;
 }
@@ -252,7 +252,7 @@ function headerSummary(profile: ModelProfile): string {
 }
 .mpl-btn {
   font: inherit;
-  font-size: 12px;
+  font-size: 13.5px;
   padding: 4px 10px;
   border-radius: 8px;
   border: 1px solid var(--color-line);
@@ -273,7 +273,7 @@ function headerSummary(profile: ModelProfile): string {
   border-color: rgba(225, 29, 72, 0.3);
 }
 .mpl-confirm {
-  font-size: 11.5px;
+  font-size: 13px;
   color: #e11d48;
 }
 </style>

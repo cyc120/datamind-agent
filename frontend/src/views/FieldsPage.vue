@@ -621,18 +621,18 @@ function backToChat(): void {
   min-width: 0;
 }
 .tb-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--color-text);
 }
 .tb-note {
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-muted);
 }
 .tb-action {
   margin-left: auto;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   padding: 6px 12px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -684,29 +684,29 @@ function backToChat(): void {
 }
 .fields-h3 {
   margin: 0;
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--color-text);
 }
 .fields-h4 {
   margin: 0;
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
   color: var(--color-text);
 }
 .fields-h5 {
   margin: 14px 0 6px;
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--color-text);
 }
 .fields-count {
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
 }
 .fields-note {
   margin: 8px 0 10px;
-  font-size: 11px;
+  font-size: 12.5px;
   line-height: 1.7;
   color: var(--color-muted);
 }
@@ -740,14 +740,14 @@ function backToChat(): void {
   background: rgba(37, 99, 235, 0.06);
 }
 .fields-doc-title {
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .fields-doc-meta {
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
 }
 .fields-doc-badges {
@@ -757,12 +757,12 @@ function backToChat(): void {
   margin-top: 2px;
 }
 .fields-doc-note {
-  font-size: 10.5px;
+  font-size: 12.5px;
   line-height: 1.5;
   color: #d97706;
 }
 .fields-badge {
-  font-size: 10.5px;
+  font-size: 12.5px;
   padding: 1px 7px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -804,7 +804,7 @@ function backToChat(): void {
 }
 .fields-meta {
   margin: 5px 0 0;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.6;
   color: var(--color-muted);
   word-break: break-all;
@@ -818,7 +818,7 @@ function backToChat(): void {
   border: 1px solid var(--color-line);
   border-radius: 9px;
   background: var(--color-ink);
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.8;
   color: var(--color-body);
 }
@@ -838,16 +838,16 @@ function backToChat(): void {
 .fields-quality-key {
   flex-shrink: 0;
   width: 72px;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
 }
 .fields-quality-val {
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-text);
 }
 .fields-quality-gap {
   margin: 6px 0 0;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.7;
   color: #d97706;
 }
@@ -855,7 +855,7 @@ function backToChat(): void {
 .fields-quality-unknown,
 .fields-quality-scope {
   margin: 6px 0 0;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: var(--color-muted);
   word-break: break-word;
@@ -863,13 +863,13 @@ function backToChat(): void {
 .fields-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 13.5px;
 }
 .fields-table th {
   text-align: left;
   font-weight: 600;
   color: var(--color-muted);
-  font-size: 11px;
+  font-size: 12.5px;
   padding: 6px 8px;
   border-bottom: 1px solid var(--color-line);
   white-space: nowrap;
@@ -896,7 +896,7 @@ function backToChat(): void {
 }
 .fields-cell-sub {
   display: block;
-  font-size: 10.5px;
+  font-size: 12.5px;
   color: var(--color-muted);
 }
 .is-legacy-cell {
@@ -916,7 +916,7 @@ function backToChat(): void {
   margin-bottom: 10px;
 }
 .fields-detail-id {
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
 }
 .fields-detail-grid {
@@ -933,11 +933,11 @@ function backToChat(): void {
 .fields-k {
   flex-shrink: 0;
   width: 128px;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
 }
 .fields-v {
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-text);
   word-break: break-all;
 }
@@ -962,28 +962,28 @@ function backToChat(): void {
   gap: 8px;
 }
 .fields-ref-role {
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 600;
   color: #2563eb;
 }
 .fields-ref-field {
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
 }
 .fields-ref-value {
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-text);
 }
 .fields-ref-text {
   margin: 5px 0 0;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.7;
   color: var(--color-body);
   white-space: pre-wrap;
 }
 .fields-ref-meta {
   margin: 4px 0 0;
-  font-size: 10.5px;
+  font-size: 12.5px;
   line-height: 1.6;
   color: var(--color-muted);
   word-break: break-all;
@@ -991,7 +991,7 @@ function backToChat(): void {
 .fields-link {
   margin-left: auto;
   font: inherit;
-  font-size: 11.5px;
+  font-size: 13px;
   padding: 3px 10px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -1005,7 +1005,7 @@ function backToChat(): void {
 }
 .fields-hint,
 .fields-empty {
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.75;
   color: var(--color-muted);
 }
@@ -1017,7 +1017,7 @@ function backToChat(): void {
   max-width: 560px;
 }
 .fields-error {
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.75;
   color: #e11d48;
   padding: 10px 0;
@@ -1028,7 +1028,7 @@ function backToChat(): void {
   border: 1px solid rgba(217, 119, 6, 0.35);
   border-radius: 9px;
   background: rgba(217, 119, 6, 0.08);
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.7;
   color: #d97706;
 }

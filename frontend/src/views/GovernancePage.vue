@@ -205,14 +205,14 @@ function backToChat(): void {
 }
 .gov-title {
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--color-text);
 }
 .gov-note {
   margin: 5px 0 0;
   max-width: 1000px;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.7;
   color: var(--color-muted);
 }
@@ -241,7 +241,7 @@ function backToChat(): void {
   background: transparent;
   color: var(--color-body);
   font-family: inherit;
-  font-size: 13px;
+  font-size: 14.5px;
   cursor: pointer;
   transition: color 0.15s, background 0.15s, border-color 0.15s;
 }
@@ -262,7 +262,7 @@ function backToChat(): void {
 .gov-tab-ico {
   width: 16px;
   text-align: center;
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--color-muted);
 }
 .gov-tab.is-active .gov-tab-ico {

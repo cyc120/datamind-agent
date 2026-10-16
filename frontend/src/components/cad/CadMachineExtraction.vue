@@ -147,7 +147,7 @@ function outcome(featureId: string): { kind: 'eligible' | 'excluded' | 'absent';
 }
 .cad-sec-title {
   margin: 0 0 8px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--color-text);
   display: flex;
@@ -155,7 +155,7 @@ function outcome(featureId: string): { kind: 'eligible' | 'excluded' | 'absent';
   gap: 10px;
 }
 .cad-sec-tag {
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--color-muted);
   border: 1px solid var(--color-line);
@@ -164,7 +164,7 @@ function outcome(featureId: string): { kind: 'eligible' | 'excluded' | 'absent';
 }
 .cad-hint {
   margin: 0 0 8px;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.75;
   color: var(--color-muted);
 }
@@ -173,7 +173,7 @@ function outcome(featureId: string): { kind: 'eligible' | 'excluded' | 'absent';
 }
 .cad-hint code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11.5px;
+  font-size: 13px;
   background: var(--color-ink);
   border-radius: 5px;
   padding: 1px 5px;
@@ -186,7 +186,7 @@ function outcome(featureId: string): { kind: 'eligible' | 'excluded' | 'absent';
 .cad-table {
   border-collapse: collapse;
   width: 100%;
-  font-size: 12.5px;
+  font-size: 14px;
   min-width: 1180px;
 }
 .cad-table th,
@@ -226,7 +226,7 @@ function outcome(featureId: string): { kind: 'eligible' | 'excluded' | 'absent';
 .cad-fid {
   display: block;
   margin-top: 3px;
-  font-size: 10.5px;
+  font-size: 12.5px;
   color: var(--color-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
@@ -238,7 +238,7 @@ function outcome(featureId: string): { kind: 'eligible' | 'excluded' | 'absent';
 }
 .cad-code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11.5px;
+  font-size: 13px;
   background: rgba(15, 23, 42, 0.06);
   border-radius: 5px;
   padding: 1px 5px;
@@ -255,13 +255,13 @@ function outcome(featureId: string): { kind: 'eligible' | 'excluded' | 'absent';
 .cad-gate-why {
   display: block;
   margin-top: 3px;
-  font-size: 11px;
+  font-size: 12.5px;
   line-height: 1.6;
   color: var(--color-muted);
 }
 .cad-pill {
   display: inline-block;
-  font-size: 11px;
+  font-size: 12.5px;
   padding: 2px 7px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -282,7 +282,7 @@ function outcome(featureId: string): { kind: 'eligible' | 'excluded' | 'absent';
 }
 .cad-pick {
   font: inherit;
-  font-size: 11.5px;
+  font-size: 13px;
   padding: 5px 10px;
   border-radius: 999px;
   border: 1px solid var(--color-line);

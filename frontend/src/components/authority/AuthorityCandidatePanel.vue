@@ -141,14 +141,14 @@ const scopeFields: Array<{ key: keyof AuthorityCandidate['context']['scope']; la
   margin-bottom: 10px;
 }
 .acp-id {
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-text);
   word-break: break-all;
 }
 .acp-badge {
   margin-left: auto;
   flex-shrink: 0;
-  font-size: 11.5px;
+  font-size: 13px;
   padding: 3px 8px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -184,7 +184,7 @@ const scopeFields: Array<{ key: keyof AuthorityCandidate['context']['scope']; la
 }
 .acp-side-title {
   margin: 0 0 6px;
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--color-muted);
 }
@@ -201,22 +201,22 @@ const scopeFields: Array<{ key: keyof AuthorityCandidate['context']['scope']; la
   color: var(--color-text);
 }
 .acp-number.is-missing {
-  font-size: 13px;
+  font-size: 14.5px;
   color: #e11d48;
 }
 .acp-unit {
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-body);
 }
 .acp-gap {
   align-self: center;
   flex-shrink: 0;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
 }
 .acp-note {
   margin: 10px 0 0;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
 }
 .acp-meta {
@@ -233,25 +233,25 @@ const scopeFields: Array<{ key: keyof AuthorityCandidate['context']['scope']; la
 }
 .acp-meta-row dt {
   flex-shrink: 0;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
 }
 .acp-meta-row dd {
   margin: 0;
   min-width: 0;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-body);
   word-break: break-all;
 }
 .acp-blocked {
   margin: 12px 0 0;
-  font-size: 12.5px;
+  font-size: 14px;
   color: #d97706;
 }
 .acp-pick {
   margin-top: 12px;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   padding: 7px 14px;
   border-radius: 999px;
   border: 1px solid var(--color-line);

@@ -1633,7 +1633,7 @@ defineExpose({
 }
 
 .wg-vzoom {
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -1644,7 +1644,7 @@ defineExpose({
   border-radius: 6px;
   background: var(--color-panel);
   color: var(--color-text);
-  font-size: 11.5px;
+  font-size: 13px;
   font-family: inherit;
   text-decoration: none;
   cursor: pointer;
@@ -1680,14 +1680,14 @@ defineExpose({
 
 .wg-overlay-title {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
 }
 
 .wg-overlay-note {
   margin: 0;
   max-width: 62ch;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.65;
   color: var(--color-body);
 }
@@ -1718,13 +1718,13 @@ defineExpose({
   align-items: baseline;
   gap: 8px;
   margin: 0;
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
 }
 
 .wg-card-note {
   margin: 0;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.6;
   color: var(--color-body);
 }
@@ -1736,13 +1736,13 @@ defineExpose({
 
 .wg-sub-title {
   margin: 6px 0 0;
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 600;
 }
 
 .wg-sel-title {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
 }
 
@@ -1787,17 +1787,17 @@ defineExpose({
 }
 
 .wg-catalog-title {
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
 }
 
 .wg-catalog-meta {
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-body);
 }
 
 .wg-catalog-marks {
-  font-size: 11px;
+  font-size: 12.5px;
   color: #b45309;
 }
 
@@ -1806,7 +1806,7 @@ defineExpose({
   grid-template-columns: max-content 1fr;
   gap: 2px 10px;
   margin: 0;
-  font-size: 11.5px;
+  font-size: 13px;
 }
 
 .wg-kv dt {
@@ -1843,20 +1843,20 @@ defineExpose({
 
 .wg-relation-head {
   margin: 0;
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 600;
 }
 
 .wg-relation-dir {
   display: block;
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 400;
   color: var(--color-body);
 }
 
 .wg-relation-note {
   margin: 2px 0 0;
-  font-size: 11px;
+  font-size: 12.5px;
   line-height: 1.55;
   color: var(--color-muted);
   word-break: break-word;
@@ -1868,7 +1868,7 @@ defineExpose({
   border: 0;
   background: none;
   color: var(--color-accent);
-  font-size: 11px;
+  font-size: 12.5px;
   font-family: inherit;
   text-decoration: underline;
   cursor: pointer;
@@ -1882,7 +1882,7 @@ defineExpose({
 .wg-warn-list {
   margin: 0;
   padding-left: 16px;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.6;
   color: #b45309;
 }
@@ -1890,7 +1890,7 @@ defineExpose({
 .wg-legend-notes {
   margin: 0;
   padding-left: 16px;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.65;
   color: var(--color-body);
 }

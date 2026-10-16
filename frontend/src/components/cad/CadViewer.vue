@@ -70,7 +70,7 @@ const previewHref = computed(() => drawingPreviewUrl(props.documentId, props.ver
 }
 .cad-sec-title {
   margin: 0 0 8px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--color-text);
   display: flex;
@@ -78,7 +78,7 @@ const previewHref = computed(() => drawingPreviewUrl(props.documentId, props.ver
   gap: 10px;
 }
 .cad-sec-tag {
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--color-muted);
   border: 1px solid var(--color-line);
@@ -87,14 +87,14 @@ const previewHref = computed(() => drawingPreviewUrl(props.documentId, props.ver
 }
 .cad-hint {
   margin: 0 0 8px;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.7;
   color: var(--color-muted);
 }
 .cad-hint code,
 .cad-links code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11.5px;
+  font-size: 13px;
   background: var(--color-ink);
   border-radius: 5px;
   padding: 1px 5px;
@@ -118,7 +118,7 @@ const previewHref = computed(() => drawingPreviewUrl(props.documentId, props.ver
   gap: 14px;
   align-items: baseline;
   margin: 0;
-  font-size: 12.5px;
+  font-size: 14px;
 }
 .cad-links a {
   color: var(--color-accent);
@@ -126,7 +126,7 @@ const previewHref = computed(() => drawingPreviewUrl(props.documentId, props.ver
   border-bottom: 1px dashed rgba(37, 99, 235, 0.5);
 }
 .cad-links-note {
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
 }
 </style>

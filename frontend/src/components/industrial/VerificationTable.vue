@@ -272,17 +272,17 @@ const ruleLine = computed(() => {
 }
 .v-title {
   margin: 0;
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
   color: var(--color-text);
 }
 .v-count {
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
 }
 .v-chip {
   margin-left: auto;
-  font-size: 10.5px;
+  font-size: 12.5px;
   color: var(--color-body);
   background: var(--color-ink);
   border: 1px solid var(--color-line);
@@ -295,7 +295,7 @@ const ruleLine = computed(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 8px;
-  font-size: 10.5px;
+  font-size: 12.5px;
   line-height: 1.6;
   color: var(--color-muted);
 }
@@ -328,13 +328,13 @@ const ruleLine = computed(() => {
   border-radius: 8px;
   padding: 4px 9px;
   font-family: inherit;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-body);
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
 .v-stat b {
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--color-text);
 }
 .v-stat:hover:not(:disabled) {
@@ -364,7 +364,7 @@ const ruleLine = computed(() => {
   background: none;
   padding: 0;
   font-family: inherit;
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-accent);
   cursor: pointer;
 }
@@ -384,7 +384,7 @@ const ruleLine = computed(() => {
   min-width: 660px;
   table-layout: fixed;
   border-collapse: collapse;
-  font-size: 11.5px;
+  font-size: 13px;
 }
 .v-table th {
   text-align: left;
@@ -440,10 +440,10 @@ const ruleLine = computed(() => {
 }
 .mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10.5px;
+  font-size: 12.5px;
 }
 .c-rev {
-  font-size: 10.5px;
+  font-size: 12.5px;
   color: var(--color-body);
 }
 /* 版本号 / 值 / 单位都是不可拆的整体。
@@ -469,7 +469,7 @@ const ruleLine = computed(() => {
 .v-table td.c-val i {
   margin-left: 4px;
   font-style: normal;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--color-muted);
 }
 .c-na {
@@ -478,7 +478,7 @@ const ruleLine = computed(() => {
 }
 .tag {
   display: inline-block;
-  font-size: 10.5px;
+  font-size: 12.5px;
   line-height: 1.6;
   border-radius: 4px;
   padding: 0 4px;
@@ -512,7 +512,7 @@ const ruleLine = computed(() => {
 }
 .issue-kind {
   display: inline-block;
-  font-size: 10px;
+  font-size: 12px;
   border-radius: 4px;
   padding: 0 4px;
   color: var(--color-body);
@@ -528,7 +528,7 @@ const ruleLine = computed(() => {
 }
 .issue-pair {
   display: block;
-  font-size: 10.5px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--color-text);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -561,12 +561,12 @@ const ruleLine = computed(() => {
 .v-empty {
   margin: 0;
   padding: 10px;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
 }
 .v-legend {
   margin: 8px 0 0;
-  font-size: 10.5px;
+  font-size: 12.5px;
   line-height: 1.6;
   color: var(--color-muted);
 }

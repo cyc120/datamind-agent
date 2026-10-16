@@ -166,40 +166,40 @@ function testFailure(): string {
 }
 .mpp-title {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--color-text);
 }
 .mpp-h3 {
   margin: 12px 0 0;
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--color-text);
 }
 .mpp-stamp {
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--color-muted);
   font-variant-numeric: tabular-nums;
 }
 .mpp-hint {
   margin: 6px 0 0;
-  font-size: 11px;
+  font-size: 12.5px;
   line-height: 1.65;
   color: var(--color-muted);
 }
 .mpp-state {
   margin: 8px 0 0;
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-muted);
 }
 .mpp-bad {
   margin: 8px 0 0;
-  font-size: 12px;
+  font-size: 13.5px;
   color: #e11d48;
   line-height: 1.6;
 }
 .mpp-target {
   margin: 8px 0 0;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
 }
 .mpp-box {
@@ -217,12 +217,12 @@ function testFailure(): string {
   background: rgba(225, 29, 72, 0.05);
 }
 .mpp-box strong {
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-text);
 }
 .mpp-line {
   margin: 6px 0 0;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.65;
   color: var(--color-body);
   word-break: break-word;
@@ -242,7 +242,7 @@ function testFailure(): string {
 }
 .mpp-chip {
   font: inherit;
-  font-size: 11.5px;
+  font-size: 13px;
   padding: 3px 9px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -259,7 +259,7 @@ function testFailure(): string {
   color: var(--color-accent);
 }
 code {
-  font-size: 11.5px;
+  font-size: 13px;
   padding: 1px 5px;
   border-radius: 5px;
   background: var(--color-ink);

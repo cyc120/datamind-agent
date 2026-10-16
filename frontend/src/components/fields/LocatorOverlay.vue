@@ -234,12 +234,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   margin-bottom: 10px;
 }
 .fo-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--color-text);
 }
 .fo-page {
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-muted);
 }
 .fo-page.is-bad {
@@ -248,7 +248,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .fo-close {
   margin-left: auto;
   font: inherit;
-  font-size: 12px;
+  font-size: 13.5px;
   padding: 5px 12px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -266,7 +266,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   flex-wrap: wrap;
   gap: 8px;
   margin: 0 0 10px;
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-body);
 }
 .fo-focus-role {
@@ -279,7 +279,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   color: var(--color-text);
 }
 .fo-ok {
-  font-size: 11.5px;
+  font-size: 13px;
   color: #16a34a;
   border: 1px solid rgba(22, 163, 74, 0.35);
   background: rgba(22, 163, 74, 0.08);
@@ -287,7 +287,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   padding: 2px 8px;
 }
 .fo-bad {
-  font-size: 11.5px;
+  font-size: 13px;
   color: #d97706;
   border: 1px solid rgba(217, 119, 6, 0.35);
   background: rgba(217, 119, 6, 0.08);
@@ -322,7 +322,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .fo-error {
   margin: 0;
   padding: 14px 12px;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.7;
 }
 .fo-empty {
@@ -345,7 +345,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   display: flex;
   align-items: baseline;
   gap: 8px;
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-body);
 }
 .fo-swatch {
@@ -359,7 +359,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 }
 .fo-legend-focus {
   margin-left: auto;
-  font-size: 10.5px;
+  font-size: 12.5px;
   color: var(--color-muted);
   border: 1px solid var(--color-line);
   border-radius: 999px;
@@ -376,7 +376,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 }
 .fo-note {
   margin: 12px 0 0;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: var(--color-muted);
 }

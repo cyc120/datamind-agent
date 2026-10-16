@@ -308,12 +308,12 @@ const approval = computed(() => props.detail?.approval ?? null)
 .fud-k {
   flex-shrink: 0;
   width: 132px;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 .fud-v {
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-text);
   word-break: break-all;
   line-height: 1.7;
@@ -327,7 +327,7 @@ const approval = computed(() => props.detail?.approval ?? null)
   border-top: 1px solid var(--color-line);
 }
 .fud-bt {
-  font-size: 11.5px;
+  font-size: 13px;
   letter-spacing: 0.04em;
   color: var(--color-muted);
   margin-bottom: 6px;
@@ -341,7 +341,7 @@ const approval = computed(() => props.detail?.approval ?? null)
 }
 .fud-k2 {
   flex-shrink: 0;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
 }
 .fud-chips {
@@ -350,7 +350,7 @@ const approval = computed(() => props.detail?.approval ?? null)
   gap: 4px;
 }
 .fud-chip {
-  font-size: 11px;
+  font-size: 12.5px;
   padding: 1px 6px;
   border-radius: 6px;
   border: 1px solid var(--color-line);
@@ -364,22 +364,22 @@ const approval = computed(() => props.detail?.approval ?? null)
 }
 .fud-note {
   margin: 8px 0 0;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: var(--color-muted);
 }
 .fud-link {
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-accent);
 }
 .fud-hint {
   margin: 0;
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-muted);
 }
 .fud-error {
   margin: 0;
-  font-size: 12px;
+  font-size: 13.5px;
   color: #e11d48;
   word-break: break-all;
 }

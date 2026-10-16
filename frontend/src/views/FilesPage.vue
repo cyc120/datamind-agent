@@ -683,18 +683,18 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 .files-tb-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--color-text);
 }
 .files-tb-note {
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-muted);
 }
 .files-tb-action {
   margin-left: auto;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
   padding: 6px 12px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
@@ -725,19 +725,19 @@ onBeforeUnmount(() => {
 }
 .files-h2 {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--color-text);
 }
 .files-count {
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--color-body);
 }
 .files-count-note,
 .files-gate-note,
 .files-retry {
   margin: 4px 0 0;
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: var(--color-muted);
 }
@@ -746,7 +746,7 @@ onBeforeUnmount(() => {
 }
 .files-worker {
   margin: 10px 0 0;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.7;
   padding: 8px 10px;
   border-radius: 10px;
@@ -767,13 +767,13 @@ onBeforeUnmount(() => {
   margin-top: 12px;
 }
 .files-fl {
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--color-muted);
 }
 .files-fs,
 .files-fi {
   font: inherit;
-  font-size: 12px;
+  font-size: 13.5px;
   padding: 5px 8px;
   border-radius: 8px;
   border: 1px solid var(--color-line);
@@ -791,7 +791,7 @@ onBeforeUnmount(() => {
 }
 .files-apply {
   font: inherit;
-  font-size: 12px;
+  font-size: 13.5px;
   padding: 5px 12px;
   border-radius: 999px;
   border: 1px solid rgba(37, 99, 235, 0.4);
@@ -813,7 +813,7 @@ onBeforeUnmount(() => {
 }
 .files-hint,
 .files-empty {
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-muted);
   line-height: 1.7;
 }
@@ -821,7 +821,7 @@ onBeforeUnmount(() => {
   padding: 24px 0;
 }
 .files-error {
-  font-size: 12.5px;
+  font-size: 14px;
   color: #e11d48;
   padding: 10px 0;
   word-break: break-all;
