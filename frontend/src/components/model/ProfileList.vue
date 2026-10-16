@@ -268,10 +268,7 @@ function headerSummary(profile: ModelProfile): string {
   opacity: 0.6;
   cursor: default;
 }
-.mpl-btn.is-danger {
-  color: #e11d48;
-  border-color: rgba(225, 29, 72, 0.3);
-}
+.mpl-btn.is-danger { color: #ffffff; font-weight: 600; border-color: transparent; background: #e11d48; }
 .mpl-confirm {
   font-size: 13px;
   color: #e11d48;

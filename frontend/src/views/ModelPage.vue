@@ -987,10 +987,7 @@ onMounted(async () => {
   background: rgba(37, 99, 235, 0.08);
   color: var(--color-accent);
 }
-.mp-btn.is-danger {
-  color: #e11d48;
-  border-color: rgba(225, 29, 72, 0.3);
-}
+.mp-btn.is-danger { color: #ffffff; font-weight: 600; border-color: transparent; background: #e11d48; }
 .mp-file {
   display: block;
   margin-top: 8px;
