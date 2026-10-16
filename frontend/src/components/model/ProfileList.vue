@@ -216,12 +216,12 @@ function headerSummary(profile: ModelProfile): string {
   white-space: nowrap;
 }
 .mpl-pill.tone-ok {
-  color: #ffffff;
+  color: #ffffff; font-weight: 600;
   border-color: transparent;
   background: var(--color-accent);
 }
 .mpl-pill.tone-on {
-  color: #ffffff;
+  color: #ffffff; font-weight: 600;
   border-color: transparent;
   background: var(--color-accent);
 }

@@ -154,7 +154,7 @@ const scopeFields: Array<{ key: keyof AuthorityCandidate['context']['scope']; la
   border: 1px solid var(--color-line);
 }
 .acp-badge.is-eligible {
-  color: #ffffff;
+  color: #ffffff; font-weight: 600;
   border-color: transparent;
   background: var(--color-accent);
 }

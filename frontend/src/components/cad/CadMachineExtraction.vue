@@ -268,7 +268,7 @@ function outcome(featureId: string): { kind: 'eligible' | 'excluded' | 'absent';
   margin-bottom: 3px;
 }
 .cad-pill.cad-is-ok {
-  color: #ffffff;
+  color: #ffffff; font-weight: 600;
   border-color: transparent;
   background: var(--color-accent);
 }

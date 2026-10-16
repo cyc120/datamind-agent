@@ -369,16 +369,16 @@ function act(rule: AuthorityRule, decision: ApprovalDecision): void {
   background: rgba(217, 119, 6, 0.08);
 }
 .art-state.is-approved {
-  color: #ffffff;
+  color: #ffffff; font-weight: 600;
   border-color: transparent;
   background: var(--color-accent);
 }
 .art-state.is-rejected,
 .art-state.is-revoked,
 .art-state.is-unknown {
-  color: #e11d48;
-  border-color: rgba(225, 29, 72, 0.35);
-  background: rgba(225, 29, 72, 0.06);
+  color: #ffffff; font-weight: 600;
+  border-color: transparent;
+  background: #e11d48;
 }
 .art-payload.is-ok {
   color: #16a34a;

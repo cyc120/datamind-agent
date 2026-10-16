@@ -594,7 +594,7 @@ function whenText(iso?: string | null): string {
   border: 1px solid var(--color-line);
 }
 .fp-badge.tone-ok {
-  color: #ffffff;
+  color: #ffffff; font-weight: 600;
   border-color: transparent;
   background: var(--color-accent);
 }
@@ -604,9 +604,9 @@ function whenText(iso?: string | null): string {
   background: rgba(217, 119, 6, 0.08);
 }
 .fp-badge.tone-bad {
-  color: #e11d48;
-  border-color: rgba(225, 29, 72, 0.35);
-  background: rgba(225, 29, 72, 0.08);
+  color: #ffffff; font-weight: 600;
+  border-color: transparent;
+  background: #e11d48;
 }
 .fp-badge.tone-muted {
   color: var(--color-muted);

@@ -99,7 +99,7 @@ defineProps<{
   border: 1px solid var(--color-line);
 }
 .cad-gate-status.cad-is-ready {
-  color: #ffffff;
+  color: #ffffff; font-weight: 600;
   border-color: transparent;
   background: var(--color-accent);
 }

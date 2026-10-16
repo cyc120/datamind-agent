@@ -821,8 +821,8 @@ onMounted(async () => {
   color: var(--color-body);
 }
 .mp-notice.tone-ok {
-  border-color: transparent;
-  background: var(--color-accent);
+  border-color: rgba(22, 163, 74, 0.35);
+  background: rgba(22, 163, 74, 0.06);
 }
 .mp-notice.tone-bad {
   border-color: rgba(225, 29, 72, 0.3);
@@ -872,7 +872,7 @@ onMounted(async () => {
   color: var(--color-muted);
 }
 .mp-chip.tone-ok {
-  color: #ffffff;
+  color: #ffffff; font-weight: 600;
   border-color: transparent;
   background: var(--color-accent);
 }

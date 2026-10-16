@@ -209,8 +209,8 @@ function testFailure(): string {
   border: 1px solid var(--color-line);
 }
 .mpp-box.is-ok {
-  border-color: transparent;
-  background: var(--color-accent);
+  border-color: rgba(22, 163, 74, 0.35);
+  background: rgba(22, 163, 74, 0.06);
 }
 .mpp-box.is-bad {
   border-color: rgba(225, 29, 72, 0.3);

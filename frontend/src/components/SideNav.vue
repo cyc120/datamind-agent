@@ -1200,9 +1200,9 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 .sess-confirm-yes {
-  border-color: rgba(225, 29, 72, 0.35);
-  background: rgba(225, 29, 72, 0.08);
-  color: #e11d48;
+  border-color: transparent;
+  background: #e11d48;
+  color: #ffffff; font-weight: 600;
 }
 .sess-confirm-yes:disabled {
   cursor: not-allowed;

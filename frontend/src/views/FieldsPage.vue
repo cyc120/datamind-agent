@@ -769,7 +769,7 @@ function backToChat(): void {
   white-space: nowrap;
 }
 .fields-badge.is-ok {
-  color: #ffffff;
+  color: #ffffff; font-weight: 600;
   border-color: transparent;
   background: var(--color-accent);
 }
@@ -782,7 +782,7 @@ function backToChat(): void {
   color: var(--color-muted);
 }
 .fields-badge.tone-ok {
-  color: #ffffff;
+  color: #ffffff; font-weight: 600;
   border-color: transparent;
   background: var(--color-accent);
 }
@@ -792,9 +792,9 @@ function backToChat(): void {
   background: rgba(217, 119, 6, 0.08);
 }
 .fields-badge.tone-bad {
-  color: #e11d48;
-  border-color: rgba(225, 29, 72, 0.35);
-  background: rgba(225, 29, 72, 0.08);
+  color: #ffffff; font-weight: 600;
+  border-color: transparent;
+  background: #e11d48;
 }
 .fields-badge.tone-muted {
   color: var(--color-muted);
