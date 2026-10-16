@@ -558,38 +558,63 @@ onMounted(async () => {
             <p v-if="configLoading" class="mp-hint">正在读取…</p>
             <p v-else-if="configError" class="mp-bad" data-testid="model-active-error">{{ configError }}</p>
             <template v-else-if="config">
-              <p class="mp-line" data-testid="model-active-summary">
-                {{ config.name || '未命名配置' }} ·
-                {{ protocolLabel(config.protocol, protocols) }} ·
-                模型 {{ config.model || '(未填模型)' }} ·
-                地址 {{ config.base_url || '(未填)' }}
-              </p>
-              <p class="mp-line" data-testid="model-active-key">
-                密钥：{{ config.has_key ? `已填写 ${config.key_masked || ''}` : '未填写' }}{{ config.has_key ? ' —— ' : '。' }}{{ HAS_KEY_NOTE }}
-              </p>
-              <p class="mp-line">
-                配置来源：{{ sourceText(config.source) }}
-                <span v-if="config.updated_at"> · 更新于 {{ stamp(config.updated_at) }}</span>
-              </p>
-              <p v-if="config.environment_fallback" class="mp-warn" data-testid="model-env-fallback">
-                {{ ENV_FALLBACK_NOTE }}
-              </p>
-              <p v-if="config.has_proxy" class="mp-line mp-hint">
-                代理：{{ config.proxy || '(地址不下发或为空)' }}
-                {{ config.proxy_has_credentials ? ' · 地址里带账号口令（凭据不下发）' : '' }}
-              </p>
-              <p v-if="(config.header_keys || []).length" class="mp-line mp-hint">
-                敏感请求头：{{ (config.header_keys || []).join('、') }}（只回显键名，值不下发）
-              </p>
+              <!-- 按条列出：每条前面一个蓝点。事实与「这句话的边界在哪」分开成两条，
+                   免得读成一整段。 -->
+              <ul class="mp-facts">
+                <li data-testid="model-active-summary">
+                  <b>接入</b>
+                  {{ config.name || '未命名配置' }} · {{ protocolLabel(config.protocol, protocols) }}
+                </li>
+                <li>
+                  <b>模型</b>{{ config.model || '(未填模型)' }}
+                </li>
+                <li>
+                  <b>地址</b>{{ config.base_url || '(未填)' }}
+                </li>
+
+                <li data-testid="model-active-key">
+                  <b>密钥</b>{{ config.has_key ? `已填写 ${config.key_masked || ''}` : '未填写' }}
+                </li>
+                <!-- has_key 的边界单独成条：它是最容易被误读的一处 -->
+                <li v-if="config.has_key" class="is-hint">
+                  「已填写」只表示密钥字段填过值，<b>不代表密钥有效</b>，也不代表模型可用。
+                </li>
+                <li v-if="config.has_key" class="is-hint">
+                  唯一能证明模型真的能应答的是「测试连接」的成功结果。
+                </li>
+
+                <li>
+                  <b>配置来源</b>{{ sourceText(config.source) }}
+                </li>
+                <li v-if="config.updated_at" class="is-hint">
+                  <b>更新于</b>{{ stamp(config.updated_at) }}
+                </li>
+
+                <li v-if="config.environment_fallback" class="is-warn" data-testid="model-env-fallback">
+                  {{ ENV_FALLBACK_NOTE }}
+                </li>
+                <li v-if="config.has_proxy">
+                  <b>代理</b>{{ config.proxy || '(地址不下发或为空)' }}
+                  <span v-if="config.proxy_has_credentials"> · 地址里带账号口令（凭据不下发）</span>
+                </li>
+                <li v-if="(config.header_keys || []).length" class="is-hint">
+                  <b>敏感请求头</b>{{ (config.header_keys || []).join('、') }}（只回显键名，值不下发）
+                </li>
+              </ul>
             </template>
             <p v-else class="mp-hint" data-testid="model-active-empty">没有读到当前启用配置。</p>
 
-            <p class="mp-line mp-hint" data-testid="model-clear-note">
-              这是单配置兼容面（DELETE /v1/model/config）的动作：只清空<strong>当前启用</strong>那条配置的
-              api_key 字段，配置条目与端点/模型都保留，其他配置不受影响。右侧的配置编辑表单里
-              <strong>刻意没有</strong>「清空密钥」入口——__clear__ 只对敏感请求头与代理有效，
-              把它当 api_key 提交会把字面量存成密钥。
-            </p>
+            <ul class="mp-facts is-subtle" data-testid="model-clear-note">
+              <li>
+                这是单配置兼容面（<code>DELETE /v1/model/config</code>）的动作：
+                <b>只清空「当前启用」那条配置的 api_key 字段</b>。
+              </li>
+              <li class="is-hint">配置条目、端点与模型都保留；其他配置不受影响，这也不是删除配置。</li>
+              <li class="is-hint">
+                右侧配置编辑表单里<b>刻意没有</b>「清空密钥」入口：<code>__clear__</code>
+                只对敏感请求头与代理有效，把它当 api_key 提交会把字面量存成密钥。
+              </li>
+            </ul>
 
             <div class="mp-actions">
               <template v-if="!confirmClear">
@@ -851,6 +876,51 @@ onMounted(async () => {
   border-color: rgba(22, 163, 74, 0.35);
   background: rgba(22, 163, 74, 0.08);
 }
+/* 按条列出：「当前启用配置」用它替代原来揉成一整段的 mp-line。
+   每条前面一个蓝点（--color-accent = #2563eb），事实与说明用 .is-hint 区分层级。 */
+.mp-facts {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.mp-facts > li {
+  position: relative;
+  padding-left: 15px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--color-body);
+  word-break: break-word;
+}
+.mp-facts > li::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 0.62em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+.mp-facts > li.is-hint {
+  font-size: 11.5px;
+  color: var(--color-muted);
+}
+.mp-facts > li.is-hint::before { background: rgba(37, 99, 235, 0.4); }
+.mp-facts > li.is-warn { color: #d97706; }
+.mp-facts > li.is-warn::before { background: #d97706; }
+.mp-facts > li b { color: var(--color-text); font-weight: 600; margin-right: 6px; }
+.mp-facts > li code {
+  font-size: 11px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--color-ink);
+  border: 1px solid var(--color-line);
+}
+.mp-facts.is-subtle { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--color-line); }
+
 .mp-line {
   margin: 6px 0 0;
   font-size: 12.5px;
