@@ -1041,9 +1041,11 @@ onMounted(async () => {
   outline: none;
   border-color: var(--color-accent);
 }
+/* 单栏：左栏「已保存的配置」已提到工具条之上，这里只剩编辑器 + 探活面板。
+   原来两列模板的第一列是 380px —— 只剩一个子元素时它会被挤在那一列里、右侧全空。 */
 .mp-grid {
   display: grid;
-  grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
