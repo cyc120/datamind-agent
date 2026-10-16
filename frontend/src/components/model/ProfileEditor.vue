@@ -675,19 +675,22 @@ defineExpose({ load, applyModel, focusModel, buildPayload })
   gap: 6px;
   margin: 10px 0 4px;
 }
+/* 预设胶囊：做成与「启用中」同款的蓝底白字加粗椭圆（用户要求）。
+   原来是白底灰字细描边，和整页的蓝色语言不统一。 */
 .mpe-preset {
   font: inherit;
   font-size: 13px;
-  padding: 3px 9px;
+  font-weight: 600;
+  padding: 3px 10px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
-  background: var(--color-ink);
-  color: var(--color-body);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
 }
 .mpe-preset:hover {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 /* 一行一个字段：原来两列并排（配置名称｜协议、鉴权方式｜max_tokens）看着乱，
    用户要求改成逐行。 */
