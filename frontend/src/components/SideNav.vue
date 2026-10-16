@@ -130,7 +130,7 @@ interface NavItem {
   /** 站内路由：问数与问答就是本页 */
   to?: string
   /**
-   * 站内**动作**而不是路由。目前只有 `'history'`：它和「问数与问答」是同一个路由
+   * 站内**动作**而不是路由（当前没有条目使用，保留类型以备将来）。
    * （/app），若也给一个 `to`，两个条目会同时高亮，看着像有两个页面。
    */
   action?: 'history'
@@ -147,9 +147,6 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
     title: '工作台',
     items: [
       { key: 'chat', label: '问数与问答', icon: '◎', to: '/app' },
-      // 侧栏那块历史区是**常驻列表**（主流 AI 应用也是这样，历史不该藏在按钮后面），
-      // 这个入口解决的是「一眼扫导航却找不到历史」：点它=回到工作台 + 展开历史 + 聚焦搜索。
-      { key: 'history', label: '历史对话', icon: '☰', action: 'history' },
       { key: 'runs', label: '运行记录', icon: '↺', to: '/runs' },
       { key: 'model', label: '模型接入', icon: '⚙', to: '/model' },
       /**
@@ -227,21 +224,6 @@ async function toggleMenu(id: string) {
     const item = popup.getBoundingClientRect()
     menuUp.value = item.bottom > box.bottom && row.getBoundingClientRect().top - item.height >= box.top
   }
-}
-
-/**
- * 导航里的「历史对话」按钮。
- *
- * 已经在工作台就地展开并把焦点放进搜索框（不跳转、不刷新，省一次往返）；
- * 不在工作台则跳到 `?panel=history`，由 MainPage 统一处理展开与聚焦——同一条路径，
- * 不在这里重复一遍「展开 + 聚焦」的逻辑。
- */
-function openHistory() {
-  if (route.path === '/app') {
-    revealHistory()
-    return
-  }
-  void router.push({ path: '/app', query: { panel: 'history' } })
 }
 
 async function startRename(id: string, title: string) {
@@ -579,14 +561,6 @@ onBeforeUnmount(() => {
             <span class="ico" aria-hidden="true">{{ it.icon }}</span>
             <span class="txt">{{ it.label }}</span>
           </RouterLink>
-          <!-- 动作型入口：「历史对话」回到工作台并展开历史区，见 openHistory()。
-               它不做高亮 —— active 归「问数与问答」，同一路由不该亮两个。 -->
-          <button v-else-if="it.action === 'history'" class="nav-item" type="button"
-                  :title="it.label" :data-nav="it.key" data-testid="nav-history"
-                  @click="openHistory">
-            <span class="ico" aria-hidden="true">{{ it.icon }}</span>
-            <span class="txt">{{ it.label }}</span>
-          </button>
           <span v-else class="nav-item is-legacy" :title="`${it.label}：新前端尚未迁移（旧版入口）`"
                 :data-nav="it.key" data-testid="nav-legacy">
             <span class="ico" aria-hidden="true">{{ it.icon }}</span>

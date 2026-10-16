@@ -738,20 +738,23 @@ class ConversationHistoryTests(unittest.TestCase):
                 self.assertNotIn(forbidden, strip_comments(self.landing),
                                  f'落地页不得出现 {forbidden}：那是私有会话数据')
 
-    def test_the_nav_has_a_real_history_button(self):
-        """导航里的「历史对话」是**动作型**入口，不是路由。
+    def test_the_nav_has_no_separate_history_entry(self):
+        """导航里**不再**有独立的「历史对话」入口。
 
-        它与「问数与问答」同为 `/app`：若也给一个 `to`，两个条目会同时高亮，
-        看着像有两个页面。所以它只做「回到工作台 + 展开历史 + 聚焦搜索」。
+        会话列表本身就是侧栏里的常驻区块（标题「历史对话」+ 搜索 + 行菜单），
+        再放一个「跳到它」的导航按钮是重复的——导航里那一格与「问数与问答」同路由，
+        既不路由也不高亮，价值只有一个跳转，用户明确要求去掉。
+
+        保留的是：常驻列表本体、它的折叠开关（history-toggle）、以及**落地页**那个
+        跳转按钮（`landing-history`，另一条通道，见下一条测试）。
         """
         items = re.findall(r"\{[^{}]*key:\s*'history'[^{}]*\}", strip_comments(self.side_nav))
-        self.assertTrue(items, '侧栏导航里缺少「历史对话」入口')
-        self.assertIn("action: 'history'", items[0])
-        self.assertNotIn('to:', items[0])
-        self.assertIn('data-testid="nav-history"', self.side_nav)
-        body = function_body(self.side_nav, 'openHistory')
-        self.assertIn("route.path === '/app'", body)
-        self.assertIn('revealHistory()', body)
+        self.assertEqual(items, [], '侧栏导航里不应再有「历史对话」条目')
+        self.assertNotIn('data-testid="nav-history"', self.side_nav)
+        self.assertNotIn('function openHistory', self.side_nav)
+        # 常驻列表还在，别把它一起删了
+        self.assertIn('data-testid="history-toggle"', self.side_nav)
+        self.assertIn("class=\"sessions\"", self.side_nav)
 
     def test_the_landing_page_privacy_rule_is_not_vacuous(self):
         mutated = self.landing + '\nconst rows = useSessions().rows\n'
