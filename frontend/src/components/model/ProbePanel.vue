@@ -164,14 +164,17 @@ function testFailure(): string {
   justify-content: space-between;
   gap: 8px;
 }
+/* 面板标题与小标题统一为 15px / 600 / 蓝 —— 用户指出两者字号与字重不一致
+   （标题 15px 常规、小标题 13.5px 加粗，放一起像两种字体）。 */
 .mpp-title {
   margin: 0;
   font-size: 15px;
+  font-weight: 600;
   color: var(--color-accent);
 }
 .mpp-h3 {
   margin: 12px 0 0;
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--color-accent);
 }

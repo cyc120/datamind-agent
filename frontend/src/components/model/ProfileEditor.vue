@@ -663,6 +663,7 @@ defineExpose({ load, applyModel, focusModel, buildPayload })
 .mpe-title {
   margin: 0;
   font-size: 15px;
+  font-weight: 600;
   color: var(--color-accent);
 }
 .mpe-sub {
@@ -775,7 +776,7 @@ defineExpose({ load, applyModel, focusModel, buildPayload })
 }
 .mpe-h3 {
   margin: 0 0 4px;
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--color-accent);
 }
@@ -817,28 +818,32 @@ defineExpose({ load, applyModel, focusModel, buildPayload })
   gap: 8px;
   margin-top: 14px;
 }
+/* 按钮统一蓝底白字加粗椭圆（用户要求：四个按钮之前是两套观感 —— is-primary 蓝底描边、
+   其余白底灰字，看着不像一组）。 */
 .mpe-btn {
   font: inherit;
   font-size: 13.5px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-body);
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
 }
 .mpe-btn:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .mpe-btn:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: default;
 }
+/* is-primary 现在与基础样式等价（保留类名，避免动模板） */
 .mpe-btn.is-primary {
-  border-color: rgba(37, 99, 235, 0.45);
-  background: rgba(37, 99, 235, 0.08);
-  color: var(--color-accent);
+  border-color: transparent;
+  background: var(--color-accent);
+  color: #ffffff;
 }
 .mpe-btn.is-danger { color: #ffffff; font-weight: 600; border-color: transparent; background: #e11d48; }
 @media (max-width: 860px) {
