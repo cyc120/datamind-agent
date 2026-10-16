@@ -208,12 +208,16 @@ function headerSummary(profile: ModelProfile): string {
   font-size: 15px;
   color: var(--color-text);
 }
+/* 药丸统一蓝底白字加粗椭圆（含「OpenAI 兼容」这个基础款 —— 用户指出它漏网了）。
+   原来是浅底细描边黑字，与 tone-ok / tone-on 不一致。 */
 .mpl-pill {
   font-size: 12.5px;
-  padding: 2px 8px;
+  font-weight: 600;
+  padding: 2px 9px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
-  color: var(--color-text);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   white-space: nowrap;
 }
 .mpl-pill.tone-ok {
@@ -227,7 +231,8 @@ function headerSummary(profile: ModelProfile): string {
   background: var(--color-accent);
 }
 .mpl-pill.tone-muted {
-  color: var(--color-text);
+  color: #ffffff;
+  background: var(--color-accent);
 }
 .mpl-model {
   margin: 8px 0 2px;
