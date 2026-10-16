@@ -216,14 +216,14 @@ function headerSummary(profile: ModelProfile): string {
   white-space: nowrap;
 }
 .mpl-pill.tone-ok {
-  color: #16a34a;
-  border-color: rgba(22, 163, 74, 0.35);
-  background: rgba(22, 163, 74, 0.08);
+  color: #ffffff;
+  border-color: transparent;
+  background: var(--color-accent);
 }
 .mpl-pill.tone-on {
-  color: #16a34a;
-  border-color: rgba(22, 163, 74, 0.45);
-  background: rgba(22, 163, 74, 0.12);
+  color: #ffffff;
+  border-color: transparent;
+  background: var(--color-accent);
 }
 .mpl-pill.tone-muted {
   color: var(--color-muted);

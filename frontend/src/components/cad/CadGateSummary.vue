@@ -99,9 +99,9 @@ defineProps<{
   border: 1px solid var(--color-line);
 }
 .cad-gate-status.cad-is-ready {
-  color: #16a34a;
-  border-color: rgba(22, 163, 74, 0.35);
-  background: rgba(22, 163, 74, 0.08);
+  color: #ffffff;
+  border-color: transparent;
+  background: var(--color-accent);
 }
 .cad-gate-status.cad-is-blocked {
   color: #d97706;

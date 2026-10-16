@@ -821,8 +821,8 @@ onMounted(async () => {
   color: var(--color-body);
 }
 .mp-notice.tone-ok {
-  border-color: rgba(22, 163, 74, 0.35);
-  background: rgba(22, 163, 74, 0.06);
+  border-color: transparent;
+  background: var(--color-accent);
 }
 .mp-notice.tone-bad {
   border-color: rgba(225, 29, 72, 0.3);
@@ -872,9 +872,9 @@ onMounted(async () => {
   color: var(--color-muted);
 }
 .mp-chip.tone-ok {
-  color: #16a34a;
-  border-color: rgba(22, 163, 74, 0.35);
-  background: rgba(22, 163, 74, 0.08);
+  color: #ffffff;
+  border-color: transparent;
+  background: var(--color-accent);
 }
 /* 按条列出：「当前启用配置」用它替代原来揉成一整段的 mp-line。
    每条前面一个蓝点（--color-accent = #2563eb），事实与说明用 .is-hint 区分层级。 */

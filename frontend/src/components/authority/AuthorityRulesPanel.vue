@@ -369,9 +369,9 @@ function act(rule: AuthorityRule, decision: ApprovalDecision): void {
   background: rgba(217, 119, 6, 0.08);
 }
 .art-state.is-approved {
-  color: #16a34a;
-  border-color: rgba(22, 163, 74, 0.35);
-  background: rgba(22, 163, 74, 0.08);
+  color: #ffffff;
+  border-color: transparent;
+  background: var(--color-accent);
 }
 .art-state.is-rejected,
 .art-state.is-revoked,
