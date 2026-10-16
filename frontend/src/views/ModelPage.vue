@@ -805,7 +805,7 @@ onMounted(async () => {
 }
 .tb-note {
   font-size: 14px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .tb-action {
   margin-left: auto;
@@ -892,7 +892,7 @@ onMounted(async () => {
   padding: 2px 8px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .mp-chip.tone-ok {
   color: #ffffff; font-weight: 600;
@@ -929,12 +929,12 @@ onMounted(async () => {
 }
 .mp-facts > li.is-hint {
   font-size: 13px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .mp-facts > li.is-hint::before { background: rgba(37, 99, 235, 0.4); }
 .mp-facts > li.is-warn { color: #d97706; }
 .mp-facts > li.is-warn::before { background: #d97706; }
-.mp-facts > li b { color: var(--color-text); font-weight: 600; margin-right: 6px; }
+.mp-facts > li b { color: var(--color-accent); font-weight: 600; margin-right: 6px; }
 .mp-facts > li code {
   font-size: 12.5px;
   padding: 1px 4px;
@@ -955,7 +955,7 @@ onMounted(async () => {
   margin: 6px 0 0;
   font-size: 13px;
   line-height: 1.7;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .mp-warn {
   margin: 6px 0 0;
@@ -1057,7 +1057,7 @@ onMounted(async () => {
   padding: 22px 0;
   font-size: 14px;
   line-height: 1.8;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 code {
   font-size: 13px;

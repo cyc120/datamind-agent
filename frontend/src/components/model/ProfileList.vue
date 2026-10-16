@@ -212,7 +212,7 @@ function headerSummary(profile: ModelProfile): string {
   padding: 2px 8px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
-  color: var(--color-muted);
+  color: var(--color-text);
   white-space: nowrap;
 }
 .mpl-pill.tone-ok {
@@ -226,7 +226,7 @@ function headerSummary(profile: ModelProfile): string {
   background: var(--color-accent);
 }
 .mpl-pill.tone-muted {
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .mpl-model {
   margin: 8px 0 2px;
@@ -240,7 +240,7 @@ function headerSummary(profile: ModelProfile): string {
 .mpl-meta {
   margin: 2px 0 0;
   font-size: 13px;
-  color: var(--color-muted);
+  color: var(--color-text);
   word-break: break-all;
 }
 .mpl-actions {
