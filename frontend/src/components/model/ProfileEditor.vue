@@ -663,7 +663,7 @@ defineExpose({ load, applyModel, focusModel, buildPayload })
 .mpe-title {
   margin: 0;
   font-size: 15px;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .mpe-sub {
   font-size: 13px;
@@ -774,7 +774,7 @@ defineExpose({ load, applyModel, focusModel, buildPayload })
   margin: 0 0 4px;
   font-size: 13.5px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .mpe-row {
   display: flex;

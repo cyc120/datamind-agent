@@ -167,13 +167,13 @@ function testFailure(): string {
 .mpp-title {
   margin: 0;
   font-size: 15px;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .mpp-h3 {
   margin: 12px 0 0;
   font-size: 13.5px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .mpp-stamp {
   font-size: 12.5px;
