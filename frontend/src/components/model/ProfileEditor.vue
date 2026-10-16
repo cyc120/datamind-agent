@@ -689,10 +689,12 @@ defineExpose({ load, applyModel, focusModel, buildPayload })
   border-color: var(--color-accent);
   color: var(--color-accent);
 }
+/* 一行一个字段：原来两列并排（配置名称｜协议、鉴权方式｜max_tokens）看着乱，
+   用户要求改成逐行。 */
 .mpe-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px 14px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
   margin-top: 12px;
 }
 .mpe-field {
@@ -707,9 +709,13 @@ defineExpose({ load, applyModel, focusModel, buildPayload })
 .mpe-field.is-dim {
   opacity: 0.6;
 }
+/* 小标题：原来一律灰色、与正文和占位符分不开。改成蓝色并加粗一档，
+   让「哪个是字段名、哪个是说明」一眼可分。 */
 .mpe-label {
-  font-size: 13px;
-  color: var(--color-muted);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-accent);
+  letter-spacing: 0.01em;
 }
 .mpe-input {
   font: inherit;
