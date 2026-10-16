@@ -177,19 +177,19 @@ function testFailure(): string {
 }
 .mpp-stamp {
   font-size: 12.5px;
-  color: var(--color-muted);
+  color: var(--color-text);
   font-variant-numeric: tabular-nums;
 }
 .mpp-hint {
   margin: 6px 0 0;
   font-size: 12.5px;
   line-height: 1.65;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .mpp-state {
   margin: 8px 0 0;
   font-size: 13.5px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .mpp-bad {
   margin: 8px 0 0;
@@ -200,7 +200,7 @@ function testFailure(): string {
 .mpp-target {
   margin: 8px 0 0;
   font-size: 13px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .mpp-box {
   margin-top: 8px;

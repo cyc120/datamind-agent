@@ -667,7 +667,7 @@ defineExpose({ load, applyModel, focusModel, buildPayload })
 }
 .mpe-sub {
   font-size: 13px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .mpe-presets {
   display: flex;
@@ -745,7 +745,7 @@ defineExpose({ load, applyModel, focusModel, buildPayload })
 .mpe-hint {
   font-size: 12.5px;
   line-height: 1.6;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .mpe-hint.is-warn {
   color: #d97706;
