@@ -256,19 +256,22 @@ function headerSummary(profile: ModelProfile): string {
   gap: 6px;
   margin-top: 10px;
 }
+/* 配置项里的「编辑 / 测试」：与同卡片里红底实心的「删除」统一成一组按钮。
+   原来是白底细描边，和「删除」放一起不像同一套。 */
 .mpl-btn {
   font: inherit;
   font-size: 13.5px;
-  padding: 4px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-body);
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
 }
 .mpl-btn:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .mpl-btn:disabled {
   opacity: 0.6;

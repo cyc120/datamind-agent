@@ -799,23 +799,26 @@ onMounted(async () => {
   min-width: 0;
 }
 .tb-title {
-  font-size: 16px;
+  /* 页内标题统一 15px（原来这处是 16px，是唯一一个 16，属离群值） */
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .tb-note {
   font-size: 14px;
   color: var(--color-text);
 }
+/* 顶部「刷新」：与页内其它按钮统一（蓝底白字椭圆）。原来是白底细描边，看着不像按钮。 */
 .tb-action {
   margin-left: auto;
   font: inherit;
   font-size: 14px;
-  padding: 6px 12px;
+  font-weight: 600;
+  padding: 6px 14px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-body);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
 }
 .tb-action:hover:not(:disabled) {
@@ -880,19 +883,23 @@ onMounted(async () => {
 }
 .mp-h2 {
   margin: 0 0 6px;
-  font-size: 14.5px;
+  /* 与页内其它标题统一 15px（原来是 14.5px，是唯一一个 14.5，属离群值） */
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .mp-panel-head .mp-h2 {
   margin: 0;
 }
+/* 药丸统一蓝底白字加粗椭圆（「身份：本机管理员」那个原来还是白底描边）。 */
 .mp-chip {
   font-size: 12.5px;
-  padding: 2px 8px;
+  font-weight: 600;
+  padding: 2px 9px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
-  color: var(--color-text);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
 }
 .mp-chip.tone-ok {
   color: #ffffff; font-weight: 600;
@@ -992,28 +999,31 @@ onMounted(async () => {
   gap: 8px;
   margin-bottom: 14px;
 }
+/* 按钮统一蓝底白字加粗椭圆（原来是白底细描边，与 Red 的危险按钮、PillNav 风格不一致）。 */
 .mp-btn {
   font: inherit;
   font-size: 13.5px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-body);
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
 }
 .mp-btn:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .mp-btn:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: default;
 }
+/* is-primary 现在与基础样式等价（保留类名，避免动模板） */
 .mp-btn.is-primary {
-  border-color: rgba(37, 99, 235, 0.45);
-  background: rgba(37, 99, 235, 0.08);
-  color: var(--color-accent);
+  border-color: transparent;
+  background: var(--color-accent);
+  color: #ffffff;
 }
 .mp-btn.is-danger { color: #ffffff; font-weight: 600; border-color: transparent; background: #e11d48; }
 .mp-file {
