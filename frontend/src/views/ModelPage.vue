@@ -557,10 +557,13 @@ onMounted(async () => {
 
             <p v-if="configLoading" class="mp-hint">正在读取…</p>
             <p v-else-if="configError" class="mp-bad" data-testid="model-active-error">{{ configError }}</p>
-            <template v-else-if="config">
-              <!-- 按条列出：每条前面一个蓝点。事实与「这句话的边界在哪」分开成两条，
-                   免得读成一整段。 -->
-              <ul class="mp-facts">
+            <!-- 两栏：左＝配置事实（短键值对，本来就窄），右＝动作与它的边界说明。
+                 原来整宽单列时右侧空一大片，而且与下面本来就两栏的区块不一致。 -->
+            <div v-else class="mp-cols">
+              <div class="mp-col">
+                <!-- 按条列出：每条前面一个蓝点。事实与「这句话的边界在哪」分开成两条，
+                     免得读成一整段。 -->
+                <ul v-if="config" class="mp-facts">
                 <li data-testid="model-active-summary">
                   <b>接入</b>
                   {{ config.name || '未命名配置' }} · {{ protocolLabel(config.protocol, protocols) }}
@@ -600,11 +603,12 @@ onMounted(async () => {
                 <li v-if="(config.header_keys || []).length" class="is-hint">
                   <b>敏感请求头</b>{{ (config.header_keys || []).join('、') }}（只回显键名，值不下发）
                 </li>
-              </ul>
-            </template>
-            <p v-else class="mp-hint" data-testid="model-active-empty">没有读到当前启用配置。</p>
+                </ul>
+                <p v-else class="mp-hint" data-testid="model-active-empty">没有读到当前启用配置。</p>
+              </div>
 
-            <ul class="mp-facts is-subtle" data-testid="model-clear-note">
+              <div class="mp-col">
+                <ul class="mp-facts is-subtle" data-testid="model-clear-note">
               <li>
                 这是单配置兼容面（<code>DELETE /v1/model/config</code>）的动作：
                 <b>只清空「当前启用」那条配置的 api_key 字段</b>。
@@ -645,8 +649,10 @@ onMounted(async () => {
                   取消
                 </button>
               </template>
+                </div>
+                <p v-if="clearedNote" class="mp-line mp-hint" data-testid="model-cleared-note">{{ clearedNote }}</p>
+              </div>
             </div>
-            <p v-if="clearedNote" class="mp-line mp-hint" data-testid="model-cleared-note">{{ clearedNote }}</p>
           </section>
 
           <!-- ── 工具条：新建 / 导出（不含密钥）/ 导入（文件或粘贴，activate_first:false）── -->
@@ -876,6 +882,18 @@ onMounted(async () => {
   border-color: rgba(22, 163, 74, 0.35);
   background: rgba(22, 163, 74, 0.08);
 }
+/* 两栏：左＝配置事实，右＝动作与说明。窄屏回落成单栏。 */
+.mp-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+.mp-col { min-width: 0; }
+@media (max-width: 1080px) {
+  .mp-cols { grid-template-columns: minmax(0, 1fr); gap: 0; }
+}
+
 /* 按条列出：「当前启用配置」用它替代原来揉成一整段的 mp-line。
    每条前面一个蓝点（--color-accent = #2563eb），事实与说明用 .is-hint 区分层级。 */
 .mp-facts {
