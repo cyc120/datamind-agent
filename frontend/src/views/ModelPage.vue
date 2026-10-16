@@ -672,6 +672,35 @@ onMounted(async () => {
           <!-- ── 工具条：新建 / 导出（不含密钥）/ 导入（文件或粘贴，activate_first:false）──
                三个按钮是【动作】不是路由，用 Vue Bits 的 PillNav（滑动药丸）承载：
                data-testid 与动态文案照旧，点击走同一个 onToolSelect 回调。 -->
+            <div class="mp-panel mp-profiles">
+              <h2 class="mp-h2">已保存的配置（{{ profiles.length }}）</h2>
+              <p class="mp-hint">
+                列表里的协议 / has_key / active 都是服务端下发的安全视图：没有密钥值，也没有敏感头的值。
+              </p>
+              <p v-if="!profiles.length" class="mp-empty" data-testid="model-empty">
+                还没有任何接入配置。点右上「新建配置」，选一个预设、填入 API 密钥后「保存并启用」。
+                <span v-if="config?.environment_fallback || config?.source === 'environment'">
+                  注意：环境变量里似乎有兜底密钥，问数可能仍在工作；但那些密钥不在本页的配置里，
+                  这里既看不到也不能证明它当前生效。
+                </span>
+              </p>
+              <ProfileList
+                v-else
+                :items="profiles"
+                :active="activeId"
+                :protocols="protocols"
+                :busy-id="busyId"
+                :deleting-id="deletingId"
+                :editing-id="editing?.id ?? null"
+                :probing-id="probingId"
+                @edit="edit"
+                @activate="activate"
+                @probe="probeProfile"
+                @remove="remove"
+              />
+            </div>
+
+            
           <div class="mp-tools">
             <PillNav
               :items="toolItems"
@@ -706,37 +735,8 @@ onMounted(async () => {
             </div>
           </section>
 
-          <!-- ── 左：配置列表；右：编辑器 + 探活面板 ─────────────────────── -->
           <div class="mp-grid">
-            <div class="mp-col">
-              <h2 class="mp-h2">已保存的配置（{{ profiles.length }}）</h2>
-              <p class="mp-hint">
-                列表里的协议 / has_key / active 都是服务端下发的安全视图：没有密钥值，也没有敏感头的值。
-              </p>
-              <p v-if="!profiles.length" class="mp-empty" data-testid="model-empty">
-                还没有任何接入配置。点右上「新建配置」，选一个预设、填入 API 密钥后「保存并启用」。
-                <span v-if="config?.environment_fallback || config?.source === 'environment'">
-                  注意：环境变量里似乎有兜底密钥，问数可能仍在工作；但那些密钥不在本页的配置里，
-                  这里既看不到也不能证明它当前生效。
-                </span>
-              </p>
-              <ProfileList
-                v-else
-                :items="profiles"
-                :active="activeId"
-                :protocols="protocols"
-                :busy-id="busyId"
-                :deleting-id="deletingId"
-                :editing-id="editing?.id ?? null"
-                :probing-id="probingId"
-                @edit="edit"
-                @activate="activate"
-                @probe="probeProfile"
-                @remove="remove"
-              />
-            </div>
-
-            <div class="mp-col">
+<div class="mp-col">
               <ProfileEditor
                 ref="editor"
                 :protocols="protocols"
@@ -980,6 +980,11 @@ onMounted(async () => {
   font-size: 13px;
   color: #e11d48;
 }
+/* 已保存的配置：从左侧栏提到工具条之上，单独成卡片（与「当前启用配置」同级）。
+   复用 .mp-panel 的边框与内边距，这里只补间距。 */
+.mp-profiles { margin: 0 0 18px; }
+.mp-profiles .mp-h2 { margin: 0 0 6px; }
+
 .mp-tools {
   display: flex;
   flex-wrap: wrap;
