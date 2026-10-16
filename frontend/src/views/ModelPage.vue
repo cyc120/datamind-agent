@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import SideNav from '../components/SideNav.vue'
+import PillNav, { type PillNavItem } from '../components/bits/PillNav/PillNav.vue'
 import ProfileEditor from '../components/model/ProfileEditor.vue'
 import ProfileList from '../components/model/ProfileList.vue'
 import ProbePanel from '../components/model/ProbePanel.vue'
@@ -422,6 +423,25 @@ function toggleImport(): void {
   importOpen.value = !importOpen.value
 }
 
+/**
+ * 工具条（Vue Bits PillNav）的三个动作。
+ * 文案与原按钮逐字一致；第三个仍是动态文案（面板展开时变「收起导入」）。
+ * data-testid 由 PillNav 透传到 <button> 上，测试仍按 model-new / model-export /
+ * model-import-toggle 取元素。activeKey 只在导入面板展开时点亮「导入配置」那一颗，
+ * 另外两个是纯动作，不做「当前项」高亮（那会让人以为它们有选中态）。
+ */
+const toolItems = computed<PillNavItem[]>(() => [
+  { key: 'new', label: '新建配置', testid: 'model-new', tone: 'primary' },
+  { key: 'export', label: '导出（不含密钥）', testid: 'model-export' },
+  { key: 'import', label: importOpen.value ? '收起导入' : '导入配置', testid: 'model-import-toggle' },
+])
+
+function onToolSelect(key: string): void {
+  if (key === 'new') newProfile()
+  else if (key === 'export') void exportProfiles()
+  else if (key === 'import') toggleImport()
+}
+
 async function onImportFile(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
@@ -649,13 +669,16 @@ onMounted(async () => {
             <p v-if="clearedNote" class="mp-line mp-hint" data-testid="model-cleared-note">{{ clearedNote }}</p>
           </section>
 
-          <!-- ── 工具条：新建 / 导出（不含密钥）/ 导入（文件或粘贴，activate_first:false）── -->
+          <!-- ── 工具条：新建 / 导出（不含密钥）/ 导入（文件或粘贴，activate_first:false）──
+               三个按钮是【动作】不是路由，用 Vue Bits 的 PillNav（滑动药丸）承载：
+               data-testid 与动态文案照旧，点击走同一个 onToolSelect 回调。 -->
           <div class="mp-tools">
-            <button class="mp-btn is-primary" type="button" data-testid="model-new" @click="newProfile">新建配置</button>
-            <button class="mp-btn" type="button" data-testid="model-export" @click="exportProfiles">导出（不含密钥）</button>
-            <button class="mp-btn" type="button" data-testid="model-import-toggle" @click="toggleImport">
-              {{ importOpen ? '收起导入' : '导入配置' }}
-            </button>
+            <PillNav
+              :items="toolItems"
+              :active-key="importOpen ? 'import' : ''"
+              :initial-load-animation="false"
+              @select="onToolSelect"
+            />
           </div>
 
           <section v-if="importOpen" class="mp-panel" data-testid="model-import-panel">
