@@ -350,10 +350,8 @@ const readingHistory = computed(
     !!headRevisionId.value &&
     requestedRevisionId.value !== headRevisionId.value,
 )
-/** 指定了版本、但词条当前还没有发布头（例如刚生成的草稿）：中性标签，不冒充"历史版本" */
-const readingPinnedRevision = computed(
-  () => !!requestedRevisionId.value && !readingHistory.value && !headRevisionId.value,
-)
+/* 曾经有一个 readingPinnedRevision（"指定了版本但还没有发布头"）专门驱动「指定版本」标签。
+   那个标签按用户要求已移除，这个 computed 随之没有使用者，一并删掉，避免留死代码。 */
 
 async function load(): Promise<void> {
   const token = ++loadToken
@@ -657,12 +655,14 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
         </div>
 
         <!-- 状态标签单独一行：原来它们紧贴在标题后面，把标题挤得没有呼吸空间。
-             注：「演示数据（demo_data=true）」标签按用户要求已移除 ——
-             注意这样一来本页就看不到"数据是合成演示数据"这个标记了；
-             图谱页的「范围与边界」卡片里仍有同一条声明。 -->
-        <div v-if="readingHistory || readingPinnedRevision" class="wk-tags">
-          <span v-if="readingHistory" class="wk-tag" data-testid="history-badge">历史版本</span>
-          <span v-else-if="readingPinnedRevision" class="wk-tag" data-testid="pinned-badge">指定版本</span>
+             用户已要求移除两个标签：
+               「演示数据（demo_data=true）」—— 数据是合成演示这件事，用户打算换个位置说明，
+                                             待定；图谱页「范围与边界」卡片里仍有一条；
+               「指定版本」                    —— 当前读的是哪个版本，版本下拉框里已经写明，
+                                             不必再挂一个标签。
+             「历史版本」保留：它标的是"你正在看历史而非发布头"这种需要提醒的状态。 -->
+        <div v-if="readingHistory" class="wk-tags">
+          <span class="wk-tag" data-testid="history-badge">历史版本</span>
         </div>
 
         <!-- 元信息改成「标签在上 / 取值在下」的三格，不再用 · 串成一行 -->
