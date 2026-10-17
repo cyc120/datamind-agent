@@ -1102,17 +1102,27 @@ watch(
   },
 )
 
-/** 其它筛选变化 → 同样是一次新集合；关键词与分类做 320ms 去抖，避免每次按键都打服务端。 */
-watch(
-  () => [filters.value.type, filters.value.status, filters.value.category, filters.value.q] as const,
-  () => {
-    if (debounceTimer != null) window.clearTimeout(debounceTimer)
-    debounceTimer = window.setTimeout(() => {
-      debounceTimer = null
-      void reload()
-    }, 320)
-  },
+/**
+ * 其它筛选变化 → 同样是一次新集合；关键词与分类做 320ms 去抖，避免每次按键都打服务端。
+ *
+ * ⚠ 依赖必须按**值**比较。筛选状态现在是**整体替换**模型对象（见 WikiGraphSettings 的
+ * `patchFilters`：`filters.value = { ...filters.value, q }`），任何一项变化都会让这个
+ * watcher 重新求值；而 `() => [a, b, c]` 这种数组 getter 每次都返回**新数组**，
+ * `watch` 按引用比较就会一律判定"变了"，结果是换图层时上面的 watch 立刻取一次数、
+ * 这里 320ms 后再取一次（同一份筛选打两次请求）。用 computed 字符串指纹把它变成
+ * 按值比较：只有这四项真的变了才去抖取数。
+ */
+const otherFiltersKey = computed(() =>
+  JSON.stringify([filters.value.type, filters.value.status, filters.value.category, filters.value.q]),
 )
+
+watch(otherFiltersKey, () => {
+  if (debounceTimer != null) window.clearTimeout(debounceTimer)
+  debounceTimer = window.setTimeout(() => {
+    debounceTimer = null
+    void reload()
+  }, 320)
+})
 
 /** 力度变化 → 布局参数变了，这是契约允许重排的三种情形之一。 */
 watch(

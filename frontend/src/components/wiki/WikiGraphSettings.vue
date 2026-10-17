@@ -21,6 +21,7 @@ import type {
   WikiAppearanceState,
   WikiColorState,
   WikiFilterState,
+  WikiLayer,
 } from './forceLayout'
 
 /* ============================================================================
@@ -45,6 +46,46 @@ const filters = defineModel<WikiFilterState>('filters', { required: true })
 const colors = defineModel<WikiColorState>('colors', { required: true })
 const appearance = defineModel<WikiAppearanceState>('appearance', { required: true })
 const forces = defineModel<ForceParams>('forces', { required: true })
+
+/**
+ * 五个筛选项**一律整体替换模型对象**，绝不 `filters.value.q = ...` 就地改属性。
+ *
+ * WHY（这是实测出来的硬约束，不是风格偏好）：`defineModel` 返回的是 `customRef`，
+ * 它只在 **`.value` 被重新赋值**时才 emit `update:filters`、才 trigger 依赖它的
+ * watch / computed；它拿到的那份对象既不是 `reactive`、也没有被再包一层，所以
+ * `filters.value.q = 'x'` 既不会通知父组件（图不重新取数、摘要不重算），也没有任何
+ * 可被追踪的依赖。实测：往关键词框键入 `zzz无此词条zzz`，DOM 里 value 变了、但图
+ * 仍是原来那几个节点、一个请求都没再发、「筛选」摘要仍显示「未筛选」；而点页脚
+ * 「清除筛选」（整体赋值）立刻发出了第二次请求 —— 差别只在这一行写法上。
+ */
+function patchFilters(patch: Partial<WikiFilterState>): void {
+  filters.value = { ...filters.value, ...patch }
+}
+
+/* v-model 的落点：每项一个带 setter 的 computed，赋值时走 patchFilters。
+   模板里仍然是原生 `v-model`（保留 IME 组词、光标与 composition 处理），
+   只是写回方式从"改属性"换成了"整体替换"。 */
+const layerModel = computed({
+  get: () => filters.value.layer,
+  // 原生 <select> 交回来的是 string；合法值只有 LAYER_OPTIONS 里那三个（选项就这三个）。
+  set: (value: string) => patchFilters({ layer: value as WikiLayer }),
+})
+const typeModel = computed({
+  get: () => filters.value.type,
+  set: (value: string) => patchFilters({ type: value }),
+})
+const categoryModel = computed({
+  get: () => filters.value.category,
+  set: (value: string) => patchFilters({ category: value }),
+})
+const statusModel = computed({
+  get: () => filters.value.status,
+  set: (value: string) => patchFilters({ status: value }),
+})
+const qModel = computed({
+  get: () => filters.value.q,
+  set: (value: string) => patchFilters({ q: value }),
+})
 
 const props = withDefaults(
   defineProps<{
@@ -272,7 +313,7 @@ const FORCE_ROWS: Array<{
 
         <label class="wg-field wg-field-inline">
           <span class="wg-label">图层</span>
-          <select v-model="filters.layer" class="wg-control">
+          <select v-model="layerModel" class="wg-control">
             <option v-for="option in LAYER_OPTIONS" :key="option.value" :value="option.value">
               {{ option.label }}
             </option>
@@ -289,7 +330,7 @@ const FORCE_ROWS: Array<{
 
         <label class="wg-field wg-field-inline">
           <span class="wg-label">词条类型</span>
-          <select v-model="filters.type" class="wg-control" :disabled="filters.layer !== 'entries'">
+          <select v-model="typeModel" class="wg-control" :disabled="filters.layer !== 'entries'">
             <option value="">不限</option>
             <option v-for="option in ENTRY_TYPE_OPTIONS" :key="option.value" :value="option.value">
               {{ option.label }}
@@ -300,7 +341,7 @@ const FORCE_ROWS: Array<{
         <label class="wg-field wg-field-inline">
           <span class="wg-label">分类</span>
           <input
-            v-model="filters.category"
+            v-model="categoryModel"
             class="wg-control"
             type="text"
             maxlength="64"
@@ -311,7 +352,7 @@ const FORCE_ROWS: Array<{
 
         <label class="wg-field wg-field-inline">
           <span class="wg-label">知识状态</span>
-          <select v-model="filters.status" class="wg-control" :disabled="filters.layer !== 'entries'">
+          <select v-model="statusModel" class="wg-control" :disabled="filters.layer !== 'entries'">
             <option value="">不限</option>
             <option v-for="option in PUBLICATION_STATUS_OPTIONS" :key="option.value" :value="option.value">
               {{ option.label }}
@@ -322,7 +363,7 @@ const FORCE_ROWS: Array<{
         <label class="wg-field wg-field-inline">
           <span class="wg-label">关键词</span>
           <input
-            v-model="filters.q"
+            v-model="qModel"
             class="wg-control"
             type="search"
             maxlength="200"
