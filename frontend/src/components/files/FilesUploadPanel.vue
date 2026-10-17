@@ -112,11 +112,14 @@ function onProvenance(event: Event): void {
       <li data-testid="files-raw-note">
         上传的是<b>文件原始内容</b>本身，不是表单打包，也不经过任何中转格式。
       </li>
-      <li data-testid="files-limits-note">
-        接受这些后缀：{{ ALLOWED_SUFFIXES.join(' ') }}；各自的体积上限：
-        <code v-for="(limit, suffix) in SIZE_LIMITS" :key="suffix" class="fup-chip">
-          {{ suffix }} ≤ {{ limit / MIB }} MiB
-        </code>
+      <li data-testid="files-limits-note">接受这些后缀：{{ ALLOWED_SUFFIXES.join(' ') }}</li>
+      <!-- 体积上限原来跟上一句挤在同一行、又用蓝色药丸渲染，把一句话撕成两行还满屏蓝块。
+           改成独立一条、纯文本排列：一句一个信息点。 -->
+      <li>
+        各自的体积上限：
+        <span v-for="(limit, suffix) in SIZE_LIMITS" :key="suffix" class="fup-limit">
+          {{ suffix }} {{ limit / MIB }} MiB
+        </span>
       </li>
       <li>
         每批最多 {{ MAX_BATCH_FILES }} 个文件，同时最多上传 {{ MAX_CONCURRENT_UPLOADS }} 个；
@@ -212,20 +215,32 @@ function onProvenance(event: Event): void {
   color: var(--color-text);
 }
 .fup-facts {
-  margin: 10px 0 0;
+  margin: 12px 0 0;
   padding-left: 18px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 9px;
 }
 .fup-facts li {
   font-size: 13px;
-  line-height: 1.7;
-  color: var(--color-body);
+  line-height: 1.75;
+  color: var(--color-text);
 }
 .fup-facts code {
   font-size: 12.5px;
-  color: var(--color-muted);
+  color: var(--color-text);
+}
+/* 体积上限用纯文本：原来每个上限都是一颗蓝色药丸，一句里塞 6 颗，
+   把句子撕成两行、还满屏蓝块。改成等宽小字 + 间隔点分隔。 */
+.fup-limit {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.fup-limit + .fup-limit::before {
+  content: '  ·  ';
+  font-family: inherit;
+  color: var(--color-body);
 }
 /* 扩展名标签统一蓝底白字加粗椭圆（原来是 6px 圆角的灰底描边） */
 .fup-chip {
