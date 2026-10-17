@@ -461,15 +461,16 @@ onMounted(() => {
   font-size: 12.5px;
 }
 /* 「当前身份」原来没有任何样式，紧贴着上面的说明块，读起来像同一段的一部分。
-   给它上方留白，让它独立成一行信息。 */
+   给它上方留白，让它独立成一行信息。（用户反馈一次后仍偏紧，再放大一档。） */
 .auth-identity {
-  margin: 32px 0 4px;
+  margin: 52px 0 6px;
 }
 /* 各板块之间留足间距：原来只有 margin-bottom，板块之间全靠前一块的下边距撑着，
-   下面那块（1 · 查询未消解的数值冲突候选）看上去像紧接在身份信息后面。 */
+   下面那块（1 · 查询未消解的数值冲突候选）看上去像紧接在身份信息后面。
+   用户反馈一次后仍偏紧，再放大一档。 */
 .auth-section {
-  margin-top: 34px;
-  margin-bottom: 26px;
+  margin-top: 56px;
+  margin-bottom: 34px;
 }
 .auth-h2 {
   margin: 0 0 4px;
