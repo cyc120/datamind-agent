@@ -404,7 +404,7 @@ defineExpose({ load, applyModel, focusModel, buildPayload })
       </label>
 
       <label class="mpe-field is-wide">
-        <span class="mpe-label">接口地址（base_url）</span>
+        <span class="mpe-label">接口地址</span>
         <input
           v-model="baseUrl"
           class="mpe-input"
@@ -414,8 +414,8 @@ defineExpose({ load, applyModel, focusModel, buildPayload })
           data-testid="model-field-base-url"
         />
         <span class="mpe-hint">
-          服务端会补版本段（/v1、/api/paas/v4、/api/v3 都能直接填）。地址与已存配置不同源时，
-          探活会以 400 MODEL_KEY_NOT_INHERITED 拒绝继承已存密钥。
+          服务端会自己补版本段（/v1、/api/paas/v4、/api/v3 都能直接填）。
+          地址与已存配置不同源时，探活会被拒绝继承已存密钥（400 MODEL_KEY_NOT_INHERITED）。
         </span>
       </label>
 
@@ -446,8 +446,8 @@ defineExpose({ load, applyModel, focusModel, buildPayload })
           data-testid="model-field-api-key"
         />
         <span class="mpe-hint">
-          留空 = 保持原密钥不变；填新值 = 覆盖。掩码只出现在上面的 placeholder 里，
-          绝不会被回填进输入框（回填提交会把真实密钥覆盖成掩码字符串）。
+          留空 = 保持原密钥不变；填新值 = 用新值覆盖。已保存的密钥只会以掩码形式出现在上面的灰字提示里，
+          绝不会被回填进输入框（回填后提交会把真实密钥覆盖成掩码字符串）。
         </span>
         <span class="mpe-hint is-warn">{{ NO_CLEAR_KEY_NOTE }}</span>
       </label>
@@ -465,8 +465,8 @@ defineExpose({ load, applyModel, focusModel, buildPayload })
         <span class="mpe-hint">
           {{
             isAnthropic
-              ? '「自动」提交成服务端的 both：同时发 x-api-key 与 Authorization: Bearer。'
-              : 'OpenAI 兼容协议固定发 Authorization: Bearer，这一项会被服务端忽略。'
+              ? '选「自动」时两种头部都会发：x-api-key 与 Authorization: Bearer。'
+              : 'OpenAI 兼容协议固定只发 Authorization: Bearer，这一项会被服务端忽略。'
           }}
         </span>
       </label>

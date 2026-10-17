@@ -89,79 +89,79 @@ const approval = computed(() => props.detail?.approval ?? null)
       <!-- ① 身份/来源：都是接口原值，缺失就写「未给出」 -->
       <div class="fud-grid">
         <div class="fud-row">
-          <span class="fud-k">upload_id</span><code class="fud-v">{{ detail.upload_id }}</code>
+          <span class="fud-k">上传编号</span><code class="fud-v">{{ detail.upload_id }}</code>
         </div>
         <div class="fud-row">
-          <span class="fud-k">job_id</span><code class="fud-v">{{ detail.job_id }}</code>
+          <span class="fud-k">任务编号</span><code class="fud-v">{{ detail.job_id }}</code>
         </div>
         <div class="fud-row">
-          <span class="fud-k">document_id</span><code class="fud-v">{{ detail.document_id }}</code>
+          <span class="fud-k">文档编号</span><code class="fud-v">{{ detail.document_id }}</code>
         </div>
         <div class="fud-row">
-          <span class="fud-k">media_type</span>
+          <span class="fud-k">文件类型</span>
           <code class="fud-v">{{ detail.media_type || '未给出' }}</code>
         </div>
         <div class="fud-row">
-          <span class="fud-k">provenance</span>
+          <span class="fud-k">来源类别</span>
           <code class="fud-v">{{ detail.provenance || '未给出' }}</code>
         </div>
         <div class="fud-row">
-          <span class="fud-k">source_sha256</span>
+          <span class="fud-k">源文件哈希</span>
           <code class="fud-v">{{ detail.source_sha256 || '未给出' }}</code>
         </div>
         <div class="fud-row">
-          <span class="fud-k">parser_version</span>
+          <span class="fud-k">解析器版本</span>
           <code class="fud-v">{{ detail.parser_version || '未给出（尚未解析）' }}</code>
         </div>
         <div class="fud-row">
-          <span class="fud-k">collection</span><code class="fud-v">{{ detail.collection }}</code>
+          <span class="fud-k">所属集合</span><code class="fud-v">{{ detail.collection }}</code>
         </div>
         <div class="fud-row">
-          <span class="fud-k">page_count</span>
+          <span class="fud-k">页数</span>
           <span class="fud-v">{{ detail.page_count == null ? '未给出' : detail.page_count }}</span>
         </div>
         <div class="fud-row">
-          <span class="fud-k">status</span>
+          <span class="fud-k">状态</span>
           <span class="fud-v" data-testid="files-detail-status">
-            {{ statusLabel(detail.status) }}（{{ detail.status }}）
+            {{ statusLabel(detail.status) }}
           </span>
         </div>
         <div class="fud-row">
-          <span class="fud-k">created_at</span>
+          <span class="fud-k">创建时间</span>
           <span class="fud-v">{{ formatWhen(detail.created_at) || '未给出' }}</span>
         </div>
         <div class="fud-row">
-          <span class="fud-k">started_at</span>
+          <span class="fud-k">开始时间</span>
           <span class="fud-v">{{ formatWhen(detail.started_at) || '未开始（排队中）' }}</span>
         </div>
         <div class="fud-row">
-          <span class="fud-k">finished_at</span>
+          <span class="fud-k">结束时间</span>
           <span class="fud-v">{{ formatWhen(detail.finished_at) || '未结束' }}</span>
         </div>
       </div>
 
       <!-- ② 解析分析：只在真的解析过之后才有内容 -->
       <div class="fud-block" data-testid="files-detail-analysis">
-        <div class="fud-bt">解析分析（analysis）</div>
+        <div class="fud-bt">解析分析</div>
         <div class="fud-grid">
           <div class="fud-row">
-            <span class="fud-k">parse_status</span>
+            <span class="fud-k">解析状态</span>
             <code class="fud-v">{{ analysis?.parse_status || '未给出' }}</code>
           </div>
           <div class="fud-row">
-            <span class="fud-k">adapter</span>
+            <span class="fud-k">解析器</span>
             <code class="fud-v">{{ analysis?.adapter || '未给出' }}</code>
           </div>
           <div class="fud-row">
-            <span class="fud-k">blocks</span>
+            <span class="fud-k">块数</span>
             <span class="fud-v">{{ analysis?.blocks ?? 0 }}</span>
           </div>
           <div class="fud-row">
-            <span class="fud-k">locators_written</span>
+            <span class="fud-k">写入的定位记录</span>
             <span class="fud-v">{{ analysis?.locators_written ?? 0 }}</span>
           </div>
           <div class="fud-row">
-            <span class="fud-k">relations</span>
+            <span class="fud-k">关系数</span>
             <span class="fud-v">{{ analysis?.relations ?? 0 }}</span>
           </div>
           <div v-for="extra in analysisExtras" :key="extra.key" class="fud-row">
@@ -171,11 +171,11 @@ const approval = computed(() => props.detail?.approval ?? null)
         </div>
 
         <p class="fud-line">
-          <span class="fud-k2">块类型（block_types）</span>
+          <span class="fud-k2">块类型</span>
           <span v-if="blockTypes.length" class="fud-chips">
             <code v-for="bt in blockTypes" :key="bt.key" class="fud-chip">{{ bt.key }}×{{ bt.value }}</code>
           </span>
-          <span v-else class="fud-v">未给出（解析未产出块）</span>
+          <span v-else class="fud-v">未给出（这次解析没有产出块）</span>
         </p>
 
         <!-- 缺口：空数组 ≠ 全支持 -->
@@ -184,51 +184,51 @@ const approval = computed(() => props.detail?.approval ?? null)
           <span v-if="gaps.length" class="fud-chips">
             <code v-for="g in gaps" :key="g" class="fud-chip fud-chip-warn">缺口：{{ g }}</code>
           </span>
-          <span v-else class="fud-v">缺口：无（未声明缺口，不等于格式全支持）</span>
+          <span v-else class="fud-v">无。没有声明缺口，不等于格式全都支持。</span>
         </p>
 
         <p class="fud-line" data-testid="files-detail-quality">
-          <span class="fud-k2">质量发现（quality_findings）</span>
+          <span class="fud-k2">质量发现</span>
           <span v-if="qualityFindings.length" class="fud-v">{{ qualityFindings.join('；') }}</span>
-          <span v-else class="fud-v">无（未报告发现，不代表解析没有质量问题）</span>
+          <span v-else class="fud-v">无。没有报告发现，不代表解析没有问题。</span>
         </p>
       </div>
 
       <!-- ③ 失败/重试与定位器 -->
       <div class="fud-block" data-testid="files-detail-failure">
         <div class="fud-row">
-          <span class="fud-k">error_code</span>
+          <span class="fud-k">错误码</span>
           <code class="fud-v" :class="{ 'is-bad': !!detail.error_code }">
             {{ detail.error_code || '无' }}
           </code>
         </div>
         <div class="fud-row">
-          <span class="fud-k">attempt</span>
-          <span class="fud-v">被领取 {{ detail.attempt }} 次</span>
+          <span class="fud-k">被领取次数</span>
+          <span class="fud-v">{{ detail.attempt }} 次</span>
         </div>
         <p class="fud-note">{{ RETRY_HONESTY_TEXT }}</p>
         <div class="fud-row">
-          <span class="fud-k">wave</span>
+          <span class="fud-k">单波时限</span>
           <span class="fud-v" data-testid="files-detail-wave">
-            单波时限 {{ detail.wave_deadline_seconds }}s · 已超时 {{ detail.wave_timeouts }} 次
+            {{ detail.wave_deadline_seconds }} 秒 · 已超时 {{ detail.wave_timeouts }} 次
           </span>
         </div>
         <div class="fud-row">
-          <span class="fud-k">locator_stores</span>
+          <span class="fud-k">定位记录</span>
           <span class="fud-v" data-testid="files-detail-locators">
-            契约块 {{ detail.locator_stores?.contract_blocks ?? 0 }} · 页式
+            契约块 {{ detail.locator_stores?.contract_blocks ?? 0 }} · 页式块
             {{ detail.locator_stores?.page_shaped ?? 0 }}
           </span>
         </div>
         <div class="fud-row">
-          <span class="fud-k">vector_index</span>
+          <span class="fud-k">向量索引</span>
           <span class="fud-v">
             <code>{{ vectorIndex || '未给出' }}</code>
             <template v-if="vectorIndex === 'deferred'">
-              ——本管道不写 chunks/Qdrant 行，未建立向量索引（索引由离线路径完成）。
+              本管道不写 chunks，也不写向量库：未建立向量索引，索引由离线流程另外完成。
             </template>
             <template v-else-if="vectorIndex">
-              ——非预期取值（本管道应为 deferred），这里按响应原样显示。
+              这个取值不是本管道预期的（应为 deferred），这里按服务端原样显示。
             </template>
           </span>
         </div>
@@ -245,10 +245,10 @@ const approval = computed(() => props.detail?.approval ?? null)
             rel="noopener noreferrer"
             data-testid="files-contract-link"
           >
-            查看解析契约（contract_url）
+            查看解析契约
           </a>
           <span v-else class="fud-v">
-            链接不可用：contract_url 不是以 / 开头的站内路径，已按纯文本显示（原值：{{
+            链接不可用：服务端给的地址不是站内路径，已按纯文本显示（原值：{{
               contractRaw || '未给出'
             }}）
           </span>
@@ -257,7 +257,7 @@ const approval = computed(() => props.detail?.approval ?? null)
 
       <!-- ④ 复核记录 -->
       <div class="fud-block" data-testid="files-detail-approval">
-        <div class="fud-bt">复核记录（approval）</div>
+        <div class="fud-bt">复核记录</div>
         <template v-if="approval">
           <div class="fud-grid">
             <div class="fud-row">
@@ -271,8 +271,8 @@ const approval = computed(() => props.detail?.approval ?? null)
             <div class="fud-row">
               <span class="fud-k">索引结果</span>
               <span class="fud-v">
-                indexed={{ approval.indexed === true ? 'true' : approval.indexed === false ? 'false' : '未给出' }}
-                · 契约块 {{ approval.block_count ?? 0 }} · chunks {{ approval.chunk_count ?? 0 }}
+                检索器{{ approval.indexed === true ? '读得到' : approval.indexed === false ? '读不到' : '：未给出' }}
+                · 契约块 {{ approval.block_count ?? 0 }} · 文本块 {{ approval.chunk_count ?? 0 }}
               </span>
             </div>
           </div>

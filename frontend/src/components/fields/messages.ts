@@ -62,10 +62,16 @@ export function approvalDecisionText(decision?: string | null): string {
 
 /* ── 检索可用性（审批 ≠ 可检索）────────────────────────────────────────── */
 
+/**
+ * index_state 的中文说法。
+ * 注意别和旁边那个 searchable 徽标写成同一句话：两个徽标挨着显示，
+ * 若都写「检索器读得到」用户会以为是重复渲染（曾经就是这样）。
+ * 所以这里只说「有没有建立索引」，searchable 那个徽标才说「读得到读不到」。
+ */
 export const INDEX_STATE_TEXT: Record<string, string> = {
-  indexed: '检索器读得到',
-  no_chunks: '没有文本块，检索不到',
-  not_approved: '未通过复核，检索不到',
+  indexed: '已建立索引',
+  no_chunks: '没有文本块，无法建索引',
+  not_approved: '未通过复核，暂不建索引',
 }
 
 export function indexStateText(state?: string | null): string {

@@ -249,10 +249,12 @@ const ruleLine = computed(() => {
       <p v-if="!filteredRows.length" class="v-empty">该筛选下没有测量记录。</p>
     </div>
 
-    <p class="v-legend">
-      「左 / 右」是冲突双方原值，两方都保留、不做取舍；无 left/right 的问题行显示「生产 ↔ 报告」两侧原值。
-      规则列的小字是本行实际套用的 rule_id，悬停可看判据表达式；结论标签悬停可看后端原始枚举值。
-    </p>
+    <ul class="v-legend">
+      <li>「左 / 右」是冲突双方的原值：两方都保留，不做取舍。</li>
+      <li>没有左右值的问题行，显示「生产 ↔ 报告」两侧的原值。</li>
+      <li>「规则」列的小字是本行实际套用的规则编号，鼠标悬停可看判据表达式。</li>
+      <li>结论标签悬停可以看到服务端返回的原始取值。</li>
+    </ul>
   </section>
 </template>
 
@@ -572,8 +574,28 @@ const ruleLine = computed(() => {
 }
 .v-legend {
   margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   font-size: 12.5px;
   line-height: 1.6;
   color: var(--color-text);
+}
+/* 说明按条列出：每行一条、前面一个蓝点（与 GovernancePage 的 .gov-note 同一套写法）。 */
+.v-legend > li {
+  position: relative;
+  padding-left: 14px;
+}
+.v-legend > li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.62em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-accent);
 }
 </style>

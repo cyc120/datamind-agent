@@ -282,31 +282,31 @@ function blankState(): BuildState {
 
 /** 服务端错误码 → 人能看懂的一句话 + 下一步。覆盖契约 §8.1 的七类场景（见文件头第 3 条）。 */
 const BUILD_ERROR_TEXT: Record<string, string> = {
-  WIKI_PERMISSION_DENIED: '无权限：整理需要 reviewer（或 admin）角色。重试不会改变结果。',
+  WIKI_PERMISSION_DENIED: '无权限：整理需要 reviewer（复核员）或 admin（管理员）角色。重试不会改变结果。',
   WIKI_SOURCE_FORBIDDEN: '来源不可访问：这次回答引用的来源不在当前授权范围内。',
   WIKI_RUN_FORBIDDEN: '运行不可访问：这条运行不属于当前身份。',
   WIKI_RUN_NOT_FOUND: '目标运行不存在（可能已被清理）。',
-  WIKI_NO_EVIDENCE: '这条运行没有可投影的证据，无法整理成词条。这是"确实没有"，不是重试能解决的。',
-  WIKI_ENTRY_NOT_FOUND: '目标词条不存在，或当前身份无权写入它（服务端对两者返回同一结果）。',
-  WIKI_REFERENCE_INVALID: '引用的证据引用已失效：需要移除该引用后再整理。',
-  WIKI_LOCATOR_UNAVAILABLE: '某个来源的定位不可用（bbox 缺失 / 页号越界 / 记录已删）：摘要仍会保留，定位不猜测。',
-  WIKI_BUILD_FAILED: '整理失败：失败详情在任务对象的 error_code / error_detail 里；原问答不受影响。',
-  WIKI_BUILD_NOT_RETRYABLE: '该任务不是 failed 状态，不能重试；刷新任务状态即可。',
-  WIKI_BUILD_REQUEST_INVALID: '整理请求载荷不合法（例如 run_id 为空）。',
-  WIKI_IDEMPOTENCY_CONFLICT: '这个 request_id 已经描述过另一份载荷：需要换一个 request_id 再提交。',
-  WIKI_VERSION_CONFLICT: '版本冲突：词条基线已经前进（有人发布了新版本）。要以最新版本为基线重新整理，不是重试同一个请求。',
-  WIKI_REVIEW_REQUIRED: '发布前需要先有复核记录。',
-  WIKI_ENTRY_IDENTITY_PENDING: '实体键还是 pending：发布前必须先人工确认实体键。',
-  LOGIN_REQUIRED: '未登录：/v1/wiki/* 不做匿名放行。',
-  CSRF_REQUIRED: 'CSRF 令牌失效：重新取一次令牌后再试。',
-  WIKI_LOAD_FAILED: '服务端读取失败（WIKI_LOAD_FAILED）：可以重试；界面不会把它显示成"没有数据"。',
+  WIKI_NO_EVIDENCE: '这条运行没有可投影的证据，无法整理成词条。这是「确实没有」，重试解决不了。',
+  WIKI_ENTRY_NOT_FOUND: '目标词条不存在，或当前身份无权写入它（服务端对这两种情况返回同一个结果）。',
+  WIKI_REFERENCE_INVALID: '引用的证据引用已失效：需要先移除该引用再整理。',
+  WIKI_LOCATOR_UNAVAILABLE: '某个来源的定位不可用（页框缺失、页号越界或记录已删）：摘要仍会保留，定位不猜。',
+  WIKI_BUILD_FAILED: '整理失败：失败详情在任务里，原始问答不受影响。',
+  WIKI_BUILD_NOT_RETRYABLE: '这个任务不是失败状态，不能重试；刷新一下任务状态即可。',
+  WIKI_BUILD_REQUEST_INVALID: '整理请求的内容不合法（例如缺少运行标识）。',
+  WIKI_IDEMPOTENCY_CONFLICT: '这次提交的标识已经描述过另一份内容，需要换一个标识再提交。',
+  WIKI_VERSION_CONFLICT: '版本冲突：词条的基线已经前进了（期间有人发布了新版本）。要以最新版本为基线重新整理，重试同一个请求没用。',
+  WIKI_REVIEW_REQUIRED: '发布前需要先有一条复核记录。',
+  WIKI_ENTRY_IDENTITY_PENDING: '实体键还是待确认状态：发布前必须先人工确认实体键。',
+  LOGIN_REQUIRED: '未登录：知识库接口不对匿名访问开放。',
+  CSRF_REQUIRED: '安全令牌已失效：刷新页面重新取一次令牌后再试。',
+  WIKI_LOAD_FAILED: '服务端读取失败：可以重试；界面不会把它显示成「没有数据」。',
 }
 
 function buildErrorText(code: string): string {
-  if (BUILD_ERROR_TEXT[code]) return BUILD_ERROR_TEXT[code]
-  if (/^HTTP_5\d\d$/.test(code)) return '服务端错误：这次整理请求失败了（不是"没有可整理的内容"）。可以重试。'
-  if (/^HTTP_4\d\d$/.test(code)) return '请求被拒绝：服务端返回了契约错误码表之外的状态码，原值保留在这里。'
-  return '未在契约 §8 错误码表里的错误码：原值保留，不翻译成更好听的说法。'
+  if (BUILD_ERROR_TEXT[code]) return `${BUILD_ERROR_TEXT[code]}（错误码：${code}）`
+  if (/^HTTP_5\d\d$/.test(code)) return `服务端出错了：这次整理请求失败（不是「没有可整理的内容」），可以重试。状态码：${code}`
+  if (/^HTTP_4\d\d$/.test(code)) return `请求被拒绝：服务端返回了错误码表之外的状态码，原值保留在这里（${code}）。`
+  return `这个错误码不在已知清单里，原值保留、不翻译成更好听的说法：${code}`
 }
 
 /** 与 client.ts 的 `apiError` 同形（本组件不 import 私有内核；`csrf()` 是 client.ts 的公开导出）。 */
@@ -391,8 +391,8 @@ function requestIdFor(m: ChatMessage): string {
 }
 
 function organizeBlockedReason(m: ChatMessage): string {
-  if (m.status === 'running') return '这次运行还在进行中：等回答结束、证据落库之后再整理。'
-  if (!m.runId) return '这条回答没有运行标识（run_id），无法按运行整理 —— 界面不提供没有依据的整理入口。'
+  if (m.status === 'running') return '这次运行还在进行中：等回答结束、证据落库之后才能整理。'
+  if (!m.runId) return '这条回答没有关联到一次运行，无法按运行整理。界面不提供没有依据的整理入口。'
   return ''
 }
 
@@ -417,15 +417,15 @@ function organizeStateText(m: ChatMessage): string {
   const state = stateOf(m.id)
   switch (state.phase) {
     case 'submitting':
-      return '正在提交整理任务（POST /v1/wiki/builds）…'
+      return '正在提交整理任务…'
     case 'queued':
-      return `已提交：状态 queued（排队中，整理 worker 尚未开始）。任务 id ${state.buildId || '（未返回）'}。`
+      return `已提交，正在排队（整理处理器还没开始）。任务编号 ${state.buildId || '（未返回）'}。`
     case 'running':
-      return `整理中（running）…任务 id ${state.buildId}`
+      return `正在整理…任务编号 ${state.buildId}`
     case 'succeeded':
-      return `整理完成（succeeded）：已生成版本 ${state.resultRevisionId || '（未返回）'}。草稿仍需复核与发布。`
+      return `整理完成，已生成版本 ${state.resultRevisionId || '（未返回）'}。草稿仍需复核与发布。`
     case 'failed':
-      return `整理失败（failed）：${state.errorCode || '未给出错误码'}`
+      return `整理失败：${state.errorCode || '服务端没有给出错误码'}`
     case 'blocked':
       return state.detail
     default:
@@ -440,16 +440,16 @@ function organizeDetailText(m: ChatMessage): string {
     return `${buildErrorText(code)}${state.detail ? `　服务端说明：${state.detail}` : ''}`
   }
   if (state.phase === 'queued' && state.polls >= MAX_POLLS) {
-    return `已连续轮询 ${MAX_POLLS} 次仍停在 queued：停止自动刷新。任务仍在队列里（不是失败），点「刷新状态」可以再查一次。`
+    return `已连续查询 ${MAX_POLLS} 次，任务仍在排队，所以停止自动刷新。它还在队列里（不是失败），点「刷新状态」可以再查一次。`
   }
   if (state.phase === 'succeeded') {
     const merges = state.suggestMerges.length
       ? `　合并建议（${state.suggestMerges.join('、')}）：只是建议，必须人工确认后才会合并。`
       : ''
-    return `整理只生成候选版本：它不会自动发布，也不会改动原问答。若正文读取返回 404，那是权限或存在性被隐藏，不是"没有这条词条"。${merges}`
+    return `整理只生成候选版本：它不会自动发布，也不会改动原来的问答。如果打开正文时提示找不到，那是权限或存在性被隐藏，不是「没有这条词条」。${merges}`
   }
   if (state.reused) {
-    return '这次请求命中了同一个 request_id 的首次结果（幂等）：没有创建重复任务。'
+    return '这次提交命中了同一个提交标识的首次结果（幂等）：没有创建重复任务。'
   }
   return ''
 }

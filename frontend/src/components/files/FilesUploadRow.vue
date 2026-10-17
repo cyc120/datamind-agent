@@ -69,16 +69,16 @@ function onApprove(): void {
       class="fur-gate"
       data-testid="files-not-approvable"
     >
-      当前状态不能复核：仅 succeeded / partial_failure 可以通过复核闸门。
+      当前状态不能复核：只有「已入库」与「部分失败」可以通过复核闸门。
     </p>
 
-    <!-- 四个诚实字段：searchable / index_state / index_note + 状态本身 -->
+    <!-- 四个诚实字段：能否被检索 / 索引状态 / 索引说明 + 状态本身 -->
     <div class="fur-fields">
       <span class="fur-f" data-testid="files-row-searchable">{{ row.searchableText }}</span>
       <span class="fur-f" data-testid="files-row-index-state">{{ row.indexStateText }}</span>
       <span class="fur-f" data-testid="files-row-index-note">{{ row.indexNoteText }}</span>
       <span v-if="row.blockCount != null" class="fur-f">
-        契约块 {{ row.blockCount }} · 定位器 {{ row.locatorCount ?? 0 }}
+        契约块 {{ row.blockCount }} · 定位记录 {{ row.locatorCount ?? 0 }}
       </span>
     </div>
 

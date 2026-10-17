@@ -59,9 +59,12 @@ function viewBBox(viewId: string): string {
       图元明细<span class="cad-sec-tag">{{ entities.length }} 个图元 / {{ views.length }} 个视图</span>
     </h2>
     <p class="cad-hint">
-      本地解析的原文证据。要素定位器只有
-      <code>source_sha256 + handle + layer + view_id + coordinate_system + layout</code>
-      六项全部一致才算有效；这张表用来核对定位器，不用来证明图纸获得审批或生产资格。
+      这里是本地解析出的原文证据。一条要素要被认定「定位可信」，下面六项必须全部一致：
+      <code>source_sha256</code>（源文件哈希）、<code>handle</code>（元素标识）、<code>layer</code>（图层）、
+      <code>view_id</code>（视图）、<code>coordinate_system</code>（坐标系）、<code>layout</code>（布局）。
+    </p>
+    <p class="cad-hint">
+      这张表用来核对定位器，不用来证明图纸获得审批或生产资格。
     </p>
 
     <CadErrorNote :error="error" testid="cad-entities-error" />

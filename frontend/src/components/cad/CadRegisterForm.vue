@@ -137,22 +137,24 @@ function submit(): void {
       登记不代表审批或生产质量结论。
     </p>
     <p class="cad-hint" data-testid="cad-provenance-note">
-      provenance 是登记人的自述（界面上标成「（登记声明）」），服务端不验证其真实性。
+      provenance（来源）是登记人的自述，界面上标成「（登记声明）」，服务端不验证它是否属实。
     </p>
-    <p class="cad-hint" data-testid="cad-idempotent-note">
-      幂等重试路径：**重发同一个 request_id、且内容完全一致**会返回既有版本，不会重复登记；
-      内容或操作者一旦不同就会 409 <code>CAD_REQUEST_ID_REUSED</code>。所以本页对同一份内容复用同一个
-      request_id，内容一改就换新 id。
-    </p>
-    <p class="cad-hint" data-testid="cad-parser-note">
-      本读取器 <code>dxf-native-v1</code> **要求源文件带 handle**：没有 handle 的 DXF 会直接 422 失败。
-      本页不提供、也不承诺「部分解析」或「按位置对齐」的降级结果。
-    </p>
+    <ul class="cad-note" data-testid="cad-idempotent-note">
+      <li>重复提交同一份内容不会登记出两条版本：服务端用 request_id 识别「这是同一次登记的重试」。</li>
+      <li>前提是 request_id 相同<b>且</b>内容完全一致。</li>
+      <li>内容或操作者一旦不同，服务端就返回 409 CAD_REQUEST_ID_REUSED 拒绝。</li>
+      <li>所以本页对同一份内容复用同一个 request_id，内容一改就换新 id。</li>
+    </ul>
+    <ul class="cad-note" data-testid="cad-parser-note">
+      <li>本页用 dxf-native-v1 读取器，它<b>要求源文件里带 handle</b>（图纸元素自带的唯一标识）。</li>
+      <li>没有 handle 的 DXF 会直接 422 失败。</li>
+      <li>本页不提供、也不承诺「部分解析」或「按位置对齐」这类降级结果。</li>
+    </ul>
 
     <p v-if="!identityLoaded" class="cad-hint">正在读取身份…</p>
     <p v-else-if="!canRegister" class="cad-hint cad-warnline" data-testid="cad-register-denied">
-      当前身份不能登记：本动作需要 ADMIN 角色（当前：{{ anonymous ? '匿名' : rolesText || '—' }}）。
-      表单仍然显示，但提交入口是关闭的 —— 不假装能写。
+      当前身份不能登记：登记需要 ADMIN（管理员）角色（当前：{{ anonymous ? '匿名' : rolesText || '—' }}）。
+      表单仍然显示，但提交入口是关闭的，不假装能写。
     </p>
 
     <CadErrorNote :error="sourcesError" testid="cad-sources-error" />
@@ -202,22 +204,31 @@ function submit(): void {
           <input v-model="prevSha" type="text" data-testid="cad-register-prev-sha" />
         </label>
       </div>
-      <p class="cad-hint">
-        链尾必须对齐：第一次登记 previous_version=0 且 previous_source_sha256 为空；
-        已有版本的资产要填 v{{ chainVersion ?? '—' }} 与
-        <code>{{ shortHash(chainSourceSha256, 16) }}</code>。对不上会 409
-        <code>CAD_VERSION_CHANGED</code>，重新加载后再试即可。
-      </p>
-      <p
+      <ul class="cad-note">
+        <li>第一次登记：previous_version 填 0，previous_source_sha256 留空。</li>
+        <li>
+          已有版本的资产：previous_version 填 v{{ chainVersion ?? '—' }}，previous_source_sha256 填
+          <code>{{ shortHash(chainSourceSha256, 16) }}</code>。
+        </li>
+        <li class="is-tech">
+          两者必须对齐当前链尾；对不上会返回 409 <code>CAD_VERSION_CHANGED</code>，重新加载后再试即可。
+        </li>
+      </ul>
+      <div
         v-if="defaultDocumentId && docId.trim() && docId.trim() !== defaultDocumentId"
         class="cad-warnline"
         data-testid="cad-register-docid-warning"
       >
-        你改动了 document_id（当前选中资产的 id 是 <code>{{ defaultDocumentId }}</code>）：
-        如果这是一份**全新资产**，previous_version 必须是 0 且 previous_source_sha256 留空；
-        如果这份资产**已经存在**，必须填它自己的当前版本号与当前 source_sha256 ——
-        本页只知道当前选中资产的链尾，不会替另一份资产猜链尾。填错会 409 CAD_VERSION_CHANGED。
-      </p>
+        <p>
+          你改动了 document_id（当前选中资产的 id 是 <code>{{ defaultDocumentId }}</code>）。请据此填写版本链：
+        </p>
+        <ul class="cad-note">
+          <li>如果这是一份<b>全新资产</b>：previous_version 必须是 0，previous_source_sha256 留空。</li>
+          <li>如果这份资产<b>已经存在</b>：必须填它自己的当前版本号与当前 source_sha256。</li>
+          <li>本页只知道当前选中资产的链尾，不会替另一份资产猜链尾。</li>
+          <li class="is-tech">填错会返回 409 <code>CAD_VERSION_CHANGED</code>。</li>
+        </ul>
+      </div>
 
       <CadErrorNote :error="submitError" testid="cad-register-error" />
       <p v-if="submitNotice" class="cad-ok" data-testid="cad-register-notice">{{ submitNotice }}</p>
@@ -261,6 +272,51 @@ function submit(): void {
 }
 .cad-warnline {
   color: #b45309;
+}
+.cad-warnline > p {
+  margin: 0 0 6px;
+}
+/* 说明文字按条列出：每行一条、前面一个蓝点（与 CadPage 的 .cad-note 同一套写法）。 */
+.cad-note {
+  margin: 0 0 8px;
+  padding: 0;
+  max-width: 1000px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--color-text);
+}
+.cad-note > li {
+  position: relative;
+  padding-left: 15px;
+}
+.cad-note > li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.62em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+.cad-note b {
+  font-weight: 600;
+  color: var(--color-accent);
+}
+.cad-note .is-tech {
+  font-size: 12.5px;
+  color: var(--color-body);
+}
+.cad-note code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  background: var(--color-ink);
+  border-radius: 5px;
+  padding: 1px 5px;
 }
 .cad-hint code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;

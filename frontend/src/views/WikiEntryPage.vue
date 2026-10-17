@@ -701,7 +701,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
           <p class="wk-error-msg">{{ pageError.message }}</p>
           <p class="wk-note">{{ errorCopy(pageError.code).note }}</p>
           <p class="wk-note">
-            这不是"这个知识库是空的"：读取失败与空集合是两件事，所以这里不显示空态文案。
+            这不是「这个知识库是空的」：读取失败与空集合是两件事，所以这里不显示空态文案。
           </p>
           <div class="wk-actions">
             <button v-if="errorCopy(pageError.code).retry" class="wk-btn" type="button" @click="reload">重试</button>
@@ -751,13 +751,13 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
             <!-- ══ 关系图一步 ══ -->
             <section v-if="showGraph" class="wk-col" data-testid="graph-column">
               <h2 class="wk-col-title">当前授权范围图</h2>
-              <p class="wk-note">
-                这里嵌的是<strong>当前授权范围图</strong>（不是全库全图，也不是"本词条的全库邻域"）：
-                进入这一步时已预选本词条，可以直接看它在<strong>已加载</strong>集合里的位置；
-                点别的节点只改选中，点「打开详情」才跳转到那个词条的深链。
-                本词条自己的邻域统计在详情那一步的「关系」卡片里（两个口径分开说，不混成一个数字）。
-                离开这一步会卸载关系图（布局模拟随之停止），不是把它留在后台继续算。
-              </p>
+              <ul class="wk-note-list">
+                <li>这里嵌的是<strong>当前授权范围图</strong>，不是全库全图，也不是「这个词条的全库邻居」。</li>
+                <li>进入这一步时已经预选了这个词条，可以直接看它在<strong>已加载</strong>集合里的位置。</li>
+                <li>点别的节点只改选中；点「打开详情」才跳转到那个词条的详情页。</li>
+                <li>这个词条自己的邻域统计在详情的「关系」卡片里，两个口径分开说，不混成一个数字。</li>
+                <li>离开这一步会卸载关系图，布局计算随之停止，不会留在后台继续算。</li>
+              </ul>
               <WikiForceGraph
                 v-model:selectedEntryId="graphSelected"
                 height="min(56vh, 620px)"
@@ -783,7 +783,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
                   <dd data-testid="status-revision">
                     {{ revision ? statusLabel(revision.publication_status) : '（没有版本对象）' }}
                     <span class="wk-note-inline">
-                      —— 历史版本只带它自己记录的状态；把当前状态贴到历史版本上就是用新事实改写历史读取。
+                      历史版本只带它自己记录的状态。把当前状态贴到历史版本上，等于用新事实改写历史的读取结果。
                     </span>
                   </dd>
                   <dt>业务键人工确认</dt>
@@ -955,16 +955,16 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
                 </ul>
                 <p v-else class="wk-note">本版本没有关系记录（<code class="wk-code">relations: []</code>）。</p>
 
-                <h3 class="wk-sub-title">授权关系邻域（#6 接口的独立口径）</h3>
+                <h3 class="wk-sub-title">授权关系邻域（这一项是单独一次统计）</h3>
                 <p v-if="partErrors.neighborhood" class="wk-error-note" data-testid="neighborhood-error">
-                  邻域读取失败（{{ partErrors.neighborhood.errorCode || 'HTTP_ERROR' }}）：
-                  {{ partErrors.neighborhood.message }} —— 这是读取失败，不是"没有邻居"。
+                  邻域读取失败（错误码 {{ partErrors.neighborhood.errorCode || 'HTTP_ERROR' }}）：
+                  {{ partErrors.neighborhood.message }}。这是读取失败，不是「没有邻居」。
                 </p>
                 <template v-else-if="neighborhood">
                   <p class="wk-note" data-testid="neighborhood-line">{{ neighborhoodLine }}</p>
                   <p class="wk-note">
-                    邻域与空间图是两个不同的口径：这里是<strong>本词条</strong>在授权范围内的邻居
-                    （depth 1 / 每批 50），空间图是<strong>整个授权范围</strong>的一页。
+                    邻域与空间图是两个不同的口径：这里算的是<strong>这一个词条</strong>在授权范围内的邻居
+                    （只取一层，每批 50 个）；空间图是<strong>整个授权范围</strong>的一页。
                     两者都只统计当前授权、当前图层、已加载的对象。
                   </p>
                   <ul v-if="neighborEntries.length" class="wk-chips">
@@ -983,10 +983,10 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
                 </h2>
 
                 <p v-if="partErrors.provenance" class="wk-error-note" data-testid="provenance-error">
-                  证据与轨迹读取失败（{{ partErrors.provenance.errorCode || 'HTTP_ERROR' }}）：
-                  {{ partErrors.provenance.message }} —— 读取失败<strong>不等于</strong>"没有证据"。
+                  证据与轨迹读取失败（错误码 {{ partErrors.provenance.errorCode || 'HTTP_ERROR' }}）：
+                  {{ partErrors.provenance.message }}。读取失败<strong>不等于</strong>「没有证据」。
                   <template v-if="detail?.provenance_summary">
-                    下面是 #3 详情接口顺带返回的摘要（口径相同、覆盖面更小）。
+                    下面是词条详情接口顺带返回的摘要，口径相同但覆盖面更小。
                   </template>
                 </p>
 
@@ -1006,14 +1006,15 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
                 </template>
 
                 <p v-if="provenanceMeta?.truncated" class="wk-warn wk-warn-tight" data-testid="evidence-truncated">
-                  证据引用<strong>已截断</strong>（超过单次可返回条数上限）：这不是"只有这些"，请按版本或范围缩小。
+                  证据引用<strong>已截断</strong>（超过单次可返回的条数上限）：这不是「只有这些」，
+                  请按版本或范围缩小后再查。
                 </p>
                 <p v-else-if="provenanceMeta?.hasMore" class="wk-warn wk-warn-tight">
-                  事件<strong>尚有后续</strong>（本页只是前一批，可以继续翻页）——与"已截断"不是同一件事。
+                  事件<strong>还有后续</strong>（本页只是前一批，可以继续翻页）。这与「已截断」不是同一件事。
                 </p>
 
                 <p v-if="!evidenceList.length && !partErrors.provenance" class="wk-note" data-testid="evidence-empty">
-                  本次返回的证据清单为空。它与"读取失败"是两件事：上面没有失败提示，所以这是"确实没有"。
+                  这次返回的证据清单是空的。它和「读取失败」是两件事：上面没有失败提示，所以这里确实是「没有」。
                 </p>
 
                 <ul v-else class="wk-list">
@@ -1039,19 +1040,18 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
                     </p>
                     <p class="wk-note">定位：{{ locatorText(item) }}</p>
                     <p class="wk-note">
-                      内容摘要 content_sha256：<span class="wk-mono">{{ shortHash(item.content_sha256) || '（字段缺失）' }}</span>
+                      内容摘要 <span class="wk-mono">{{ shortHash(item.content_sha256) || '（字段缺失）' }}</span>
                       · 指纹 <span class="wk-mono">{{ shortHash(item.fingerprint) || '（字段缺失）' }}</span>
                     </p>
                     <blockquote v-if="item.excerpt" class="wk-quote">{{ item.excerpt }}</blockquote>
                     <p v-else-if="item.excerpt_withheld" class="wk-note">
-                      原文被授权扣留（<code class="wk-code">excerpt_withheld=true</code>）：<strong>有</strong>原文但这次不给，
-                      与"没有可引用原文"是两件事。
+                      原文被授权策略扣留：<strong>有</strong>原文，但这一次不给。这与「没有可引用原文」是两件事。
                     </p>
                     <p v-else class="wk-note">
-                      没有可引用的原文（<code class="wk-code">excerpt_available=false</code>）。
+                      没有可引用的原文（服务端标注 <code class="wk-code">excerpt_available=false</code>）。
                     </p>
                     <p v-if="item.provenance_incomplete?.applies" class="wk-warn wk-warn-tight">
-                      该引用的溯源不完整：见下方 provenance_incomplete 声明。
+                      这条引用的溯源不完整，详见下方「声明与提示」里的说明。
                     </p>
                   </li>
                 </ul>
@@ -1064,8 +1064,8 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
                 </h2>
 
                 <p v-if="eventsUnavailable" class="wk-warn" data-testid="events-unavailable">
-                  轨迹事件<strong>读取失败</strong>（服务端标注 events_unavailable）：这里<strong>不</strong>显示为
-                  "没有事件"，因为"读不到"与"确实没有"是两件事。
+                  轨迹事件<strong>读取失败</strong>：这里<strong>不</strong>显示成「没有事件」，
+                  因为「读不到」与「确实没有」是两件事。
                 </p>
 
                 <h3 class="wk-sub-title">相关运行（{{ runs.length }} 条）</h3>
@@ -1169,17 +1169,18 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
                     :class="{ 'wk-warn-tight': !provenanceSummary.provenance_incomplete.applies }"
                     data-testid="provenance-incomplete"
                   >
-                    provenance_incomplete.applies =
-                    {{ provenanceSummary.provenance_incomplete.applies ? 'true' : 'false' }}<template
+                    溯源完整性：{{ provenanceSummary.provenance_incomplete.applies ? '不完整' : '本次投影不适用' }}<template
                       v-if="provenanceSummary.provenance_incomplete.applies"
-                    >：缺失字段 <span class="wk-mono">{{ (provenanceSummary.provenance_incomplete.missing_fields || []).join('、') || '（未列出）' }}</span>
+                    >。缺失字段 <span class="wk-mono">{{ (provenanceSummary.provenance_incomplete.missing_fields || []).join('、') || '（未列出）' }}</span>
                       · 理由码 <span class="wk-mono">{{ text(provenanceSummary.provenance_incomplete.reason_code) }}</span>
                       · 检出时间 {{ whenText(provenanceSummary.provenance_incomplete.detected_at) || '（字段缺失）' }}
                     </template>
-                    <template v-else>（本次投影不适用；缺失不被推测补全）</template>
+                    <template v-else>。缺失的字段不会被推测补全。</template>
                   </p>
                 </template>
-                <p v-else class="wk-note">服务端没有给出 provenance_incomplete 段（不猜它是"完整"还是"缺失"）。</p>
+                <p v-else class="wk-note">
+                  服务端没有给出溯源完整性这一段，所以本页不判断它是「完整」还是「缺失」。
+                </p>
 
                 <ul v-if="provenanceMeta?.warnings?.length" class="wk-warn-list">
                   <li v-for="code in provenanceMeta.warnings" :key="code">
@@ -1188,18 +1189,18 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
                 </ul>
 
                 <p class="wk-note">
-                  权限口径：本页所有读取走同一个授权投影；"看不到"不等于"不存在"。
-                  <template v-if="provenanceMeta?.truncated">证据引用已因上限截断（上方已标明）。</template>
-                  <template v-else>分页、邻域、轨迹的"尚有后续 / 已截断"分别标注在各自区块里。</template>
+                  权限口径：本页所有读取都走同一份授权投影，「看不到」不等于「不存在」。
+                  <template v-if="provenanceMeta?.truncated">证据引用已因上限截断，上方已标明。</template>
+                  <template v-else>分页、邻域、轨迹的「还有后续」与「已截断」分别标注在各自区块里。</template>
                 </p>
                 <p v-if="entry?.demo_data" class="wk-warn" data-testid="demo-notice">
-                  demo_data=true：本库数据是<strong>合成演示数据</strong>，不代表真实工厂数据、真实审批或独立准确率结论。
+                  本库数据是<strong>合成演示数据</strong>，不代表真实工厂数据、真实审批或独立准确率结论。
                 </p>
                 <p class="wk-note">
                   词条自报的可见关系数：{{ entry?.relation_counts?.visible ?? '（字段缺失）' }}
-                  （口径 {{ entry?.relation_counts?.scope ?? '（缺失）' }}；
+                  （统计口径 {{ entry?.relation_counts?.scope ?? '（缺失）' }}；
                   该词条层面是否被截断：{{ entry?.relation_counts?.truncated == null ? '（字段缺失）' : entry.relation_counts.truncated ? '是' : '否' }}）。
-                  它与本页"邻域已加载数"不是同一个口径。
+                  它和本页上面「邻域已加载数」不是同一个口径。
                 </p>
                 <p class="wk-note">
                   版本数 {{ entry?.revision_count ?? '（字段缺失）' }} ·
@@ -1508,6 +1509,37 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   font-size: 13px;
   line-height: 1.7;
   color: var(--color-body);
+}
+
+/* 说明文字按条列出：每行一条、前面一个蓝点（与 WikiPage 的 .wk-note-list 同一套写法）。
+   类名前缀 wk- 不会撞 Tailwind 工具类。 */
+.wk-note-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--color-body);
+}
+.wk-note-list > li {
+  position: relative;
+  padding-left: 15px;
+}
+.wk-note-list > li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.62em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+.wk-note-list strong {
+  color: var(--color-text);
 }
 
 .wk-note-inline {

@@ -186,6 +186,38 @@ const checkIssues = computed(() => {
   const list = payload.value.issues
   return Array.isArray(list) ? list : []
 })
+
+/* ── 后端枚举 → 中文：界面上不直接甩英文码（未收录的取值仍原样露出，不猜） ── */
+
+const COMPLIANCE_TEXT: Record<string, string> = {
+  out_of_range: '超出区间',
+  within_range: '落在区间内',
+}
+
+const AGREEMENT_TEXT: Record<string, string> = {
+  unresolved: '两侧仍不一致（未消解）',
+  consistent: '两侧一致',
+  resolved_equivalent: '换算后一致',
+}
+
+const RESOLUTION_STATUS_TEXT: Record<string, string> = {
+  resolved_by_authority: '已按权威规则裁决',
+  needs_review: '待人工复核',
+  unresolved: '未消解',
+}
+
+function complianceText(v: any): string {
+  if (v == null || v === '') return '—'
+  return COMPLIANCE_TEXT[v] ?? String(v)
+}
+function agreementText(v: any): string {
+  if (v == null || v === '') return '—'
+  return AGREEMENT_TEXT[v] ?? String(v)
+}
+function resolutionText(v: any): string {
+  if (v == null || v === '') return '—'
+  return RESOLUTION_STATUS_TEXT[v] ?? String(v)
+}
 </script>
 
 <template>
@@ -279,8 +311,8 @@ const checkIssues = computed(() => {
     <!-- 核验：整行 row，结论 + 双方原值 + 问题 + 规则 -->
     <template v-else-if="node.node_type === 'VerificationCheck'">
       <dl class="kv">
-        <template v-if="payload.compliance"><dt>合规结论</dt><dd><span class="pill" :class="payload.compliance === 'out_of_range' ? 'bad' : payload.compliance === 'within_range' ? 'ok' : 'warn'">{{ payload.compliance }}</span></dd></template>
-        <template v-if="payload.agreement"><dt>来源一致性</dt><dd><span class="pill" :class="payload.agreement === 'unresolved' ? 'bad' : payload.agreement === 'consistent' || payload.agreement === 'resolved_equivalent' ? 'ok' : 'warn'">{{ payload.agreement }}</span></dd></template>
+        <template v-if="payload.compliance"><dt>合规结论</dt><dd><span class="pill" :class="payload.compliance === 'out_of_range' ? 'bad' : payload.compliance === 'within_range' ? 'ok' : 'warn'">{{ complianceText(payload.compliance) }}</span></dd></template>
+        <template v-if="payload.agreement"><dt>来源一致性</dt><dd><span class="pill" :class="payload.agreement === 'unresolved' ? 'bad' : payload.agreement === 'consistent' || payload.agreement === 'resolved_equivalent' ? 'ok' : 'warn'">{{ agreementText(payload.agreement) }}</span></dd></template>
         <template v-if="payload.batch_id"><dt>批次</dt><dd>{{ payload.batch_id }}</dd></template>
         <template v-if="payload.value != null"><dt>实测值</dt><dd><b>{{ withUnit(payload.value, payload.unit) }}</b></dd></template>
         <template v-if="payload.normalized_value != null"><dt>归一值</dt><dd>{{ withUnit(payload.normalized_value, payload.normalized_unit) }}</dd></template>
@@ -312,7 +344,7 @@ const checkIssues = computed(() => {
       <dl class="kv">
         <template v-if="payload.conflict_type"><dt>冲突类型</dt><dd>{{ payload.conflict_type }}</dd></template>
         <template v-if="payload.metric"><dt>指标</dt><dd>{{ payload.metric }}</dd></template>
-        <template v-if="payload.resolution_status"><dt>状态</dt><dd><span class="pill" :class="payload.resolution_status === 'resolved_by_authority' ? 'ok' : payload.resolution_status === 'needs_review' ? 'warn' : 'bad'">{{ payload.resolution_status }}</span></dd></template>
+        <template v-if="payload.resolution_status"><dt>状态</dt><dd><span class="pill" :class="payload.resolution_status === 'resolved_by_authority' ? 'ok' : payload.resolution_status === 'needs_review' ? 'warn' : 'bad'">{{ resolutionText(payload.resolution_status) }}</span></dd></template>
         <template v-if="payload.rule_id"><dt>规则</dt><dd class="mono">{{ payload.rule_id }}</dd></template>
         <template v-if="payload.rule_version"><dt>规则版本</dt><dd>{{ payload.rule_version }}</dd></template>
         <template v-if="payload.entity_key"><dt>实体</dt><dd class="mono">{{ fmt(payload.entity_key) }}</dd></template>

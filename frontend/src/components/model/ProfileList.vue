@@ -108,7 +108,7 @@ function headerSummary(profile: ModelProfile): string {
       </div>
 
       <p class="mpl-model" :class="{ 'is-missing': !p.model }" data-testid="model-profile-model">
-        {{ p.model || '未填模型（保存/探活前必须填写）' }}
+        {{ p.model || '未填模型（保存或探活前必须填写）' }}
       </p>
       <p class="mpl-meta">{{ p.base_url || '未填接口地址' }}</p>
       <p v-if="headerSummary(p)" class="mpl-meta">{{ headerSummary(p) }}</p>

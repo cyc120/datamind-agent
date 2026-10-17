@@ -108,13 +108,13 @@ const withinRange = computed(() => comparison.value?.status === 'within_annotati
 
         <div class="dimr-grid">
           <div class="dimr-cell">
-            <div class="dimr-key">测量原值 measurement_original</div>
+            <div class="dimr-key">测量原值</div>
             <div class="dimr-val" data-testid="dim-measurement-original">
               {{ valueWithUnit(comparison.measurement_original.value, comparison.measurement_original.unit) }}
             </div>
           </div>
           <div class="dimr-cell">
-            <div class="dimr-key">标注原值 annotation_original</div>
+            <div class="dimr-key">标注原值（图纸上写的）</div>
             <div class="dimr-val" data-testid="dim-annotation-original">
               raw = {{ comparison.annotation_original.raw }}
             </div>
@@ -124,7 +124,7 @@ const withinRange = computed(() => comparison.value?.status === 'within_annotati
             </div>
           </div>
           <div class="dimr-cell">
-            <div class="dimr-key">归一后 normalized_mm</div>
+            <div class="dimr-key">换算成毫米后（normalized_mm）</div>
             <div class="dimr-val" data-testid="dim-normalized-mm">
               measurement = {{ comparison.normalized_mm.measurement }}
             </div>
@@ -141,15 +141,19 @@ const withinRange = computed(() => comparison.value?.status === 'within_annotati
           </span>
         </div>
 
-        <p class="dimr-caveat">
-          原值与归一值<b>都</b>显示：inch→mm 换算后才可比较，但原始记录不被替换。区间关系只来自图纸标注的
-          上下界；它不等于公差判定、不等于产品质量判定，也不构成任何制造授权。
-        </p>
+        <ul class="dimr-caveat-list">
+          <li>原值与归一值都会显示：inch→mm 换算之后才能比较，但原始记录不会被替换。</li>
+          <li>区间关系只来自图纸标注的上下界。</li>
+          <li>它不等于公差判定，不等于产品质量判定，也不构成任何制造授权。</li>
+        </ul>
       </div>
 
       <!-- 未认识的 status：原样露出，不猜 -->
       <div v-else class="dimr-block" data-testid="dim-result-unknown">
-        <p class="dimr-why">状态未知：{{ result.status }}（本页只认 compared / blocked，原样显示不猜）</p>
+        <p class="dimr-why">
+          状态未知：<code>{{ result.status }}</code>。本页只认 compared（已对照）与 blocked（已阻断）
+          两种状态，其它取值原样显示，不做猜测。
+        </p>
         <p v-if="result.reason" class="dimr-why">{{ reasonText(result.reason) }}</p>
         <p v-else class="dimr-why">后端未给出 reason。</p>
       </div>
@@ -161,25 +165,22 @@ const withinRange = computed(() => comparison.value?.status === 'within_annotati
           <p class="dimr-fact-q">回答的问题：<b>这份输入与这次对照，能不能当作正式依据？</b></p>
           <ul class="dimr-fact-list">
             <li>
-              authentication_verified =
               <code :class="{ 'dimr-bool-true': result.authentication_verified }">
-                {{ result.authentication_verified }}
+                authentication_verified = {{ result.authentication_verified }}
               </code>
-              —— 输入是作者自述的合成 / 本地记录，不是外部认证过的数据。
+              <span>含义：输入是作者自述的合成 / 本地记录，不是外部认证过的数据。</span>
             </li>
             <li>
-              formal_drawing_approval =
               <code :class="{ 'dimr-bool-true': result.formal_drawing_approval }">
-                {{ result.formal_drawing_approval }}
+                formal_drawing_approval = {{ result.formal_drawing_approval }}
               </code>
-              —— 本流程不做图纸的正式批准。
+              <span>含义：本流程不做图纸的正式批准。</span>
             </li>
             <li>
-              product_quality_conclusion =
               <code :class="{ 'dimr-bool-true': result.product_quality_conclusion }">
-                {{ result.product_quality_conclusion }}
+                product_quality_conclusion = {{ result.product_quality_conclusion }}
               </code>
-              —— 对照结果不是产品质量判定。
+              <span>含义：对照结果不是产品质量判定。</span>
             </li>
           </ul>
         </section>
@@ -302,6 +303,33 @@ const withinRange = computed(() => comparison.value?.status === 'within_annotati
   line-height: 1.7;
   color: var(--color-text);
 }
+/* 一段话里塞了三个结论时改成列表：一条一个结论，前面一个蓝点。
+   类名前缀 dimr- 不会撞 Tailwind 工具类。 */
+.dimr-caveat-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--color-text);
+}
+.dimr-caveat-list > li {
+  position: relative;
+  padding-left: 15px;
+}
+.dimr-caveat-list > li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.62em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
 .dimr-compare {
   margin-top: 10px;
 }
@@ -369,6 +397,10 @@ const withinRange = computed(() => comparison.value?.status === 'within_annotati
   font-size: 13.5px;
   color: var(--color-body);
   line-height: 1.8;
+}
+.dimr-fact-list > li span {
+  display: block;
+  color: var(--color-text);
 }
 .dimr-fact-line {
   margin: 6px 0 0;

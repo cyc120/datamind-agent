@@ -516,7 +516,7 @@ onMounted(async () => {
       <header class="topbar">
         <div class="tb-left">
           <span class="tb-title">模型接入</span>
-          <span class="tb-note">这里只回答「配了没有」；密钥是否有效、模型能否应答要靠探活证明</span>
+          <span class="tb-note">本页只回答「配了没有」；密钥是否有效、模型能否应答，要靠探活证明</span>
         </div>
         <button class="tb-action" type="button" :disabled="listLoading || configLoading" @click="refresh">
           {{ listLoading || configLoading ? '刷新中…' : '刷新' }}
@@ -532,16 +532,18 @@ onMounted(async () => {
         <section v-if="permissionBlocked" class="mp-panel mp-panel-perm" data-testid="model-permission">
           <h2 class="mp-h2">模型接入需要管理员身份</h2>
           <p class="mp-line" data-testid="model-permission-text">{{ listError?.text }}</p>
-          <p class="mp-line">
-            <code>/v1/model/*</code> 的全部 12 个路由——<strong>包括读取</strong>——都要求
-            <code>admin</code> 角色（配置视图带接口地址与密钥掩码，中间件把整个前缀归到 admin）。
-            所以匿名或 viewer / reviewer / approver 身份拿到
-            <code>403 PERMISSION_DENIED</code> 是设计如此；拿到 401 则说明会话已失效。
-          </p>
-          <p class="mp-line">当前身份：{{ identityText }}（admin 会通过全部权限门）</p>
-          <p class="mp-line mp-hint">
-            本页不会因为读不到配置就假装"没有配置"：现在显示的就是"读不到"，而不是"未配置"。
-          </p>
+          <ul class="mp-facts">
+            <li>模型接入的全部接口<b>包括读取</b>都要求 admin（管理员）角色。</li>
+            <li>原因是配置视图里带接口地址与密钥掩码，不属于普通身份可见的范围。</li>
+            <li>所以匿名或普通身份被拒是设计如此，不是系统故障。</li>
+            <li>当前身份：{{ identityText }}（admin 会通过全部权限门）。</li>
+            <li class="is-hint">
+              本页不会因为读不到配置就假装「没有配置」：现在显示的是「读不到」，不是「未配置」。
+            </li>
+            <li class="is-tech">
+              被拒时服务端返回 <code>403 PERMISSION_DENIED</code>；如果拿到 401，说明会话已失效。
+            </li>
+          </ul>
           <button class="mp-btn" type="button" :disabled="listLoading" data-testid="model-permission-retry" @click="refresh">
             重新读取
           </button>
@@ -626,13 +628,12 @@ onMounted(async () => {
 
             <ul class="mp-facts is-subtle" data-testid="model-clear-note">
               <li>
-                这是单配置兼容面（<code>DELETE /v1/model/config</code>）的动作：
-                <b>只清空「当前启用」那条配置的 api_key 字段</b>。
+                「清空启用配置的密钥」<b>只清空当前启用那条配置的 api_key 字段</b>。
               </li>
               <li class="is-hint">配置条目、端点与模型都保留；其他配置不受影响，这也不是删除配置。</li>
               <li class="is-hint">
-                右侧配置编辑表单里<b>刻意没有</b>「清空密钥」入口：<code>__clear__</code>
-                只对敏感请求头与代理有效，把它当 api_key 提交会把字面量存成密钥。
+                右侧配置编辑表单里<b>不提供</b>「清空密钥」入口：<code>__clear__</code>
+                这个标记只对敏感请求头与代理有效，把它当 api_key 提交会把字面量存成密钥。
               </li>
             </ul>
 
@@ -675,14 +676,18 @@ onMounted(async () => {
             <div class="mp-panel mp-profiles">
               <h2 class="mp-h2">已保存的配置（{{ profiles.length }}）</h2>
               <p class="mp-hint">
-                列表里的协议 / has_key / active 都是服务端下发的安全视图：没有密钥值，也没有敏感头的值。
+                列表里的协议、是否填过密钥、是否启用，都是服务端下发的安全视图：
+                既没有密钥值，也没有敏感请求头的值。
               </p>
               <p v-if="!profiles.length" class="mp-empty" data-testid="model-empty">
                 还没有任何接入配置。点右上「新建配置」，选一个预设、填入 API 密钥后「保存并启用」。
-                <span v-if="config?.environment_fallback || config?.source === 'environment'">
-                  注意：环境变量里似乎有兜底密钥，问数可能仍在工作；但那些密钥不在本页的配置里，
-                  这里既看不到也不能证明它当前生效。
-                </span>
+              </p>
+              <p
+                v-if="!profiles.length && (config?.environment_fallback || config?.source === 'environment')"
+                class="mp-empty"
+              >
+                注意：环境变量里似乎有兜底密钥，问数可能仍在工作；但那些密钥不在本页的配置里，
+                这里既看不到、也不能证明它当前生效。
               </p>
               <ProfileList
                 v-else

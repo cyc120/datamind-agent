@@ -512,18 +512,28 @@ onMounted(async () => {
 
       <div class="body">
         <!-- 身份与角色：读接口要身份，写接口要角色；两件事分开说 -->
-        <p class="cad-ident" data-testid="cad-identity">
-          <template v-if="!identityLoaded">正在读取身份（GET /v1/auth/me）…</template>
+        <div class="cad-ident" data-testid="cad-identity">
+          <template v-if="!identityLoaded">正在读取当前身份…</template>
           <template v-else-if="anonymous">
-            当前是**匿名**访问：图纸接口组不在公开读前缀（/v1/documents、/v1/runs、/assets/）里，
-            所以下面每一项读操作都会以 401 <code>LOGIN_REQUIRED</code> 被拒。请先登录再回来。
+            <p><b>当前是匿名访问</b>：图纸功能不对未登录用户开放，下面每一项读取都会被服务端拒绝。</p>
+            <ul class="cad-note">
+              <li>请先登录再回来。</li>
+              <li class="is-tech">被拒时服务端返回 <code>LOGIN_REQUIRED</code>（HTTP 401）。</li>
+            </ul>
           </template>
           <template v-else-if="identity?.user">
-            当前身份：{{ identity.user.display_name }}（角色 {{ rolesText || '—' }}）。
-            登记需要 <b>ADMIN</b>；关联复核需要 <b>REVIEWER</b>（ADMIN 可过所有闸门，APPROVER 在复核接口会被 403 PERMISSION_DENIED）。
+            <p>当前身份：{{ identity.user.display_name }}（角色 {{ rolesText || '—' }}）。</p>
+            <ul class="cad-note">
+              <li>登记图纸版本：需要 <b>ADMIN</b>（管理员）角色。</li>
+              <li>关联复核：需要 <b>REVIEWER</b>（复核员）角色。</li>
+              <li class="is-tech">
+                ADMIN 可以通过所有角色门；APPROVER 在这个复核接口会被 403
+                <code>PERMISSION_DENIED</code> 拒绝。
+              </li>
+            </ul>
           </template>
-          <template v-else>身份未知（/v1/auth/me 读取失败）：下面按钮可能被服务端拒绝，页面照实报错。</template>
-        </p>
+          <template v-else>没有读到当前身份：下面按钮可能被服务端拒绝，页面会照实报错。</template>
+        </div>
         <CadErrorNote :error="identityError" testid="cad-identity-error" />
 
         <!-- 诚实声明：本页所有结论的边界，放在最显眼处 -->
@@ -531,7 +541,9 @@ onMounted(async () => {
           <p>登记不代表审批或生产质量结论。</p>
           <p>复核只确认标注对应哪个候选圆；原文、单位和几何保持不变，不代表图纸审批或生产合格。</p>
           <p>
-            页面上所有 provenance（来源）都标着「（登记声明）」：它是登记时的自述，服务端不验证其真实性。
+            页面上所有 provenance（来源）都标着「（登记声明）」：它只是登记时的自述，服务端不验证真实性。
+          </p>
+          <p>
             门槛冲突（例如 <code>CAD_GEOMETRY_ANNOTATION_CONFLICT</code>）来自原文本身，复核或审批都消除不了。
           </p>
         </section>
@@ -542,18 +554,18 @@ onMounted(async () => {
         <!-- 1) 资产列表 -->
         <section class="cad-section" data-testid="cad-assets">
           <h2 class="cad-sec-title">
-            图纸资产<span class="cad-sec-tag">listDrawings · 每份只列当前版本</span>
+            图纸资产<span class="cad-sec-tag">每份只列当前版本</span>
           </h2>
-          <p class="cad-hint">
-            列表只说明「本地登记过哪些版本」；provenance 是登记人自述
-            （界面统一标注「（登记声明）」），不代表来源已被核实。
-          </p>
+          <ul class="cad-note">
+            <li>列表只说明「本地登记过哪些版本」。</li>
+            <li>provenance（来源）是登记人的自述，界面统一标注「（登记声明）」，不代表来源已被核实。</li>
+          </ul>
 
           <CadErrorNote :error="drawingsError" testid="cad-drawings-error" />
           <p v-if="drawingsLoading" class="cad-hint">正在加载图纸资产…</p>
           <p v-else-if="!drawingsError && !drawings.length" class="cad-hint" data-testid="cad-drawings-empty">
-            还没有登记过任何图纸版本。管理员可以在页面下方「登记图纸版本」里登记第一份 .dxf
-            （需要 ADMIN；本读取器要求源文件带 handle）。
+            还没有登记过任何图纸版本。管理员可以在页面下方「登记图纸版本」里登记第一份 .dxf。
+            登记需要 ADMIN 角色，并且源文件里要带 handle。
           </p>
 
           <ul v-else class="cad-assets" data-testid="cad-asset-list">
@@ -584,12 +596,13 @@ onMounted(async () => {
         <!-- 2) 版本选择器 -->
         <section v-if="selectedDocId" class="cad-section" data-testid="cad-versions">
           <h2 class="cad-sec-title">
-            版本选择<span class="cad-sec-tag">drawingVersions · 当前 v{{ currentVersion ?? '—' }}</span>
+            版本选择<span class="cad-sec-tag">当前 v{{ currentVersion ?? '—' }}</span>
           </h2>
-          <p class="cad-hint">
-            当前版本是 <b>v{{ currentVersion ?? '—' }}</b>。历史版本**可以读，但只读**：切版本会重新拉取该版本的
-            要素与复核历史。复核记录按 (版本, 要素) 分开存储 —— **新版本不继承上一版本的复核结论**。
-          </p>
+          <ul class="cad-note">
+            <li>当前版本是 <b>v{{ currentVersion ?? '—' }}</b>。</li>
+            <li>历史版本可以读，但只读：切版本会重新拉取该版本的要素与复核历史。</li>
+            <li>复核记录按「版本 + 要素」分开存储：<b>新版本不继承上一版本的复核结论</b>。</li>
+          </ul>
 
           <CadErrorNote :error="versionsError" testid="cad-versions-error" />
           <p v-if="versionsLoading" class="cad-hint">正在读取版本历史…</p>
@@ -644,12 +657,14 @@ onMounted(async () => {
               drawing_id <code>{{ detail.identity?.drawing_id?.value ?? '—' }}</code>
               / drawing_revision <code>{{ detail.identity?.drawing_revision?.value ?? '—' }}</code>
               / part_id <code>{{ detail.identity?.part_id?.value ?? '—' }}</code>。
-              图纸版次**不等于**工艺版次，本页不做隐式映射。
+              图纸版次<b>不等于</b>工艺版次，本页不做推测性对应。
             </p>
             <p class="cad-hint">
               版本指纹：source <code>{{ shortHash(loadedVersion.source_sha256, 16) }}</code>
               · bundle <code>{{ shortHash(loadedVersion.bundle_sha256, 16) }}</code>
-              （复核提交时服务端会 CAS 校验整组指纹）
+            </p>
+            <p class="cad-hint">
+              提交复核时服务端会拿这组指纹做一次 CAS（比较后交换）校验：任何一项过期就拒收。
             </p>
           </div>
           <CadErrorNote :error="detailError" testid="cad-detail-error" />
@@ -737,10 +752,11 @@ onMounted(async () => {
           @submit="submitRegistration"
         />
 
-        <p class="cad-foot">
-          「机器提取」与「人工关联复核」是两份独立数据：复核记录只进 association_reviews / review_gate，
-          不会改写 features[].association_status，也不会让原文、单位或几何发生变化。
-        </p>
+        <ul class="cad-note cad-foot">
+          <li>「机器提取」与「人工关联复核」是两份独立数据，不能互相替代。</li>
+          <li>人工复核记录只进 association_reviews 与 review_gate 两份数据。</li>
+          <li>复核不会改写 features[].association_status，也不会让原文、单位或几何发生变化。</li>
+        </ul>
       </div>
     </div>
   </div>
@@ -832,6 +848,54 @@ onMounted(async () => {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 13px;
   background: rgba(15, 23, 42, 0.06);
+  border-radius: 5px;
+  padding: 1px 5px;
+}
+.cad-ident > p {
+  margin: 0;
+}
+/* 说明文字按条列出：每行一条、前面一个蓝点（与 .gov-note / .fields-note 同一套写法）。
+   原来是整段连排，用户反馈"读不懂、不知道从哪看起"。
+   类名统一 cad- 前缀：Tailwind v4 会生成同名工具类，撞上会出现"只声明了部分属性"的怪象。 */
+.cad-note {
+  margin: 6px 0 8px;
+  padding: 0;
+  max-width: 1000px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--color-text);
+}
+.cad-note > li {
+  position: relative;
+  padding-left: 15px;
+}
+.cad-note > li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.62em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+.cad-note b {
+  font-weight: 600;
+  color: var(--color-accent);
+}
+/* 技术细节（错误码、字段名）压小一档，别和主说明抢注意力 */
+.cad-note .is-tech {
+  font-size: 12.5px;
+  color: var(--color-body);
+}
+.cad-note code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  background: var(--color-ink);
   border-radius: 5px;
   padding: 1px 5px;
 }

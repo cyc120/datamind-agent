@@ -145,9 +145,9 @@ export function indexNoteText(note?: string | null): string {
 }
 
 export function searchableText(searchable?: boolean | null): string {
-  if (searchable === true) return 'searchable=true'
-  if (searchable === false) return 'searchable=false'
-  return 'searchable=未知（该响应没有这个字段）'
+  if (searchable === true) return '检索器读得到'
+  if (searchable === false) return '检索器读不到'
+  return '能否被检索：未知（该响应没有这个字段）'
 }
 
 /** 本管道**只**落契约证据与元数据，不写 chunks / Qdrant 行：vector_index 恒为
@@ -163,7 +163,7 @@ export function searchableCaveat(searchable?: boolean | null): string {
 /* ── worker 诚实（mandatory）────────────────────────────────────────────── */
 
 export const WORKER_NOT_RUNNING_TEXT =
-  '后台处理器未运行：任务不会自行推进。请启动上传 worker（或运行 scripts/start_local.sh）后刷新查看。'
+  '后台处理器未运行：任务不会自行推进。请先启动上传处理器（scripts/start_local.sh 会一并启动），再刷新本页查看。'
 
 export const POLL_EXHAUSTED_TEXT = '轮询已达上限，仍在处理中；请稍后刷新查看。'
 
@@ -171,7 +171,7 @@ export const POLL_EXHAUSTED_TEXT = '轮询已达上限，仍在处理中；请�
  *  触发不了重试 —— 上传管道只有 create/list/detail/approve 四个 HTTP 路由，
  *  retry/cancel 只存在于进程内函数，没有对外路由。 */
 export const RETRY_HONESTY_TEXT =
-  '重试会从头重新解析整个文件（没有断点/检查点；attempt 只表示被领取过几次）。本界面也无法触发重试或取消——上传管道没有暴露 retry/cancel 的 HTTP 路由。'
+  '重试会从头重新解析整个文件，没有断点或检查点；「被领取次数」只表示这个文件被处理器拿起来过几次。本界面也无法触发重试或取消，上传流程没有开放这两个动作。'
 
 export const APPROVE_GATE_NOTE = '未复核前不会出现在可检索文档中。'
 
@@ -210,13 +210,13 @@ export function workerHonesty(
 ): string {
   if (worker && worker.error === 'UPLOAD_WORKER_HEARTBEAT_UNREADABLE') {
     // 心跳读不出来 ≠ 没有 worker：探测失败不能猜成「未运行」。
-    return '后台处理器心跳读不出来（UPLOAD_WORKER_HEARTBEAT_UNREADABLE）：这不等于「未运行」，只是这次探测失败。'
+    return '这次没能读到后台处理器的心跳，但这不等于「它没在运行」，只是这次探测失败了。'
   }
   if (!worker || status == null) return ''
   if (worker.alive === false) {
     if (status === 'queued') return WORKER_NOT_RUNNING_TEXT
     if (status === 'running') {
-      return '状态是「解析中」，但后台处理器已不在运行：这次解析很可能已中断，要等 worker 恢复后由后续波次重新领取（重新领取=从头解析，不是断点续传）。'
+      return '状态显示「解析中」，但后台处理器已不在运行：这次解析很可能已经中断。要等处理器恢复后由后续批次重新领取，而重新领取是从头解析，不是断点续传。'
     }
   }
   return ''
@@ -227,31 +227,31 @@ export function workerHonesty(
    {"detail":[{loc,msg}]}（没有 error_code，client.ts 归一成 VALIDATION_ERROR）。
    `{ok:false,…}` 只是模型探针的响应体，这里不认它。 */
 const ERROR_TEXT: Record<string, string> = {
-  PERMISSION_DENIED: '权限不足：/v1/uploads 全部接口（含读取）都要求 admin 角色。',
-  LOGIN_REQUIRED: '需要登录：该接口不在公开读取前缀里，匿名访问会被默认拒绝。',
+  PERMISSION_DENIED: '权限不足：上传相关的全部接口（包括读取）都要求 admin（管理员）角色。',
+  LOGIN_REQUIRED: '需要先登录：上传接口不对匿名访问开放。',
   SESSION_INVALID: '会话已失效，请重新登录。',
-  CSRF_REQUIRED: '缺少 X-CSRF-Token：写操作必须带 CSRF 令牌（本页经 csrf() 自动获取）。',
-  ORIGIN_NOT_ALLOWED: '来源不被允许：上传必须与本服务同源（不要用绝对地址直连其它端口）。',
-  VALIDATION_ERROR: '服务端 422 校验未通过：FastAPI 自身的校验不带 error_code，这里给的是原始信息。',
-  UPLOAD_FILTER_INVALID: '筛选参数不合法：status 必须是固定枚举，since 必须是 ISO-8601 或 epoch 秒。',
-  UPLOAD_NOT_FOUND: '该上传不存在（id 写错，或记录已被清理）。',
-  UPLOAD_NOT_REVIEWABLE: '当前状态不能复核：只有 succeeded / partial_failure 可以通过复核闸门。',
-  UPLOAD_TOO_LARGE: '文件超过该类型的大小上限（服务端 413）。',
-  UPLOAD_EMPTY: '文件为空（服务端 422 UPLOAD_EMPTY）。',
-  UPLOAD_LENGTH_INVALID: 'Content-Length 不是合法整数。',
-  FILE_TYPE_OR_NAME_INVALID: '文件名或后缀不合法：只能是纯文件名，且后缀在白名单内。',
-  UNSUPPORTED_MEDIA_TYPE: '不支持的文件类型（服务端 415）。',
-  CAD_DWG_CONVERTER_UNAVAILABLE: `${DWG_LOCAL_MESSAGE}（服务端 415；本页也会在本地先拦一次）。`,
+  CSRF_REQUIRED: '缺少安全令牌：写操作必须带上令牌，本页会自动获取，刷新页面即可重试。',
+  ORIGIN_NOT_ALLOWED: '来源不被允许：上传必须从本站页面发起，不要用外部地址直接连过来。',
+  VALIDATION_ERROR: '服务端校验没通过（422）：这类错误不附带错误码，下面显示的是服务端原文。',
+  UPLOAD_FILTER_INVALID: '筛选条件不合法：「状态」必须是固定选项，「此时间之后」必须是标准时间或时间戳。',
+  UPLOAD_NOT_FOUND: '这条上传记录不存在（编号写错，或记录已被清理）。',
+  UPLOAD_NOT_REVIEWABLE: '当前状态不能复核：只有「已入库」与「部分失败」可以通过复核闸门。',
+  UPLOAD_TOO_LARGE: '文件超过该类型的大小上限（服务端返回 413）。',
+  UPLOAD_EMPTY: '文件是空的，服务端拒绝接收。',
+  UPLOAD_LENGTH_INVALID: '文件长度信息不合法。',
+  FILE_TYPE_OR_NAME_INVALID: '文件名或后缀不合法：只能填纯文件名，且后缀必须在允许清单里。',
+  UNSUPPORTED_MEDIA_TYPE: '不支持这种文件类型（服务端返回 415）。',
+  CAD_DWG_CONVERTER_UNAVAILABLE: `${DWG_LOCAL_MESSAGE}（服务端返回 415；本页也会先在本地拦一次）。`,
   UPLOAD_STAGED_SOURCE_INVALID: '暂存的源文件已不可用，无法解析。',
-  UPLOAD_STAGED_SOURCE_CHANGED: '暂存源文件内容与登记哈希不一致，拒绝解析。',
+  UPLOAD_STAGED_SOURCE_CHANGED: '暂存源文件的内容与登记时的哈希不一致，服务端拒绝解析。',
 }
 
 export function errorTextFrom(e: unknown, fallback: string): string {
   const code = typeof (e as any)?.errorCode === 'string' ? ((e as any).errorCode as string) : ''
-  if (code && ERROR_TEXT[code]) return ERROR_TEXT[code]
+  if (code && ERROR_TEXT[code]) return `${ERROR_TEXT[code]}（错误码：${code}）`
   const raw = typeof (e as any)?.message === 'string' ? ((e as any).message as string) : ''
-  if (raw) return code ? `${fallback}：${raw}（error_code=${code}）` : `${fallback}：${raw}`
-  return code ? `${fallback}：error_code=${code}` : fallback
+  if (raw) return code ? `${fallback}：${raw}（错误码：${code}）` : `${fallback}：${raw}`
+  return code ? `${fallback}（错误码：${code}）` : fallback
 }
 
 /* ── 本地预检（镜像服务端，给用户一个快速明确的答案）────────────────────── */

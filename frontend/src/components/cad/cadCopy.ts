@@ -160,7 +160,7 @@ export function cadError(e: any, fallback: string): CadErrorView {
   let text = ''
   if (code && AUTH_ERROR_TEXT[code]) text = AUTH_ERROR_TEXT[code]
   else if (code === 'VALIDATION_ERROR')
-    text = `请求体未通过 FastAPI/pydantic 校验（422 且**不带** error_code）：${raw || '参数不合法'}`
+    text = `请求内容没有通过服务端校验（422，服务端没有给出错误码）：${raw || '参数不合法'}`
   else if (code.startsWith('CAD_SNAPSHOT')) text = SNAPSHOT_ERROR_TEXT
   else if (code && CAD_ERROR_TEXT[code]) text = CAD_ERROR_TEXT[code]
   else if (raw) text = `${fallback}：${raw}`

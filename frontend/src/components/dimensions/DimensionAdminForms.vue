@@ -30,7 +30,9 @@ import {
   checkIdentifier,
   checkSha,
   checkTimestamp,
+  featureAssociationText,
   newRequestId,
+  reviewDecisionText,
   shortHash,
   whenText,
 } from './shared'
@@ -513,12 +515,20 @@ async function lookupBindingHead(): Promise<void> {
     <!-- ── 尺寸记录登记 ─────────────────────────────────────────────── -->
     <section class="dimg-card" data-testid="dim-measurement-form">
       <h3 class="dimg-title">登记尺寸记录（追加新版本）</h3>
-      <p class="dimg-note">
-        measurement_id <b>必须已经写在源文件里</b>（后端会用它和文件内容核对，不一致按
-        DIMENSION_SOURCE_INVALID 拒绝）；previous_version / previous_sha256 必须等于服务端当前链尾，否则 409
-        DIMENSION_MEASUREMENT_STATE_CHANGED。provenance 决定源文件必须位于哪个暂存目录，所以它随所选源文件
-        自动带出，不是自由选项。
-      </p>
+      <ul class="dimg-note-list">
+        <li>
+          measurement_id <b>必须已经写在源文件里</b>：服务端会拿它和文件内容核对，不一致就拒绝。
+        </li>
+        <li>previous_version 与 previous_sha256 必须等于服务端当前的版本链尾，否则拒绝提交。</li>
+        <li>
+          provenance（来源类别）决定源文件必须位于哪个暂存目录，所以它随所选源文件自动带出，
+          不是可以自己选的项。
+        </li>
+        <li class="is-tech">
+          服务端错误码：内容不一致是 <code>DIMENSION_SOURCE_INVALID</code>，链尾对不上是 409
+          <code>DIMENSION_MEASUREMENT_STATE_CHANGED</code>。
+        </li>
+      </ul>
       <p v-if="sourcesError" class="dimg-error" data-testid="dim-sources-error">{{ sourcesError }}</p>
 
       <div class="dimg-grid">
@@ -590,10 +600,11 @@ async function lookupBindingHead(): Promise<void> {
     <!-- ── 绑定登记 ─────────────────────────────────────────────────── -->
     <section class="dimg-card" data-testid="dim-binding-form">
       <h3 class="dimg-title">登记绑定（图纸标注 ↔ 尺寸记录）</h3>
-      <p class="dimg-note" data-testid="dim-binding-prereq">
-        绑定<b>必须</b>引用一条已 confirmed 的关联复核；目标存在歧义时后端 409
-        DIMENSION_CONFIRMED_ASSOCIATION_REQUIRED。关联复核在「图纸与实体」页产生 —— 本表单只读取、不代替人工确认。
-      </p>
+      <ul class="dimg-note-list" data-testid="dim-binding-prereq">
+        <li>绑定<b>必须</b>引用一条已确认（confirmed）的关联复核。</li>
+        <li>目标圆存在歧义时，服务端会以 409 <code>DIMENSION_CONFIRMED_ASSOCIATION_REQUIRED</code> 拒绝。</li>
+        <li>关联复核要到「图纸与实体」页产生；本表单只读取复核记录，不代替人工确认。</li>
+      </ul>
 
       <div class="dimg-tools">
         <button class="dimg-btn" type="button" :disabled="bBusy" data-testid="dim-binding-load-upstream" @click="loadUpstream">
@@ -618,7 +629,7 @@ async function lookupBindingHead(): Promise<void> {
         <div class="dimg-ev-row">
           <span class="dimg-key">要素关联状态</span>
           <span class="dimg-val" data-testid="dim-binding-feature-status">
-            {{ featureStatus || '（尚未读取）' }}
+            {{ featureStatus ? featureAssociationText(featureStatus) : '（尚未读取）' }}
             <template v-if="featureCandidates.length">· 候选 {{ featureCandidates.join('、') }}</template>
             <template v-if="featureExcluded">· 门槛原因 {{ featureExcluded }}</template>
           </span>
@@ -633,7 +644,7 @@ async function lookupBindingHead(): Promise<void> {
         <div v-if="reviews.length" class="dimg-ev-row">
           <span class="dimg-key">复核历史（{{ reviews.length }} 条）</span>
           <span class="dimg-val">
-            最后一条：{{ lastReview?.review_id }} · {{ lastReview?.decision }} · 复核人
+            最后一条：{{ lastReview?.review_id }} · {{ lastReview ? reviewDecisionText(lastReview.decision) : '—' }} · 复核人
             {{ lastReview?.reviewer_label || lastReview?.reviewer_user_id }} ·
             {{ whenText(lastReview?.created_at) }}
           </span>
@@ -643,12 +654,14 @@ async function lookupBindingHead(): Promise<void> {
           class="dimg-ok"
           data-testid="dim-binding-has-confirmed"
         >
-          已读到 confirmed 复核（{{ confirmedReviews.length }} 条）：review_id={{ lastReview.review_id }}、目标
-          {{ lastReview.selected_target || '（未选目标）' }}。绑定只能引用 reviews[-1]，请核对。
+          已读到已确认的复核（共 {{ confirmedReviews.length }} 条）：review_id =
+          {{ lastReview.review_id }}、目标 {{ lastReview.selected_target || '（未选目标）' }}。
+          绑定只能引用最后一条复核，请核对。
         </p>
         <p v-else-if="reviews.length" class="dimg-warn" data-testid="dim-binding-no-confirmed">
-          复核历史里最后一条不是 confirmed（当前：{{ lastReview?.decision }}）：提交绑定会被 409
-          DIMENSION_CONFIRMED_ASSOCIATION_REQUIRED 拒绝，请先去「图纸与实体」页确认关联。
+          复核历史里最后一条不是「已确认」（当前：{{ lastReview ? reviewDecisionText(lastReview.decision) : '—' }}）。
+          这时提交绑定会被服务端以 409 DIMENSION_CONFIRMED_ASSOCIATION_REQUIRED 拒绝，
+          请先去「图纸与实体」页确认关联。
         </p>
       </div>
 
@@ -732,6 +745,48 @@ async function lookupBindingHead(): Promise<void> {
   font-size: 13px;
   line-height: 1.7;
   color: var(--color-text);
+}
+/* 说明文字按条列出：每行一条、前面一个蓝点（与 DimensionsPage 的 .dim-note 同一套写法）。 */
+.dimg-note-list {
+  margin: 6px 0 0;
+  padding: 0;
+  max-width: 1000px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--color-text);
+}
+.dimg-note-list > li {
+  position: relative;
+  padding-left: 15px;
+}
+.dimg-note-list > li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.62em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+.dimg-note-list b {
+  font-weight: 600;
+  color: var(--color-accent);
+}
+.dimg-note-list .is-tech {
+  font-size: 12.5px;
+  color: var(--color-body);
+}
+.dimg-note-list code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  background: var(--color-ink);
+  border-radius: 4px;
+  padding: 1px 5px;
 }
 .dimg-tools {
   display: flex;

@@ -31,11 +31,11 @@ const previewHref = computed(() => drawingPreviewUrl(props.documentId, props.ver
   <section class="cad-section" data-testid="cad-viewer">
     <h2 class="cad-sec-title">图纸查看器<span class="cad-sec-tag">{{ versionLabel }}</span></h2>
     <p class="cad-hint">
-      iframe 的 sandbox 只给 <code>allow-scripts</code>：服务端 viewer 的 CSP 刻意不给
-      <code>allow-same-origin</code>，把图纸脚本与本站隔开。客户端**不补**这一项。
+      图纸在隔离的沙箱里渲染：只能执行脚本，拿不到本站的登录态与数据。这一项由服务端的安全策略决定，
+      客户端不会去放开它。
     </p>
     <p class="cad-hint">
-      这里显示的是服务端本地渲染（<code>ingestion/cad_render</code>）的结果，只证明「本地解析出的几何画得出来」，
+      这里显示的是服务端本地渲染的结果，只证明「本地解析出的几何画得出来」，
       不构成图纸审批、生产绑定或质量结论。
     </p>
 
@@ -51,11 +51,11 @@ const previewHref = computed(() => drawingPreviewUrl(props.documentId, props.ver
     </div>
 
     <p class="cad-links">
-      <a :href="fileHref" data-testid="cad-file-link" rel="noopener">下载原始 DXF（/file）</a>
+      <a :href="fileHref" data-testid="cad-file-link" rel="noopener">下载原始 DXF</a>
       <a :href="previewHref" target="_blank" rel="noopener" data-testid="cad-preview-link">
-        打开 SVG 预览（/preview）
+        打开 SVG 预览
       </a>
-      <span class="cad-links-note">两个链接都是同源相对地址；内部 object_uri 不在接口里，本页也不显示。</span>
+      <span class="cad-links-note">两个链接都指向本站；图纸在服务端的存储位置不下发，本页也不显示。</span>
     </p>
   </section>
 </template>

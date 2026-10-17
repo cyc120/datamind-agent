@@ -51,38 +51,39 @@ export interface AuthorityFailure {
 
 const ERROR_TEXT: Record<string, string> = {
   // 身份 / 权限（默认拒绝中间件）
-  LOGIN_REQUIRED: '需要登录：查询候选与登记规则需要 admin，批准/驳回/撤销需要 approver',
+  LOGIN_REQUIRED: '需要先登录：查询候选与登记规则要 admin（管理员），批准 / 驳回 / 撤销要 approver（审批员）',
   SESSION_INVALID: '登录会话已失效，请重新登录后再操作',
-  PERMISSION_DENIED: '当前账户角色不足：登记需要 admin，批准/驳回/撤销需要 approver（admin 通过所有角色门）',
-  CSRF_REQUIRED: '写操作缺少 X-CSRF-Token（必须同源并带上 /v1/auth/me 下发的令牌），请重新登录后再试',
-  ORIGIN_NOT_ALLOWED: '请求来源不被允许：必须与后端同源，不能用绝对地址',
-  VALIDATION_ERROR: '请求体没通过字段校验（FastAPI 自身的 422，不带 error_code）',
+  PERMISSION_DENIED:
+    '当前账户角色不足：登记规则要 admin（管理员），批准 / 驳回 / 撤销要 approver（审批员）；admin 可以通过所有角色门',
+  CSRF_REQUIRED: '这次写操作缺少安全令牌，请刷新页面重新登录后再试',
+  ORIGIN_NOT_ALLOWED: '请求来源不被允许：只能从本站页面发起，不能用外部地址直连',
+  VALIDATION_ERROR: '请求内容没通过字段校验（服务端返回 422，没有给出错误码）',
   // 登记表单
   AUTHORITY_VALIDITY_INVALID:
-    '有效期不合法：时间必须带显式时区偏移（如 +08:00），且 valid_from ≤ produced_at < valid_to',
+    '有效期不合法：时间必须带时区偏移（如 +08:00），并且起点 ≤ 测量时间 < 终点',
   AUTHORITY_RATIONALE_REQUIRED: '登记理由不能为空',
-  AUTHORITY_CONTEXT_CHANGED: '候选上下文已变化（生产记录 / 报告事实 / 版本已变），请重新查询候选后再登记',
+  AUTHORITY_CONTEXT_CHANGED: '候选的上下文已经变了（生产记录、报告事实或版本已变），请重新查询候选后再登记',
   APPROVED_FIELD_REQUIRED: '报告字段尚未独立审批，请先到字段复核处理。',
-  AUTHORITY_BASIS_INVALID: '依据无效：必须是已发布 PDF，且版本、SHA-256、页码都要对得上（上传件不能作依据）',
-  AUTHORITY_REQUEST_ID_REUSED: '同一请求 ID 已用于不同载荷，已重新加载最新状态，请重新发起',
+  AUTHORITY_BASIS_INVALID: '依据无效：必须是已发布的 PDF，且版本、SHA-256、页码都要对得上（上传件不能作依据）',
+  AUTHORITY_REQUEST_ID_REUSED: '这次提交的标识已经用于另一份内容，已重新加载最新状态，请重新发起',
   // 事件（启用 / 驳回 / 撤销）
-  AUTHORITY_RULE_NOT_FOUND: '规则不存在（可能已超出注册表范围）',
+  AUTHORITY_RULE_NOT_FOUND: '这条规则不存在（可能已超出注册表范围）',
   AUTHORITY_REASON_REQUIRED: '审批理由不能为空',
-  AUTHORITY_STATE_CHANGED: '规则链尾已经变了（另一个账户刚操作过），已重新加载，请基于最新状态重新操作',
-  AUTHORITY_PAYLOAD_CHANGED: '登记载荷与哈希不一致：本条不能作为权威依据，服务端已拒绝启用',
-  AUTHORITY_CREATOR_CANNOT_APPROVE: '创建人不能启用/驳回/撤销自己登记的规则，必须换另一个审批账户',
-  AUTHORITY_CANNOT_APPROVE: '创建人不能启用/驳回/撤销自己登记的规则，必须换另一个审批账户',
-  NO_AUTHORITY_APPROVAL_TO_REVOKE: '撤销需要先有一次已批准的记录（待审批/已驳回的规则没有可撤销的批准）',
+  AUTHORITY_STATE_CHANGED: '规则的链尾已经变了（另一个账户刚操作过），已重新加载，请基于最新状态重新操作',
+  AUTHORITY_PAYLOAD_CHANGED: '登记的载荷与哈希对不上：这一条不能作为权威依据，服务端已拒绝启用',
+  AUTHORITY_CREATOR_CANNOT_APPROVE: '不能启用 / 驳回 / 撤销自己登记的规则，必须换另一个审批账户',
+  AUTHORITY_CANNOT_APPROVE: '不能启用 / 驳回 / 撤销自己登记的规则，必须换另一个审批账户',
+  NO_AUTHORITY_APPROVAL_TO_REVOKE: '撤销之前必须有一条已批准的记录（待审批或已驳回的规则没有可撤销的批准）',
   // 注册表整体
-  AUTHORITY_REGISTRY_LIMIT: '注册表超过 1000 条上限，服务端拒绝读取（503），不做截断展示',
+  AUTHORITY_REGISTRY_LIMIT: '注册表超过 1000 条上限，服务端拒绝读取（503），本页不做截断展示',
   // 候选查询（问题解析不出来时后端返回 422 + 原因串，这些码没有中文信封）
   INDUSTRIAL_SCOPE_REQUIRED:
-    '问题没解析出唯一范围：需要同时含 A### 零件号、「工序 N」、YYYY年M月 与「温度」字样',
-  INDUSTRIAL_DATA_NOT_READY: '工业演示数据未就绪（dataset_manifest 缺失），候选查询无法进行',
-  SOURCE_VERSION_MISMATCH: '数据集/来源版本对不上，候选查询被拒（不做版本兜底）',
-  INDUSTRIAL_ROW_LIMIT: '命中行数超过 1000 上限，服务端拒绝返回候选',
-  INVALID_TEMPERATURE: '数值不是可比的工业温度值（限定温度规则）',
-  UNKNOWN_UNIT: '单位不在可换算白名单里，无法比较',
+    '问题没有解析出唯一范围：需要同时包含 A### 零件号、「工序 N」、年月 与「温度」字样',
+  INDUSTRIAL_DATA_NOT_READY: '工业演示数据还没准备好，候选查询无法进行',
+  SOURCE_VERSION_MISMATCH: '数据集或来源版本对不上，候选查询被拒绝（不做版本降级）',
+  INDUSTRIAL_ROW_LIMIT: '命中的行数超过 1000 上限，服务端拒绝返回候选',
+  INVALID_TEMPERATURE: '这个数值不是可比的工业温度值（本页只处理温度冲突）',
+  UNKNOWN_UNIT: '单位不在可换算清单里，没法比较',
 }
 
 /** 这些 409 都是「世界变了」而不是「你填错了」：显示码，然后重新拉规则（+候选）再让人决定。 */

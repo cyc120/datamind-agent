@@ -29,15 +29,15 @@ const NOT_MIGRATED = ['模型接入', '字段复核', '来源权威规则', '图
 <template>
   <div class="nm">
     <div class="nm-card">
-      <div class="nm-tag">未迁移</div>
-      <h1 class="nm-title">这个视图还没有搬到新前端</h1>
+      <div class="nm-tag">还没搬过来</div>
+      <h1 class="nm-title">这个页面还没有搬到新版界面</h1>
       <p class="nm-path">
         你访问的是 <code>{{ attempted }}</code>
       </p>
       <p class="nm-body">
-        你看到的不是错误页，而是<strong>确实还没有实现</strong>的页面 —— 旧版前端的这批入口
-        （<code>/#model</code>、<code>/#fields</code> 等）在新前端还没有对应的视图，
-        所以以前点进来只会得到一片空白。这些功能的后端接口都还在，只是界面待迁移。
+        这不是错误页，而是<strong>确实还没有做</strong>的页面。旧版的这批入口
+        （<code>/#model</code>、<code>/#fields</code> 等）在新版界面里还没有对应页面，
+        所以以前点进来只会看到一片空白。这些功能本身都还在，只是界面还没搬过来。
       </p>
 
       <h2 class="nm-h">现在可以用的</h2>

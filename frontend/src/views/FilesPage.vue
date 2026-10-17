@@ -383,13 +383,11 @@ async function pollUntilTerminal(item: BatchItem): Promise<void> {
 
 function batchPhaseText(item: BatchItem): string {
   if (item.phase === 'rejected') return `本地预检未通过：${item.rejectedReason}`
-  if (item.phase === 'pending') return `等待上传（并发上限 ${MAX_CONCURRENT_UPLOADS}）…`
-  if (item.phase === 'uploading') {
-    return '正在上传原始字节（application/octet-stream，非 multipart）…'
-  }
+  if (item.phase === 'pending') return `等待上传（同时最多 ${MAX_CONCURRENT_UPLOADS} 个）…`
+  if (item.phase === 'uploading') return '正在上传文件内容…'
   if (item.phase === 'polling') {
     if (item.status && item.status !== 'queued') {
-      return `201 返回的当前状态是「${statusLabel(item.status)}」——重传相同字节是幂等的，不一定是 queued；这里按响应原样显示，正在轮询详情。`
+      return `服务端受理后，当前状态是「${statusLabel(item.status)}」（重传相同内容是幂等的，不一定是排队中）；这里按响应原样显示，正在轮询详情。`
     }
     return '上传已受理，正在轮询解析状态…'
   }
@@ -526,7 +524,7 @@ onBeforeUnmount(() => {
         <div class="files-tb-left">
           <span class="files-tb-title">我的文件</span>
           <span class="files-tb-note">
-            上传原始字节 → 独立 worker 解析 → 人工复核闸门；解析完成 ≠ 可检索
+            上传原始字节 → 独立后台处理器解析 → 人工复核闸门；解析完成 ≠ 可检索
           </span>
         </div>
         <button
@@ -557,8 +555,7 @@ onBeforeUnmount(() => {
             <span class="files-count" data-testid="files-count">{{ countText }}</span>
           </div>
           <p class="files-count-note">
-            /v1/uploads 只返回 limit 条（1..200），既没有 offset 也没有总数：这里的 count
-            是本页条数，不能推断全部记录数。
+            服务端不支持翻页，也不给总数：上面这个数字只是本页条数，不能当成全部记录数。
           </p>
 
           <p class="files-worker" :class="workerTone" data-testid="files-worker-banner">
@@ -579,7 +576,7 @@ onBeforeUnmount(() => {
               </option>
             </select>
 
-            <label class="files-fl" for="files-filter-media">media_type</label>
+            <label class="files-fl" for="files-filter-media">文件类型</label>
             <select
               id="files-filter-media"
               v-model="filters.media_type"
@@ -592,17 +589,17 @@ onBeforeUnmount(() => {
               </option>
             </select>
 
-            <label class="files-fl" for="files-filter-since">since</label>
+            <label class="files-fl" for="files-filter-since">此时间之后</label>
             <input
               id="files-filter-since"
               v-model="filters.since"
               class="files-fi"
               type="text"
-              placeholder="ISO-8601 或 epoch 秒"
+              placeholder="如 2026-10-01"
               data-testid="files-filter-since"
             />
 
-            <label class="files-fl" for="files-filter-limit">limit</label>
+            <label class="files-fl" for="files-filter-limit">最多显示</label>
             <input
               id="files-filter-limit"
               v-model.number="filters.limit"

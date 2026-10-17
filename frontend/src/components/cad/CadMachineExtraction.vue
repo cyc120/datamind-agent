@@ -45,19 +45,30 @@ function outcome(featureId: string): { kind: 'eligible' | 'excluded' | 'absent';
       机器提取（原文/几何）<span class="cad-sec-tag">{{ versionLabel }}</span>
     </h2>
 
-    <p class="cad-hint cad-emph" data-testid="cad-machine-note">
-      「机器关联状态」是抽取器在解析原文时给出的判定（confirmed / ambiguous / unresolved），
-      <b>落库即冻结</b>：人工复核**不会**改写它，`inspection_gate` 也不会因为复核而变化。
-      人工做出的结论只出现在下方「人工关联复核」区的 `review_gate` 与 `association_reviews`。
-    </p>
-    <p class="cad-hint">
-      门槛冲突（如 <code>CAD_GEOMETRY_ANNOTATION_CONFLICT</code>）来自原文本身；本页唯一能做的
-      人工动作是关联复核，它**消除不了**这类冲突，也不能把它「批准掉」。
-    </p>
+    <ul class="cad-note cad-emph" data-testid="cad-machine-note">
+      <li>
+        「机器关联状态」是抽取器解析原文时给出的判定，只有三种：
+        <b>confirmed</b>（已确认）、<b>ambiguous</b>（有歧义）、<b>unresolved</b>（未消解）。
+      </li>
+      <li>
+        这个判定<b>落库即冻结</b>：人工复核不会改写它，inspection_gate（检查门槛）也不会因为复核而变化。
+      </li>
+      <li>
+        人工做出的结论只出现在下方「人工关联复核」区，落在 review_gate 与 association_reviews 两处。
+      </li>
+    </ul>
+    <ul class="cad-note">
+      <li>
+        门槛冲突（如 <code>CAD_GEOMETRY_ANNOTATION_CONFLICT</code>）来自原文本身，不是抽取或复核造成的。
+      </li>
+      <li>
+        本页唯一能做的人工动作是关联复核；它<b>消除不了</b>这类冲突，也不能把它「批准掉」。
+      </li>
+    </ul>
 
     <CadGateSummary
       :gate="inspectionGate"
-      caption="原样抽取 / 对象一致性门槛（inspection_gate）"
+      caption="原样抽取 · 对象一致性门槛"
       testid="cad-inspection-gate"
     />
 
@@ -108,7 +119,7 @@ function outcome(featureId: string): { kind: 'eligible' | 'excluded' | 'absent';
             <td class="cad-status">{{ machineStatusText(f.association_status) }}</td>
             <td class="cad-gate-cell">
               <template v-if="outcome(f.feature_id).kind === 'eligible'">
-                <span class="cad-pill cad-is-ok">可用（review_gate）</span>
+                <span class="cad-pill cad-is-ok">可用</span>
               </template>
               <template v-else-if="outcome(f.feature_id).kind === 'excluded'">
                 <span class="cad-pill cad-is-bad">被排除</span>
@@ -117,7 +128,7 @@ function outcome(featureId: string): { kind: 'eligible' | 'excluded' | 'absent';
               </template>
               <template v-else>
                 <span class="cad-pill cad-is-muted">未表态</span>
-                <span class="cad-gate-why">该要素既不在 review_gate.features 也不在 excluded —— 不视为可用</span>
+                <span class="cad-gate-why">该要素既不在可用清单、也不在排除清单里，因此不视为可用</span>
               </template>
             </td>
             <td>
@@ -172,6 +183,45 @@ function outcome(featureId: string): { kind: 'eligible' | 'excluded' | 'absent';
 }
 .cad-emph {
   color: var(--color-body);
+}
+/* 说明文字按条列出：每行一条、前面一个蓝点（与 CadPage 的 .cad-note 同一套写法，
+   跨组件各自 scoped，所以要各声明一份）。类名前缀 cad- 不会撞 Tailwind 工具类。 */
+.cad-note {
+  margin: 0 0 8px;
+  padding: 0;
+  max-width: 1000px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--color-text);
+}
+.cad-note > li {
+  position: relative;
+  padding-left: 15px;
+}
+.cad-note > li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.62em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+.cad-note b {
+  font-weight: 600;
+  color: var(--color-accent);
+}
+.cad-note code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  background: var(--color-ink);
+  border-radius: 5px;
+  padding: 1px 5px;
 }
 .cad-hint code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;

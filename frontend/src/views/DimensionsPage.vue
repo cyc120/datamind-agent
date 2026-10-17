@@ -23,7 +23,7 @@ import DimensionAdminForms from '../components/dimensions/DimensionAdminForms.vu
 import DimensionApprovalForm from '../components/dimensions/DimensionApprovalForm.vue'
 import DimensionComparisonSection from '../components/dimensions/DimensionComparisonSection.vue'
 import DimensionResultCard from '../components/dimensions/DimensionResultCard.vue'
-import { apiErrorText, shortHash, valueWithUnit, whenText } from '../components/dimensions/shared'
+import { apiErrorText, approvalDecisionText, shortHash, valueWithUnit, whenText } from '../components/dimensions/shared'
 
 /**
  * 尺寸核验（measurement registry）。
@@ -310,13 +310,18 @@ onMounted(() => {
       </header>
 
       <div class="body">
-        <p class="dim-identity" data-testid="dim-identity">
+        <div class="dim-identity" data-testid="dim-identity">
           <template v-if="identity">
-            当前身份：{{ identity.display_name }}（{{ identity.user_id }}） · 角色：{{ roleSummary }} ·
-            保存快照与登记需 admin，使用审批需 approver
+            <p>
+              当前身份：{{ identity.display_name }}（{{ identity.user_id }}） · 角色：{{ roleSummary }}
+            </p>
+            <ul class="dim-note">
+              <li>保存快照与登记：需要 admin（管理员）角色。</li>
+              <li>使用审批：需要 approver（审批员）角色。</li>
+            </ul>
           </template>
           <template v-else>{{ identityError || '身份未知' }}</template>
-        </p>
+        </div>
         <p v-if="identity && identityError" class="dim-error" data-testid="dim-identity-error">{{ identityError }}</p>
 
         <p v-if="error" class="dim-error" data-testid="dim-page-error">{{ error }}</p>
@@ -329,12 +334,15 @@ onMounted(() => {
               记录链：注册尺寸记录 → 绑定（必须引用一条已确认的关联复核）→ 独立使用审批 → 对照快照（可回放）。
             </p>
             <p class="dim-contract-line">
-              任何一次评估里，<code>authentication_verified</code>、<code>formal_drawing_approval</code>、
-              <code>product_quality_conclusion</code> 都是 <b>false</b>：输入是作者自述的合成 / 本地记录，本流程不做图纸
-              正式批准，对照结果不是产品质量判定。
+              任何一次评估里，下面三项都是 <b>false</b>，这一点不会随操作变化：
             </p>
+            <ul class="dim-note">
+              <li><code>authentication_verified</code>（输入是否经过外部认证）：输入是作者自述的合成 / 本地记录。</li>
+              <li><code>formal_drawing_approval</code>（图纸是否正式批准）：本流程不做图纸的正式批准。</li>
+              <li><code>product_quality_conclusion</code>（是否是产品质量判定）：对照结果不是产品质量判定。</li>
+            </ul>
             <p class="dim-contract-line">
-              而响应外层还有 <code>authentication.verified = true</code>：它只说这次本地读取走了鉴权，
+              响应外层还有一个 <code>authentication.verified = true</code>：它只说这次本地读取走了鉴权，
               与上面三个 false 回答的是<b>不同</b>的问题，不能互相推导。
             </p>
             <p class="dim-contract-line dim-contract-muted">
@@ -348,11 +356,11 @@ onMounted(() => {
               <section class="dim-panel" data-testid="dim-measurements">
                 <h3 class="dim-panel-title">尺寸记录（measurements）</h3>
                 <p class="dim-panel-note">
-                  列表接口只回 id + 当前版本；点一行才去读内容。truncated 为 true 时后端只回了前 200 条，不得当作全集。
+                  列表只回 id 与当前版本，点一行才去读内容。
                 </p>
                 <p v-if="measurementsError" class="dim-error" data-testid="dim-measurements-error">{{ measurementsError }}</p>
                 <p v-else-if="!measurements.length" class="dim-empty" data-testid="dim-measurements-empty">
-                  还没有登记任何尺寸记录。管理员可在页尾「管理员登记」里登记（需要一份暂存目录里的 .json 源文件）。
+                  还没有登记任何尺寸记录。管理员可在页尾「管理员登记」里登记，需要一份暂存目录里的 .json 源文件。
                 </p>
                 <ul v-else class="dim-list" data-testid="dim-measurement-list">
                   <li v-for="m in measurements" :key="m.measurement_id">
@@ -369,7 +377,7 @@ onMounted(() => {
                   </li>
                 </ul>
                 <p v-if="measurementsTruncated" class="dim-warn" data-testid="dim-measurements-truncated">
-                  后端只返回了前 200 条（truncated=true）：这里不是全集。
+                  服务端只返回了前 200 条：这里不是全集。
                 </p>
               </section>
 
@@ -378,7 +386,8 @@ onMounted(() => {
                 <p class="dim-panel-note">点一行查看绑定载荷、审批链、当前对照结论与对照历史。</p>
                 <p v-if="bindingsError" class="dim-error" data-testid="dim-bindings-error">{{ bindingsError }}</p>
                 <p v-else-if="!bindings.length" class="dim-empty" data-testid="dim-bindings-empty">
-                  还没有任何绑定。绑定必须先有一条已 confirmed 的关联复核，否则会被 409 DIMENSION_CONFIRMED_ASSOCIATION_REQUIRED 拒绝。
+                  还没有任何绑定。绑定必须先有一条已确认的关联复核，否则服务端会以 409
+                  <code>DIMENSION_CONFIRMED_ASSOCIATION_REQUIRED</code> 拒绝。
                 </p>
                 <ul v-else class="dim-list" data-testid="dim-binding-list">
                   <li v-for="b in bindings" :key="b.binding_id">
@@ -395,7 +404,7 @@ onMounted(() => {
                   </li>
                 </ul>
                 <p v-if="bindingsTruncated" class="dim-warn" data-testid="dim-bindings-truncated">
-                  后端只返回了前 200 条（truncated=true）：这里不是全集。
+                  服务端只返回了前 200 条：这里不是全集。
                 </p>
               </section>
             </div>
@@ -453,8 +462,8 @@ onMounted(() => {
                       <div class="dim-kv-row"><span class="dim-k">rationale</span><span class="dim-v">{{ bindingPayload.rationale }}</span></div>
                     </div>
                     <p class="dim-caveat">
-                      有效期是 [valid_from, valid_to)，且必须带时区偏移；测量时间不落在里面就会以
-                      DIMENSION_OUTSIDE_VALIDITY 暂停核验。
+                      有效期是左闭右开区间：起点算在内、终点不算，而且必须带时区偏移。
+                      测量时间不落在里面，核验就会以 DIMENSION_OUTSIDE_VALIDITY 暂停。
                     </p>
                   </template>
                 </section>
@@ -483,16 +492,16 @@ onMounted(() => {
                 <section v-if="detail" class="dim-panel" data-testid="dim-approvals">
                   <h3 class="dim-panel-title">使用审批链（按顺序）</h3>
                   <p class="dim-panel-note">
-                    列表项是 <code>{payload, sha256}</code> 审计包裹：这里读的是 <code>item.payload</code> 里的
-                    decision / approver_user_id / reason / created_at。
+                    每一行是一条审批记录：结论、审批人、时间与理由都照原样显示。
                   </p>
                   <p v-if="!approvals.length" class="dim-empty" data-testid="dim-approvals-empty">
-                    还没有任何使用审批 —— 当前结论会因 DIMENSION_USE_APPROVAL_REQUIRED 暂停。审批人不得是登记人，也不得是该复核的复核人。
+                    还没有任何使用审批，所以当前结论会因 DIMENSION_USE_APPROVAL_REQUIRED 暂停。
+                    审批人不得是登记人，也不得是该复核的复核人。
                   </p>
                   <ol v-else class="dim-approval-list" data-testid="dim-approval-list">
                     <li v-for="(item, index) in approvals" :key="item.payload.approval_id" class="dim-approval-row" data-testid="dim-approval-row">
                       <span class="dim-approval-seq">#{{ index + 1 }}</span>
-                      <span class="dim-approval-decision" :class="`tone-${item.payload.decision}`">{{ item.payload.decision }}</span>
+                      <span class="dim-approval-decision" :class="`tone-${item.payload.decision}`">{{ approvalDecisionText(item.payload.decision) }}</span>
                       <span class="dim-approval-who">{{ item.payload.approver_user_id }}</span>
                       <span class="dim-approval-when">{{ whenText(item.payload.created_at) }}</span>
                       <span class="dim-approval-reason" :title="item.payload.reason">{{ item.payload.reason }}</span>
@@ -547,9 +556,11 @@ onMounted(() => {
                 {{ adminOpen ? '收起表单' : '展开表单' }}
               </button>
             </div>
-            <p class="dim-panel-note">
-              登记尺寸记录与绑定都是 admin 操作。绑定必须引用一条已 confirmed 的关联复核；本页只读取复核记录，不代替人工确认。
-            </p>
+            <ul class="dim-note">
+              <li>登记尺寸记录与登记绑定都是 admin（管理员）操作。</li>
+              <li>绑定必须引用一条已确认的关联复核。</li>
+              <li>本页只读取复核记录，不代替人工确认。</li>
+            </ul>
             <DimensionAdminForms
               v-if="adminOpen"
               :is-admin="isAdmin"
@@ -644,6 +655,48 @@ onMounted(() => {
   font-size: 13.5px;
   color: var(--color-text);
   line-height: 1.7;
+}
+.dim-identity > p {
+  margin: 0 0 4px;
+}
+/* 说明文字按条列出：每行一条、前面一个蓝点（与 GovernancePage 的 .gov-note、
+   FieldsPage 的 .fields-note 同一套写法）。类名前缀 dim- 不会撞 Tailwind 工具类。 */
+.dim-note {
+  margin: 6px 0 0;
+  padding: 0;
+  max-width: 1000px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--color-text);
+}
+.dim-note > li {
+  position: relative;
+  padding-left: 15px;
+}
+.dim-note > li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.62em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+.dim-note b {
+  font-weight: 600;
+  color: var(--color-accent);
+}
+.dim-note code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  background: var(--color-ink);
+  border-radius: 4px;
+  padding: 1px 5px;
 }
 .dim-contract {
   border: 1px solid var(--color-line);

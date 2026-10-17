@@ -50,6 +50,19 @@ function statusText(status?: string | null): string {
   return STATUS_TEXT[status] ?? status
 }
 
+/** confidence_level 的中文说法：后端给的是 high / medium / insufficient 这类英文值。 */
+const CONFIDENCE_TEXT: Record<string, string> = {
+  high: '高',
+  medium: '中',
+  low: '低',
+  insufficient: '证据不足',
+}
+
+function confidenceText(level?: string | null): string {
+  if (!level) return '—'
+  return CONFIDENCE_TEXT[level] ?? level
+}
+
 /** COMPLETED 之外的终态都值得用警示色标出来，别让失败看起来和成功一样。
  *  NEEDS_CLARIFICATION 归 warn：它不是失败，但需要用户补充信息才能继续，
  *  落到 muted 会显示成与「已完成」同款蓝底，看不出"这条在等你"。 */
@@ -176,7 +189,7 @@ onMounted(() => {
                 <div class="d-row"><span class="d-key">运行 ID</span><code class="d-val">{{ detail.run_id }}</code></div>
                 <div class="d-row">
                   <span class="d-key">置信度</span>
-                  <span class="d-val">{{ detail.confidence_level || '—' }}</span>
+                  <span class="d-val">{{ confidenceText(detail.confidence_level) }}</span>
                 </div>
                 <div class="d-row">
                   <span class="d-key">会话归属</span>

@@ -127,23 +127,37 @@ onMounted(() => {
           <li>仅支持工业温度数值冲突。</li>
         </ul>
 
-        <p class="auth-failclosed" data-testid="authority-failclosed">
-          失败即关闭（fail closed）：注册表里任何一条 <code>payload_valid=false</code> 的规则，
-          都会让运行时裁决整体以 <code>AUTHORITY_REGISTRY_INVALID</code> 失败；同一测量时刻命中两条
-          适用规则时以 <code>AUTHORITY_RULE_OVERLAP</code> 失败，而且<strong>没有优先级</strong>。
-          所以「已批准」不等于运行时一定生效，更不是合格结论。
-        </p>
+        <ul class="auth-failclosed" data-testid="authority-failclosed">
+          <li>
+            <b>失败即关闭</b>：注册表里只要有一条规则登记校验不通过（
+            <code>payload_valid=false</code>），运行时裁决就会整体失败，不会只跳过那一条。
+          </li>
+          <li>
+            同一测量时刻命中两条都适用的规则，也会整体失败（<code>AUTHORITY_RULE_OVERLAP</code>），
+            而且<b>没有优先级</b>。
+          </li>
+          <li>所以「已批准」不等于运行时一定生效，更不是合格结论。</li>
+        </ul>
 
         <!-- 身份：角色不够时就别让按钮看起来能用 -->
         <p v-if="identityLoading" class="auth-hint">正在读取身份…</p>
-        <p v-else-if="!identity" class="auth-anon" data-testid="authority-anon">
-          未登录或当前身份不可用：查询候选与登记规则需要 admin，批准/驳回/撤销需要 approver
-          （admin 通过所有角色门）。此时注册表接口会以 401 LOGIN_REQUIRED 失败——那<strong>不是</strong>空注册表。
-        </p>
-        <p v-else class="auth-identity" data-testid="authority-identity">
-          当前身份：{{ identity.display_name || identity.user_id }}（角色：{{ roles.join('、') || '无' }}）
-          · 登记需要 admin，启用/驳回/撤销需要 approver
-        </p>
+        <div v-else-if="!identity" class="auth-anon" data-testid="authority-anon">
+          <p>当前未登录，或身份不可用。此时注册表接口会以 401 失败，那<b>不是</b>「没有规则」。</p>
+          <ul class="auth-note">
+            <li>查询候选与登记规则：需要 admin（管理员）角色。</li>
+            <li>批准 / 驳回 / 撤销：需要 approver（审批员）角色。</li>
+            <li class="is-tech">admin 可以通过所有角色门；被拒时服务端返回 <code>LOGIN_REQUIRED</code>。</li>
+          </ul>
+        </div>
+        <div v-else class="auth-identity" data-testid="authority-identity">
+          <p>
+            当前身份：{{ identity.display_name || identity.user_id }}（角色：{{ roles.join('、') || '无' }}）
+          </p>
+          <ul class="auth-note">
+            <li>登记规则：需要 admin（管理员）。</li>
+            <li>启用 / 驳回 / 撤销：需要 approver（审批员）。</li>
+          </ul>
+        </div>
         <p v-if="identityFailure" class="auth-error" data-testid="authority-identity-error">
           {{ failureText(identityFailure) }}
         </p>
@@ -152,7 +166,7 @@ onMounted(() => {
         <section class="auth-section">
           <h2 class="auth-h2">1 · 查询未消解的数值冲突候选</h2>
           <p class="auth-sub">
-            候选只列 <code>agreement=unresolved</code> 的冲突；两侧原值都会给出来。
+            候选只列「两侧原值还不一致、尚无裁决」的冲突，两侧原值都会给出来。
           </p>
           <div class="auth-query">
             <input
@@ -175,21 +189,23 @@ onMounted(() => {
             </button>
           </div>
           <p v-if="!isAdmin" class="auth-warn" data-testid="authority-admin-required">
-            查询候选与登记规则都需要 admin 角色；这个按钮会被服务端以 403 PERMISSION_DENIED 拦住。
+            查询候选与登记规则都需要 admin（管理员）角色。当前身份点这个按钮，会被服务端以 403
+            PERMISSION_DENIED 拦住。
           </p>
 
           <p v-if="candidatesFailure" class="auth-error" data-testid="authority-candidates-error">
             {{ failureText(candidatesFailure) }}
           </p>
           <p v-if="candidatesLoading" class="auth-hint">正在重新解析问题并读取冲突…</p>
-          <p
+          <ul
             v-else-if="candidatesQueried && !candidates.length && !candidatesFailure"
-            class="auth-empty"
+            class="auth-note"
             data-testid="authority-candidates-empty"
           >
-            该问题下没有未消解的数值冲突候选。查不到候选不等于两侧一致：只有 unresolved 冲突才会出现在这里，
-            其余情况（缺报告、单位不可比、无匹配测量）都不构成本页能裁决的冲突。
-          </p>
+            <li>这个问题下没有未消解的数值冲突候选。</li>
+            <li>查不到候选不等于两侧一致：只有「未消解」的冲突才会出现在这里。</li>
+            <li>缺报告、单位不可比、没有匹配测量，都不构成本页能裁决的冲突。</li>
+          </ul>
 
           <AuthorityCandidatePanel
             v-for="c in candidates"
@@ -205,7 +221,7 @@ onMounted(() => {
         <section v-if="selected && isAdmin" class="auth-section">
           <h2 class="auth-h2">2 · 登记规则（提交后仍是待审批）</h2>
           <p class="auth-sub">
-            登记的是上面选中的那条候选；两侧原值仍以上方面板为准，登记不会改写任何一侧。
+            登记的是上面选中的那条候选。两侧原值仍以上方面板为准，登记不会改写任何一侧。
           </p>
           <p v-if="registerNotice" class="auth-ok" data-testid="authority-register-notice">
             {{ registerNotice }}
@@ -235,13 +251,16 @@ onMounted(() => {
         <section class="auth-section">
           <h2 class="auth-h2">3 · 已登记规则</h2>
           <p class="auth-sub">
-            服务端没有 status 列：状态就是链尾事件的结论，没有事件即待审批。
+            服务端没有单独的「状态」字段：一条规则的状态就是它链尾那条事件的结论，还没有事件就是待审批。
           </p>
 
-          <p v-if="hasInvalidRule" class="auth-warn" data-testid="authority-registry-invalid">
-            注册表里存在「登记完整性校验失败」的规则：运行时裁决会整体 fail closed
-            （<code>AUTHORITY_REGISTRY_INVALID</code>），不会退化成「按其余有效规则继续裁决」。
-          </p>
+          <ul v-if="hasInvalidRule" class="auth-note" data-testid="authority-registry-invalid">
+            <li>注册表里存在「登记完整性校验失败」的规则。</li>
+            <li>
+              这种情况下运行时裁决会整体失败，不会退化成「按其余有效规则继续裁决」。
+            </li>
+            <li class="is-tech">失败时服务端返回 <code>AUTHORITY_REGISTRY_INVALID</code>。</li>
+          </ul>
           <p v-if="actionNotice" class="auth-ok" data-testid="authority-action-notice">
             {{ actionNotice }}
           </p>
@@ -258,7 +277,7 @@ onMounted(() => {
             class="auth-empty"
             data-testid="authority-rules-empty"
           >
-            尚未登记规则；来源冲突保持未消解。
+            还没有登记规则，来源冲突保持未消解。
           </p>
           <AuthorityRulesPanel
             v-else-if="rules.length"
@@ -365,10 +384,58 @@ onMounted(() => {
   line-height: 1.8;
   color: var(--color-body);
 }
+/* 说明文字按条列出：每行一条、前面一个蓝点（与 GovernancePage 的 .gov-note、
+   FieldsPage 的 .fields-note 同一套写法）。类名前缀 auth- 不会撞 Tailwind 工具类。 */
+.auth-note {
+  margin: 6px 0 0;
+  padding: 0;
+  max-width: 1000px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--color-text);
+}
+.auth-note > li {
+  position: relative;
+  padding-left: 15px;
+}
+.auth-note > li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.62em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+.auth-note b {
+  font-weight: 600;
+  color: var(--color-accent);
+}
+.auth-note .is-tech {
+  font-size: 12.5px;
+  color: var(--color-body);
+}
+.auth-note code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  background: var(--color-ink);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.auth-identity > p,
+.auth-anon > p {
+  margin: 0 0 4px;
+}
 .auth-honesty code,
 .auth-failclosed code,
 .auth-sub code,
-.auth-empty code {
+.auth-empty code,
+.auth-note code {
   font-size: 12.5px;
 }
 .auth-section {

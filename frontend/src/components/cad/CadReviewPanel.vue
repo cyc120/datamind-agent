@@ -10,7 +10,7 @@ import type {
 } from '../../api/types'
 import CadErrorNote from './CadErrorNote.vue'
 import CadGateSummary from './CadGateSummary.vue'
-import { decisionText, shortHash } from './cadCopy'
+import { decisionText, machineStatusText, shortHash } from './cadCopy'
 import type { CadErrorView } from './cadCopy'
 
 /**
@@ -145,31 +145,41 @@ const tuple = computed(() => [
   <section class="cad-section" data-testid="cad-review-panel">
     <h2 class="cad-sec-title">人工关联复核</h2>
 
-    <p class="cad-hint cad-emph" data-testid="cad-review-note">
-      本区只呈现 <code>review_gate</code>（叠加人工复核后的门槛）与 <code>association_reviews</code>
-      （人工决策）。它与「机器提取」是两份数据：复核不会改写 <code>features[].association_status</code>，
-      也不会改变原文、单位或几何。
-    </p>
+    <ul class="cad-note cad-emph" data-testid="cad-review-note">
+      <li>
+        这一区只呈现两份数据：review_gate（叠加人工复核后的使用门槛）与
+        association_reviews（每条要素的人工决策）。
+      </li>
+      <li>它和上半区的「机器提取」是两份数据，不能互相替代。</li>
+      <li>人工复核不会改写 features[].association_status，也不会改变原文、单位或几何。</li>
+    </ul>
     <p class="cad-hint cad-honesty" data-testid="cad-honesty-review">
       复核只确认标注对应哪个候选圆；原文、单位和几何保持不变，不代表图纸审批或生产合格。
     </p>
 
-    <CadGateSummary :gate="reviewGate" caption="使用门槛（review_gate，叠加人工复核）" testid="cad-review-gate" />
+    <CadGateSummary :gate="reviewGate" caption="使用门槛（已叠加人工复核）" testid="cad-review-gate" />
 
     <p v-if="reviewSemantics" class="cad-semantics" data-testid="cad-review-semantics">
       服务端原文（review_semantics）：<code>{{ reviewSemantics }}</code>
     </p>
 
-    <p v-if="readOnlyVersion" class="cad-warn" data-testid="cad-readonly-version">
-      正在读版本 v{{ version?.document_version ?? '—' }}，当前版本是 v{{ currentVersion ?? '—' }}：
-      历史版本**可以读、但只读**。复核记录的 CAS 整组指纹只认当前版本链尾，对历史版本提交会以
-      409 <code>CAD_REVIEW_VERSION_CHANGED</code> 失败 —— 所以本区对历史版本禁用提交，不假装能写。
-    </p>
+    <div v-if="readOnlyVersion" class="cad-warn" data-testid="cad-readonly-version">
+      <p>
+        正在读版本 v{{ version?.document_version ?? '—' }}，而当前版本是 v{{ currentVersion ?? '—' }}。
+      </p>
+      <ul class="cad-note">
+        <li>历史版本可以读，但只读。</li>
+        <li>复核提交要一整组版本指纹，服务端只认当前版本的链尾。</li>
+        <li>对历史版本提交一定会失败，所以这一区直接禁用提交，不假装能写。</li>
+        <li class="is-tech">失败时服务端返回 409 <code>CAD_REVIEW_VERSION_CHANGED</code>。</li>
+      </ul>
+    </div>
 
     <!-- 关联复核快照：每条要素的人工决策 -->
     <h3 class="cad-sub">各要素的人工复核状态（association_reviews）</h3>
     <p v-if="!associationReviews.length" class="cad-hint" data-testid="cad-association-empty">
-      服务端没有返回任何 association_reviews 条目 —— 缺少该快照就无法安全提交复核（拿不到 feature_sha256）。
+      服务端没有返回任何 association_reviews 条目。缺少这份快照就无法安全提交复核，
+      因为拿不到每条要素的 feature_sha256（用于核对提交时数据有没有被人改过）。
     </p>
     <div v-else class="cad-tablewrap">
       <table class="cad-table">
@@ -207,15 +217,15 @@ const tuple = computed(() => [
         </tbody>
       </table>
     </div>
-    <p
+    <ul
       v-if="associationReviews.length && associationReviews.every((s) => !s.latest_review)"
-      class="cad-hint"
+      class="cad-note"
       data-testid="cad-no-review-note"
     >
-      本版本**尚未有任何人工复核**：所有 latest_review 都是 null，review_gate 对被排除要素给出的原因是
-      <code>CAD_ASSOCIATION_NOT_REVIEWED</code>。新版本不继承上一版本的复核结论 —— 每次登记新版本，
-      复核都要在这个版本上重新做。
-    </p>
+      <li>这个版本<b>还没有任何人工复核</b>：所有要素的最新复核都是空的。</li>
+      <li>所以使用门槛把被排除的要素判为「未复核」，原因码是 CAD_ASSOCIATION_NOT_REVIEWED。</li>
+      <li>新版本不继承上一版本的复核结论：每次登记新版本，复核都要在这个版本上重新做。</li>
+    </ul>
 
     <!-- 选中要素的复核历史 + 提交表单 -->
     <h3 class="cad-sub">单条要素的复核</h3>
@@ -239,16 +249,16 @@ const tuple = computed(() => [
         </button>
       </div>
       <p class="cad-hint">
-        机器关联状态（冻结，仅供参考，不是本区结论）：{{ feature.association_status }}；
+        机器关联状态（落库即冻结，仅供参考，不是本区结论）：{{ machineStatusText(feature.association_status) }}。
         机器选定目标：<code class="cad-code">{{ feature.selected_target ?? '—' }}</code>。
-        人工结论以 <code>association_reviews</code> 为准。
+        人工结论以 association_reviews 为准。
       </p>
 
       <CadErrorNote :error="historyError" testid="cad-history-error" />
       <p v-if="historyLoading" class="cad-hint">正在读取复核历史…</p>
       <p v-else-if="!historyError && !reviews.length" class="cad-hint" data-testid="cad-history-empty">
-        该要素在本版本**从未**被人工复核（latest_review = null）：所以 previous_review_id 会发 null，
-        review_gate 以 CAD_ASSOCIATION_NOT_REVIEWED 排除它。
+        这条要素在这个版本里<b>从未</b>被人工复核。所以提交时上一版复核 id 会发 null，
+        使用门槛也会以 CAD_ASSOCIATION_NOT_REVIEWED 把它排除。
       </p>
       <ul v-else-if="reviews.length" class="cad-history" data-testid="cad-history-list">
         <li v-for="(r, i) in reviews" :key="r.review_id">
@@ -266,24 +276,25 @@ const tuple = computed(() => [
       </ul>
 
       <form class="cad-form" data-testid="cad-review-form" @submit.prevent="submit">
-        <h4>提交关联复核（DrawingAssociationReviewRequest）</h4>
+        <h4>提交关联复核</h4>
 
         <fieldset class="cad-field">
-          <legend>decision</legend>
+          <legend>复核结论（decision）</legend>
           <label><input v-model="decision" type="radio" value="confirmed" data-testid="cad-decision-confirmed" /> confirmed（确认关联）</label>
           <label><input v-model="decision" type="radio" value="rejected" data-testid="cad-decision-rejected" /> rejected（驳回）</label>
           <label><input v-model="decision" type="radio" value="needs_review" data-testid="cad-decision-needs-review" /> needs_review（仍需复核）</label>
         </fieldset>
 
         <fieldset class="cad-field">
-          <legend>selected_target</legend>
+          <legend>选定目标圆（selected_target）</legend>
           <p v-if="decision !== 'confirmed'" class="cad-hint" data-testid="cad-target-absent">
-            当前决策不是 confirmed：按契约 <code>selected_target</code> 必须是 null（带上会被 422
-            CAD_REVIEW_TARGET_UNEXPECTED），本页发送 null。
+            当前结论不是 confirmed（确认关联）。这时 selected_target 必须是空值；带上会被服务端
+            422 <code>CAD_REVIEW_TARGET_UNEXPECTED</code> 拒绝。本页按空值发送。
           </p>
           <template v-else>
             <p v-if="!candidates.length" class="cad-hint" data-testid="cad-target-empty">
-              该要素的 <code>target_candidates</code> 为空：无法做 confirmed，只能 rejected 或 needs_review。
+              这条要素没有候选目标圆，所以做不了 confirmed（确认关联），只能选 rejected（驳回）
+              或 needs_review（仍需复核）。
             </p>
             <label v-for="h in candidates" :key="h">
               <input v-model="target" type="radio" :value="h" data-testid="cad-target-option" />
@@ -293,7 +304,7 @@ const tuple = computed(() => [
         </fieldset>
 
         <label class="cad-textarea">
-          <span>reason（必填，非空，≤1000 字）</span>
+          <span>复核理由（必填，不超过 1000 字）</span>
           <textarea
             v-model="reason"
             rows="3"
@@ -304,7 +315,7 @@ const tuple = computed(() => [
         </label>
 
         <details class="cad-tuple" data-testid="cad-cas-tuple">
-          <summary>本次提交会带上的版本指纹（服务端 CAS 校验整组，任一项过期即 409）</summary>
+          <summary>本次提交会带上的版本指纹（服务端整组校验，任一项过期就拒收）</summary>
           <dl>
             <template v-for="[key, value] in tuple" :key="key">
               <dt>{{ key }}</dt>
@@ -327,16 +338,21 @@ const tuple = computed(() => [
           {{ submitting ? '提交中…' : '提交复核' }}
         </button>
         <span class="cad-meta cad-role">
-          当前身份：{{ anonymous ? '匿名' : rolesText || '—' }}；
-          本动作要求 REVIEWER（ADMIN 可过所有闸门，APPROVER 在这里会被 403 PERMISSION_DENIED）。
+          当前身份：{{ anonymous ? '匿名' : rolesText || '—' }}。本动作要求 REVIEWER（复核员）角色。
+          ADMIN（管理员）可以通过所有角色门；APPROVER（审批员）调用这个接口会被 403
+          PERMISSION_DENIED 拒绝。
         </span>
       </form>
     </template>
 
-    <p class="cad-hint cad-foot" data-testid="cad-review-conflict-note">
-      门槛冲突（例如 <code>CAD_GEOMETRY_ANNOTATION_CONFLICT</code>）来自原文本身：
-      关联复核**不能**把它批准掉，也不能让 inspection_gate 变成 ready。
-    </p>
+    <ul class="cad-note cad-foot" data-testid="cad-review-conflict-note">
+      <li>
+        门槛冲突（例如 <code>CAD_GEOMETRY_ANNOTATION_CONFLICT</code>）来自原文本身，不是复核造成的。
+      </li>
+      <li>
+        关联复核<b>不能</b>把它批准掉，也不能让检查门槛（inspection_gate）变成可用。
+      </li>
+    </ul>
   </section>
 </template>
 
@@ -369,6 +385,49 @@ const tuple = computed(() => [
 }
 .cad-emph {
   color: var(--color-body);
+}
+/* 说明文字按条列出：每行一条、前面一个蓝点（与 CadPage 的 .cad-note 同一套写法）。
+   类名前缀 cad- 不会撞 Tailwind 工具类。 */
+.cad-note {
+  margin: 0 0 8px;
+  padding: 0;
+  max-width: 1000px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--color-text);
+}
+.cad-note > li {
+  position: relative;
+  padding-left: 15px;
+}
+.cad-note > li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.62em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+.cad-note b {
+  font-weight: 600;
+  color: var(--color-accent);
+}
+.cad-note .is-tech {
+  font-size: 12.5px;
+  color: var(--color-body);
+}
+.cad-note code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  background: var(--color-ink);
+  border-radius: 5px;
+  padding: 1px 5px;
 }
 .cad-honesty {
   color: #b45309;

@@ -14,20 +14,33 @@ defineProps<{
   caption: string
   testid: string
 }>()
+
+/** 门槛状态的中文说法。后端只回 ready / blocked，界面不能把英文枚举直接甩给用户。 */
+const GATE_STATUS_TEXT: Record<string, string> = {
+  ready: '可用',
+  blocked: '不可用',
+}
+
+function gateStatusText(status?: string | null): string {
+  if (!status) return '未给出'
+  return GATE_STATUS_TEXT[status] ?? status
+}
 </script>
 
 <template>
   <div v-if="gate" class="cad-gate" :data-testid="testid">
     <p class="cad-gate-line">
       <span class="cad-gate-caption">{{ caption }}</span>
-      状态 <b class="cad-gate-status" :class="gate.status === 'ready' ? 'cad-is-ready' : 'cad-is-blocked'">{{ gate.status }}</b>
+      状态 <b class="cad-gate-status" :class="gate.status === 'ready' ? 'cad-is-ready' : 'cad-is-blocked'">{{ gateStatusText(gate.status) }}</b>
       <span class="cad-gate-count">可用 {{ gate.features.length }} / 排除 {{ gate.excluded.length }}</span>
     </p>
 
     <p v-if="gate.reason" class="cad-gate-reason" data-testid="cad-gate-reason">
-      整道门槛不可用：{{ gateReasonText(gate.reason) }}
-      <code class="cad-code">{{ gate.reason }}</code>
-      —— 这类冲突来自原文本身，复核或审批都消除不了它。
+      整道门槛不可用：{{ gateReasonText(gate.reason) }}。
+      这类冲突来自原文本身，复核或审批都消除不了它。
+    </p>
+    <p v-if="gate.reason" class="cad-gate-foot">
+      服务端原因码：<code class="cad-code">{{ gate.reason }}</code>
     </p>
 
     <div class="cad-gate-cols">
@@ -46,7 +59,7 @@ defineProps<{
           </li>
         </ul>
         <p class="cad-gate-foot">
-          上下界是**标注偏差**（名义值加减），不是几何公差。
+          上下界是<b>标注偏差</b>（名义值加减出来的），不是几何公差。
         </p>
       </div>
 

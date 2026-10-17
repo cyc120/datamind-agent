@@ -132,8 +132,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
         <template v-else>
           <p v-if="imageError" class="fo-error" data-testid="fields-locator-image-error">
-            第 {{ pageNo }} 页的页面图加载失败（后端可能返回 SOURCE_PAGE_UNAVAILABLE）。
-            图上没有画任何框——定位未获证明，不代表本节没有证据。
+            第 {{ pageNo }} 页的页面图没有加载出来（服务端可能返回了页面图不可用）。
+            图上没有画任何框，说明这次定位没有得到证明，不代表这一段原文不存在。
           </p>
           <div v-else class="fo-frame">
             <img class="fo-img" :src="imageUrl" :alt="`第 ${pageNo} 页`" @error="imageError = true" />
@@ -198,8 +198,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       </ul>
 
       <p class="fo-note">
-        框选区域来自证据引用自带的 bbox（坐标系 pdf_points），未做任何位置推断；
-        没有框就是「定位未被证明」，不等于这段原文不存在。
+        框的位置直接取自这条证据引用自带的坐标，没有做任何位置推断。
+        没有框就表示「定位没有得到证明」，不等于这段原文不存在。
       </p>
     </div>
   </div>

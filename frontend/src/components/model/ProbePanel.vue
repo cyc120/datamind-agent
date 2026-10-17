@@ -88,7 +88,7 @@ function testFailure(): string {
         <p class="mpp-line">接口地址：{{ props.testResult.base_url || '(未回报)' }}</p>
         <p class="mpp-line">上游回复摘录：{{ props.testResult.reply || '(空)' }}</p>
         <p class="mpp-hint">
-          注意：这只证明「刚才、这个地址、这个模型」返回了内容；它不证明密钥长期有效，
+          注意：这只证明「刚才、这个地址、这个模型」返回了内容。它不证明密钥长期有效，
           也不证明该模型适合本项目的问数链路（SQL 生成质量要由评测集证明）。
         </p>
       </div>
@@ -113,13 +113,13 @@ function testFailure(): string {
         <span v-if="props.modelsAt" class="mpp-stamp" data-testid="model-models-stamp">{{ stamp(props.modelsAt) }}</span>
       </div>
       <p class="mpp-hint">
-        列表只说明「这个密钥在这些地址上能看到哪些模型名」，不代表它们都能用于本项目的问数链路。
+        这个列表只说明「这个密钥在这些地址上能看到哪些模型名」，不代表它们都能用于本项目的问数链路。
       </p>
 
       <p v-if="props.modelsLoading" class="mpp-state" data-testid="model-models-loading">正在获取模型列表…</p>
       <p v-else-if="props.modelsError" class="mpp-bad" data-testid="model-models-error">{{ props.modelsError }}</p>
       <p v-else-if="!props.models" class="mpp-state" data-testid="model-models-empty">
-        还没有拉取过模型列表。点「获取模型列表」会向当前表单/所选配置指向的上游要一次。
+        还没有拉取过模型列表。点「获取模型列表」，会向当前表单或所选配置指向的上游请求一次。
       </p>
       <template v-else-if="props.models.ok">
         <p class="mpp-state" data-testid="model-models-count">

@@ -93,18 +93,32 @@ const exampleDeepLink = '/#/wiki/<entryId>?revision=<revisionId>'
           <h1 class="wk-title">知识图谱</h1>
           <span class="wk-tag">当前授权范围图</span>
         </div>
-        <p class="wk-note" data-testid="wiki-head-note">
-          本页的图是<strong>当前授权范围图</strong>，<strong>不是</strong>全库全图：只包含本次授权、
-          当前图层、<strong>已加载</strong>的节点与关系。圆点大小只表示<strong>已授权且已加载</strong>的连接数，
-          位置只用于排布——两者都不代表任何结论。分页、邻域、轨迹的状态在图下方的「范围与边界」里
-          <strong>分别</strong>标明（"尚有后续"与"已截断"不是一回事）。
-        </p>
-        <p class="wk-note" data-testid="wiki-head-help">
-          图外有<strong>可聚焦的词条目录</strong>：用 Tab 键就能选词条，不需要拖拽，也不靠辨色。
-          选中后点「打开详情」进入词条正文；正文深链形如 <code class="wk-code">{{ exampleDeepLink }}</code>，
-          刷新与分享都停在同一词条与同一版本。后端返回空集合时这里显示<strong>空态</strong>，
-          读取失败时显示<strong>失败</strong>——两者绝不互相冒充。
-        </p>
+        <ul class="wk-note" data-testid="wiki-head-note">
+          <li>
+            这张图是<strong>当前授权范围图</strong>，<strong>不是</strong>全库全图：只包含本次授权、
+            当前图层、<strong>已加载</strong>的节点与关系。
+          </li>
+          <li>
+            圆点大小只表示<strong>已授权且已加载</strong>的连接数，位置只用于排布 —— 两者都不代表任何结论。
+          </li>
+          <li>
+            分页、邻域、轨迹的状态在图下方的「范围与边界」里<strong>分别</strong>标明，
+            「还有后续」与「已截断」不是一回事。
+          </li>
+        </ul>
+        <ul class="wk-note" data-testid="wiki-head-help">
+          <li>
+            图外有一份<strong>可以用键盘操作的词条目录</strong>：按 Tab 键就能选词条，不需要拖拽，也不靠辨色。
+          </li>
+          <li>
+            选中后点「打开详情」进入词条正文，地址形如
+            <code class="wk-code">{{ exampleDeepLink }}</code>，刷新与分享都停在同一词条、同一版本。
+          </li>
+          <li>
+            服务端返回空集合时这里显示<strong>空态</strong>，读取失败时显示<strong>失败</strong>，
+            两者绝不互相冒充。
+          </li>
+        </ul>
       </header>
 
       <div class="wk-body">
@@ -174,10 +188,32 @@ const exampleDeepLink = '/#/wiki/<entryId>?revision=<revisionId>'
 
 .wk-note {
   margin: 5px 0 0;
+  padding: 0;
   max-width: 1080px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   font-size: 14px;
   line-height: 1.75;
   color: var(--color-text);
+}
+
+/* 说明文字按条列出：每行一条、前面一个蓝点（与 GovernancePage 的 .gov-note、
+   FieldsPage 的 .fields-note 同一套写法）。类名前缀 wk- 不会撞 Tailwind 工具类。 */
+.wk-note > li {
+  position: relative;
+  padding-left: 16px;
+}
+.wk-note > li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.62em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-accent);
 }
 
 .wk-note strong {

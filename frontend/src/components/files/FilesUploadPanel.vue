@@ -87,7 +87,7 @@ function onProvenance(event: Event): void {
     </div>
 
     <div class="fup-controls">
-      <label class="fup-label" for="files-provenance">来源（provenance）</label>
+      <label class="fup-label" for="files-provenance">来源类别</label>
       <select
         id="files-provenance"
         class="fup-select"
@@ -102,7 +102,7 @@ function onProvenance(event: Event): void {
       <span class="fup-hint">
         {{
           PROVENANCE_OPTIONS.find((o) => o.value === props.provenance)?.hint ||
-          '来源由你选择，服务端按所选值登记'
+          '来源由你选择，服务端按所选的值登记'
         }}
       </span>
     </div>
@@ -110,24 +110,20 @@ function onProvenance(event: Event): void {
     <!-- 上传方式与限制：这些数字与服务端 UPLOAD_LIMITS 一一对应；本地预检失败会逐条列出 -->
     <ul class="fup-facts">
       <li data-testid="files-raw-note">
-        上传方式是<strong>原始字节</strong>：File 直接作为请求体，
-        <code>Content-Type: application/octet-stream</code>，查询参数带
-        <code>filename</code>/<code>provenance</code> —— 不是 multipart，也不使用已退役的
-        <code>/v1/files/uploads</code>+<code>/v1/files/jobs</code> 两步家族。
+        上传的是<b>文件原始内容</b>本身，不是表单打包，也不经过任何中转格式。
       </li>
       <li data-testid="files-limits-note">
-        接受 {{ ALLOWED_SUFFIXES.join(' ') }}；上限：
+        接受这些后缀：{{ ALLOWED_SUFFIXES.join(' ') }}；各自的体积上限：
         <code v-for="(limit, suffix) in SIZE_LIMITS" :key="suffix" class="fup-chip">
           {{ suffix }} ≤ {{ limit / MIB }} MiB
         </code>
       </li>
       <li>
-        每批最多 {{ MAX_BATCH_FILES }} 个文件，上传并发 {{ MAX_CONCURRENT_UPLOADS }}；
+        每批最多 {{ MAX_BATCH_FILES }} 个文件，同时最多上传 {{ MAX_CONCURRENT_UPLOADS }} 个；
         超出部分与不合规文件会在下面逐条说明。
       </li>
       <li data-testid="files-dwg-note">
-        <code>.dwg</code> {{ DWG_LOCAL_MESSAGE }}（本地直接拒绝；服务端同样以 415
-        CAD_DWG_CONVERTER_UNAVAILABLE 拒绝）。
+        <code>.dwg</code> {{ DWG_LOCAL_MESSAGE }}：本页直接拒绝，服务端同样会以 415 拒绝。
       </li>
     </ul>
 

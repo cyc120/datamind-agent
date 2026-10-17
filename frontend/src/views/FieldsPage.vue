@@ -387,20 +387,22 @@ function backToChat(): void {
                   抽取侧报告没有未确认的字段或表头（这仍不等于内容正确）。
                 </p>
                 <p v-else class="fields-quality-unknown" data-testid="fields-quality-unresolved">
-                  抽取侧没有给出「未确认字段」的计数：无法确认是否存在漏抽（没有计数 ≠ 没有缺口）。
+                  抽取侧没有给出「未确认字段」的数量，所以无法判断有没有漏抽。
+                  没有计数不等于没有缺口。
                 </p>
                 <p v-if="scopeNote" class="fields-quality-scope" data-testid="fields-quality-scope">
-                  抽取口径（后端原文）：{{ scopeNote }}
+                  抽取口径（服务端原文）：{{ scopeNote }}
                 </p>
                 <p v-if="approvalSemanticsNote" class="fields-quality-scope">
-                  抽取侧审批口径（后端原文）：{{ approvalSemanticsNote }}
+                  抽取侧的审批口径（服务端原文）：{{ approvalSemanticsNote }}
                 </p>
               </div>
 
-              <p v-if="!facts.length" class="fields-empty" data-testid="fields-facts-empty">
-                这份文档没有通过定位校验的事实。这不等于「原文没有内容」：可能是抽取没有产出事实，
-                也可能是定位校验未通过（后端只返回哈希与页框都对得上的事实）。
-              </p>
+              <ul v-if="!facts.length" class="fields-note" data-testid="fields-facts-empty">
+                <li>这份文档没有通过定位校验的事实。</li>
+                <li>这不等于「原文没有内容」：可能是抽取没有产出事实。</li>
+                <li>也可能是定位校验没通过 —— 服务端只返回哈希与页框都对得上的事实。</li>
+              </ul>
 
               <template v-else>
                 <table class="fields-table" data-testid="fields-fact-table">
@@ -514,7 +516,7 @@ function backToChat(): void {
                       </span>
                     </div>
                     <div class="fields-kv">
-                      <span class="fields-k">定位版本四元组</span>
+                      <span class="fields-k">定位版本（四项一起校验）</span>
                       <span class="fields-v mono">
                         v{{ selectedFact.document_version }} · sha
                         {{ (selectedFact.source_sha256 || '').slice(0, 12) }}… · parser
@@ -560,10 +562,10 @@ function backToChat(): void {
                       <p v-if="refText(ref)" class="fields-ref-text">{{ refText(ref) }}</p>
                       <p class="fields-ref-meta mono">
                         第 {{ ref.page_no ?? '?' }} 页 ·
-                        bbox {{ Array.isArray(ref.bbox) ? ref.bbox.join(', ') : '缺失' }} ·
-                        page_size {{ Array.isArray(ref.page_size) ? ref.page_size.join('×') : '缺失' }} ·
+                        框选坐标 {{ Array.isArray(ref.bbox) ? ref.bbox.join(', ') : '缺失' }} ·
+                        页面尺寸 {{ Array.isArray(ref.page_size) ? ref.page_size.join('×') : '缺失' }} ·
                         {{ ref.coordinate_system || '坐标系未声明' }} ·
-                        block {{ ref.block_id || '—' }}
+                        块 {{ ref.block_id || '—' }}
                       </p>
                     </li>
                   </ul>

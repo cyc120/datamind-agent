@@ -167,13 +167,18 @@ onMounted(() => {
 
 <template>
   <section class="dimc-card" data-testid="dim-comparison-section">
-    <h3 class="dimc-title">对照（comparison）</h3>
-    <p class="dimc-note">
-      保存快照会按当时冻结的评估器<b>重算并落库</b>；回放只读旧记录，<b>永不重算</b>。回放返回的结论与
-      落库时逐字节一致（record_sha256 不变），它证明的是「当时那条结论仍可复现」，不是「今天的数据也得
-      同一结论」。POST 的响应是<b>顶层</b>对照记录（result / authentication 在 payload 里），不是
-      <code>{result: …}</code> 包裹。
-    </p>
+    <h3 class="dimc-title">对照</h3>
+    <ul class="dimc-note-list">
+      <li>「保存快照」会用当时冻结的评估器<b>重算一遍并落库</b>。</li>
+      <li>「回放」只读旧记录，<b>永不重算</b>。</li>
+      <li>
+        回放给出的结论与落库时逐字节一致（record_sha256 不变）。它证明的是「当时那条结论还能复现」，
+        不是「今天的数据也会得出同一结论」。
+      </li>
+      <li class="is-tech">
+        服务端返回的就是顶层对照记录，result 与 authentication 都在 payload 里，没有再包一层。
+      </li>
+    </ul>
 
     <div class="dimc-actions">
       <button
@@ -192,7 +197,7 @@ onMounted(() => {
     </div>
 
     <p v-if="!isAdmin" class="dimc-refuse" data-testid="dim-comparison-refuse">
-      当前身份不是 admin：POST .../comparisons 属于 admin 操作，按钮保持禁用（这不是网络故障）。
+      当前身份不是 admin（管理员），保存快照属于管理员操作，所以按钮保持禁用。这不是网络故障。
     </p>
     <p v-if="saveError" class="dimc-error" data-testid="dim-comparison-error">{{ saveError }}</p>
     <p v-if="saveNote" class="dimc-ok" data-testid="dim-comparison-note">{{ saveNote }}</p>
@@ -202,7 +207,7 @@ onMounted(() => {
       class="dimc-result"
       :result="snapshot.payload.result"
       :authentication="snapshot.payload.authentication"
-      :title="snapshot.replay ? '本次响应 · 幂等回放既有快照（replay=true）' : '本次响应 · 新落库快照（replay=false）'"
+      :title="snapshot.replay ? '本次响应 · 复用已保存的同一次快照' : '本次响应 · 新保存的快照'"
       :subtitle="`comparison_id = ${snapshot.payload.comparison_id} · record_sha256 = ${shortHash(snapshot.record_sha256)} · 落库时间 ${whenText(snapshot.registered_at)}`"
     />
 
@@ -211,7 +216,7 @@ onMounted(() => {
       class="dimc-result"
       :result="replayed.payload.result"
       :authentication="replayed.payload.authentication"
-      :title="`回放的历史快照（replay=true）· 当时绑定版本 ${replayedBindingVersion(replayed)}`"
+      :title="`回放的历史快照 · 当时绑定版本 ${replayedBindingVersion(replayed)}`"
       :subtitle="`comparison_id = ${replayed.payload.comparison_id} · record_sha256 = ${shortHash(replayed.record_sha256)} · 落库时间 ${whenText(replayed.registered_at)} · 逐字节一致，未重算`"
     />
     <p v-if="replayError" class="dimc-error" data-testid="dim-comparison-replay-error">{{ replayError }}</p>
@@ -225,11 +230,11 @@ onMounted(() => {
       收起回放结果
     </button>
 
-    <h4 class="dimc-subtitle">对照历史（分页）</h4>
+    <h4 class="dimc-subtitle">对照历史（可翻页）</h4>
     <p v-if="historyLoading" class="dimc-hint" data-testid="dim-comparison-history-loading">正在加载历史…</p>
     <p v-else-if="historyError" class="dimc-error" data-testid="dim-comparison-history-error">{{ historyError }}</p>
     <p v-else-if="!history.length" class="dimc-empty" data-testid="dim-comparison-history-empty">
-      这条绑定还没有任何对照快照。上面点「保存快照」就会产生第一条（需要 admin）。
+      这条绑定还没有任何对照快照。在上面点「保存快照」就会产生第一条（需要 admin 管理员角色）。
     </p>
     <ul v-else class="dimc-list" data-testid="dim-comparison-history">
       <li v-for="row in history" :key="row.comparison_id" class="dimc-row" data-testid="dim-comparison-row">
@@ -286,6 +291,48 @@ onMounted(() => {
   font-size: 13px;
   line-height: 1.7;
   color: var(--color-text);
+}
+/* 说明文字按条列出：每行一条、前面一个蓝点（与 DimensionsPage 的 .dim-note 同一套写法）。 */
+.dimc-note-list {
+  margin: 6px 0 0;
+  padding: 0;
+  max-width: 1000px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--color-text);
+}
+.dimc-note-list > li {
+  position: relative;
+  padding-left: 15px;
+}
+.dimc-note-list > li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.62em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+.dimc-note-list b {
+  font-weight: 600;
+  color: var(--color-accent);
+}
+.dimc-note-list .is-tech {
+  font-size: 12.5px;
+  color: var(--color-body);
+}
+.dimc-note-list code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  background: var(--color-ink);
+  border-radius: 4px;
+  padding: 1px 5px;
 }
 .dimc-actions {
   display: flex;

@@ -48,15 +48,18 @@ function onSelectSource(value: 'production' | 'report'): void {
 
 <template>
   <form class="arf-form" data-testid="authority-register-form" @submit.prevent="emit('submit')">
-    <p class="arf-timezone" data-testid="authority-timezone-note">
-      有效期<strong>必须</strong>带显式时区偏移（例如 <code>2026-10-01T00:00:00+08:00</code>）。
-      不带偏移的 naive 时间会被后端以 422 <code>AUTHORITY_VALIDITY_INVALID</code> 拒绝。
-      适用判定是<strong>左闭右开</strong>：<code>valid_from ≤ produced_at &lt; valid_to</code>。
-      本候选的 produced_at = <code data-testid="authority-form-produced-at">{{ producedAt }}</code>。
-    </p>
+    <ul class="arf-timezone" data-testid="authority-timezone-note">
+      <li>有效期<strong>必须</strong>带时区偏移（例如 <code>2026-10-01T00:00:00+08:00</code>）。</li>
+      <li>不带偏移的时间无法判定先后，服务端会以 422 拒收。</li>
+      <li>生效区间是左闭右开：起点算在内、终点不算，测量时间必须落在里面。</li>
+      <li class="arf-help-item">
+        本候选的测量时间是
+        <code data-testid="authority-form-produced-at">{{ producedAt }}</code>。
+      </li>
+    </ul>
 
     <label class="arf-field">
-      <span class="arf-label">问题 question（服务端会用它重新解析候选）</span>
+      <span class="arf-label">问题（服务端会用它重新解析候选）</span>
       <input
         v-model="draft.question"
         class="arf-input"
@@ -66,13 +69,13 @@ function onSelectSource(value: 'production' | 'report'): void {
         data-testid="authority-form-question"
       />
       <span class="arf-help">
-        改这里等于换一个问题：候选哈希会对不上，服务端以 409 <code>AUTHORITY_CONTEXT_CHANGED</code> 拒绝。
+        改这里等于换一个问题：候选哈希会对不上，服务端会以 409 AUTHORITY_CONTEXT_CHANGED 拒绝。
       </span>
     </label>
 
     <div class="arf-grid">
       <label class="arf-field">
-        <span class="arf-label">测量 ID measurement_id（来自候选 scope）</span>
+        <span class="arf-label">测量 ID（来自候选的测量范围）</span>
         <input
           v-model="draft.measurement_id"
           class="arf-input"
@@ -83,7 +86,7 @@ function onSelectSource(value: 'production' | 'report'): void {
       </label>
 
       <label class="arf-field">
-        <span class="arf-label">候选哈希 candidate_sha256（原样回传，服务端重算比对）</span>
+        <span class="arf-label">候选哈希（原样回传，服务端会重算比对）</span>
         <input
           v-model="draft.candidate_sha256"
           class="arf-input arf-mono"
@@ -95,7 +98,7 @@ function onSelectSource(value: 'production' | 'report'): void {
     </div>
 
     <fieldset class="arf-fieldset">
-      <legend class="arf-label">以哪一侧为准 selected_source（必须显式选择，没有默认值）</legend>
+      <legend class="arf-label">以哪一侧为准（必须自己选，没有默认值）</legend>
       <div class="arf-radios">
         <label class="arf-radio">
           <input
@@ -127,7 +130,7 @@ function onSelectSource(value: 'production' | 'report'): void {
 
     <div class="arf-grid">
       <label class="arf-field">
-        <span class="arf-label">有效期起点（含时区，包含） valid_from</span>
+        <span class="arf-label">有效期起点（含时区，算在内）</span>
         <input
           v-model="draft.valid_from"
           class="arf-input arf-mono"
@@ -139,7 +142,7 @@ function onSelectSource(value: 'production' | 'report'): void {
       </label>
 
       <label class="arf-field">
-        <span class="arf-label">有效期终点（含时区，不包含） valid_to</span>
+        <span class="arf-label">有效期终点（含时区，不算在内）</span>
         <input
           v-model="draft.valid_to"
           class="arf-input arf-mono"
@@ -152,7 +155,7 @@ function onSelectSource(value: 'production' | 'report'): void {
     </div>
 
     <fieldset class="arf-fieldset">
-      <legend class="arf-label">依据 basis（必须是<strong>已发布</strong>的 PDF；上传件不能作依据）</legend>
+      <legend class="arf-label">依据（必须是<strong>已发布</strong>的 PDF；上传件不能作依据）</legend>
       <div class="arf-grid">
         <label class="arf-field">
           <span class="arf-label">document_id</span>
@@ -198,9 +201,8 @@ function onSelectSource(value: 'production' | 'report'): void {
         </label>
       </div>
       <p class="arf-help">
-        预填来自候选的 basis_suggestion（报告侧事实的依据页）。服务端仍会重新校验它是不是
-        <strong>已发布</strong>的 PDF 且版本/SHA-256/页码一致，否则 409
-        <code>AUTHORITY_BASIS_INVALID</code>。
+        下面这几项预填自候选报告侧事实的依据页。服务端还会重新校验它是不是
+        <strong>已发布</strong>的 PDF，且版本、SHA-256、页码都对得上，否则会以 409 拒绝。
         <a
           v-if="basisLink"
           class="arf-link"
@@ -214,7 +216,7 @@ function onSelectSource(value: 'production' | 'report'): void {
     </fieldset>
 
     <label class="arf-field">
-      <span class="arf-label">登记理由 rationale（10..1000 字，必填）</span>
+      <span class="arf-label">登记理由（10 到 1000 字，必填）</span>
       <textarea
         v-model="draft.rationale"
         class="arf-textarea"
@@ -230,9 +232,8 @@ function onSelectSource(value: 'production' | 'report'): void {
     </label>
 
     <p class="arf-help">
-      幂等键 request_id：<code>{{ draft.request_id }}</code>
-      —— 同一次填写的重试沿用同一个 ID（避免网络超时重试登记出两条规则）；
-      换候选会重新生成。
+      提交标识：<code>{{ draft.request_id }}</code>。同一次填写重试会沿用同一个标识，
+      这样网络超时重发也不会登记出两条规则；换候选会重新生成。
     </p>
 
     <p v-if="failure" class="arf-error" data-testid="authority-register-error">
@@ -248,8 +249,8 @@ function onSelectSource(value: 'production' | 'report'): void {
       {{ props.registering ? '登记中…' : '登记规则（提交后仍是待审批）' }}
     </button>
     <p class="arf-help">
-      登记成功不等于生效：规则要由<strong>另一个</strong>审批账户启用，运行时还会再核验一次版本、审批、
-      依据与重叠规则。
+      登记成功不等于生效：规则要由<strong>另一个</strong>审批账户启用，
+      运行时还会再核验一次版本、审批、依据与重叠规则。
     </p>
   </form>
 </template>
@@ -264,13 +265,35 @@ function onSelectSource(value: 'production' | 'report'): void {
 }
 .arf-timezone {
   margin: 0 0 14px;
-  padding: 10px 12px;
+  padding: 10px 12px 10px 0;
   border: 1px solid rgba(217, 119, 6, 0.35);
   border-radius: 12px;
   background: rgba(217, 119, 6, 0.07);
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   font-size: 13.5px;
   line-height: 1.75;
   color: var(--color-body);
+}
+/* 每条前面一个蓝点（与 AuthorityPage 的 .auth-note 同一套写法） */
+.arf-timezone > li {
+  position: relative;
+  padding-left: 26px;
+}
+.arf-timezone > li::before {
+  content: '';
+  position: absolute;
+  left: 13px;
+  top: 0.62em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+.arf-timezone .arf-help-item {
+  font-size: 12.5px;
 }
 .arf-form code {
   font-size: 13px;

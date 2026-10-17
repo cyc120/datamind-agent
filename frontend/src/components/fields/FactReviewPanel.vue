@@ -368,10 +368,11 @@ function whenText(iso?: string | null): string {
           </span>
         </span>
       </div>
-      <p class="fp-honesty" data-testid="fields-review-scope-note">
-        复核只针对提取忠实度；不覆盖原文声明、不裁定来源权威。源文件自己写的审批状态见下方「源文件自述」，
-        它不是本系统的审批结论。
-      </p>
+      <ul class="fp-honesty" data-testid="fields-review-scope-note">
+        <li>复核只针对提取忠实度。</li>
+        <li>复核不覆盖原文声明，也不裁定来源权威。</li>
+        <li>源文件自己写的审批状态见下方「源文件自述」，那<b>不是</b>本系统的审批结论。</li>
+      </ul>
     </div>
 
     <div class="fp-cols">
@@ -399,12 +400,12 @@ function whenText(iso?: string | null): string {
                 复核人 {{ r.reviewer_label || '—' }}（{{ r.reviewer_user_id }}）
               </template>
               <template v-else>
-                历史未认证记录：没有复核人身份，历史未认证记录不补身份
+                历史未认证记录：没有记录复核人身份，这里也不替它补一个身份。
               </template>
               <span v-if="r.reviewer_roles?.length"> · 角色 {{ r.reviewer_roles.join('/') }}</span>
             </p>
             <p class="fp-item-meta">{{ tupleText(r) }}</p>
-            <p class="fp-item-meta">previous_review_id：{{ r.previous_review_id ?? 'null（链首）' }}</p>
+            <p class="fp-item-meta">上一条复核：{{ r.previous_review_id ?? '没有（这是链首）' }}</p>
             <p class="fp-item-reason">{{ r.reason }}</p>
           </li>
         </ul>
@@ -442,8 +443,8 @@ function whenText(iso?: string | null): string {
             data-testid="fields-review-reason"
           ></textarea>
           <p class="fp-hint">
-            只评价「原文这段字有没有被忠实提取成这条事实」。不要在这里裁定来源权威，也不要把它当成对原文
-            结论的背书。
+            只评价「原文这段字有没有被忠实提取成这条事实」。不要在这里裁定来源权威，
+            也不要把它当成对原文结论的背书。
           </p>
 
           <p v-if="reviewError" class="fp-error" data-testid="fields-review-form-error">{{ reviewError }}</p>
@@ -476,8 +477,8 @@ function whenText(iso?: string | null): string {
               <span v-if="a.approver_roles?.length"> · 角色 {{ a.approver_roles.join('/') }}</span>
             </p>
             <p class="fp-item-meta">{{ tupleText(a) }}</p>
-            <p class="fp-item-meta">review_id：{{ a.review_id }}</p>
-            <p class="fp-item-meta">previous_approval_id：{{ a.previous_approval_id ?? 'null（链首）' }}</p>
+            <p class="fp-item-meta">对应的复核：{{ a.review_id }}</p>
+            <p class="fp-item-meta">上一条审批：{{ a.previous_approval_id ?? '没有（这是链首）' }}</p>
             <p class="fp-item-reason">{{ a.reason }}</p>
           </li>
         </ul>
@@ -526,8 +527,8 @@ function whenText(iso?: string | null): string {
             data-testid="fields-approval-reason"
           ></textarea>
           <p class="fp-hint">
-            审批只解开这一条事实的复核闸门：审批 ≠ 可检索。文档能否被检索器读到，由文档自己的
-            index_state / searchable 决定（见左侧文档信息），与审批结果无关。
+            审批只解开这一条事实的复核闸门：<b>审批 ≠ 可检索</b>。文档能否被检索器读到，
+            由它自己的 index_state 与 searchable（能否被检索器读到）决定，见左侧文档信息，与审批结果无关。
           </p>
 
           <p v-if="approvalError" class="fp-error" data-testid="fields-approval-form-error">{{ approvalError }}</p>
@@ -538,12 +539,13 @@ function whenText(iso?: string | null): string {
           </button>
         </form>
 
-        <!-- 规则②：不满足绑定条件时**不提供**按钮，只说明为什么 -->
+        <!-- 规则②：不满足绑定条件时不提供按钮，只说明为什么 -->
         <div v-else class="fp-blocked" data-testid="fields-approval-blocked">
           <h5 class="fp-form-title">不提供审批按钮</h5>
           <p class="fp-blocked-text">{{ approvalBlockedReason }}</p>
           <p class="fp-hint">
-            审批 ≠ 可检索：即使审批通过，文档能否被检索到仍取决于它自己的 index_state / searchable。
+            <b>审批 ≠ 可检索</b>：即使审批通过，文档能否被检索到仍取决于它自己的 index_state 与
+            searchable（能否被检索器读到），与审批结果无关。
           </p>
         </div>
       </div>
@@ -621,9 +623,33 @@ function whenText(iso?: string | null): string {
 }
 .fp-honesty {
   margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   font-size: 13px;
   line-height: 1.7;
   color: var(--color-text);
+}
+/* 每条前面一个蓝点（与 FieldsPage 的 .fields-note 同一套写法）。 */
+.fp-honesty > li {
+  position: relative;
+  padding-left: 15px;
+}
+.fp-honesty > li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.62em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+.fp-honesty b {
+  font-weight: 600;
+  color: var(--color-accent);
 }
 .fp-cols {
   display: grid;

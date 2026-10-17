@@ -260,10 +260,10 @@ const FORCE_ROWS: Array<{
         <span v-else class="wg-summary-note wg-muted">未筛选</span>
       </summary>
       <div class="wg-body">
-        <p class="wg-note">
-          筛选<strong>只在当前授权集合内</strong>生效：它是重新向服务端取数，不是把已经有权限的
-          对象藏起来。因此“筛掉”不等于“不存在”——服务端每次都会回报本次实际考虑与可见的对象数。
-        </p>
+        <ul class="wg-note-list">
+          <li>筛选<strong>只在当前授权范围内</strong>生效：它会让服务端重新取数，不是把已有权限的对象藏起来。</li>
+          <li>所以「筛掉」不等于「不存在」：每次取数服务端都会回报本次实际考虑与可见的对象数。</li>
+        </ul>
 
         <label class="wg-field">
           <span class="wg-label">图层</span>
@@ -274,11 +274,12 @@ const FORCE_ROWS: Array<{
           </select>
         </label>
         <p v-if="layerMismatch" class="wg-warn">
-          当前显示的是服务端返回的「{{ activeLayer }}」图层，与选择不一致，正在重新取数。
+          当前显示的是服务端返回的「{{ activeLayer }}」图层，与你选的不一致，正在重新取数。
         </p>
         <p v-if="filters.layer !== 'entries'" class="wg-note">
-          关键词 / 词条类型 / 分类 / 知识状态<strong>只对「词条关系」图层有意义</strong>：换到另外两层时
-          这些条件不会下发（服务端拒绝静默忽略这类筛选，传了会报错），所以它们在这一层是禁用的。
+          关键词、词条类型、分类、知识状态<strong>只对「词条关系」图层有意义</strong>。
+          换到另外两层时这些条件不会发给服务端（服务端拒绝静默忽略这类筛选，传了会报错），
+          所以它们在这一层是禁用的。
         </p>
 
         <label class="wg-field">
@@ -312,8 +313,8 @@ const FORCE_ROWS: Array<{
             </option>
           </select>
           <span class="wg-hint">
-            这里筛的是<strong>发布流程</strong>状态（草稿/待复核/已发布/已归档）。核验状态与来源有效性是
-            另外两套独立状态，不会因为这一项被筛掉或被合并。
+            这里筛的是<strong>发布流程</strong>状态（草稿 / 待复核 / 已发布 / 已归档）。
+            核验状态与来源有效性是另外两套独立状态，不会因为这一项被筛掉或被合并。
           </span>
         </label>
 
@@ -328,8 +329,8 @@ const FORCE_ROWS: Array<{
             :disabled="filters.layer !== 'entries'"
           />
           <span class="wg-hint">
-            关键词<strong>只匹配标题、别名与分类</strong>；正文检索本次未覆盖（中文正文检索策略未定，
-            服务端会在响应的 search 段里如实声明覆盖范围）。
+            关键词<strong>只匹配标题、别名与分类</strong>，不搜正文 —— 中文正文的检索方案还没定，
+            服务端会在返回结果里如实声明这次搜索覆盖了哪些字段。
           </span>
         </label>
 
@@ -716,6 +717,37 @@ const FORCE_ROWS: Array<{
   font-size: 12.5px;
   line-height: 1.55;
   color: var(--color-body);
+}
+
+/* 说明按条列出：每行一条、前面一个蓝点（与 WikiPage 的 .wk-note 同一套写法）。
+   类名前缀 wg- 不会撞 Tailwind 工具类。 */
+.wg-note-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--color-body);
+}
+.wg-note-list > li {
+  position: relative;
+  padding-left: 13px;
+}
+.wg-note-list > li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.62em;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+.wg-note-list strong {
+  color: var(--color-text);
 }
 
 .wg-hint {

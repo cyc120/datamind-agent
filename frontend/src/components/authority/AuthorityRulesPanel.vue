@@ -136,11 +136,11 @@ const rows = computed<RuleRow[]>(() =>
 
     // 谁能操作：approver 角色；不能是自己的规则；载荷校验必须是「通过」而不是「没结论」。
     const blocker = !props.isApprover
-      ? '需要 approver 角色（admin 通过所有角色门）；这个动作会被服务端以 403 PERMISSION_DENIED 拦住。'
+      ? '需要 approver（审批员）角色；admin（管理员）可以通过所有角色门。当前身份点这个动作会被服务端以 403 PERMISSION_DENIED 拦住。'
       : isCreator
-        ? '创建人不能启用/驳回/撤销自己登记的规则（409 AUTHORITY_CREATOR_CANNOT_APPROVE）；请换另一个审批账户操作。'
+        ? '不能启用 / 驳回 / 撤销自己登记的规则（服务端会以 409 AUTHORITY_CREATOR_CANNOT_APPROVE 拒绝），请换另一个审批账户操作。'
         : !payloadKnown
-          ? '没有拿到载荷校验结论（payload_valid 缺失）：不能把这条当作有效依据，也不提供启用动作。'
+          ? '没有拿到这条规则的载荷校验结论，不能把它当作有效依据，所以不提供启用动作。'
           : ''
 
     const unknownState = state === 'unknown'
@@ -149,12 +149,12 @@ const rows = computed<RuleRow[]>(() =>
     const canRevoke = !blocker && !unknownState && state === 'approved'
 
     const transitionHint = unknownState
-      ? '服务端返回了无法识别的链尾结论：本行不提供任何动作，也不替它解释。'
+      ? '服务端返回了无法识别的链尾结论：这一行不提供任何动作，也不替它解释。'
       : state === 'approved'
-        ? '只能撤销：撤销需要先有一次已批准的记录（本次满足）；撤销只追加事件，不删除历史。'
+        ? '只能撤销：撤销需要先有一条已批准的记录（本次满足）；撤销只追加事件，不删除历史。'
         : state === 'rejected' || state === 'revoked'
-          ? '可重新批准：服务端会重跑一次完整核验（候选是否仍未消解、报告字段是否仍已独立审批、依据是否仍是已发布 PDF），可能返回 AUTHORITY_CONTEXT_CHANGED / APPROVED_FIELD_REQUIRED / AUTHORITY_BASIS_INVALID。'
-          : '批准会重跑一次完整核验；驳回只是记录结论，不改变任何一方的数值。'
+          ? '可以重新批准：服务端会重跑一次完整核验（候选是否仍未消解、报告字段是否仍已独立审批、依据是否仍是已发布 PDF），可能被拒（候选上下文变化、报告字段未审批、依据无效）。'
+          : '批准会重跑一次完整核验；驳回只记录结论，不改变任何一方的数值。'
 
     return {
       rule,
@@ -166,7 +166,7 @@ const rows = computed<RuleRow[]>(() =>
       selectedSourceText: invalid ? '' : sourceText(rule.payload?.selected_source),
       windowText: invalid
         ? ''
-        : `${rule.payload?.valid_from ?? '—'} → ${rule.payload?.valid_to ?? '—'}（左闭右开：valid_from ≤ produced_at < valid_to）`,
+        : `${rule.payload?.valid_from ?? '—'} → ${rule.payload?.valid_to ?? '—'}（左闭右开：起点算在内、终点不算）`,
       basisText: invalid ? '' : basisText(rule),
       basisLink: invalid ? '' : basisHref(rule.payload?.basis),
       creatorText: invalid ? '' : creatorText(rule),
@@ -212,17 +212,17 @@ function act(rule: AuthorityRule, decision: ApprovalDecision): void {
             :class="row.payloadKnown ? 'is-ok' : 'is-warn'"
             data-testid="authority-rule-payload"
           >
-            载荷校验 payload_valid：{{ row.payloadKnown ? '通过' : '未取得结论' }}
+            载荷校验：{{ row.payloadKnown ? '通过' : '未取得结论' }}
           </span>
         </header>
 
         <dl class="art-facts">
           <div class="art-fact">
-            <dt>范围 scope</dt>
+            <dt>适用范围</dt>
             <dd>{{ row.scopeSummary }}</dd>
           </div>
           <div class="art-fact">
-            <dt>为准来源 selected_source</dt>
+            <dt>以哪一侧为准</dt>
             <dd>{{ row.selectedSourceText }}</dd>
           </div>
           <div class="art-fact">
@@ -230,7 +230,7 @@ function act(rule: AuthorityRule, decision: ApprovalDecision): void {
             <dd>{{ row.windowText }}</dd>
           </div>
           <div class="art-fact">
-            <dt>依据 basis</dt>
+            <dt>依据</dt>
             <dd>
               {{ row.basisText }}
               <a
@@ -244,11 +244,11 @@ function act(rule: AuthorityRule, decision: ApprovalDecision): void {
             </dd>
           </div>
           <div class="art-fact">
-            <dt>登记人 creator</dt>
+            <dt>登记人</dt>
             <dd data-testid="authority-rule-creator">{{ row.creatorText }}</dd>
           </div>
           <div class="art-fact">
-            <dt>登记理由 rationale</dt>
+            <dt>登记理由</dt>
             <dd class="art-rationale" data-testid="authority-rule-rationale">
               {{ row.rule.payload?.rationale || '（载荷里没有理由）' }}
             </dd>
@@ -261,7 +261,7 @@ function act(rule: AuthorityRule, decision: ApprovalDecision): void {
             <dt>链尾事件</dt>
             <dd data-testid="authority-rule-event">
               {{ row.latestEventText }}
-              <code v-if="row.rule.event_id"> · event {{ row.rule.event_id }}</code>
+              <code v-if="row.rule.event_id"> · 事件 {{ row.rule.event_id }}</code>
             </dd>
           </div>
         </dl>
@@ -276,7 +276,7 @@ function act(rule: AuthorityRule, decision: ApprovalDecision): void {
             class="art-reason"
             type="text"
             maxlength="1000"
-            placeholder="审批理由（必填，1..1000 字）"
+            placeholder="审批理由（必填，1 到 1000 字）"
             :disabled="row.acting"
             data-testid="authority-reason"
           />

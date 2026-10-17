@@ -7,7 +7,7 @@ import type {
   DimensionApprovalPayload,
   DimensionAuditRecord,
 } from '../../api/types'
-import { REASON_TEXT, apiErrorText, newRequestId, shortHash } from './shared'
+import { REASON_TEXT, apiErrorText, approvalDecisionText, newRequestId, shortHash } from './shared'
 
 /**
  * 使用审批表单（ApprovalRequest）。
@@ -126,7 +126,7 @@ async function submit(): Promise<void> {
   submitting.value = true
   try {
     const res = await submitBindingApproval(props.bindingId, body)
-    okText.value = `已记录审批：${res.approval.payload.decision} · ${res.approval.payload.approval_id}`
+    okText.value = `已记录审批：${approvalDecisionText(res.approval.payload.decision)} · ${res.approval.payload.approval_id}`
     reason.value = ''
     emit('submitted', res.approval)
   } catch (e: any) {
@@ -141,8 +141,8 @@ async function submit(): Promise<void> {
   <section class="dima-card" data-testid="dim-approval-form">
     <h3 class="dima-title">使用审批</h3>
     <p class="dima-note">
-      审批只决定「这条绑定能不能用于对照」这一道闸门；它不构成制造授权，也不会把结论里的三个 false
-      改成 true。
+      审批只决定「这条绑定能不能用于对照」这一道闸门。它不构成制造授权，
+      也不会把对照结论里那三个 false 改成 true。
     </p>
 
     <div class="dima-ref" data-testid="dim-approval-target">
@@ -157,32 +157,32 @@ async function submit(): Promise<void> {
       <div class="dima-ref-row">
         <span class="dima-key">previous_approval_id</span>
         <code class="dima-val" data-testid="dim-approval-previous">
-          {{ previousApprovalId ?? 'null（链尾为空，必须显式传 null）' }}
+          {{ previousApprovalId ?? '空值（链尾为空，这里必须显式传空）' }}
         </code>
       </div>
       <div class="dima-ref-row">
         <span class="dima-key">链尾结论</span>
         <span class="dima-val" data-testid="dim-approval-latest">
-          {{ latest ? latest.decision : '（还没有审批）' }}
+          {{ latest ? approvalDecisionText(latest.decision) : '（还没有审批）' }}
         </span>
       </div>
     </div>
 
     <p v-if="blockedReason" class="dima-blocked" data-testid="dim-approval-blocked">{{ blockedReason }}</p>
     <p v-else-if="!reviewerKnown" class="dima-warn" data-testid="dim-approval-reviewer-unknown">
-      本页没能读到这条绑定引用的关联复核记录，因此<b>无法证明</b>你不是该复核的复核人。若你正是，
-      后端会以 403 DIMENSION_INDEPENDENT_APPROVER_REQUIRED 拒绝。
+      本页没能读到这条绑定引用的关联复核记录，因此<b>无法证明</b>你不是该复核的复核人。
+      如果你正是，服务端会以 403 DIMENSION_INDEPENDENT_APPROVER_REQUIRED 拒绝。
     </p>
 
     <div class="dima-fields">
       <label class="dima-field">
-        <span class="dima-label">decision</span>
+        <span class="dima-label">审批结论</span>
         <select v-model="decision" class="dima-input" :disabled="disabled" data-testid="dim-approval-decision">
-          <option v-for="d in decisions" :key="d" :value="d">{{ d }}</option>
+          <option v-for="d in decisions" :key="d" :value="d">{{ approvalDecisionText(d) }}</option>
         </select>
       </label>
       <label class="dima-field">
-        <span class="dima-label">reason（必填，后端存原文）</span>
+        <span class="dima-label">审批理由（必填，服务端存原文）</span>
         <textarea
           v-model="reason"
           class="dima-input dima-textarea"
@@ -205,8 +205,8 @@ async function submit(): Promise<void> {
     </button>
 
     <p v-if="!canRevoke" class="dima-hint" data-testid="dim-approval-revoke-hint">
-      当前链尾不是 approved，因此不提供「撤销」：撤销需要一条生效审批，否则后端 409
-      DIMENSION_NO_ACTIVE_APPROVAL_TO_REVOKE。
+      当前链尾不是「同意使用」，所以不提供「撤销」：撤销需要一条仍在生效的审批，
+      否则服务端会以 409 DIMENSION_NO_ACTIVE_APPROVAL_TO_REVOKE 拒绝。
     </p>
 
     <p v-if="error" class="dima-error" data-testid="dim-approval-error">{{ error }}</p>

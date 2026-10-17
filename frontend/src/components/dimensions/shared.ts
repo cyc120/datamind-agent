@@ -125,11 +125,51 @@ export function reasonText(code: string | null | undefined): string {
 }
 
 /**
+ * 使用审批链上 `decision` 的中文说法。
+ * 界面上原来直接显示 approved / rejected / revoked 三个英文枚举，普通用户读不懂；
+ * 未收录的取值仍原样露出（不猜、不吞）。
+ */
+export const APPROVAL_DECISION_TEXT: Record<string, string> = {
+  approved: '同意使用',
+  rejected: '否决',
+  revoked: '已撤销',
+}
+
+export function approvalDecisionText(decision?: string | null): string {
+  if (!decision) return '—'
+  return APPROVAL_DECISION_TEXT[decision] ?? decision
+}
+
+/** 关联复核结论（association review 的 decision）的中文说法。 */
+export const REVIEW_DECISION_TEXT: Record<string, string> = {
+  confirmed: '已确认',
+  rejected: '已驳回',
+  needs_review: '仍需复核',
+}
+
+export function reviewDecisionText(decision?: string | null): string {
+  if (!decision) return '—'
+  return REVIEW_DECISION_TEXT[decision] ?? decision
+}
+
+/** 机器关联状态（features[].association_status）的中文说法：它是机器判定，不是人工结论。 */
+export const MACHINE_ASSOCIATION_TEXT: Record<string, string> = {
+  confirmed: '机器判定：抽取时已关联',
+  ambiguous: '机器判定：有多个候选，未定',
+  unresolved: '机器判定：无法解析',
+}
+
+export function featureAssociationText(status?: string | null): string {
+  if (!status) return '未给出'
+  return MACHINE_ASSOCIATION_TEXT[status] ?? status
+}
+
+/**
  * 任何 API 异常 → 一句中文。
  *
  * 三种情况必须分开处理（见文件头注释）：
  *   · 422-without-code → 通用中文，绝不打印原始 detail 数组 / undefined；
- *   · 已收录的码 → 「CODE：中文解释」；
+ *   · 已收录的码 → 「中文解释（错误码：CODE）」：先给一句人话，码放后面便于对照日志；
  *   · 其余 → 带上码与后端 message（若 message 里出现 undefined 就丢掉它）。
  */
 export function apiErrorText(e: any, fallback: string): string {
@@ -137,7 +177,7 @@ export function apiErrorText(e: any, fallback: string): string {
   const status = typeof e?.status === 'number' ? e.status : 0
   // FastAPI 自己的 422 没有 error_code（client.ts 归一成 VALIDATION_ERROR / HTTP_422）。
   if (code === 'VALIDATION_ERROR' || code === 'HTTP_422' || status === 422) return VALIDATION_GENERIC
-  if (code && REASON_TEXT[code]) return `${code}：${REASON_TEXT[code]}`
+  if (code && REASON_TEXT[code]) return `${REASON_TEXT[code]}（错误码：${code}）`
   const raw = typeof e?.message === 'string' ? e.message.trim() : ''
   // 「never print undefined」：后端在某些 422 下会把 detail 拼成含 undefined 的串，直接丢掉。
   const message = raw && !/undefined/i.test(raw) ? raw : ''

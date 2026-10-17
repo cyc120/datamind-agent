@@ -87,11 +87,11 @@ const scopeFields: Array<{ key: keyof AuthorityCandidate['context']['scope']; la
       </section>
     </div>
 
-    <p class="acp-note">两侧都是原值，未做单位换算或取舍：冲突到这里仍然未消解。</p>
+    <p class="acp-note">两侧都是原值，没有做单位换算或取舍：冲突到这里仍然未消解。</p>
 
     <dl class="acp-meta">
       <div class="acp-meta-row">
-        <dt>生产记录时间 produced_at</dt>
+        <dt>生产记录时间</dt>
         <dd><code data-testid="authority-candidate-produced-at">{{ stamp(candidate.produced_at) }}</code></dd>
       </div>
       <div v-for="f in scopeFields" :key="f.key" class="acp-meta-row">
