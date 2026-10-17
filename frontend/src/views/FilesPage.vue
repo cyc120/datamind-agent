@@ -762,16 +762,19 @@ onBeforeUnmount(() => {
   border-left-color: #d97706;
   color: var(--color-text);
 }
+/* 筛选栏不再拉成一整条：限制最大宽度、加大间距、控件底对齐。 */
 .files-filters {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px 18px;
   flex-wrap: wrap;
-  margin-top: 12px;
+  max-width: 1140px;
+  margin-top: 18px;
 }
 .files-fl {
   font-size: 13px;
-  color: var(--color-muted);
+  font-weight: 500;
+  color: var(--color-text);
 }
 .files-fs,
 .files-fi {
@@ -783,8 +786,10 @@ onBeforeUnmount(() => {
   background: var(--color-panel);
   color: var(--color-text);
 }
+/* 固定宽度：原来只给 max-width，几个控件宽窄不一，排起来参差。 */
 .files-fs {
-  max-width: 260px;
+  width: 160px;
+  min-width: 0;
 }
 .files-fi {
   width: 200px;
