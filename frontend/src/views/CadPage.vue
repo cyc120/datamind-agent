@@ -832,7 +832,9 @@ onMounted(async () => {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 18px 28px 40px;
+  /* 顶部与底部留白放大：原来 18/40，模块之间又都只有 20 出头的下边距，
+     整页读起来挤成一团。 */
+  padding: 34px 28px 56px;
   max-width: 1180px;
   width: 100%;
   box-sizing: border-box;
@@ -840,7 +842,7 @@ onMounted(async () => {
 /* 身份区：去掉「圆角 + 浅底 + 描边」的卡片框，改成左侧一条 2px 蓝细线分组。
    与权威页的两块说明同一套处理（用户反馈"框框太丑、AI 味重"）。 */
 .cad-ident {
-  margin: 0 0 16px;
+  margin: 0 0 38px;
   padding: 2px 0 2px 16px;
   border: 0;
   border-left: 2px solid var(--color-accent);
@@ -909,7 +911,7 @@ onMounted(async () => {
    读起来像警告横幅）。橙色只留在这条线上，语义还在、但不刺眼。
    这个块外面包了 Vue Bits 的 AnimatedList，四条声明逐条淡入。 */
 .cad-declare {
-  margin: 0 0 18px;
+  margin: 0 0 42px;
   padding: 2px 0 2px 16px;
   border: 0;
   border-left: 2px solid #d97706;
@@ -939,7 +941,8 @@ onMounted(async () => {
   color: var(--color-text);
 }
 .cad-section {
-  margin: 0 0 22px;
+  /* 模块之间间距放大：原来 22px，区块又都带边框，挤在一起分不清边界。 */
+  margin: 0 0 38px;
   padding: 14px 16px;
   border: 1px solid var(--color-line);
   border-radius: 12px;
