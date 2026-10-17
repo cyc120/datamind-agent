@@ -868,7 +868,7 @@ function backToChat(): void {
   margin: 0 0 22px;
   padding: 2px 0 2px 16px;
   border: 0;
-  border-left: 2px solid var(--color-accent);
+  border-left: 2px solid #d97706;
   border-radius: 0;
   background: none;
   font-size: 13px;
