@@ -169,7 +169,7 @@ onMounted(() => {
 
         <!-- 1 · 候选 -->
         <section class="auth-section">
-          <h2 class="auth-h2">1 · 查询未消解的数值冲突候选</h2>
+          <h2 class="auth-h2">1 查询未消解的数值冲突候选</h2>
           <p class="auth-sub">
             候选只列「两侧原值还不一致、尚无裁决」的冲突，两侧原值都会给出来。
           </p>
@@ -222,39 +222,48 @@ onMounted(() => {
           />
         </section>
 
-        <!-- 2 · 登记 -->
-        <section v-if="selected && isAdmin" class="auth-section">
-          <h2 class="auth-h2">2 · 登记规则（提交后仍是待审批）</h2>
-          <p class="auth-sub">
-            登记的是上面选中的那条候选。两侧原值仍以上方面板为准，登记不会改写任何一侧。
-          </p>
-          <p v-if="registerNotice" class="auth-ok" data-testid="authority-register-notice">
-            {{ registerNotice }}
-          </p>
-          <AuthorityRegisterForm
-            v-model="draft"
-            :produced-at="selected.produced_at"
-            :can-register="canRegister"
-            :registering="registering"
-            :failure="registerFailure"
-            :basis-link="basisLink"
-            @submit="submitRegister"
-          />
+        <!-- 2 · 登记
+             原来整块是 v-if="selected && isAdmin"，没选候选时连标题都不渲染，
+             界面上就出现「1 之后直接跳到 3」的断号，读者会以为漏了一节。
+             改成标题常驻、内容按状态切换：编号稳定，同时说明"这一块现在为什么不能填"。 -->
+        <section class="auth-section">
+          <h2 class="auth-h2">2 登记规则（提交后仍是待审批）</h2>
+          <template v-if="selected && isAdmin">
+            <p class="auth-sub">
+              登记的是上面选中的那条候选。两侧原值仍以上方面板为准，登记不会改写任何一侧。
+            </p>
+            <p v-if="registerNotice" class="auth-ok" data-testid="authority-register-notice">
+              {{ registerNotice }}
+            </p>
+            <AuthorityRegisterForm
+              v-model="draft"
+              :produced-at="selected.produced_at"
+              :can-register="canRegister"
+              :registering="registering"
+              :failure="registerFailure"
+              :basis-link="basisLink"
+              @submit="submitRegister"
+            />
+          </template>
+          <!-- 登记成功后选区会被清空、表单随之消失；上下文变化时也会清空表单。这两条消息
+               不能跟着表单一起消失，否则就等于「悄悄失败/悄悄成功」——所以在这里补渲染。 -->
+          <template v-else>
+            <p class="auth-sub" data-testid="authority-register-empty">
+              <template v-if="!isAdmin">登记规则需要 admin（管理员）角色。</template>
+              <template v-else>先在上面查询并选中一条候选，这里会出现登记表单。</template>
+            </p>
+            <p v-if="registerNotice" class="auth-ok" data-testid="authority-register-notice">
+              {{ registerNotice }}
+            </p>
+            <p v-if="registerFailure" class="auth-error" data-testid="authority-register-error">
+              {{ failureText(registerFailure) }}
+            </p>
+          </template>
         </section>
-        <!-- 登记成功后选区会被清空、表单随之消失；上下文变化时也会清空表单。这两条消息
-             不能跟着表单一起消失，否则就等于「悄悄失败/悄悄成功」——所以在这里补渲染。 -->
-        <template v-else>
-          <p v-if="registerNotice" class="auth-ok" data-testid="authority-register-notice">
-            {{ registerNotice }}
-          </p>
-          <p v-if="registerFailure" class="auth-error" data-testid="authority-register-error">
-            {{ failureText(registerFailure) }}
-          </p>
-        </template>
 
         <!-- 3 · 规则注册表 -->
         <section class="auth-section">
-          <h2 class="auth-h2">3 · 已登记规则</h2>
+          <h2 class="auth-h2">3 已登记规则</h2>
           <p class="auth-sub">
             服务端没有单独的「状态」字段：一条规则的状态就是它链尾那条事件的结论，还没有事件就是待审批。
           </p>
@@ -466,7 +475,7 @@ onMounted(() => {
   margin: 52px 0 6px;
 }
 /* 各板块之间留足间距：原来只有 margin-bottom，板块之间全靠前一块的下边距撑着，
-   下面那块（1 · 查询未消解的数值冲突候选）看上去像紧接在身份信息后面。
+   下面那块（1 查询未消解的数值冲突候选）看上去像紧接在身份信息后面。
    用户反馈一次后仍偏紧，再放大一档。 */
 .auth-section {
   margin-top: 56px;
