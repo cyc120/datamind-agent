@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import SideNav from '../components/SideNav.vue'
+import AnimatedList from '../components/bits/AnimatedList/AnimatedList.vue'
 import {
   drawingEntities,
   drawingFeatures,
@@ -536,8 +537,10 @@ onMounted(async () => {
         </div>
         <CadErrorNote :error="identityError" testid="cad-identity-error" />
 
-        <!-- 诚实声明：本页所有结论的边界，放在最显眼处 -->
-        <section class="cad-declare" data-testid="cad-honesty">
+        <!-- 诚实声明：本页所有结论的边界，放在最显眼处。
+             原来是「圆角 + 浅橙底 + 描边」的卡片，与权威页那两块一起改成
+             无框 + 左侧细线，并逐条淡入（与权威页「失败即关闭」那块同一处理）。 -->
+        <AnimatedList tag="section" class="cad-declare" data-testid="cad-honesty">
           <p>登记不代表审批或生产质量结论。</p>
           <p>复核只确认标注对应哪个候选圆；原文、单位和几何保持不变，不代表图纸审批或生产合格。</p>
           <p>
@@ -546,7 +549,7 @@ onMounted(async () => {
           <p>
             门槛冲突（例如 <code>CAD_GEOMETRY_ANNOTATION_CONFLICT</code>）来自原文本身，复核或审批都消除不了。
           </p>
-        </section>
+        </AnimatedList>
 
         <CadErrorNote :error="conflictNotice" testid="cad-conflict" />
         <p v-if="conflictNotice" class="cad-conflict-note" data-testid="cad-conflict-note">{{ CONFLICT_NOTE }}</p>
@@ -834,12 +837,15 @@ onMounted(async () => {
   width: 100%;
   box-sizing: border-box;
 }
+/* 身份区：去掉「圆角 + 浅底 + 描边」的卡片框，改成左侧一条 2px 蓝细线分组。
+   与权威页的两块说明同一套处理（用户反馈"框框太丑、AI 味重"）。 */
 .cad-ident {
-  margin: 0 0 10px;
-  padding: 9px 11px;
-  border: 1px solid var(--color-line);
-  border-radius: 12px;
-  background: var(--color-ink);
+  margin: 0 0 16px;
+  padding: 2px 0 2px 16px;
+  border: 0;
+  border-left: 2px solid var(--color-accent);
+  border-radius: 0;
+  background: none;
   font-size: 14px;
   line-height: 1.75;
   color: var(--color-body);
@@ -899,18 +905,22 @@ onMounted(async () => {
   border-radius: 5px;
   padding: 1px 5px;
 }
+/* 诚实声明：同样去框，改成左侧 2px 橙细线；正文回到黑色（原来整块文字都是深橙，
+   读起来像警告横幅）。橙色只留在这条线上，语义还在、但不刺眼。
+   这个块外面包了 Vue Bits 的 AnimatedList，四条声明逐条淡入。 */
 .cad-declare {
-  margin: 0 0 14px;
-  padding: 10px 12px;
-  border: 1px solid rgba(217, 119, 6, 0.35);
-  border-radius: 12px;
-  background: rgba(217, 119, 6, 0.06);
+  margin: 0 0 18px;
+  padding: 2px 0 2px 16px;
+  border: 0;
+  border-left: 2px solid #d97706;
+  border-radius: 0;
+  background: none;
   font-size: 13.5px;
   line-height: 1.8;
-  color: #b45309;
+  color: var(--color-text);
 }
 .cad-declare p {
-  margin: 0 0 4px;
+  margin: 0 0 5px;
 }
 .cad-declare p:last-child {
   margin-bottom: 0;
@@ -918,7 +928,7 @@ onMounted(async () => {
 .cad-declare code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 13px;
-  background: rgba(217, 119, 6, 0.12);
+  background: var(--color-ink);
   border-radius: 5px;
   padding: 1px 5px;
 }

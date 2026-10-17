@@ -44,21 +44,23 @@ withDefaults(
   list-style: none;
 }
 
-/* 逐条入场：只动 opacity 与 transform，不触发布局重排。 */
-.al-root :deep(> li) {
+/* 逐条入场：只动 opacity 与 transform，不触发布局重排。
+   目标写成「任意直接子元素」而不是只认 li —— 调用方有的地方用 <li>（权威页），
+   有的地方用 <p>（图纸页的声明块），两者都要能吃到动画。 */
+.al-root :deep(> *) {
   animation: al-rise 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
   will-change: transform, opacity;
 }
 
 /* 前 8 条各错开 70ms；再多就不叠延迟，避免后面的条目等太久才出现。 */
-.al-root :deep(> li:nth-child(1)) { animation-delay: 0s; }
-.al-root :deep(> li:nth-child(2)) { animation-delay: 0.07s; }
-.al-root :deep(> li:nth-child(3)) { animation-delay: 0.14s; }
-.al-root :deep(> li:nth-child(4)) { animation-delay: 0.21s; }
-.al-root :deep(> li:nth-child(5)) { animation-delay: 0.28s; }
-.al-root :deep(> li:nth-child(6)) { animation-delay: 0.35s; }
-.al-root :deep(> li:nth-child(7)) { animation-delay: 0.42s; }
-.al-root :deep(> li:nth-child(n + 8)) { animation-delay: 0.49s; }
+.al-root :deep(> *:nth-child(1)) { animation-delay: 0s; }
+.al-root :deep(> *:nth-child(2)) { animation-delay: 0.07s; }
+.al-root :deep(> *:nth-child(3)) { animation-delay: 0.14s; }
+.al-root :deep(> *:nth-child(4)) { animation-delay: 0.21s; }
+.al-root :deep(> *:nth-child(5)) { animation-delay: 0.28s; }
+.al-root :deep(> *:nth-child(6)) { animation-delay: 0.35s; }
+.al-root :deep(> *:nth-child(7)) { animation-delay: 0.42s; }
+.al-root :deep(> *:nth-child(n + 8)) { animation-delay: 0.49s; }
 
 @keyframes al-rise {
   from {
@@ -73,7 +75,7 @@ withDefaults(
 
 /* 减少动效偏好：直接显示，不做位移。 */
 @media (prefers-reduced-motion: reduce) {
-  .al-root :deep(> li) {
+  .al-root :deep(> *) {
     animation: none;
     opacity: 1;
     transform: none;
