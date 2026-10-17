@@ -261,10 +261,12 @@ function backToChat(): void {
             <h3 class="fields-h3">文档</h3>
             <span v-if="documents.length" class="fields-count">{{ documents.length }} 份</span>
           </div>
-          <p class="fields-note" data-testid="fields-searchable-note">
-            这里故意不按可检索性过滤：尚未建立索引的文档同样可能装着待复核的事实。
-            审批 ≠ 可检索——审批结论不改变一份文档能否被检索器读到。
-          </p>
+          <!-- 原来是一整段连排、带"这里故意…"这种代码注释口吻，用户反馈太随意。
+               改成分条：一条一个结论，蓝点起头，术语加粗。 -->
+          <ul class="fields-note" data-testid="fields-searchable-note">
+            <li>列表<b>不按可检索性过滤</b>：尚未建立索引的文档，同样可能装着待复核的事实。</li>
+            <li><b>审批 ≠ 可检索</b>：审批结论不改变一份文档能否被检索器读到。</li>
+          </ul>
 
           <p v-if="docsLoading" class="fields-hint">正在加载…</p>
           <p v-else-if="docsError" class="fields-error" data-testid="fields-docs-error">{{ docsError }}</p>
@@ -324,10 +326,13 @@ function backToChat(): void {
             {{ staleNotice }}
           </p>
 
-          <p v-if="!selectedDocId" class="fields-empty fields-empty-big" data-testid="fields-no-doc">
-            从左侧选一份文档，这里会列出它通过定位校验的全部事实。每条事实都能打开原页核对定位，
-            并分别记录复核与审批。
-          </p>
+          <!-- 空态原来是一句长跑句；改成「一句引导 + 一句说明」两行，读起来不费劲。 -->
+          <div v-if="!selectedDocId" class="fields-empty fields-empty-big" data-testid="fields-no-doc">
+            <p class="fields-empty-lead">从左侧选一份文档</p>
+            <p class="fields-empty-sub">
+              这里会列出它通过定位校验的全部事实；每条都能打开原页核对定位，并分别记录复核与审批。
+            </p>
+          </div>
 
           <template v-else>
             <!-- 文档身份与可检索性：信息，不是过滤条件 -->
@@ -708,11 +713,35 @@ function backToChat(): void {
   font-size: 13px;
   color: var(--color-muted);
 }
+/* 说明改成按条列出：每行一个结论，前面一个蓝点（原来是一整段连排）。 */
 .fields-note {
   margin: 8px 0 10px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   font-size: 12.5px;
   line-height: 1.7;
   color: var(--color-text);
+}
+.fields-note > li {
+  position: relative;
+  padding-left: 13px;
+}
+.fields-note > li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.66em;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+.fields-note b {
+  font-weight: 600;
+  color: var(--color-accent);
 }
 .fields-doc-list {
   list-style: none;
@@ -1037,6 +1066,19 @@ function backToChat(): void {
 .fields-empty-big {
   padding: 28px 0;
   max-width: 560px;
+}
+/* 空态的两行：第一行是把人叫过来的动作，第二行才是说明。字号与颜色拉开层次。 */
+.fields-empty-lead {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-accent);
+}
+.fields-empty-sub {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--color-text);
 }
 .fields-error {
   font-size: 13.5px;
