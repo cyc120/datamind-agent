@@ -589,9 +589,6 @@ onBeforeUnmount(() => {
               </option>
             </select>
 
-            <!-- 在这里强制换行：前两个筛（状态 / 文件类型）一行，其余换到下一行 -->
-            <span class="files-filter-break" aria-hidden="true"></span>
-
             <label class="files-fl" for="files-filter-since">此时间之后</label>
             <input
               id="files-filter-since"
@@ -793,12 +790,6 @@ onBeforeUnmount(() => {
 .files-fs {
   width: 160px;
   min-width: 0;
-}
-/* 强制换行用的零高度占位：flex 里 flex-basis:100% 会独占一行，
-   于是它之后的元素自动落到下一行。 */
-.files-filter-break {
-  flex-basis: 100%;
-  height: 0;
 }
 .files-fi {
   width: 200px;
