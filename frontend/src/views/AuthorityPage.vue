@@ -460,7 +460,15 @@ onMounted(() => {
 .auth-note code {
   font-size: 12.5px;
 }
+/* 「当前身份」原来没有任何样式，紧贴着上面的说明块，读起来像同一段的一部分。
+   给它上方留白，让它独立成一行信息。 */
+.auth-identity {
+  margin: 32px 0 4px;
+}
+/* 各板块之间留足间距：原来只有 margin-bottom，板块之间全靠前一块的下边距撑着，
+   下面那块（1 · 查询未消解的数值冲突候选）看上去像紧接在身份信息后面。 */
 .auth-section {
+  margin-top: 34px;
   margin-bottom: 26px;
 }
 .auth-h2 {
