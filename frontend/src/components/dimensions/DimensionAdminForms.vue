@@ -715,7 +715,7 @@ async function lookupBindingHead(): Promise<void> {
 .dimg-wrap {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 34px;
 }
 .dimg-refuse {
   margin: 0;
@@ -829,22 +829,25 @@ async function lookupBindingHead(): Promise<void> {
   font-weight: 600;
   color: var(--color-accent);
 }
+/* 原来用 auto-fit：列数随可用宽度浮动，有的行 3 个、有的行 4 个，宽度也不等，所以看起来参差不齐。改成固定两列 + 更大的行列间距，字段就对得上了。 */
 .dimg-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 20px;
 }
 .dimg-field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 .dimg-field-wide {
   grid-column: 1 / -1;
 }
+/* 字段名：原来 13px 灰色，与说明文字分不开、也偏小。改成蓝色加粗，与模型接入页、权威页的字段名统一。 */
 .dimg-label {
-  font-size: 13px;
-  color: var(--color-muted);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-accent);
   line-height: 1.5;
 }
 .dimg-input {
