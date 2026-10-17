@@ -758,9 +758,9 @@ onBeforeUnmount(() => {
   color: var(--color-body);
 }
 .files-worker.is-warn {
-  border-color: rgba(217, 119, 6, 0.35);
-  background: rgba(217, 119, 6, 0.08);
-  color: #b45309;
+  border-color: transparent;
+  background: #d97706;
+  color: #ffffff; font-weight: 600;
 }
 .files-filters {
   display: flex;

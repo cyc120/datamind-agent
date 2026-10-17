@@ -781,10 +781,13 @@ function backToChat(): void {
   border-color: transparent;
   background: var(--color-accent);
 }
+/* 警示徽标：橙底白字无边框（原来是浅橙底 + 橙字 + 描边）。橙色作为「需注意」
+   的语义保留，只把浅底改成实心，与蓝(正常)/红(异常)药丸统一成实心圆角。 */
 .fields-badge.is-warn {
-  color: #d97706;
-  border-color: rgba(217, 119, 6, 0.35);
-  background: rgba(217, 119, 6, 0.08);
+  color: #ffffff;
+  font-weight: 600;
+  border-color: transparent;
+  background: #d97706;
 }
 /* is-muted / tone-muted 现在与基础样式等价（保留类名，避免动模板） */
 .fields-badge.is-muted {
@@ -799,9 +802,10 @@ function backToChat(): void {
   background: var(--color-accent);
 }
 .fields-badge.tone-warn {
-  color: #d97706;
-  border-color: rgba(217, 119, 6, 0.35);
-  background: rgba(217, 119, 6, 0.08);
+  color: #ffffff;
+  font-weight: 600;
+  border-color: transparent;
+  background: #d97706;
 }
 .fields-badge.tone-bad {
   color: #ffffff; font-weight: 600;

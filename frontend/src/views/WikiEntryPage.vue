@@ -1280,9 +1280,9 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
 /* 演示数据标记：橙色是警告语义，保留；但基础样式现在是蓝底，必须自带浅橙底，
    否则会变成「蓝底橙字」（灰/橙字压蓝底读不出来）。与 .fields-badge.is-warn 同一写法。 */
 .wk-tag-demo {
-  border-color: rgba(217, 119, 6, 0.5);
-  background: rgba(217, 119, 6, 0.08);
-  color: #b45309;
+  border-color: transparent;
+  background: #d97706;
+  color: #ffffff;
   font-weight: 600;
 }
 

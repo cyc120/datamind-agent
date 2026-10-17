@@ -529,8 +529,8 @@ const ruleLine = computed(() => {
   background: rgba(225, 29, 72, 0.12);
 }
 .issue-kind.warn {
-  color: #b45309;
-  background: rgba(217, 119, 6, 0.12);
+  color: #ffffff; font-weight: 600;
+  background: #d97706;
 }
 .issue-pair {
   display: block;

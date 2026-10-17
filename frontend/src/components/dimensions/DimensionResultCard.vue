@@ -246,9 +246,9 @@ const withinRange = computed(() => comparison.value?.status === 'within_annotati
   background: var(--color-accent);
 }
 .dimr-tone-warn {
-  color: #d97706;
-  border-color: rgba(217, 119, 6, 0.35);
-  background: rgba(217, 119, 6, 0.08);
+  color: #ffffff; font-weight: 600;
+  border-color: transparent;
+  background: #d97706;
 }
 /* tone-muted 现在与基础样式等价（保留类名，避免动模板） */
 .dimr-tone-muted {
