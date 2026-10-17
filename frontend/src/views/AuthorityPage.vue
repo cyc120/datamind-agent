@@ -122,7 +122,8 @@ onMounted(() => {
       <div class="body">
         <!-- 全页诚实声明：这三条不是免责话术，是这一页能证明的全部范围 -->
         <ul class="auth-honesty" data-testid="authority-honesty">
-          <li>登记状态不保证当前适用；运行时再次核验版本、审批、依据与重叠规则。</li>
+          <li>登记状态不保证当前适用。</li>
+          <li>运行时还会再次核验版本、审批、依据与重叠规则。</li>
           <li>裁决保留双方原值，不能据此宣称来源一致或整体合格。</li>
           <li>仅支持工业温度数值冲突。</li>
         </ul>
@@ -364,25 +365,42 @@ onMounted(() => {
   max-width: 1120px;
   width: 100%;
 }
+/* 去框：原来两处说明都是「圆角 + 浅底 + 描边」的卡片，用户反馈"AI 味太重"。
+   改成左侧一条细竖线分组（蓝=说明，橙=警示），不加底色、不加圆角。
+   这是编辑排版里的常见做法：用一条线建立层次，比整块填色克制得多。 */
 .auth-honesty {
-  margin: 0 0 10px;
-  padding: 12px 16px 12px 32px;
-  border: 1px solid var(--color-line);
-  border-radius: 12px;
-  background: var(--color-ink);
+  margin: 0 0 16px;
+  padding: 2px 0 2px 16px;
+  border: 0;
+  border-left: 2px solid var(--color-accent);
+  border-radius: 0;
+  background: none;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
   font-size: 13.5px;
-  line-height: 1.85;
-  color: var(--color-body);
+  line-height: 1.8;
+  color: var(--color-text);
 }
 .auth-failclosed {
   margin: 0 0 18px;
-  padding: 10px 14px;
-  border: 1px solid rgba(217, 119, 6, 0.35);
-  border-radius: 12px;
-  background: rgba(217, 119, 6, 0.07);
-  font-size: 13px;
+  padding: 2px 0 2px 16px;
+  border: 0;
+  border-left: 2px solid #d97706;
+  border-radius: 0;
+  background: none;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13.5px;
   line-height: 1.8;
-  color: var(--color-body);
+  color: var(--color-text);
+}
+.auth-failclosed b {
+  font-weight: 600;
+  color: #b45309;
 }
 /* 说明文字按条列出：每行一条、前面一个蓝点（与 GovernancePage 的 .gov-note、
    FieldsPage 的 .fields-note 同一套写法）。类名前缀 auth- 不会撞 Tailwind 工具类。 */
