@@ -654,6 +654,10 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
           <h1 class="wk-title" data-testid="wiki-entry-title">
             {{ entry?.title || (loading ? '词条读取中…' : '词条') }}
           </h1>
+        </div>
+
+        <!-- 状态标签单独一行：原来它们紧贴在标题后面，把标题挤得没有呼吸空间 -->
+        <div v-if="entry?.demo_data || readingHistory || readingPinnedRevision" class="wk-tags">
           <span v-if="entry?.demo_data" class="wk-tag wk-tag-demo" data-testid="demo-badge">
             演示数据（demo_data=true）
           </span>
@@ -661,9 +665,22 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
           <span v-else-if="readingPinnedRevision" class="wk-tag" data-testid="pinned-badge">指定版本</span>
         </div>
 
+        <!-- 元信息改成「标签在上 / 取值在下」的三格，不再用 · 串成一行 -->
         <p class="wk-sub" data-testid="wiki-entry-id">
-          词条 <code class="wk-code">{{ entryId }}</code>
-          <template v-if="entry"> · 类型 {{ entryTypeText(entry.entry_type) }} · 分类 {{ text(entry.category, '（未分类）') }}</template>
+          <span class="wk-sub-item">
+            <span class="wk-sub-key">词条</span>
+            <code class="wk-code">{{ entryId }}</code>
+          </span>
+          <template v-if="entry">
+            <span class="wk-sub-item">
+              <span class="wk-sub-key">类型</span>
+              <span>{{ entryTypeText(entry.entry_type) }}</span>
+            </span>
+            <span class="wk-sub-item">
+              <span class="wk-sub-key">分类</span>
+              <span>{{ text(entry.category, '（未分类）') }}</span>
+            </span>
+          </template>
         </p>
 
         <div class="wk-toolbar">
@@ -685,8 +702,12 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
           <button class="wk-btn" type="button" data-testid="reload-entry" :disabled="loading" @click="reload">
             {{ loading ? '读取中…' : '重新读取' }}
           </button>
-          <span class="wk-hint-inline">刷新页面仍停在这一词条与这一版本（版本在地址栏 <code class="wk-code">?revision=</code>）</span>
         </div>
+
+        <!-- 这条说明原来挂在按钮后面，看起来像"操作的一部分"。移到单独一行、压小。 -->
+        <p class="wk-hint-inline">
+          刷新页面仍停在这一词条与这一版本（版本在地址栏 <code class="wk-code">?revision=</code>）
+        </p>
 
         <p v-if="requestedRevisionId && !requestedRevisionInList && !partErrors.revisions" class="wk-warn" data-testid="revision-not-in-list">
           地址栏里的版本 <code class="wk-code">{{ requestedRevisionId }}</code> 不在可见版本历史里：
@@ -1236,16 +1257,17 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
 }
 
 /* ── 顶栏 ── */
+/* 头部留白放大：原来 14/10，三行内容挤在一起。 */
 .wk-head {
   flex-shrink: 0;
-  padding: 14px 28px 10px;
+  padding: 20px 28px 16px;
   border-bottom: 1px solid var(--color-line);
 }
 
 .wk-head-top {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 14px;
   flex-wrap: wrap;
 }
 
@@ -1257,11 +1279,32 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   color: var(--color-accent);
 }
 
+/* 状态标签：原来紧贴标题，现在单独一行。 */
+.wk-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+/* 元信息：词条 / 类型 / 分类 三格横排，标签在上、取值在下，不再用 · 串成一行。 */
 .wk-sub {
-  margin: 4px 0 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 28px;
+  margin: 12px 0 0 0;
   font-size: 13.5px;
   color: var(--color-text);
-  word-break: break-all;
+}
+.wk-sub-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.wk-sub-key {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-accent);
 }
 
 /* 口径标签统一蓝底白字加粗椭圆（原来是灰底描边）；-demo 是警告语义色，保留 */
@@ -1290,9 +1333,9 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
 .wk-toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
-  margin-top: 8px;
+  margin-top: 16px;
 }
 
 .wk-field {
@@ -1360,6 +1403,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
 }
 
 .wk-hint-inline {
+  margin: 10px 0 0;
   font-size: 12.5px;
   color: var(--color-text);
 }
