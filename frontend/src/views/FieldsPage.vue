@@ -22,6 +22,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import SideNav from '../components/SideNav.vue'
+import AnimatedList from '../components/bits/AnimatedList/AnimatedList.vue'
 import FactReviewPanel from '../components/fields/FactReviewPanel.vue'
 import LocatorOverlay from '../components/fields/LocatorOverlay.vue'
 import { getDocumentFacts, listDocuments } from '../api/client'
@@ -356,18 +357,18 @@ function backToChat(): void {
               </p>
             </div>
 
-            <ul class="fields-honesty" data-testid="fields-honesty">
+            <AnimatedList tag="ul" class="fields-honesty" data-testid="fields-honesty">
               <li>复核只针对提取忠实度；不覆盖原文声明、不裁定来源权威。</li>
               <li>审批 ≠ 可检索：审批不改变检索器读不读得到这份文档。</li>
               <li>历史未认证记录（reviewer_user_id 为空）不补身份，也不能作为审批依据。</li>
-            </ul>
+            </AnimatedList>
 
             <p v-if="factsLoading" class="fields-hint">正在读取事实…</p>
             <p v-else-if="factsError" class="fields-error" data-testid="fields-facts-error">{{ factsError }}</p>
 
             <template v-else-if="factsResult">
               <!-- 抽取质量：有缺口必须说，没缺口也不许说成「全部核验通过」 -->
-              <div class="fields-quality" data-testid="fields-quality">
+              <AnimatedList tag="div" class="fields-quality" data-testid="fields-quality">
                 <div class="fields-quality-row">
                   <span class="fields-quality-key">已定位事实</span>
                   <span class="fields-quality-val">{{ factsResult.fact_count }} 条</span>
@@ -396,7 +397,7 @@ function backToChat(): void {
                 <p v-if="approvalSemanticsNote" class="fields-quality-scope">
                   抽取侧的审批口径（服务端原文）：{{ approvalSemanticsNote }}
                 </p>
-              </div>
+              </AnimatedList>
 
               <ul v-if="!facts.length" class="fields-note" data-testid="fields-facts-empty">
                 <li>这份文档没有通过定位校验的事实。</li>
@@ -862,22 +863,26 @@ function backToChat(): void {
 .mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
+/* 去框：改成左侧 2px 蓝细线分组，不加底色、不加圆角。与权威页、图纸页、尺寸页的说明块同一套处理。这个块外面包了 Vue Bits 的 AnimatedList，三条逐条淡入。 */
 .fields-honesty {
-  margin: 0 0 12px;
-  padding: 8px 12px 8px 26px;
-  border: 1px solid var(--color-line);
-  border-radius: 12px;
-  background: var(--color-ink);
+  margin: 0 0 22px;
+  padding: 2px 0 2px 16px;
+  border: 0;
+  border-left: 2px solid var(--color-accent);
+  border-radius: 0;
+  background: none;
   font-size: 13px;
-  line-height: 1.8;
-  color: var(--color-body);
+  line-height: 1.85;
+  color: var(--color-text);
 }
+/* 同上：抽取侧报告那块也去框，改左侧蓝细线 + 逐条淡入。 */
 .fields-quality {
-  margin-bottom: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--color-line);
-  border-radius: 12px;
-  background: var(--color-panel);
+  margin-bottom: 24px;
+  padding: 2px 0 2px 16px;
+  border: 0;
+  border-left: 2px solid var(--color-accent);
+  border-radius: 0;
+  background: none;
 }
 .fields-quality-row {
   display: flex;
