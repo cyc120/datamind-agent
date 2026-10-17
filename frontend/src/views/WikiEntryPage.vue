@@ -1556,28 +1556,26 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
 }
 
 /* 浅底错误/警告条：保持浅底（红/橙是判据），只把圆角收敛到 12px */
+/* 去框：改左侧 2px 红细条 + 黑色正文。原来这里是「描边 + 圆角 + 浅底」的卡片，与全站其它提示块不统一；红作为语义保留在细线上。 */
 .wk-error-note {
-  margin: 0;
-  padding: 7px 9px;
-  border: 1px solid rgba(225, 29, 72, 0.35);
-  border-radius: 12px;
-  background: rgba(225, 29, 72, 0.06);
-  font-size: 13px;
-  line-height: 1.7;
-  color: #b91c1c;
-  word-break: break-word;
+  margin: 0 0 18px;
+  padding: 2px 0 2px 16px;
+  border: 0;
+  border-left: 2px solid #e11d48;
+  border-radius: 0;
+  background: none;
+  color: var(--color-text);
 }
 
+/* 去框：改左侧 2px 橙细条 + 黑色正文。原来这里是「描边 + 圆角 + 浅底」的卡片，与全站其它提示块不统一；橙作为语义保留在细线上。 */
 .wk-warn {
-  margin: 0;
-  padding: 7px 9px;
-  border: 1px solid rgba(217, 119, 6, 0.35);
-  border-radius: 12px;
-  background: rgba(217, 119, 6, 0.07);
-  font-size: 13px;
-  line-height: 1.7;
-  color: #92400e;
-  word-break: break-word;
+  margin: 0 0 18px;
+  padding: 2px 0 2px 16px;
+  border: 0;
+  border-left: 2px solid #d97706;
+  border-radius: 0;
+  background: none;
+  color: var(--color-text);
 }
 
 .wk-warn-tight {

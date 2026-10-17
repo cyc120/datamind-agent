@@ -23,19 +23,15 @@ defineProps<{
 /* cad- 前缀：Tailwind v4 的 @layer utilities 会生成同名工具类，撞上就会出现
    「只生效一半」的怪象（本仓库已出过两次事故）。 */
 /* 浅底错误提示条：保持浅底（红是判据），只把圆角收敛到卡片档 12px */
+/* 去框：改左侧 2px 红细条 + 黑色正文。原来这里是「描边 + 圆角 + 浅底」的卡片，与全站其它提示块不统一；红作为语义保留在细线上。 */
 .cad-errnote {
-  margin: 0 0 10px;
-  padding: 9px 11px;
-  border: 1px solid rgba(225, 29, 72, 0.35);
-  border-radius: 12px;
-  background: rgba(225, 29, 72, 0.06);
-  color: #b91c1c;
-  font-size: 14px;
-  line-height: 1.7;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: baseline;
+  margin: 0 0 18px;
+  padding: 2px 0 2px 16px;
+  border: 0;
+  border-left: 2px solid #e11d48;
+  border-radius: 0;
+  background: none;
+  color: var(--color-text);
 }
 .cad-errnote-code {
   flex-shrink: 0;

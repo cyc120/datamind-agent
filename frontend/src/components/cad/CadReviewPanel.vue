@@ -446,15 +446,17 @@ const tuple = computed(() => [
   font-size: 13px;
   color: var(--color-text);
 }
+/* 去框：改成左侧 2px 橙细线分组，不加底色、不加圆角。原来这些提示是「描边 + 浅橙底 + 深橙字」的卡片，与全站其它警示块不统一。橙 = 警示语义保留在这条线上。 */
 .cad-warn {
-  margin: 0 0 10px;
-  padding: 8px 10px;
-  border: 1px solid rgba(217, 119, 6, 0.35);
-  border-radius: 12px;
-  background: rgba(217, 119, 6, 0.07);
+  margin: 0 0 18px;
+  padding: 2px 0 2px 16px;
+  border: 0;
+  border-left: 2px solid #d97706;
+  border-radius: 0;
+  background: none;
   font-size: 13.5px;
-  line-height: 1.75;
-  color: #b45309;
+  line-height: 1.8;
+  color: var(--color-text);
 }
 .cad-tablewrap {
   overflow-x: auto;
@@ -644,14 +646,17 @@ const tuple = computed(() => [
   margin: 0;
   word-break: break-all;
 }
+/* 去框：改成左侧 2px 橙细线分组，不加底色、不加圆角。原来这些提示是「描边 + 浅橙底 + 深橙字」的卡片，与全站其它警示块不统一。橙 = 警示语义保留在这条线上。 */
 .cad-blocked {
-  margin: 0 0 10px;
-  padding: 8px 10px;
-  border: 1px solid rgba(217, 119, 6, 0.35);
-  border-radius: 12px;
-  background: rgba(217, 119, 6, 0.07);
+  margin: 0 0 18px;
+  padding: 2px 0 2px 16px;
+  border: 0;
+  border-left: 2px solid #d97706;
+  border-radius: 0;
+  background: none;
   font-size: 13.5px;
-  color: #b45309;
+  line-height: 1.8;
+  color: var(--color-text);
 }
 .cad-blocked p {
   margin: 0 0 4px;

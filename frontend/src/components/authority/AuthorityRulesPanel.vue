@@ -327,16 +327,15 @@ function act(rule: AuthorityRule, decision: ApprovalDecision): void {
 .art-item {
   margin: 0;
 }
+/* 去框：改左侧 2px 红细条 + 黑色正文。原来这里是「描边 + 圆角 + 浅底」的卡片，与全站其它提示块不统一；红作为语义保留在细线上。 */
 .art-invalid {
-  margin: 0;
-  padding: 12px 14px;
-  border: 1px solid rgba(225, 29, 72, 0.4);
-  border-radius: 12px;
-  background: rgba(225, 29, 72, 0.06);
-  color: #e11d48;
-  font-size: 14px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  word-break: break-all;
+  margin: 0 0 18px;
+  padding: 2px 0 2px 16px;
+  border: 0;
+  border-left: 2px solid #e11d48;
+  border-radius: 0;
+  background: none;
+  color: var(--color-text);
 }
 .art-row {
   border: 1px solid var(--color-line);

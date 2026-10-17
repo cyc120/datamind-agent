@@ -259,25 +259,25 @@ async function submit(): Promise<void> {
   color: var(--color-text);
   word-break: break-all;
 }
+/* 去框：改左侧 2px 红细条 + 黑色正文。原来这里是「描边 + 圆角 + 浅底」的卡片，与全站其它提示块不统一；红作为语义保留在细线上。 */
 .dima-blocked {
-  margin: 10px 0 0;
-  padding: 8px 10px;
-  border: 1px solid rgba(225, 29, 72, 0.3);
-  border-radius: 12px;
-  background: rgba(225, 29, 72, 0.06);
-  font-size: 13.5px;
-  line-height: 1.7;
-  color: #b91c1c;
+  margin: 0 0 18px;
+  padding: 2px 0 2px 16px;
+  border: 0;
+  border-left: 2px solid #e11d48;
+  border-radius: 0;
+  background: none;
+  color: var(--color-text);
 }
+/* 去框：改左侧 2px 橙细条 + 黑色正文。原来这里是「描边 + 圆角 + 浅底」的卡片，与全站其它提示块不统一；橙作为语义保留在细线上。 */
 .dima-warn {
-  margin: 10px 0 0;
-  padding: 8px 10px;
-  border: 1px solid rgba(217, 119, 6, 0.3);
-  border-radius: 12px;
-  background: rgba(217, 119, 6, 0.06);
-  font-size: 13.5px;
-  line-height: 1.7;
-  color: #b45309;
+  margin: 0 0 18px;
+  padding: 2px 0 2px 16px;
+  border: 0;
+  border-left: 2px solid #d97706;
+  border-radius: 0;
+  background: none;
+  color: var(--color-text);
 }
 .dima-fields {
   display: grid;
