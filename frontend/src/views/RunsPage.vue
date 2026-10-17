@@ -346,10 +346,13 @@ onMounted(() => {
   border-color: transparent;
   background: var(--color-accent);
 }
+/* 警示态：橙底白字无边框（用户要求去掉浅色描边，与蓝/红药丸统一成实心圆角）。
+   橙色本身作为语义保留 —— 它表示「需要你注意」，与蓝(完成)/红(失败)区分。 */
 .run-badge.tone-warn {
-  color: #d97706;
-  border-color: rgba(217, 119, 6, 0.35);
-  background: rgba(217, 119, 6, 0.08);
+  color: #ffffff;
+  font-weight: 600;
+  border-color: transparent;
+  background: #d97706;
 }
 .run-badge.tone-bad {
   color: #ffffff; font-weight: 600;

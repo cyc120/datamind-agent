@@ -603,9 +603,9 @@ function whenText(iso?: string | null): string {
   background: var(--color-accent);
 }
 .fp-badge.tone-warn {
-  color: #d97706;
-  border-color: rgba(217, 119, 6, 0.35);
-  background: rgba(217, 119, 6, 0.08);
+  color: #ffffff; font-weight: 600;
+  border-color: transparent;
+  background: #d97706;
 }
 .fp-badge.tone-bad {
   color: #ffffff; font-weight: 600;
@@ -683,9 +683,9 @@ function whenText(iso?: string | null): string {
   border-color: rgba(22, 163, 74, 0.35);
 }
 .fp-tag.is-legacy {
-  background: rgba(217, 119, 6, 0.10);
-  color: #d97706;
-  border-color: rgba(217, 119, 6, 0.35);
+  background: #d97706;
+  color: #ffffff; font-weight: 600;
+  border-color: transparent;
 }
 .fp-item-when {
   margin-left: auto;

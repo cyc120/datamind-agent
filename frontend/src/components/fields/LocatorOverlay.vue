@@ -291,9 +291,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 }
 .fo-bad {
   font-size: 13px;
-  color: #d97706;
-  border: 1px solid rgba(217, 119, 6, 0.35);
-  background: rgba(217, 119, 6, 0.08);
+  color: #ffffff; font-weight: 600;
+  border: 1px solid transparent;
+  background: #d97706;
   border-radius: 999px;
   padding: 2px 8px;
 }

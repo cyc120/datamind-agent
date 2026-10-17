@@ -379,9 +379,9 @@ onMounted(() => {
 }
 /* 警告态徽标：橙色是判据，保留；基础样式现在是蓝底，必须自带浅橙底 */
 .dimc-badge-warn {
-  background: rgba(217, 119, 6, 0.08);
-  color: #d97706;
-  border-color: rgba(217, 119, 6, 0.35);
+  background: #d97706;
+  color: #ffffff; font-weight: 600;
+  border-color: transparent;
 }
 .dimc-ver {
   flex-shrink: 0;

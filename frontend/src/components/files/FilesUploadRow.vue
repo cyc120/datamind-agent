@@ -195,9 +195,9 @@ function onApprove(): void {
   background: var(--color-accent);
 }
 .fur-badge.tone-warn {
-  color: #d97706;
-  border-color: rgba(217, 119, 6, 0.35);
-  background: rgba(217, 119, 6, 0.08);
+  color: #ffffff; font-weight: 600;
+  border-color: transparent;
+  background: #d97706;
 }
 .fur-badge.tone-bad {
   color: #ffffff; font-weight: 600;

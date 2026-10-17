@@ -360,9 +360,9 @@ const approval = computed(() => props.detail?.approval ?? null)
   color: #ffffff;
 }
 .fud-chip-warn {
-  border-color: rgba(217, 119, 6, 0.35);
-  color: #d97706;
-  background: rgba(217, 119, 6, 0.08);
+  border-color: transparent;
+  color: #ffffff; font-weight: 600;
+  background: #d97706;
 }
 .fud-note {
   margin: 8px 0 0;

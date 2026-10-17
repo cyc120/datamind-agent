@@ -279,9 +279,9 @@ function outcome(featureId: string): { kind: 'eligible' | 'excluded' | 'absent';
   background: var(--color-accent);
 }
 .cad-pill.cad-is-bad {
-  color: #d97706;
-  border-color: rgba(217, 119, 6, 0.35);
-  background: rgba(217, 119, 6, 0.08);
+  color: #ffffff; font-weight: 600;
+  border-color: transparent;
+  background: #d97706;
 }
 .cad-pill.cad-is-muted {
   color: #ffffff;

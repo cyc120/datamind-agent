@@ -497,9 +497,12 @@ const ruleLine = computed(() => {
   background: rgba(225, 29, 72, 0.12);
   font-weight: 600;
 }
+/* 判据标签：橙底白字。原来是浅橙底 + 深橙字 #b45309，实心化后深橙压橙底读不出来；
+   橙色本身作为「待复核」语义保留。 */
 .tag.warn {
-  color: #b45309;
-  background: rgba(217, 119, 6, 0.12);
+  color: #ffffff;
+  font-weight: 600;
+  background: #d97706;
 }
 .tag.info {
   color: #1d4ed8;

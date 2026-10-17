@@ -365,9 +365,9 @@ function act(rule: AuthorityRule, decision: ApprovalDecision): void {
   border: 1px solid var(--color-line);
 }
 .art-state.is-pending {
-  color: #d97706;
-  border-color: rgba(217, 119, 6, 0.35);
-  background: rgba(217, 119, 6, 0.08);
+  color: #ffffff; font-weight: 600;
+  border-color: transparent;
+  background: #d97706;
 }
 .art-state.is-approved {
   color: #ffffff; font-weight: 600;

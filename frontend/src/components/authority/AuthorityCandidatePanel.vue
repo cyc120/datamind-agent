@@ -163,9 +163,9 @@ const scopeFields: Array<{ key: keyof AuthorityCandidate['context']['scope']; la
   background: var(--color-accent);
 }
 .acp-badge.is-blocked {
-  color: #d97706;
-  border-color: rgba(217, 119, 6, 0.35);
-  background: rgba(217, 119, 6, 0.08);
+  color: #ffffff; font-weight: 600;
+  border-color: transparent;
+  background: #d97706;
 }
 .acp-compare {
   display: flex;
