@@ -721,10 +721,11 @@ onMounted(() => {
 .dim-contract-muted {
   color: var(--color-text);
 }
+/* 单栏：原来左栏放「尺寸记录 / 绑定」、右栏放「详情」，详情孤零零占着右半边，下面又是整宽的「管理员登记」，一行出现两个框、视觉很跳。改成一行一个框，依次整宽排列。 */
 .dim-cols {
   display: grid;
-  grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 26px;
   align-items: start;
 }
 @media (max-width: 1080px) {
@@ -735,7 +736,7 @@ onMounted(() => {
 .dim-col {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 26px;
   min-width: 0;
 }
 .dim-panel {
