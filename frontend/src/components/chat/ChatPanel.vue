@@ -128,8 +128,11 @@ watch(
 function statusText(m: ChatMessage): string {
   if (m.status === 'running') return '正在思考…'
   if (m.status === 'error') return '运行失败'
-  if (m.runStatus === 'ABSTAINED') return '证据不足'
+  // 终态里"没给出可用答案"的几种要各自说清，否则会掉到下面「置信度 X」那一行，
+  // 把失败/证据不足显示成置信度（实测漏过 NEEDS_CLARIFICATION 与两个证据类状态）。
+  if (m.runStatus === 'ABSTAINED' || m.runStatus === 'INSUFFICIENT_EVIDENCE') return '证据不足'
   if (m.runStatus === 'NEEDS_CLARIFICATION') return '需要澄清'
+  if (m.runStatus === 'FAILED' || m.runStatus === 'FAILED_WITH_EVIDENCE') return '运行失败'
   return m.confidence ? `置信度 ${m.confidence}` : ''
 }
 

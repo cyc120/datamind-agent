@@ -40,6 +40,9 @@ const STATUS_TEXT: Record<string, string> = {
   ABSTAINED: '拒答',
   RUNNING: '进行中',
   PLANNED: '已计划',
+  // 这两个原来漏了，界面上直接显示英文状态码（用户截图看到 NEEDS_CLARIFICATION）。
+  NEEDS_CLARIFICATION: '需要澄清',
+  INSUFFICIENT_EVIDENCE: '证据不足',
 }
 
 function statusText(status?: string | null): string {
@@ -47,10 +50,12 @@ function statusText(status?: string | null): string {
   return STATUS_TEXT[status] ?? status
 }
 
-/** COMPLETED 之外的终态都值得用警示色标出来，别让失败看起来和成功一样。 */
+/** COMPLETED 之外的终态都值得用警示色标出来，别让失败看起来和成功一样。
+ *  NEEDS_CLARIFICATION 归 warn：它不是失败，但需要用户补充信息才能继续，
+ *  落到 muted 会显示成与「已完成」同款蓝底，看不出"这条在等你"。 */
 function statusTone(status?: string | null): string {
   if (status === 'COMPLETED') return 'ok'
-  if (status === 'ABSTAINED') return 'warn'
+  if (status === 'ABSTAINED' || status === 'NEEDS_CLARIFICATION' || status === 'INSUFFICIENT_EVIDENCE') return 'warn'
   if (status && (status.startsWith('FAILED') || status === 'RUNNING')) return 'bad'
   return 'muted'
 }
