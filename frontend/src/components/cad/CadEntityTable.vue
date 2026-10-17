@@ -123,24 +123,26 @@ function viewBBox(viewId: string): string {
   margin: 0 0 8px;
   font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
   display: flex;
   align-items: baseline;
   gap: 10px;
 }
+/* 节标题旁的计数标签：蓝底白字加粗椭圆（原来是灰字描边） */
 .cad-sec-tag {
   font-size: 13px;
-  font-weight: 500;
-  color: var(--color-muted);
-  border: 1px solid var(--color-line);
+  font-weight: 600;
+  color: #ffffff;
+  border: 1px solid transparent;
   border-radius: 999px;
-  padding: 2px 8px;
+  background: var(--color-accent);
+  padding: 2px 9px;
 }
 .cad-hint {
   margin: 0 0 8px;
   font-size: 13.5px;
   line-height: 1.7;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .cad-hint code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -157,7 +159,7 @@ function viewBBox(viewId: string): string {
   flex-wrap: wrap;
   gap: 12px;
   font-size: 13.5px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .cad-views code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -166,7 +168,7 @@ function viewBBox(viewId: string): string {
 .cad-tablewrap {
   overflow-x: auto;
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
 }
 .cad-table {
   border-collapse: collapse;
@@ -198,20 +200,22 @@ function viewBBox(viewId: string): string {
 .cad-geo {
   white-space: normal;
 }
+/* 「加载更多」：与其它按钮统一成蓝底白字加粗椭圆（原来是白底细描边） */
 .cad-more {
   display: block;
   margin: 12px auto 0;
   font: inherit;
   font-size: 14px;
-  padding: 7px 16px;
+  font-weight: 600;
+  padding: 7px 18px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-body);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
 }
 .cad-more:hover {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 </style>

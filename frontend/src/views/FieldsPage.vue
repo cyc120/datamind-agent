@@ -620,29 +620,32 @@ function backToChat(): void {
   gap: 12px;
   min-width: 0;
 }
+/* 标题与「模型接入」页一致：蓝色、15px、600（原来是 16px 灰黑，属离群值） */
 .tb-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .tb-note {
   font-size: 14px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
+/* 顶栏按钮统一蓝底白字加粗椭圆（原来是白底细描边） */
 .tb-action {
   margin-left: auto;
   font: inherit;
   font-size: 14px;
-  padding: 6px 12px;
+  font-weight: 600;
+  padding: 6px 14px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-body);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
 }
 .tb-action:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .tb-action:disabled {
   opacity: 0.6;
@@ -682,23 +685,24 @@ function backToChat(): void {
   align-items: baseline;
   gap: 8px;
 }
+/* 三级标题统一：蓝色、15px、600（原来是 15 / 14.5 / 13.5 三种灰黑字号） */
 .fields-h3 {
   margin: 0;
   font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .fields-h4 {
   margin: 0;
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .fields-h5 {
   margin: 14px 0 6px;
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .fields-count {
   font-size: 13px;
@@ -708,7 +712,7 @@ function backToChat(): void {
   margin: 8px 0 10px;
   font-size: 12.5px;
   line-height: 1.7;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .fields-doc-list {
   list-style: none;
@@ -727,7 +731,7 @@ function backToChat(): void {
   font: inherit;
   padding: 9px 11px;
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--color-panel);
   color: var(--color-body);
   cursor: pointer;
@@ -761,11 +765,15 @@ function backToChat(): void {
   line-height: 1.5;
   color: #d97706;
 }
+/* 徽标统一蓝底白字加粗椭圆（原来是白底描边） */
 .fields-badge {
   font-size: 12.5px;
-  padding: 1px 7px;
+  font-weight: 600;
+  padding: 1px 8px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   white-space: nowrap;
 }
 .fields-badge.is-ok {
@@ -778,8 +786,12 @@ function backToChat(): void {
   border-color: rgba(217, 119, 6, 0.35);
   background: rgba(217, 119, 6, 0.08);
 }
+/* is-muted / tone-muted 现在与基础样式等价（保留类名，避免动模板） */
 .fields-badge.is-muted {
-  color: var(--color-muted);
+  color: #ffffff;
+  font-weight: 600;
+  border-color: transparent;
+  background: var(--color-accent);
 }
 .fields-badge.tone-ok {
   color: #ffffff; font-weight: 600;
@@ -797,7 +809,10 @@ function backToChat(): void {
   background: #e11d48;
 }
 .fields-badge.tone-muted {
-  color: var(--color-muted);
+  color: #ffffff;
+  font-weight: 600;
+  border-color: transparent;
+  background: var(--color-accent);
 }
 .fields-doc-head {
   margin-bottom: 10px;
@@ -806,7 +821,7 @@ function backToChat(): void {
   margin: 5px 0 0;
   font-size: 13px;
   line-height: 1.6;
-  color: var(--color-muted);
+  color: var(--color-text);
   word-break: break-all;
 }
 .mono {
@@ -816,7 +831,7 @@ function backToChat(): void {
   margin: 0 0 12px;
   padding: 8px 12px 8px 26px;
   border: 1px solid var(--color-line);
-  border-radius: 9px;
+  border-radius: 12px;
   background: var(--color-ink);
   font-size: 13px;
   line-height: 1.8;
@@ -826,7 +841,7 @@ function backToChat(): void {
   margin-bottom: 12px;
   padding: 10px 12px;
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--color-panel);
 }
 .fields-quality-row {
@@ -857,7 +872,7 @@ function backToChat(): void {
   margin: 6px 0 0;
   font-size: 13px;
   line-height: 1.7;
-  color: var(--color-muted);
+  color: var(--color-text);
   word-break: break-word;
 }
 .fields-table {
@@ -897,7 +912,7 @@ function backToChat(): void {
 .fields-cell-sub {
   display: block;
   font-size: 12.5px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .is-legacy-cell {
   color: #d97706;
@@ -951,7 +966,7 @@ function backToChat(): void {
 }
 .fields-ref {
   border: 1px solid var(--color-line);
-  border-radius: 9px;
+  border-radius: 12px;
   background: var(--color-panel);
   padding: 8px 10px;
 }
@@ -985,29 +1000,32 @@ function backToChat(): void {
   margin: 4px 0 0;
   font-size: 12.5px;
   line-height: 1.6;
-  color: var(--color-muted);
+  color: var(--color-text);
   word-break: break-all;
 }
+/* 「定位到原文 →」：与其它按钮统一成蓝底白字椭圆（原来是白底描边、蓝字） */
 .fields-link {
   margin-left: auto;
   font: inherit;
   font-size: 13px;
-  padding: 3px 10px;
+  font-weight: 600;
+  padding: 3px 12px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
-  background: #ffffff;
-  color: var(--color-accent);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
   white-space: nowrap;
 }
 .fields-link:hover {
-  border-color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .fields-hint,
 .fields-empty {
   font-size: 13.5px;
   line-height: 1.75;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .fields-empty {
   padding: 10px 0;
@@ -1026,7 +1044,7 @@ function backToChat(): void {
   margin: 0 0 12px;
   padding: 9px 12px;
   border: 1px solid rgba(217, 119, 6, 0.35);
-  border-radius: 9px;
+  border-radius: 12px;
   background: rgba(217, 119, 6, 0.08);
   font-size: 13.5px;
   line-height: 1.7;

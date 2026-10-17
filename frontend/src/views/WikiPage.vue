@@ -151,22 +151,24 @@ const exampleDeepLink = '/#/wiki/<entryId>?revision=<revisionId>'
   flex-wrap: wrap;
 }
 
+/* 标题与「模型接入」页一致：蓝色、15px、600 */
 .wk-title {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 
-/* 「当前授权范围图」是口径标签，不是状态徽标：灰底描边、不加颜色含义 */
+/* 「当前授权范围图」是口径标签：统一成蓝色药丸（蓝是品牌主色，不承载好坏判据） */
 .wk-tag {
   display: inline-block;
-  padding: 1px 7px;
-  border: 1px solid var(--color-line);
+  padding: 1px 8px;
+  border: 1px solid transparent;
   border-radius: 999px;
-  background: var(--color-ink);
-  color: var(--color-body);
+  background: var(--color-accent);
+  color: #ffffff;
   font-size: 12.5px;
+  font-weight: 600;
   line-height: 1.6;
 }
 
@@ -175,7 +177,7 @@ const exampleDeepLink = '/#/wiki/<entryId>?revision=<revisionId>'
   max-width: 1080px;
   font-size: 14px;
   line-height: 1.75;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 
 .wk-note strong {

@@ -1638,20 +1638,23 @@ defineExpose({
   font-variant-numeric: tabular-nums;
 }
 
+/* 视图缩放按钮：与其它按钮统一成蓝底白字加粗椭圆（原来是白底细描边） */
 .wg-vbtn {
-  padding: 3px 8px;
-  border: 1px solid var(--color-line);
-  border-radius: 6px;
-  background: var(--color-panel);
-  color: var(--color-text);
+  padding: 3px 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: #ffffff;
   font-size: 13px;
+  font-weight: 600;
   font-family: inherit;
   text-decoration: none;
   cursor: pointer;
 }
 
 .wg-vbtn:hover:not(:disabled) {
-  border-color: rgba(37, 99, 235, 0.4);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 
 .wg-vbtn:focus-visible {
@@ -1678,10 +1681,12 @@ defineExpose({
   background: rgba(255, 255, 255, 0.94);
 }
 
+/* 覆盖层标题与其它页统一：蓝色、15px、600（出错态由下面一条改成红字，保留判据色） */
 .wg-overlay-title {
   margin: 0;
   font-size: 15px;
   font-weight: 600;
+  color: var(--color-accent);
 }
 
 .wg-overlay-note {
@@ -1709,17 +1714,19 @@ defineExpose({
   padding: 12px 14px;
   background: var(--color-panel);
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
 }
 
+/* 卡片标题与其它页统一：蓝色、15px、600（原来是 14.5px 灰黑，属离群值） */
 .wg-card-title {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: 8px;
   margin: 0;
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 600;
+  color: var(--color-accent);
 }
 
 .wg-card-note {
@@ -1734,16 +1741,20 @@ defineExpose({
   font-weight: 500;
 }
 
+/* 子标题与其它页统一：蓝色、15px、600（原来是 13.5px 灰黑，属离群值） */
 .wg-sub-title {
   margin: 6px 0 0;
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
+  color: var(--color-accent);
 }
 
+/* 选中词条标题：蓝色、15px、600 */
 .wg-sel-title {
   margin: 0;
   font-size: 15px;
   font-weight: 600;
+  color: var(--color-accent);
 }
 
 .wg-catalog {
@@ -1838,7 +1849,7 @@ defineExpose({
 .wg-relation {
   padding: 6px 8px;
   border: 1px solid var(--color-line);
-  border-radius: 8px;
+  border-radius: 12px;
 }
 
 .wg-relation-head {
@@ -1858,7 +1869,7 @@ defineExpose({
   margin: 2px 0 0;
   font-size: 12.5px;
   line-height: 1.55;
-  color: var(--color-muted);
+  color: var(--color-text);
   word-break: break-word;
 }
 

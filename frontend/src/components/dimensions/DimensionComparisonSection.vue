@@ -274,17 +274,18 @@ onMounted(() => {
   background: var(--color-panel);
   padding: 14px 16px;
 }
+/* 面板标题与其它页统一：蓝色、15px、600（原来是 14.5px 灰黑，属离群值） */
 .dimc-title {
   margin: 0;
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .dimc-note {
   margin: 5px 0 0;
   font-size: 13px;
   line-height: 1.7;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .dimc-actions {
   display: flex;
@@ -293,19 +294,21 @@ onMounted(() => {
   flex-wrap: wrap;
   margin-top: 10px;
 }
+/* 按钮统一蓝底白字加粗椭圆（原来是白底细描边） */
 .dimc-btn {
   font: inherit;
   font-size: 14px;
-  padding: 7px 16px;
+  font-weight: 600;
+  padding: 7px 18px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-body);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
 }
 .dimc-btn:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .dimc-btn:disabled {
   opacity: 0.55;
@@ -313,24 +316,25 @@ onMounted(() => {
 }
 .dimc-target {
   font-size: 13px;
-  color: var(--color-muted);
+  color: var(--color-text);
   word-break: break-all;
 }
 .dimc-refuse {
   margin: 8px 0 0;
   font-size: 13px;
   line-height: 1.7;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .dimc-result {
   display: block;
   margin-top: 12px;
 }
+/* 子标题与其它页统一：蓝色、15px、600（原来是 14px 灰黑） */
 .dimc-subtitle {
   margin: 16px 0 6px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .dimc-list {
   list-style: none;
@@ -346,7 +350,7 @@ onMounted(() => {
   gap: 10px;
   padding: 8px 10px;
   border: 1px solid var(--color-line);
-  border-radius: 9px;
+  border-radius: 12px;
   background: var(--color-ink);
   font-size: 13.5px;
 }
@@ -356,18 +360,26 @@ onMounted(() => {
   color: var(--color-muted);
   font-variant-numeric: tabular-nums;
 }
+/* 徽标统一蓝底白字加粗椭圆；-warn 是警告语义色（橙），保留 */
 .dimc-badge {
   flex-shrink: 0;
   font-size: 12.5px;
-  padding: 2px 8px;
+  font-weight: 600;
+  padding: 2px 9px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
 }
 .dimc-badge-info {
-  color: #2563eb;
-  border-color: rgba(37, 99, 235, 0.35);
+  color: #ffffff;
+  font-weight: 600;
+  border-color: transparent;
+  background: var(--color-accent);
 }
+/* 警告态徽标：橙色是判据，保留；基础样式现在是蓝底，必须自带浅橙底 */
 .dimc-badge-warn {
+  background: rgba(217, 119, 6, 0.08);
   color: #d97706;
   border-color: rgba(217, 119, 6, 0.35);
 }
@@ -385,27 +397,29 @@ onMounted(() => {
   color: #b45309;
 }
 .dimc-reason-ok {
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .dimc-hash {
   flex-shrink: 0;
   color: var(--color-muted);
   font-variant-numeric: tabular-nums;
 }
+/* 「重放这一条」「加载更多」：与其它按钮统一成蓝底白字加粗椭圆 */
 .dimc-replay {
   flex-shrink: 0;
   font: inherit;
   font-size: 13px;
-  padding: 3px 10px;
+  font-weight: 600;
+  padding: 3px 12px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-body);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
 }
 .dimc-replay:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .dimc-replay:disabled {
   opacity: 0.55;
@@ -416,16 +430,17 @@ onMounted(() => {
   margin: 12px auto 0;
   font: inherit;
   font-size: 14px;
-  padding: 7px 18px;
+  font-weight: 600;
+  padding: 7px 20px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-body);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
 }
 .dimc-more:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .dimc-more:disabled {
   opacity: 0.55;
@@ -445,7 +460,7 @@ onMounted(() => {
 .dimc-empty {
   font-size: 13.5px;
   line-height: 1.7;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .dimc-empty {
   padding: 10px 0;

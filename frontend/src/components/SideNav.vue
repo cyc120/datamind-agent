@@ -742,7 +742,7 @@ onBeforeUnmount(() => {
   width: 100%;
   padding: 8px 10px;
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   background: transparent;
   color: var(--color-body);
   font-size: 15px;
@@ -777,14 +777,17 @@ onBeforeUnmount(() => {
   background: transparent;
   color: var(--color-body);
 }
+/* 「未迁移」标签：统一蓝底白字加粗椭圆（当前八项已全部迁移，这条不会命中任何元素） */
 .legacy-tag {
   margin-left: auto;
   font-size: 12px;
   line-height: 1;
-  padding: 3px 5px;
-  border-radius: 5px;
-  border: 1px solid var(--color-line);
-  color: var(--color-muted);
+  padding: 3px 7px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
+  font-weight: 600;
   white-space: nowrap;
 }
 .ico {
@@ -863,7 +866,7 @@ onBeforeUnmount(() => {
   color: var(--color-body);
 }
 .evidence.detail-line {
-  color: var(--color-muted);
+  color: var(--color-text);
   word-break: break-all;
 }
 .hint {
@@ -871,23 +874,25 @@ onBeforeUnmount(() => {
   padding-left: 15px;
   font-size: 12.5px;
   line-height: 1.5;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
+/* 「测试连通性」：与其它按钮统一成蓝底白字加粗椭圆（原来是白底细描边） */
 .test-btn {
   margin: 2px 0 0 15px;
-  padding: 5px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--color-line);
-  background: #ffffff;
-  color: var(--color-text);
+  padding: 5px 14px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   font-family: inherit;
   font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 .test-btn:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .test-btn:disabled {
   cursor: not-allowed;
@@ -984,7 +989,7 @@ onBeforeUnmount(() => {
   font-size: 12.5px;
   line-height: 1;
   padding: 2px 4px;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
 }
 .sess-fold:hover {
@@ -1005,7 +1010,7 @@ onBeforeUnmount(() => {
   gap: 6px;
   padding: 6px 8px;
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 8px;
   background: #ffffff;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
@@ -1041,7 +1046,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 6px;
   padding: 7px 8px;
-  border-radius: 10px;
+  border-radius: 12px;
   cursor: pointer;
   transition: background 0.15s;
 }
@@ -1092,7 +1097,7 @@ onBeforeUnmount(() => {
   width: 100%;
   min-width: 0;
   border: 1px solid rgba(37, 99, 235, 0.45);
-  border-radius: 7px;
+  border-radius: 8px;
   padding: 2px 6px;
   font-family: inherit;
   font-size: 14px;
@@ -1108,7 +1113,7 @@ onBeforeUnmount(() => {
   display: grid;
   place-items: center;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   color: var(--color-muted);
   font-family: inherit;
@@ -1142,7 +1147,7 @@ onBeforeUnmount(() => {
   flex-direction: column;
   padding: 4px;
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
   background: #ffffff;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
 }
@@ -1154,7 +1159,7 @@ onBeforeUnmount(() => {
 }
 .sess-menu-item {
   border: none;
-  border-radius: 7px;
+  border-radius: 8px;
   padding: 5px 8px;
   text-align: left;
   font-family: inherit;
@@ -1191,8 +1196,8 @@ onBeforeUnmount(() => {
 .sess-confirm-yes,
 .sess-confirm-no {
   border: 1px solid var(--color-line);
-  border-radius: 7px;
-  padding: 2px 6px;
+  border-radius: 999px;
+  padding: 3px 9px;
   font-family: inherit;
   font-size: 12.5px;
   line-height: 1.6;
@@ -1217,9 +1222,9 @@ onBeforeUnmount(() => {
 }
 .sess-more {
   margin-top: 2px;
-  padding: 5px 8px;
+  padding: 5px 10px;
   border: 1px dashed var(--color-line);
-  border-radius: 9px;
+  border-radius: 999px;
   background: transparent;
   color: var(--color-muted);
   font-family: inherit;
@@ -1239,7 +1244,7 @@ onBeforeUnmount(() => {
   padding: 2px 4px;
   font-size: 12.5px;
   line-height: 1.6;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .sess-error {
   color: #e11d48;

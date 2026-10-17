@@ -306,29 +306,32 @@ onMounted(() => {
   gap: 12px;
   min-width: 0;
 }
+/* 标题与「模型接入」页一致：蓝色、15px、600（原来是 16px 灰黑，属离群值） */
 .tb-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .tb-note {
   font-size: 14px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
+/* 顶栏按钮统一蓝底白字加粗椭圆（原来是白底细描边） */
 .tb-action {
   margin-left: auto;
   font: inherit;
   font-size: 14px;
-  padding: 6px 12px;
+  font-weight: 600;
+  padding: 6px 14px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-body);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
 }
 .tb-action:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .tb-action:disabled {
   opacity: 0.6;
@@ -375,13 +378,13 @@ onMounted(() => {
   margin: 0 0 4px;
   font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .auth-sub {
   margin: 0 0 12px;
   font-size: 13px;
   line-height: 1.7;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .auth-query {
   display: flex;
@@ -394,25 +397,27 @@ onMounted(() => {
   font: inherit;
   font-size: 14.5px;
   padding: 8px 11px;
-  border-radius: 10px;
+  border-radius: 8px;
   border: 1px solid var(--color-line);
   background: var(--color-panel);
   color: var(--color-text);
 }
+/* 查询按钮统一蓝底白字加粗椭圆（原来是白底细描边） */
 .auth-btn {
   flex-shrink: 0;
   font: inherit;
   font-size: 14px;
-  padding: 8px 16px;
+  font-weight: 600;
+  padding: 8px 18px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-body);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
 }
 .auth-btn:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .auth-btn:disabled {
   opacity: 0.6;
@@ -435,7 +440,7 @@ onMounted(() => {
 .auth-empty {
   font-size: 14px;
   line-height: 1.8;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .auth-empty {
   padding: 22px 0;

@@ -74,7 +74,7 @@ defineProps<{
 <style scoped>
 .cad-gate {
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 10px 12px;
   background: var(--color-ink);
   margin-bottom: 12px;
@@ -123,11 +123,12 @@ defineProps<{
   gap: 12px;
   margin-top: 10px;
 }
+/* 两列小标题与其它页统一：蓝色、15px、600（原来是 13.5px 灰黑） */
 .cad-gate-col h4 {
   margin: 0 0 6px;
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .cad-gate-list {
   list-style: none;
@@ -149,20 +150,20 @@ defineProps<{
 .cad-gate-meta {
   font-size: 13px;
   line-height: 1.6;
-  color: var(--color-muted);
+  color: var(--color-text);
   word-break: break-word;
 }
 .cad-gate-foot {
   margin: 6px 0 0;
   font-size: 12.5px;
-  color: var(--color-muted);
+  color: var(--color-text);
   line-height: 1.6;
 }
 .cad-hint {
   margin: 0;
   font-size: 13.5px;
   line-height: 1.7;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .cad-code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;

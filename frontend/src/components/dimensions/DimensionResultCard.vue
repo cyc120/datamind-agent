@@ -221,48 +221,58 @@ const withinRange = computed(() => comparison.value?.status === 'within_annotati
   align-items: center;
   gap: 10px;
 }
+/* 面板标题与其它页统一：蓝色、15px、600（原来是 14.5px 灰黑，属离群值） */
 .dimr-title {
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
+/* 徽标统一蓝底白字加粗椭圆；tone-warn 是警告语义色（橙），保留 */
 .dimr-badge {
   margin-left: auto;
   font-size: 13px;
-  padding: 3px 9px;
+  font-weight: 600;
+  padding: 3px 10px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   white-space: nowrap;
 }
 .dimr-tone-info {
-  color: #2563eb;
-  border-color: rgba(37, 99, 235, 0.35);
-  background: rgba(37, 99, 235, 0.08);
+  color: #ffffff;
+  font-weight: 600;
+  border-color: transparent;
+  background: var(--color-accent);
 }
 .dimr-tone-warn {
   color: #d97706;
   border-color: rgba(217, 119, 6, 0.35);
   background: rgba(217, 119, 6, 0.08);
 }
+/* tone-muted 现在与基础样式等价（保留类名，避免动模板） */
 .dimr-tone-muted {
-  color: var(--color-muted);
+  color: #ffffff;
+  font-weight: 600;
+  border-color: transparent;
+  background: var(--color-accent);
 }
 .dimr-sub {
   margin: 4px 0 0;
   font-size: 13.5px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .dimr-empty {
   margin: 10px 0 0;
   font-size: 14px;
-  color: var(--color-muted);
+  color: var(--color-text);
   line-height: 1.7;
 }
 .dimr-block {
   margin-top: 10px;
   padding: 10px 12px;
   border: 1px solid rgba(217, 119, 6, 0.3);
-  border-radius: 10px;
+  border-radius: 12px;
   background: rgba(217, 119, 6, 0.06);
 }
 .dimr-code-row {
@@ -290,7 +300,7 @@ const withinRange = computed(() => comparison.value?.status === 'within_annotati
   margin: 8px 0 0;
   font-size: 13px;
   line-height: 1.7;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .dimr-compare {
   margin-top: 10px;
@@ -317,7 +327,7 @@ const withinRange = computed(() => comparison.value?.status === 'within_annotati
 }
 .dimr-cell {
   border: 1px solid var(--color-line);
-  border-radius: 9px;
+  border-radius: 12px;
   padding: 8px 10px;
   background: var(--color-ink);
 }
@@ -331,7 +341,7 @@ const withinRange = computed(() => comparison.value?.status === 'within_annotati
 }
 .dimr-fact {
   border: 1px dashed var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 10px 12px;
 }
 .dimr-fact-inner {
@@ -340,16 +350,17 @@ const withinRange = computed(() => comparison.value?.status === 'within_annotati
 .dimr-fact-outer {
   background: rgba(37, 99, 235, 0.04);
 }
+/* 事实卡标题与其它页统一：蓝色、15px、600（原来是 14px 灰黑） */
 .dimr-fact-title {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .dimr-fact-q {
   margin: 5px 0 0;
   font-size: 13px;
-  color: var(--color-muted);
+  color: var(--color-text);
   line-height: 1.7;
 }
 .dimr-fact-list {

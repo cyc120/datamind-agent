@@ -223,7 +223,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   overflow-y: auto;
   background: #ffffff;
   border: 1px solid var(--color-line);
-  border-radius: 14px;
+  border-radius: 12px;
   padding: 16px 18px 20px;
   box-shadow: 0 18px 48px rgba(15, 23, 42, 0.22);
 }
@@ -233,32 +233,35 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   gap: 10px;
   margin-bottom: 10px;
 }
+/* 弹层标题与其它页统一：蓝色、15px、600 */
 .fo-title {
   font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .fo-page {
   font-size: 13.5px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .fo-page.is-bad {
   color: #d97706;
 }
+/* 「关闭」：与其它按钮统一成蓝底白字加粗椭圆（原来是白底细描边） */
 .fo-close {
   margin-left: auto;
   font: inherit;
   font-size: 13.5px;
-  padding: 5px 12px;
+  font-weight: 600;
+  padding: 5px 14px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-body);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
 }
 .fo-close:hover {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .fo-focus {
   display: flex;
@@ -273,7 +276,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   font-weight: 600;
 }
 .fo-focus-field {
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .fo-focus-value {
   color: var(--color-text);
@@ -296,7 +299,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 }
 .fo-canvas {
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--color-ink);
   padding: 8px;
 }
@@ -326,7 +329,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   line-height: 1.7;
 }
 .fo-empty {
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .fo-error {
   color: #e11d48;
@@ -357,13 +360,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .fo-legend-text {
   min-width: 0;
 }
+/* 图例里「定位框」标记：蓝底白字加粗椭圆（原来是灰字描边） */
 .fo-legend-focus {
   margin-left: auto;
   font-size: 12.5px;
-  color: var(--color-muted);
-  border: 1px solid var(--color-line);
+  font-weight: 600;
+  color: #ffffff;
+  border: 1px solid transparent;
   border-radius: 999px;
-  padding: 1px 6px;
+  background: var(--color-accent);
+  padding: 1px 8px;
 }
 .fo-refused-role {
   flex-shrink: 0;
@@ -378,6 +384,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   margin: 12px 0 0;
   font-size: 13px;
   line-height: 1.7;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 </style>

@@ -873,7 +873,7 @@ function openDraft(m: ChatMessage): void {
 .brand-sub {
   margin: 16px 0 0;
   font-size: 15.5px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 
 /* ── 输入框 ── */
@@ -884,11 +884,13 @@ function openDraft(m: ChatMessage): void {
   flex-shrink: 0;
   padding-bottom: 18px;
 }
+/* 圆角收敛到「卡片/面板」档 12px（原来是 24px，是本站最离群的圆角；
+   它是有描边+阴影、内含一行控件的容器，而不是一个裸输入框）。 */
 .composer {
   /* 定位上下文，配合下面的 ::before 灰底板 */
   position: relative;
   border: 1px solid var(--color-line);
-  border-radius: 24px;
+  border-radius: 12px;
   background: var(--color-panel);
   padding: 10px 12px 10px 12px;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 28px rgba(15, 23, 42, 0.05);
@@ -906,7 +908,7 @@ function openDraft(m: ChatMessage): void {
   bottom: -14px;
   z-index: -1;
   background: var(--color-ink);
-  border-radius: 22px;
+  border-radius: 12px;
 }
 
 .composer:focus-within {
@@ -1035,7 +1037,7 @@ function openDraft(m: ChatMessage): void {
   margin: 14px 0 0;
   text-align: center;
   font-size: 13px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 
 /* ── 消息列表 ── */
@@ -1187,14 +1189,14 @@ function openDraft(m: ChatMessage): void {
      改名 + 显式声明 display 双保险。 */
   display: block;
   font-size: 13.5px;
-  color: var(--color-muted);
+  color: var(--color-text);
   margin-bottom: 6px;
   white-space: nowrap;
 }
 .twrap {
   overflow-x: auto;
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
 }
 table {
   width: 100%;
@@ -1224,9 +1226,11 @@ tr:last-child td {
   flex-direction: column;
   gap: 8px;
 }
+/* 引用区小标题与其它页统一：蓝色、15px、600（原来是 13.5px 灰字） */
 .cite-title {
-  font-size: 13.5px;
-  color: var(--color-muted);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-accent);
 }
 .cite {
   display: flex;
@@ -1234,7 +1238,7 @@ tr:last-child td {
   padding: 10px 12px;
   background: var(--color-ink);
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
 }
 .cite-idx {
   width: 20px;
@@ -1278,7 +1282,7 @@ tr:last-child td {
 }
 .cite-path {
   font-size: 13px;
-  color: var(--color-muted);
+  color: var(--color-text);
   margin-top: 4px;
   word-break: break-word;
 }
@@ -1365,22 +1369,24 @@ tr:last-child td {
   border-top: 1px dashed var(--color-line);
 }
 
+/* 「整理为知识词条」的三个按钮：统一蓝底白字加粗椭圆（原来是白底细描边） */
 .org-btn {
-  padding: 4px 10px;
-  border: 1px solid var(--color-line);
-  border-radius: 8px;
-  background: var(--color-panel);
-  color: var(--color-text);
+  padding: 5px 13px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: #ffffff;
   font-family: inherit;
   font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
 
 .org-btn:hover:not(:disabled) {
-  border-color: rgba(37, 99, 235, 0.45);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 
 .org-btn:focus-visible {
@@ -1394,21 +1400,23 @@ tr:last-child td {
   background: var(--color-ink);
 }
 
+/* ghost / primary 两个变体现在与基础样式等价（保留类名，避免动模板） */
 .org-btn-ghost {
-  background: var(--color-ink);
+  background: var(--color-accent);
+  color: #ffffff;
 }
 
 .org-btn-primary {
-  border-color: rgba(37, 99, 235, 0.45);
-  background: rgba(37, 99, 235, 0.08);
-  color: var(--color-accent);
+  border-color: transparent;
+  background: var(--color-accent);
+  color: #ffffff;
 }
 
 /* 状态文字：排队中 ≠ 完成 ≠ 失败 —— 用文字说清，不靠颜色；颜色只做辅助 */
 .org-state {
   font-size: 12.5px;
   line-height: 1.6;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 
 .org-state.is-queued,

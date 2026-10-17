@@ -22,11 +22,12 @@ defineProps<{
 <style scoped>
 /* cad- 前缀：Tailwind v4 的 @layer utilities 会生成同名工具类，撞上就会出现
    「只生效一半」的怪象（本仓库已出过两次事故）。 */
+/* 浅底错误提示条：保持浅底（红是判据），只把圆角收敛到卡片档 12px */
 .cad-errnote {
   margin: 0 0 10px;
   padding: 9px 11px;
   border: 1px solid rgba(225, 29, 72, 0.35);
-  border-radius: 10px;
+  border-radius: 12px;
   background: rgba(225, 29, 72, 0.06);
   color: #b91c1c;
   font-size: 14px;

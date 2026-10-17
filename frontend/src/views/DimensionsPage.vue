@@ -600,29 +600,32 @@ onMounted(() => {
   gap: 12px;
   min-width: 0;
 }
+/* 标题与「模型接入」页一致：蓝色、15px、600（原来是 16px 灰黑，属离群值） */
 .tb-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .tb-note {
   font-size: 14px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
+/* 顶栏按钮统一蓝底白字加粗椭圆（原来是白底细描边） */
 .tb-action {
   margin-left: auto;
   font: inherit;
   font-size: 14px;
-  padding: 6px 12px;
+  font-weight: 600;
+  padding: 6px 14px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-body);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
 }
 .tb-action:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .tb-action:disabled {
   opacity: 0.6;
@@ -639,7 +642,7 @@ onMounted(() => {
 .dim-identity {
   margin: 0 0 12px;
   font-size: 13.5px;
-  color: var(--color-muted);
+  color: var(--color-text);
   line-height: 1.7;
 }
 .dim-contract {
@@ -659,7 +662,7 @@ onMounted(() => {
   margin-bottom: 0;
 }
 .dim-contract-muted {
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .dim-cols {
   display: grid;
@@ -685,17 +688,18 @@ onMounted(() => {
   padding: 14px 16px;
   min-width: 0;
 }
+/* 面板标题与其它页统一：蓝色、15px、600（原来是 14.5px 灰黑，属离群值） */
 .dim-panel-title {
   margin: 0;
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .dim-panel-note {
   margin: 5px 0 10px;
   font-size: 13px;
   line-height: 1.7;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .dim-list {
   list-style: none;
@@ -715,7 +719,7 @@ onMounted(() => {
   font-size: 14px;
   padding: 8px 10px;
   border: 1px solid var(--color-line);
-  border-radius: 9px;
+  border-radius: 12px;
   background: var(--color-panel);
   color: var(--color-body);
   cursor: pointer;
@@ -767,11 +771,11 @@ onMounted(() => {
   margin: 10px 0 0;
   font-size: 13px;
   line-height: 1.7;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .dim-details {
   border: 1px solid var(--color-line);
-  border-radius: 9px;
+  border-radius: 12px;
   background: var(--color-ink);
   padding: 8px 10px;
 }
@@ -807,7 +811,7 @@ onMounted(() => {
   gap: 10px;
   padding: 7px 10px;
   border: 1px solid var(--color-line);
-  border-radius: 9px;
+  border-radius: 12px;
   background: var(--color-ink);
   font-size: 13.5px;
 }
@@ -864,26 +868,28 @@ onMounted(() => {
   align-items: center;
   gap: 12px;
 }
+/* 「展开/收起」按钮统一蓝底白字加粗椭圆（原来是白底细描边） */
 .dim-toggle {
   margin-left: auto;
   font: inherit;
   font-size: 13.5px;
-  padding: 5px 12px;
+  font-weight: 600;
+  padding: 6px 14px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-body);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
 }
 .dim-toggle:hover {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .dim-hint,
 .dim-empty {
   font-size: 13.5px;
   line-height: 1.7;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .dim-empty {
   padding: 8px 0;

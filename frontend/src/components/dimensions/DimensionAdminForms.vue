@@ -708,7 +708,7 @@ async function lookupBindingHead(): Promise<void> {
   margin: 0;
   padding: 8px 10px;
   border: 1px solid rgba(217, 119, 6, 0.3);
-  border-radius: 9px;
+  border-radius: 12px;
   background: rgba(217, 119, 6, 0.06);
   font-size: 13.5px;
   line-height: 1.7;
@@ -720,17 +720,18 @@ async function lookupBindingHead(): Promise<void> {
   background: var(--color-panel);
   padding: 14px 16px;
 }
+/* 面板标题与其它页统一：蓝色、15px、600（原来是 14.5px 灰黑，属离群值） */
 .dimg-title {
   margin: 0;
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .dimg-note {
   margin: 5px 0 0;
   font-size: 13px;
   line-height: 1.7;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .dimg-tools {
   display: flex;
@@ -742,7 +743,7 @@ async function lookupBindingHead(): Promise<void> {
   margin-top: 10px;
   padding: 8px 10px;
   border: 1px solid var(--color-line);
-  border-radius: 9px;
+  border-radius: 12px;
   background: var(--color-ink);
 }
 .dimg-ev-row {
@@ -766,11 +767,12 @@ async function lookupBindingHead(): Promise<void> {
 .dimg-group {
   margin-top: 12px;
 }
+/* 分组小标题与其它页统一：蓝色、15px、600（原来是 13.5px 灰黑，属离群值） */
 .dimg-group-title {
   margin: 0 0 6px;
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-body);
+  color: var(--color-accent);
 }
 .dimg-grid {
   display: grid;
@@ -817,23 +819,25 @@ async function lookupBindingHead(): Promise<void> {
   color: #e11d48;
   line-height: 1.6;
 }
+/* 按钮统一蓝底白字加粗椭圆（原来是白底细描边） */
 .dimg-btn {
   margin-top: 10px;
   font: inherit;
   font-size: 14px;
-  padding: 7px 16px;
+  font-weight: 600;
+  padding: 7px 18px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-body);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
 }
 .dimg-tools .dimg-btn {
   margin-top: 0;
 }
 .dimg-btn:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .dimg-btn:disabled {
   opacity: 0.55;
@@ -843,7 +847,7 @@ async function lookupBindingHead(): Promise<void> {
   margin: 8px 0 0;
   font-size: 13px;
   line-height: 1.7;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .dimg-warn {
   margin: 8px 0 0;

@@ -1248,35 +1248,40 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   flex-wrap: wrap;
 }
 
+/* 标题与「模型接入」页一致：蓝色、15px、600（原来是 16px 灰黑，属离群值） */
 .wk-title {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 
 .wk-sub {
   margin: 4px 0 0 0;
   font-size: 13.5px;
-  color: var(--color-muted);
+  color: var(--color-text);
   word-break: break-all;
 }
 
+/* 口径标签统一蓝底白字加粗椭圆（原来是灰底描边）；-demo 是警告语义色，保留 */
 .wk-tag {
   display: inline-block;
-  padding: 1px 7px;
-  border: 1px solid var(--color-line);
+  padding: 1px 8px;
+  border: 1px solid transparent;
   border-radius: 999px;
-  background: var(--color-ink);
-  color: var(--color-body);
+  background: var(--color-accent);
+  color: #ffffff;
   font-size: 12.5px;
+  font-weight: 600;
   line-height: 1.6;
   white-space: nowrap;
 }
 
-/* 演示属性只用文字与描边表达（不靠颜色），但必须一眼看到 */
+/* 演示数据标记：橙色是警告语义，保留；但基础样式现在是蓝底，必须自带浅橙底，
+   否则会变成「蓝底橙字」（灰/橙字压蓝底读不出来）。与 .fields-badge.is-warn 同一写法。 */
 .wk-tag-demo {
   border-color: rgba(217, 119, 6, 0.5);
+  background: rgba(217, 119, 6, 0.08);
   color: #b45309;
   font-weight: 600;
 }
@@ -1297,7 +1302,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
 
 .wk-field-label {
   font-size: 13px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 
 .wk-select {
@@ -1316,22 +1321,24 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   outline-offset: 1px;
 }
 
+/* 工具条按钮统一蓝底白字加粗椭圆（原来是白底细描边）；ghost 变体与基础等价 */
 .wk-btn {
-  padding: 5px 10px;
-  border: 1px solid var(--color-line);
-  border-radius: 8px;
-  background: var(--color-panel);
-  color: var(--color-text);
+  padding: 5px 14px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: #ffffff;
   font-family: inherit;
   font-size: 13.5px;
+  font-weight: 600;
   text-decoration: none;
   cursor: pointer;
   white-space: nowrap;
 }
 
 .wk-btn:hover:not(:disabled) {
-  border-color: rgba(37, 99, 235, 0.45);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 
 .wk-btn:focus-visible {
@@ -1339,18 +1346,21 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   outline-offset: 1px;
 }
 
+/* 禁用态只降透明度、不改文字色（蓝底压灰字对比度极差），与 .mp-btn:disabled 一致 */
 .wk-btn:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
-  color: var(--color-muted);
 }
 
+/* ghost 变体与基础样式等价（保留类名，避免动模板） */
 .wk-btn-ghost {
-  background: var(--color-ink);
+  background: var(--color-accent);
+  color: #ffffff;
 }
 
 .wk-hint-inline {
   font-size: 12.5px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 
 .wk-code {
@@ -1381,7 +1391,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
 .wk-loading {
   margin: 0;
   font-size: 14px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 
 /* 窄屏分步切换：页面级切换栏（不是卡片里的小控件） */
@@ -1399,7 +1409,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   gap: 2px;
   padding: 8px 12px;
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--color-panel);
   color: var(--color-body);
   font-family: inherit;
@@ -1410,7 +1420,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
 
 .wk-step small {
   font-size: 12.5px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 
 .wk-step.is-active {
@@ -1445,11 +1455,12 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   min-width: 0;
 }
 
+/* 两栏标题与其它页统一：蓝色、15px、600（原来是 14.5px 灰黑，属离群值） */
 .wk-col-title {
   margin: 0;
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 
 .wk-card {
@@ -1459,35 +1470,37 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   padding: 12px 14px;
   background: var(--color-panel);
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
 }
 
 .wk-card-error {
   border-color: rgba(225, 29, 72, 0.4);
 }
 
+/* 卡片标题与其它页统一：蓝色、15px、600（原来是 14.5px 灰黑，属离群值） */
 .wk-card-title {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: 8px;
   margin: 0;
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 
 .wk-card-note {
   font-size: 12.5px;
   font-weight: 400;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 
+/* 子标题与其它页统一：蓝色、15px、600（原来是 13.5px 灰黑，属离群值） */
 .wk-sub-title {
   margin: 6px 0 0;
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 
 .wk-note {
@@ -1499,7 +1512,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
 
 .wk-note-inline {
   font-size: 12.5px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 
 .wk-error-msg {
@@ -1510,11 +1523,12 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   word-break: break-word;
 }
 
+/* 浅底错误/警告条：保持浅底（红/橙是判据），只把圆角收敛到 12px */
 .wk-error-note {
   margin: 0;
   padding: 7px 9px;
   border: 1px solid rgba(225, 29, 72, 0.35);
-  border-radius: 8px;
+  border-radius: 12px;
   background: rgba(225, 29, 72, 0.06);
   font-size: 13px;
   line-height: 1.7;
@@ -1526,7 +1540,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   margin: 0;
   padding: 7px 9px;
   border: 1px solid rgba(217, 119, 6, 0.35);
-  border-radius: 8px;
+  border-radius: 12px;
   background: rgba(217, 119, 6, 0.07);
   font-size: 13px;
   line-height: 1.7;
@@ -1572,7 +1586,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   overflow: auto;
   padding: 10px 12px;
   border: 1px solid var(--color-line);
-  border-radius: 8px;
+  border-radius: 12px;
   background: var(--color-ink);
   color: var(--color-text);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -1638,7 +1652,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
 .wk-list-item {
   padding: 8px 10px;
   border: 1px solid var(--color-line);
-  border-radius: 8px;
+  border-radius: 12px;
   outline: none;
 }
 
@@ -1662,7 +1676,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
 .wk-list-sub {
   font-size: 12.5px;
   font-weight: 400;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 
 .wk-quote {
@@ -1688,14 +1702,15 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
 .wk-assertion {
   padding: 8px 10px;
   border: 1px solid var(--color-line);
-  border-radius: 8px;
+  border-radius: 12px;
 }
 
+/* 断言标题与其它页统一：蓝色、15px、600（原来是 14px 灰黑） */
 .wk-assertion-head {
   margin: 0 0 4px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 
 .wk-assertion-value {
@@ -1778,7 +1793,7 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
 }
 
 .wk-event-meta {
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 
 .wk-event-error {
@@ -1795,20 +1810,22 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   list-style: none;
 }
 
+/* 可点的证据胶囊：蓝底白字加粗椭圆（原来是灰底描边） */
 .wk-chip {
-  padding: 3px 9px;
-  border: 1px solid var(--color-line);
+  padding: 3px 11px;
+  border: 1px solid transparent;
   border-radius: 999px;
-  background: var(--color-ink);
-  color: var(--color-body);
+  background: var(--color-accent);
+  color: #ffffff;
   font-family: inherit;
   font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
 }
 
 .wk-chip:hover {
-  border-color: rgba(37, 99, 235, 0.45);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 
 .wk-chip:focus-visible {

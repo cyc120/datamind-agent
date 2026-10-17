@@ -492,15 +492,16 @@ onMounted(async () => {
   min-width: 0;
   flex: 1;
 }
+/* 标题与「模型接入」页一致：蓝色、15px、600（原来是 15.5px 灰黑，属离群值） */
 .tb-title {
-  font-size: 15.5px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
   white-space: nowrap;
 }
 .tb-note {
   font-size: 14px;
-  color: var(--color-muted);
+  color: var(--color-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -511,6 +512,8 @@ onMounted(async () => {
   gap: 8px;
   flex-shrink: 0;
 }
+/* 后端健康度胶囊：判据色在里面的圆点上（绿/红/橙），胶囊本身保持白底描边，
+   否则蓝底会把绿点吞掉（与「语义色不动」的约定一致）。 */
 .pill {
   display: inline-flex;
   align-items: center;
@@ -543,21 +546,23 @@ onMounted(async () => {
   0%, 100% { opacity: 0.45; }
   50% { opacity: 1; }
 }
+/* 顶栏按钮统一蓝底白字加粗椭圆（原来是白底细描边） */
 .ghost-btn {
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-text);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   border-radius: 999px;
-  padding: 7px 14px;
+  padding: 7px 16px;
   font-family: inherit;
   font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.15s, border-color 0.15s;
 }
 .ghost-btn:hover {
-  background: var(--color-ink);
-  border-color: rgba(15, 23, 42, 0.2);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 
 /* ── 视图切换 ──
@@ -643,6 +648,7 @@ onMounted(async () => {
   align-items: baseline;
   gap: 10px;
 }
+/* 英文大写小标签（eyebrow）不是标题：保留小字号与字间距、保持灰字。 */
 .eyebrow {
   font-size: 12px;
   letter-spacing: 0.1em;
@@ -651,9 +657,9 @@ onMounted(async () => {
 }
 .graph-head h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .count {
   font-size: 12.5px;
@@ -667,7 +673,7 @@ onMounted(async () => {
   flex: 1;
   min-width: 0;
   font-size: 13.5px;
-  color: var(--color-muted);
+  color: var(--color-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -720,7 +726,7 @@ onMounted(async () => {
 .overlay.static p {
   max-width: 320px;
   text-align: center;
-  color: var(--color-muted);
+  color: var(--color-text);
   line-height: 1.7;
   margin: 0;
   font-size: 14px;
@@ -754,6 +760,7 @@ onMounted(async () => {
   gap: 10px;
   padding: 12px 16px 8px;
 }
+/* 详情头的小标签同属大写小标签：字号与灰字都保留 */
 .dh-title {
   flex: 1;
   font-size: 12.5px;
@@ -761,19 +768,21 @@ onMounted(async () => {
   text-transform: uppercase;
   color: var(--color-muted);
 }
+/* 「收起 ✕」：与其它按钮统一成蓝底白字椭圆（原来是白底细描边） */
 .dh-clear {
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-body);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   border-radius: 999px;
-  padding: 3px 10px;
+  padding: 4px 12px;
   font-family: inherit;
   font-size: 12.5px;
+  font-weight: 600;
   cursor: pointer;
 }
 .dh-clear:hover {
-  background: var(--color-ink);
-  color: var(--color-text);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .detail {
   flex: 1;

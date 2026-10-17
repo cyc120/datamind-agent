@@ -145,13 +145,17 @@ const scopeFields: Array<{ key: keyof AuthorityCandidate['context']['scope']; la
   color: var(--color-text);
   word-break: break-all;
 }
+/* 徽标统一蓝底白字加粗椭圆（原来是白底描边） */
 .acp-badge {
   margin-left: auto;
   flex-shrink: 0;
   font-size: 13px;
-  padding: 3px 8px;
+  font-weight: 600;
+  padding: 3px 9px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
 }
 .acp-badge.is-eligible {
   color: #ffffff; font-weight: 600;
@@ -172,7 +176,7 @@ const scopeFields: Array<{ key: keyof AuthorityCandidate['context']['scope']; la
   flex: 1;
   min-width: 0;
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 10px 12px;
   background: var(--color-ink);
 }
@@ -182,11 +186,12 @@ const scopeFields: Array<{ key: keyof AuthorityCandidate['context']['scope']; la
 .acp-report {
   border-left: 3px solid var(--color-accent-2);
 }
+/* 对比栏小标题：蓝色、15px、600（原来是 13px 灰字，属离群值） */
 .acp-side-title {
   margin: 0 0 6px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--color-muted);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-accent);
 }
 .acp-value {
   margin: 0;
@@ -212,12 +217,12 @@ const scopeFields: Array<{ key: keyof AuthorityCandidate['context']['scope']; la
   align-self: center;
   flex-shrink: 0;
   font-size: 13px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .acp-note {
   margin: 10px 0 0;
   font-size: 13px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .acp-meta {
   margin: 10px 0 0;
@@ -248,20 +253,22 @@ const scopeFields: Array<{ key: keyof AuthorityCandidate['context']['scope']; la
   font-size: 14px;
   color: #d97706;
 }
+/* 「选为权威来源」：与其它按钮统一成蓝底白字加粗椭圆（原来是白底细描边） */
 .acp-pick {
   margin-top: 12px;
   font: inherit;
   font-size: 14px;
-  padding: 7px 14px;
+  font-weight: 600;
+  padding: 7px 16px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-body);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
 }
 .acp-pick:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .acp-pick:disabled {
   opacity: 0.6;

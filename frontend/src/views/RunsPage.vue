@@ -242,29 +242,32 @@ onMounted(() => {
   gap: 12px;
   min-width: 0;
 }
+/* 标题与「模型接入」页一致：蓝色、15px、600（原来是 16px 灰黑，属离群值） */
 .tb-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .tb-note {
   font-size: 14px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
+/* 顶栏按钮统一蓝底白字加粗椭圆（原来是白底细描边，看着不像按钮） */
 .tb-action {
   margin-left: auto;
   font: inherit;
   font-size: 14px;
-  padding: 6px 12px;
+  font-weight: 600;
+  padding: 6px 14px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-body);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
 }
 .tb-action:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .tb-action:disabled {
   opacity: 0.6;
@@ -295,7 +298,7 @@ onMounted(() => {
   font: inherit;
   padding: 10px 12px;
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--color-panel);
   color: var(--color-body);
   cursor: pointer;
@@ -326,9 +329,12 @@ onMounted(() => {
 .run-badge {
   flex-shrink: 0;
   font-size: 13px;
-  padding: 3px 8px;
+  font-weight: 600;
+  padding: 3px 9px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
 }
 .run-badge.tone-ok {
   color: #ffffff; font-weight: 600;
@@ -345,8 +351,12 @@ onMounted(() => {
   border-color: transparent;
   background: #e11d48;
 }
+/* tone-muted 现在与基础样式等价（保留类名，避免动模板）；白字压蓝底才读得出来 */
 .run-badge.tone-muted {
-  color: var(--color-muted);
+  color: #ffffff;
+  font-weight: 600;
+  border-color: transparent;
+  background: var(--color-accent);
 }
 .run-owner {
   flex-shrink: 0;
@@ -382,21 +392,22 @@ onMounted(() => {
   color: var(--color-text);
   word-break: break-all;
 }
-/* 「打开该会话 →」：跳工作台的会话深链，样式做成次要按钮而不是链接色块 */
+/* 「打开该会话 →」：跳工作台的会话深链，做成与其它按钮一致的蓝底白字椭圆 */
 .d-link {
-  border: 1px solid var(--color-line);
-  border-radius: 7px;
-  padding: 2px 8px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 3px 12px;
   font-family: inherit;
   font-size: 13px;
-  color: var(--color-body);
-  background: #ffffff;
+  font-weight: 600;
+  color: #ffffff;
+  background: var(--color-accent);
   cursor: pointer;
   white-space: nowrap;
 }
 .d-link:hover {
-  border-color: rgba(37, 99, 235, 0.45);
-  color: #2563eb;
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .d-block {
   margin-top: 10px;
@@ -415,7 +426,7 @@ onMounted(() => {
 .run-hint,
 .run-empty {
   font-size: 14px;
-  color: var(--color-muted);
+  color: var(--color-text);
   line-height: 1.7;
 }
 .run-empty {
@@ -431,16 +442,17 @@ onMounted(() => {
   margin: 16px auto 0;
   font: inherit;
   font-size: 14px;
-  padding: 8px 18px;
+  font-weight: 600;
+  padding: 8px 20px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-body);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
 }
 .run-more:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .run-more:disabled {
   opacity: 0.6;

@@ -395,7 +395,7 @@ const checkIssues = computed(() => {
 .code {
   background: var(--color-ink);
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 10px 12px;
   font-size: 13px;
   line-height: 1.6;
@@ -428,7 +428,7 @@ const checkIssues = computed(() => {
   overflow-x: auto;
   margin: 8px 0;
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
 }
 table {
   width: 100%;
@@ -495,9 +495,11 @@ tr:last-child td {
 .issues {
   margin: 10px 0;
 }
+/* 引用区小标题与其它页统一：蓝色、15px、600（原来是 12.5px 灰字） */
 .refs-title {
-  font-size: 12.5px;
-  color: var(--color-muted);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-accent);
   margin-bottom: 5px;
 }
 .ref {
@@ -538,7 +540,7 @@ tr:last-child td {
 .empty {
   text-align: center;
   padding: 34px 12px;
-  color: var(--color-muted);
+  color: var(--color-text);
   font-size: 14.5px;
   line-height: 1.7;
 }

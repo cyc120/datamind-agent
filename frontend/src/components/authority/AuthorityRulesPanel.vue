@@ -356,10 +356,11 @@ function act(rule: AuthorityRule, decision: ApprovalDecision): void {
   color: var(--color-text);
   word-break: break-all;
 }
+/* 审批状态 / 载荷校验：判据类徽标，语义色（橙=待批、蓝=已批准、红=驳回/撤销、绿=校验通过）保留不动 */
 .art-state,
 .art-payload {
   font-size: 13px;
-  padding: 3px 8px;
+  padding: 3px 9px;
   border-radius: 999px;
   border: 1px solid var(--color-line);
 }
@@ -444,19 +445,21 @@ function act(rule: AuthorityRule, decision: ApprovalDecision): void {
   background: var(--color-ink);
   color: var(--color-text);
 }
+/* 审批按钮统一蓝底白字加粗椭圆（原来是白底细描边） */
 .art-btn {
   font: inherit;
   font-size: 13.5px;
-  padding: 6px 13px;
+  font-weight: 600;
+  padding: 6px 14px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-body);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
 }
 .art-btn:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .art-btn:disabled {
   opacity: 0.55;
@@ -466,6 +469,6 @@ function act(rule: AuthorityRule, decision: ApprovalDecision): void {
   margin: 8px 0 0;
   font-size: 13px;
   line-height: 1.7;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 </style>

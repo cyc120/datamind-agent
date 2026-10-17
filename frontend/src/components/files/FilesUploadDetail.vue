@@ -329,7 +329,7 @@ const approval = computed(() => props.detail?.approval ?? null)
 .fud-bt {
   font-size: 13px;
   letter-spacing: 0.04em;
-  color: var(--color-muted);
+  color: var(--color-text);
   margin-bottom: 6px;
 }
 .fud-line {
@@ -349,13 +349,15 @@ const approval = computed(() => props.detail?.approval ?? null)
   flex-wrap: wrap;
   gap: 4px;
 }
+/* 小标签统一蓝底白字加粗椭圆（原来是 6px 圆角的白底描边）；-warn 是警告语义色，保留 */
 .fud-chip {
   font-size: 12.5px;
-  padding: 1px 6px;
-  border-radius: 6px;
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-body);
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
 }
 .fud-chip-warn {
   border-color: rgba(217, 119, 6, 0.35);
@@ -366,7 +368,7 @@ const approval = computed(() => props.detail?.approval ?? null)
   margin: 8px 0 0;
   font-size: 13px;
   line-height: 1.7;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .fud-link {
   font-size: 13.5px;
@@ -375,7 +377,7 @@ const approval = computed(() => props.detail?.approval ?? null)
 .fud-hint {
   margin: 0;
   font-size: 13.5px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .fud-error {
   margin: 0;

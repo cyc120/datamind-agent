@@ -149,24 +149,26 @@ function outcome(featureId: string): { kind: 'eligible' | 'excluded' | 'absent';
   margin: 0 0 8px;
   font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
   display: flex;
   align-items: baseline;
   gap: 10px;
 }
+/* 节标题旁的计数标签：蓝底白字加粗椭圆（原来是灰字描边） */
 .cad-sec-tag {
   font-size: 13px;
-  font-weight: 500;
-  color: var(--color-muted);
-  border: 1px solid var(--color-line);
+  font-weight: 600;
+  color: #ffffff;
+  border: 1px solid transparent;
   border-radius: 999px;
-  padding: 2px 8px;
+  background: var(--color-accent);
+  padding: 2px 9px;
 }
 .cad-hint {
   margin: 0 0 8px;
   font-size: 13.5px;
   line-height: 1.75;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .cad-emph {
   color: var(--color-body);
@@ -181,7 +183,7 @@ function outcome(featureId: string): { kind: 'eligible' | 'excluded' | 'absent';
 .cad-tablewrap {
   overflow-x: auto;
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
 }
 .cad-table {
   border-collapse: collapse;
@@ -257,14 +259,18 @@ function outcome(featureId: string): { kind: 'eligible' | 'excluded' | 'absent';
   margin-top: 3px;
   font-size: 12.5px;
   line-height: 1.6;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
+/* 要素状态徽标：cad-is-ok / cad-is-bad 是判据，语义色保留；基础样式与 is-muted 统一成蓝底白字 */
 .cad-pill {
   display: inline-block;
   font-size: 12.5px;
-  padding: 2px 7px;
+  font-weight: 600;
+  padding: 2px 8px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   margin-bottom: 3px;
 }
 .cad-pill.cad-is-ok {
@@ -278,21 +284,26 @@ function outcome(featureId: string): { kind: 'eligible' | 'excluded' | 'absent';
   background: rgba(217, 119, 6, 0.08);
 }
 .cad-pill.cad-is-muted {
-  color: var(--color-muted);
+  color: #ffffff;
+  font-weight: 600;
+  border-color: transparent;
+  background: var(--color-accent);
 }
+/* 「选这一行」：与其它按钮统一成蓝底白字加粗椭圆（原来是白底细描边） */
 .cad-pick {
   font: inherit;
   font-size: 13px;
-  padding: 5px 10px;
+  font-weight: 600;
+  padding: 5px 12px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-body);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
   white-space: nowrap;
 }
 .cad-pick:hover {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 </style>

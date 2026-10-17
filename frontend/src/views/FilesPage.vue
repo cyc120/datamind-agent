@@ -682,29 +682,32 @@ onBeforeUnmount(() => {
   gap: 12px;
   min-width: 0;
 }
+/* 标题与「模型接入」页一致：蓝色、15px、600（原来是 16px 灰黑，属离群值） */
 .files-tb-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .files-tb-note {
   font-size: 14px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
+/* 顶栏按钮统一蓝底白字加粗椭圆（原来是白底细描边） */
 .files-tb-action {
   margin-left: auto;
   font: inherit;
   font-size: 14px;
-  padding: 6px 12px;
+  font-weight: 600;
+  padding: 6px 14px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-body);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
 }
 .files-tb-action:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .files-tb-action:disabled {
   opacity: 0.6;
@@ -727,7 +730,7 @@ onBeforeUnmount(() => {
   margin: 0;
   font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .files-count {
   font-size: 13.5px;
@@ -739,7 +742,7 @@ onBeforeUnmount(() => {
   margin: 4px 0 0;
   font-size: 13px;
   line-height: 1.7;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .files-retry {
   margin-top: 16px;
@@ -749,7 +752,7 @@ onBeforeUnmount(() => {
   font-size: 13.5px;
   line-height: 1.7;
   padding: 8px 10px;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid var(--color-line);
   background: var(--color-ink);
   color: var(--color-body);
@@ -789,15 +792,21 @@ onBeforeUnmount(() => {
 .files-fi-num {
   width: 72px;
 }
+/* 筛选按钮统一成实心蓝（原来是浅蓝底蓝字，同页其它按钮已是实心蓝） */
 .files-apply {
   font: inherit;
   font-size: 13.5px;
-  padding: 5px 12px;
+  font-weight: 600;
+  padding: 6px 14px;
   border-radius: 999px;
-  border: 1px solid rgba(37, 99, 235, 0.4);
-  background: rgba(37, 99, 235, 0.08);
-  color: var(--color-accent);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
+}
+.files-apply:hover:not(:disabled) {
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .files-apply:disabled {
   opacity: 0.6;
@@ -814,7 +823,7 @@ onBeforeUnmount(() => {
 .files-hint,
 .files-empty {
   font-size: 14px;
-  color: var(--color-muted);
+  color: var(--color-text);
   line-height: 1.7;
 }
 .files-empty {

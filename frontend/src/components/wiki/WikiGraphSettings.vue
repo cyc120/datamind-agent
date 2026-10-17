@@ -554,12 +554,13 @@ const FORCE_ROWS: Array<{
   overflow-y: auto;
   background: var(--color-panel);
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 8px 24px rgba(15, 23, 42, 0.06);
   font-size: 13.5px;
   color: var(--color-text);
 }
 
+/* 面板标题与其它页统一：蓝色、15px、600（原来是 13.5px 灰黑） */
 .wg-panel-head {
   display: flex;
   align-items: baseline;
@@ -568,15 +569,16 @@ const FORCE_ROWS: Array<{
   margin: 0;
   padding: 8px 10px;
   border-bottom: 1px solid var(--color-line);
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
   letter-spacing: 0.02em;
+  color: var(--color-accent);
 }
 
 .wg-panel-head-note {
   font-size: 12.5px;
   font-weight: 400;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 
 .wg-group {
@@ -629,7 +631,7 @@ const FORCE_ROWS: Array<{
   flex: 1 1 auto;
   min-width: 0;
   font-size: 12.5px;
-  color: var(--color-muted);
+  color: var(--color-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -679,7 +681,7 @@ const FORCE_ROWS: Array<{
   box-sizing: border-box;
   padding: 4px 6px;
   border: 1px solid var(--color-line);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--color-panel);
   color: var(--color-text);
   font-size: 13.5px;
@@ -719,7 +721,7 @@ const FORCE_ROWS: Array<{
 .wg-hint {
   font-size: 12.5px;
   line-height: 1.5;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 
 .wg-muted {
@@ -728,8 +730,8 @@ const FORCE_ROWS: Array<{
 
 .wg-warn {
   margin: 0;
-  padding: 4px 6px;
-  border-radius: 6px;
+  padding: 4px 8px;
+  border-radius: 12px;
   background: rgba(217, 119, 6, 0.1);
   color: #b45309;
   font-size: 12.5px;
@@ -742,19 +744,22 @@ const FORCE_ROWS: Array<{
   gap: 6px;
 }
 
+/* 按钮统一蓝底白字加粗椭圆（原来是白底细描边） */
 .wg-btn {
-  padding: 4px 9px;
-  border: 1px solid var(--color-line);
-  border-radius: 6px;
-  background: var(--color-panel);
-  color: var(--color-text);
+  padding: 4px 12px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: #ffffff;
   font-size: 13px;
+  font-weight: 600;
   font-family: inherit;
   cursor: pointer;
 }
 
 .wg-btn:hover:not(:disabled) {
-  border-color: rgba(37, 99, 235, 0.4);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 
 .wg-btn:focus-visible {
@@ -762,15 +767,18 @@ const FORCE_ROWS: Array<{
   outline-offset: 1px;
 }
 
+/* 禁用态只降透明度、不改文字色：底色已是主色蓝，压成灰字会变成「蓝底灰字」
+   （实测对比度极差）。与「模型接入」页 .mp-btn:disabled 一致。 */
 .wg-btn:disabled {
-  color: var(--color-muted);
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
+/* primary 变体现在与基础样式等价（保留类名，避免动模板） */
 .wg-btn-primary {
-  border-color: rgba(37, 99, 235, 0.35);
-  background: rgba(37, 99, 235, 0.08);
-  color: #1d4ed8;
+  border-color: transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   font-weight: 600;
 }
 

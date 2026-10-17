@@ -587,11 +587,15 @@ function whenText(iso?: string | null): string {
 .fp-muted {
   color: var(--color-muted);
 }
+/* 徽标统一蓝底白字加粗椭圆；tone-warn / tone-bad 是判据（橙/红），保留 */
 .fp-badge {
   font-size: 13px;
-  padding: 2px 8px;
+  font-weight: 600;
+  padding: 2px 9px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
 }
 .fp-badge.tone-ok {
   color: #ffffff; font-weight: 600;
@@ -608,14 +612,18 @@ function whenText(iso?: string | null): string {
   border-color: transparent;
   background: #e11d48;
 }
+/* tone-muted 现在与基础样式等价（保留类名，避免动模板） */
 .fp-badge.tone-muted {
-  color: var(--color-muted);
+  color: #ffffff;
+  font-weight: 600;
+  border-color: transparent;
+  background: var(--color-accent);
 }
 .fp-honesty {
   margin: 6px 0 0;
   font-size: 13px;
   line-height: 1.7;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .fp-cols {
   display: grid;
@@ -625,11 +633,12 @@ function whenText(iso?: string | null): string {
 .fp-col {
   min-width: 0;
 }
+/* 两栏小标题与其它页统一：蓝色、15px、600（原来是 14px 灰黑） */
 .fp-h {
   margin: 0 0 8px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .fp-list {
   list-style: none;
@@ -641,7 +650,7 @@ function whenText(iso?: string | null): string {
 }
 .fp-item {
   border: 1px solid var(--color-line);
-  border-radius: 9px;
+  border-radius: 12px;
   background: var(--color-panel);
   padding: 8px 10px;
 }
@@ -656,18 +665,25 @@ function whenText(iso?: string | null): string {
   font-weight: 600;
   color: var(--color-text);
 }
+/* 标签统一蓝底白字加粗椭圆；is-current（绿）/ is-legacy（橙）是判据，保留 */
 .fp-tag {
   font-size: 12.5px;
-  color: var(--color-muted);
-  border: 1px solid var(--color-line);
+  font-weight: 600;
+  color: #ffffff;
+  border: 1px solid transparent;
   border-radius: 999px;
-  padding: 1px 6px;
+  background: var(--color-accent);
+  padding: 1px 8px;
 }
+/* 「当前有效/历史记录」是判据（绿/橙），颜色保留；
+   但基础样式现在是蓝底，必须自带浅底，否则会变成「蓝底绿字 / 蓝底橙字」。 */
 .fp-tag.is-current {
+  background: rgba(22, 163, 74, 0.10);
   color: #16a34a;
   border-color: rgba(22, 163, 74, 0.35);
 }
 .fp-tag.is-legacy {
+  background: rgba(217, 119, 6, 0.10);
   color: #d97706;
   border-color: rgba(217, 119, 6, 0.35);
 }
@@ -680,7 +696,7 @@ function whenText(iso?: string | null): string {
 .fp-item-meta {
   margin: 4px 0 0;
   font-size: 12.5px;
-  color: var(--color-muted);
+  color: var(--color-text);
   word-break: break-all;
 }
 .fp-item-reason {
@@ -694,26 +710,27 @@ function whenText(iso?: string | null): string {
   margin: 0 0 10px;
   font-size: 12.5px;
   line-height: 1.6;
-  color: var(--color-muted);
+  color: var(--color-text);
   word-break: break-word;
 }
 .fp-form,
 .fp-blocked {
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
   background: #ffffff;
   padding: 10px 12px 12px;
 }
+/* 表单标题与其它页统一：蓝色、15px、600（原来是 13.5px 灰黑，属离群值） */
 .fp-form-title {
   margin: 0 0 6px;
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .fp-identity {
   margin: 0 0 8px;
   font-size: 12.5px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .fp-decisions {
   display: flex;
@@ -758,7 +775,7 @@ function whenText(iso?: string | null): string {
   margin: 6px 0 0;
   font-size: 12.5px;
   line-height: 1.7;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .fp-error {
   margin: 6px 0 0;
@@ -784,20 +801,22 @@ function whenText(iso?: string | null): string {
   line-height: 1.75;
   color: var(--color-body);
 }
+/* 提交按钮统一蓝底白字加粗椭圆（原来是白底细描边） */
 .fp-submit {
   margin-top: 10px;
   font: inherit;
   font-size: 14px;
-  padding: 6px 16px;
+  font-weight: 600;
+  padding: 6px 18px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-body);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
 }
 .fp-submit:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .fp-submit:disabled {
   opacity: 0.6;

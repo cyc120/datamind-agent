@@ -127,7 +127,7 @@ function onApprove(): void {
 .fur-row {
   list-style: none;
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--color-panel);
   padding: 8px 12px 10px;
 }
@@ -166,7 +166,7 @@ function onApprove(): void {
 .fur-type {
   flex-shrink: 0;
   font-size: 12.5px;
-  color: var(--color-muted);
+  color: var(--color-text);
   max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -178,12 +178,16 @@ function onApprove(): void {
   color: var(--color-muted);
   font-variant-numeric: tabular-nums;
 }
+/* 徽标统一蓝底白字加粗椭圆；tone-warn / tone-bad 是判据（橙/红），保留 */
 .fur-badge {
   flex-shrink: 0;
   font-size: 12.5px;
-  padding: 2px 8px;
+  font-weight: 600;
+  padding: 2px 9px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
 }
 .fur-badge.tone-ok {
   color: #ffffff; font-weight: 600;
@@ -200,27 +204,34 @@ function onApprove(): void {
   border-color: transparent;
   background: #e11d48;
 }
+/* tone-muted 现在与基础样式等价（保留类名，避免动模板） */
 .fur-badge.tone-muted {
-  color: var(--color-muted);
+  color: #ffffff;
+  font-weight: 600;
+  border-color: transparent;
+  background: var(--color-accent);
 }
 .fur-caret {
   flex-shrink: 0;
   font-size: 12.5px;
   color: var(--color-muted);
 }
+/* 「审核」统一成实心蓝（原来是浅蓝底蓝字，与全站按钮不一致） */
 .fur-approve {
   flex-shrink: 0;
   font: inherit;
   font-size: 13.5px;
-  padding: 5px 12px;
+  font-weight: 600;
+  padding: 5px 14px;
   border-radius: 999px;
-  border: 1px solid rgba(37, 99, 235, 0.4);
-  background: rgba(37, 99, 235, 0.08);
-  color: var(--color-accent);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
 }
 .fur-approve:hover:not(:disabled) {
-  background: rgba(37, 99, 235, 0.14);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .fur-approve:disabled {
   opacity: 0.6;
@@ -229,7 +240,7 @@ function onApprove(): void {
 .fur-gate {
   margin: 4px 0 0;
   font-size: 12.5px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .fur-fields {
   display: flex;
@@ -251,7 +262,7 @@ function onApprove(): void {
   line-height: 1.7;
 }
 .fur-note {
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .fur-warn {
   color: #d97706;

@@ -203,18 +203,19 @@ function backToChat(): void {
   flex-shrink: 0;
   padding: 14px 28px 10px;
 }
+/* 标题与「模型接入」页一致：蓝色、15px、600 */
 .gov-title {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .gov-note {
   margin: 5px 0 0;
   max-width: 1000px;
   font-size: 14px;
   line-height: 1.7;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 
 /* 顶栏导航：整条铺满内容区，底部一条分隔线，选中项用 2px 主色下划线压在这条线上。

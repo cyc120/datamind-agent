@@ -222,23 +222,24 @@ async function submit(): Promise<void> {
   background: var(--color-panel);
   padding: 14px 16px;
 }
+/* 面板标题与其它页统一：蓝色、15px、600（原来是 14.5px 灰黑，属离群值） */
 .dima-title {
   margin: 0;
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .dima-note {
   margin: 5px 0 0;
   font-size: 13px;
   line-height: 1.7;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .dima-ref {
   margin-top: 10px;
   padding: 8px 10px;
   border: 1px solid var(--color-line);
-  border-radius: 9px;
+  border-radius: 12px;
   background: var(--color-ink);
 }
 .dima-ref-row {
@@ -262,7 +263,7 @@ async function submit(): Promise<void> {
   margin: 10px 0 0;
   padding: 8px 10px;
   border: 1px solid rgba(225, 29, 72, 0.3);
-  border-radius: 9px;
+  border-radius: 12px;
   background: rgba(225, 29, 72, 0.06);
   font-size: 13.5px;
   line-height: 1.7;
@@ -272,7 +273,7 @@ async function submit(): Promise<void> {
   margin: 10px 0 0;
   padding: 8px 10px;
   border: 1px solid rgba(217, 119, 6, 0.3);
-  border-radius: 9px;
+  border-radius: 12px;
   background: rgba(217, 119, 6, 0.06);
   font-size: 13.5px;
   line-height: 1.7;
@@ -313,20 +314,22 @@ async function submit(): Promise<void> {
   resize: vertical;
   line-height: 1.6;
 }
+/* 提交按钮统一蓝底白字加粗椭圆（原来是白底细描边） */
 .dima-submit {
   margin-top: 12px;
   font: inherit;
   font-size: 14px;
-  padding: 7px 16px;
+  font-weight: 600;
+  padding: 7px 18px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-body);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
 }
 .dima-submit:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .dima-submit:disabled {
   opacity: 0.55;
@@ -336,7 +339,7 @@ async function submit(): Promise<void> {
   margin: 8px 0 0;
   font-size: 13px;
   line-height: 1.7;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .dima-error {
   margin: 8px 0 0;

@@ -778,29 +778,32 @@ onMounted(async () => {
   min-width: 0;
   flex-wrap: wrap;
 }
+/* 标题与「模型接入」页一致：蓝色、15px、600（原来是 16px 灰黑，属离群值） */
 .tb-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .tb-note {
   font-size: 14px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
+/* 顶栏按钮统一蓝底白字加粗椭圆（原来是白底细描边） */
 .tb-action {
   margin-left: auto;
   font: inherit;
   font-size: 14px;
-  padding: 6px 12px;
+  font-weight: 600;
+  padding: 6px 14px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-body);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
 }
 .tb-action:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .tb-action:disabled {
   opacity: 0.6;
@@ -819,7 +822,7 @@ onMounted(async () => {
   margin: 0 0 10px;
   padding: 9px 11px;
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--color-ink);
   font-size: 14px;
   line-height: 1.75;
@@ -836,7 +839,7 @@ onMounted(async () => {
   margin: 0 0 14px;
   padding: 10px 12px;
   border: 1px solid rgba(217, 119, 6, 0.35);
-  border-radius: 10px;
+  border-radius: 12px;
   background: rgba(217, 119, 6, 0.06);
   font-size: 13.5px;
   line-height: 1.8;
@@ -859,7 +862,7 @@ onMounted(async () => {
   margin: 0 0 14px;
   font-size: 13.5px;
   line-height: 1.75;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .cad-section {
   margin: 0 0 22px;
@@ -872,25 +875,27 @@ onMounted(async () => {
   margin: 0 0 8px;
   font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
   display: flex;
   align-items: baseline;
   gap: 10px;
   flex-wrap: wrap;
 }
+/* 节标题旁的计数标签：统一蓝底白字加粗椭圆（原来是灰字描边） */
 .cad-sec-tag {
   font-size: 13px;
-  font-weight: 500;
-  color: var(--color-muted);
-  border: 1px solid var(--color-line);
+  font-weight: 600;
+  color: #ffffff;
+  border: 1px solid transparent;
   border-radius: 999px;
-  padding: 2px 8px;
+  background: var(--color-accent);
+  padding: 2px 9px;
 }
 .cad-hint {
   margin: 0 0 8px;
   font-size: 13.5px;
   line-height: 1.75;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .cad-hint code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -917,7 +922,7 @@ onMounted(async () => {
   font: inherit;
   padding: 10px 12px;
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--color-panel);
   color: var(--color-body);
   cursor: pointer;
@@ -929,6 +934,7 @@ onMounted(async () => {
   border-color: var(--color-accent);
   background: rgba(37, 99, 235, 0.06);
 }
+/* 资产名是列表行的主文本，保持中性黑字（对照 ProfileList 的 .mpl-name 也是黑字 15px） */
 .cad-asset-title {
   font-size: 15px;
   color: var(--color-text);
@@ -936,7 +942,7 @@ onMounted(async () => {
 .cad-asset-meta,
 .cad-asset-hashes {
   font-size: 13px;
-  color: var(--color-muted);
+  color: var(--color-text);
   line-height: 1.6;
   word-break: break-word;
 }
@@ -963,7 +969,7 @@ onMounted(async () => {
   font: inherit;
   font-size: 14px;
   padding: 7px 12px;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid var(--color-line);
   background: var(--color-panel);
   color: var(--color-body);
@@ -988,7 +994,7 @@ onMounted(async () => {
 .cad-vinfo {
   padding: 10px 12px;
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--color-ink);
   font-size: 13.5px;
   line-height: 1.8;
@@ -1005,6 +1011,6 @@ onMounted(async () => {
   padding-top: 4px;
   font-size: 13px;
   line-height: 1.8;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 </style>

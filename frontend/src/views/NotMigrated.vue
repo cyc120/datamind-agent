@@ -69,7 +69,7 @@ const NOT_MIGRATED = ['模型接入', '字段复核', '来源权威规则', '图
   width: 100%;
   padding: 28px 30px 30px;
   border: 1px solid var(--color-line);
-  border-radius: 16px;
+  border-radius: 12px;
   background: var(--color-panel);
 }
 .nm-tag {
@@ -82,15 +82,16 @@ const NOT_MIGRATED = ['模型接入', '字段复核', '来源权威规则', '图
   border: 1px solid rgba(217, 119, 6, 0.35);
   background: rgba(217, 119, 6, 0.08);
 }
+/* 页面主标题保留 20px（这是兜底页唯一的大标题），只把颜色转蓝 */
 .nm-title {
   margin: 14px 0 8px;
   font-size: 20px;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .nm-path {
   margin: 0 0 14px;
   font-size: 14px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .nm-body {
   margin: 0 0 22px;
@@ -98,12 +99,13 @@ const NOT_MIGRATED = ['模型接入', '字段复核', '来源权威规则', '图
   line-height: 1.8;
   color: var(--color-body);
 }
+/* 小标题与其它页统一：蓝色、15px、600（原来是 13.5px/500 灰字，属离群值） */
 .nm-h {
   margin: 0 0 8px;
-  font-size: 13.5px;
+  font-size: 15px;
   letter-spacing: 0.06em;
-  color: var(--color-muted);
-  font-weight: 500;
+  color: var(--color-accent);
+  font-weight: 600;
 }
 .nm-list {
   list-style: none;
@@ -125,12 +127,12 @@ const NOT_MIGRATED = ['模型接入', '字段复核', '来源权威规则', '图
 .nm-note {
   margin-left: 10px;
   font-size: 13.5px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .nm-pending {
   margin: 0;
   font-size: 14px;
-  color: var(--color-muted);
+  color: var(--color-text);
   line-height: 1.8;
 }
 code {

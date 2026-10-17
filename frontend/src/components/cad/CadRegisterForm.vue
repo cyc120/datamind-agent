@@ -248,13 +248,13 @@ function submit(): void {
   margin: 0 0 8px;
   font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .cad-hint {
   margin: 0 0 8px;
   font-size: 13.5px;
   line-height: 1.75;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .cad-honesty {
   color: #b45309;
@@ -272,7 +272,7 @@ function submit(): void {
 }
 .cad-form {
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 12px 14px;
   background: var(--color-ink);
   margin-top: 8px;
@@ -294,7 +294,7 @@ function submit(): void {
   font-size: 14px;
   padding: 7px 10px;
   border: 1px solid var(--color-line);
-  border-radius: 9px;
+  border-radius: 8px;
   background: var(--color-panel);
   color: var(--color-text);
   box-sizing: border-box;
@@ -308,7 +308,7 @@ function submit(): void {
   margin: 0 0 10px;
   padding: 8px 10px;
   border: 1px solid rgba(217, 119, 6, 0.35);
-  border-radius: 9px;
+  border-radius: 12px;
   background: rgba(217, 119, 6, 0.07);
   font-size: 13.5px;
   color: #b45309;
@@ -321,15 +321,21 @@ function submit(): void {
   padding-left: 18px;
   line-height: 1.7;
 }
+/* 提交按钮本来就是蓝底，补齐加粗以与「模型接入」页的按钮等价 */
 .cad-submit {
   font: inherit;
   font-size: 14px;
-  padding: 8px 18px;
+  font-weight: 600;
+  padding: 8px 20px;
   border-radius: 999px;
-  border: 1px solid var(--color-accent);
+  border: 1px solid transparent;
   background: var(--color-accent);
   color: #fff;
   cursor: pointer;
+}
+.cad-submit:hover:not(:disabled) {
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .cad-submit:disabled {
   opacity: 0.5;
@@ -342,7 +348,7 @@ function submit(): void {
   margin: 0 0 10px;
   padding: 8px 10px;
   border: 1px solid rgba(22, 163, 74, 0.35);
-  border-radius: 9px;
+  border-radius: 12px;
   background: rgba(22, 163, 74, 0.07);
   font-size: 13.5px;
   color: #15803d;

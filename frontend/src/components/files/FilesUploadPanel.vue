@@ -159,25 +159,29 @@ function onProvenance(event: Event): void {
   align-items: center;
   gap: 12px;
 }
+/* 面板标题与其它页统一：蓝色、15px、600 */
 .fup-h2 {
   margin: 0;
   font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
+/* 「选择文件」统一成实心蓝（原来是浅蓝底蓝字，同页其它按钮已是实心蓝） */
 .fup-pick {
   margin-left: auto;
   font: inherit;
   font-size: 14px;
-  padding: 6px 14px;
+  font-weight: 600;
+  padding: 6px 16px;
   border-radius: 999px;
-  border: 1px solid rgba(37, 99, 235, 0.4);
-  background: rgba(37, 99, 235, 0.08);
-  color: var(--color-accent);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
 }
 .fup-pick:hover:not(:disabled) {
-  background: rgba(37, 99, 235, 0.14);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .fup-pick:disabled {
   opacity: 0.6;
@@ -209,7 +213,7 @@ function onProvenance(event: Event): void {
 }
 .fup-hint {
   font-size: 13px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .fup-facts {
   margin: 10px 0 0;
@@ -227,13 +231,24 @@ function onProvenance(event: Event): void {
   font-size: 12.5px;
   color: var(--color-muted);
 }
+/* 扩展名标签统一蓝底白字加粗椭圆（原来是 6px 圆角的灰底描边） */
 .fup-chip {
   display: inline-block;
   margin: 0 4px 2px 0;
-  padding: 1px 6px;
-  border: 1px solid var(--color-line);
-  border-radius: 6px;
-  background: var(--color-ink);
+  padding: 1px 8px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* 这一句是必须的，不是冗余：上面 `.fup-facts code`（0,1,1）比 `.fup-chip`（0,1,0）更具体，
+   会把蓝底上的文字重新压成灰色 —— 实测对比度极差（灰字压蓝底）。这里用更具体的选择器压回去。 */
+.fup-facts code.fup-chip {
+  color: #ffffff;
+  background: var(--color-accent);
+  border-color: transparent;
 }
 .fup-summary {
   margin: 10px 0 0;

@@ -270,24 +270,27 @@ const ruleLine = computed(() => {
   gap: 8px;
   flex-wrap: wrap;
 }
+/* 面板标题与其它页统一：蓝色、15px、600（原来是 14.5px 灰黑，属离群值） */
 .v-title {
   margin: 0;
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .v-count {
   font-size: 12.5px;
   color: var(--color-muted);
 }
+/* 右上角计数标签：蓝底白字加粗椭圆（原来是灰底描边） */
 .v-chip {
   margin-left: auto;
   font-size: 12.5px;
-  color: var(--color-body);
-  background: var(--color-ink);
-  border: 1px solid var(--color-line);
+  font-weight: 600;
+  color: #ffffff;
+  background: var(--color-accent);
+  border: 1px solid transparent;
   border-radius: 999px;
-  padding: 2px 8px;
+  padding: 2px 9px;
   white-space: nowrap;
 }
 .v-meta {
@@ -297,7 +300,7 @@ const ruleLine = computed(() => {
   gap: 4px 8px;
   font-size: 12.5px;
   line-height: 1.6;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .v-scope {
   color: var(--color-body);
@@ -377,7 +380,7 @@ const ruleLine = computed(() => {
   max-width: 100%;
   overflow-x: auto;
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
 }
 .v-table {
   width: 100%;
@@ -540,7 +543,7 @@ const ruleLine = computed(() => {
   display: block;
   font-size: 9.5px;
   line-height: 1.5;
-  color: var(--color-muted);
+  color: var(--color-text);
   word-break: break-all;
 }
 
@@ -562,12 +565,12 @@ const ruleLine = computed(() => {
   margin: 0;
   padding: 10px;
   font-size: 13px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .v-legend {
   margin: 8px 0 0;
   font-size: 12.5px;
   line-height: 1.6;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 </style>

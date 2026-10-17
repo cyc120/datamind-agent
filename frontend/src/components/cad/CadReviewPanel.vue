@@ -352,19 +352,20 @@ const tuple = computed(() => [
   margin: 0 0 8px;
   font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
+/* 段内小标题与其它页统一：蓝色、15px、600（原来是 14px 灰黑） */
 .cad-sub {
   margin: 16px 0 6px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .cad-hint {
   margin: 0 0 8px;
   font-size: 13.5px;
   line-height: 1.75;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .cad-emph {
   color: var(--color-body);
@@ -384,13 +385,13 @@ const tuple = computed(() => [
 .cad-semantics {
   margin: 0 0 10px;
   font-size: 13px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .cad-warn {
   margin: 0 0 10px;
   padding: 8px 10px;
   border: 1px solid rgba(217, 119, 6, 0.35);
-  border-radius: 9px;
+  border-radius: 12px;
   background: rgba(217, 119, 6, 0.07);
   font-size: 13.5px;
   line-height: 1.75;
@@ -399,7 +400,7 @@ const tuple = computed(() => [
 .cad-tablewrap {
   overflow-x: auto;
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
 }
 .cad-table {
   border-collapse: collapse;
@@ -431,7 +432,7 @@ const tuple = computed(() => [
   border-bottom: 0;
 }
 .cad-none {
-  color: var(--color-muted);
+  color: var(--color-text);
   font-style: italic;
 }
 .cad-reason-cell {
@@ -442,7 +443,7 @@ const tuple = computed(() => [
   display: inline-block;
   margin-left: 6px;
   font-size: 12.5px;
-  color: var(--color-muted);
+  color: var(--color-text);
   line-height: 1.6;
 }
 .cad-feature-head {
@@ -453,18 +454,20 @@ const tuple = computed(() => [
   justify-content: space-between;
   padding: 8px 10px;
   border: 1px solid var(--color-line);
-  border-radius: 9px;
+  border-radius: 12px;
   background: var(--color-ink);
   margin-bottom: 8px;
 }
+/* 「逐条复核」小按钮：与其它按钮统一成蓝底白字加粗椭圆（原来是白底细描边） */
 .cad-mini {
   font: inherit;
   font-size: 13px;
-  padding: 4px 10px;
+  font-weight: 600;
+  padding: 4px 12px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-body);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
 }
 .cad-mini:disabled {
@@ -482,7 +485,7 @@ const tuple = computed(() => [
 .cad-history li {
   padding: 8px 10px;
   border: 1px solid var(--color-line);
-  border-radius: 9px;
+  border-radius: 12px;
   background: var(--color-ink);
   font-size: 13.5px;
   line-height: 1.7;
@@ -504,15 +507,16 @@ const tuple = computed(() => [
 }
 .cad-form {
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 12px 14px;
   background: var(--color-ink);
 }
+/* 表单小标题与其它页统一：蓝色、15px、600（原来是 14px 灰黑） */
 .cad-form h4 {
   margin: 0 0 10px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
 }
 .cad-field {
   border: 0;
@@ -554,7 +558,7 @@ const tuple = computed(() => [
   line-height: 1.7;
   padding: 8px 10px;
   border: 1px solid var(--color-line);
-  border-radius: 9px;
+  border-radius: 8px;
   background: var(--color-panel);
   color: var(--color-text);
   resize: vertical;
@@ -563,7 +567,7 @@ const tuple = computed(() => [
 .cad-tuple {
   margin: 0 0 10px;
   font-size: 13px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .cad-tuple summary {
   cursor: pointer;
@@ -585,7 +589,7 @@ const tuple = computed(() => [
   margin: 0 0 10px;
   padding: 8px 10px;
   border: 1px solid rgba(217, 119, 6, 0.35);
-  border-radius: 9px;
+  border-radius: 12px;
   background: rgba(217, 119, 6, 0.07);
   font-size: 13.5px;
   color: #b45309;
@@ -598,15 +602,21 @@ const tuple = computed(() => [
   padding-left: 18px;
   line-height: 1.7;
 }
+/* 提交按钮本来就是蓝底，补齐加粗以与「模型接入」页的按钮等价 */
 .cad-submit {
   font: inherit;
   font-size: 14px;
-  padding: 8px 18px;
+  font-weight: 600;
+  padding: 8px 20px;
   border-radius: 999px;
-  border: 1px solid var(--color-accent);
+  border: 1px solid transparent;
   background: var(--color-accent);
   color: #fff;
   cursor: pointer;
+}
+.cad-submit:hover:not(:disabled) {
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .cad-submit:disabled {
   opacity: 0.5;
@@ -622,7 +632,7 @@ const tuple = computed(() => [
   margin: 0 0 10px;
   padding: 8px 10px;
   border: 1px solid rgba(22, 163, 74, 0.35);
-  border-radius: 9px;
+  border-radius: 12px;
   background: rgba(22, 163, 74, 0.07);
   font-size: 13.5px;
   color: #15803d;

@@ -72,24 +72,26 @@ const previewHref = computed(() => drawingPreviewUrl(props.documentId, props.ver
   margin: 0 0 8px;
   font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-accent);
   display: flex;
   align-items: baseline;
   gap: 10px;
 }
+/* 节标题旁的标签：蓝底白字加粗椭圆（原来是灰字描边） */
 .cad-sec-tag {
   font-size: 13px;
-  font-weight: 500;
-  color: var(--color-muted);
-  border: 1px solid var(--color-line);
+  font-weight: 600;
+  color: #ffffff;
+  border: 1px solid transparent;
   border-radius: 999px;
-  padding: 2px 8px;
+  background: var(--color-accent);
+  padding: 2px 9px;
 }
 .cad-hint {
   margin: 0 0 8px;
   font-size: 13.5px;
   line-height: 1.7;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .cad-hint code,
 .cad-links code {
@@ -102,7 +104,7 @@ const previewHref = computed(() => drawingPreviewUrl(props.documentId, props.ver
 .cad-viewer-frame {
   margin: 10px 0 10px;
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
   background: var(--color-ink);
 }
@@ -127,6 +129,6 @@ const previewHref = computed(() => drawingPreviewUrl(props.documentId, props.ver
 }
 .cad-links-note {
   font-size: 13px;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 </style>

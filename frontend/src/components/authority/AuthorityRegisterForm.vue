@@ -266,7 +266,7 @@ function onSelectSource(value: 'production' | 'report'): void {
   margin: 0 0 14px;
   padding: 10px 12px;
   border: 1px solid rgba(217, 119, 6, 0.35);
-  border-radius: 10px;
+  border-radius: 12px;
   background: rgba(217, 119, 6, 0.07);
   font-size: 13.5px;
   line-height: 1.75;
@@ -290,7 +290,7 @@ function onSelectSource(value: 'production' | 'report'): void {
 }
 .arf-fieldset {
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 10px 12px 2px;
   margin: 0 0 12px;
 }
@@ -324,7 +324,7 @@ function onSelectSource(value: 'production' | 'report'): void {
 .arf-help {
   font-size: 13px;
   line-height: 1.7;
-  color: var(--color-muted);
+  color: var(--color-text);
 }
 .arf-radios {
   display: flex;
@@ -352,19 +352,21 @@ function onSelectSource(value: 'production' | 'report'): void {
   font-size: 14px;
   color: #e11d48;
 }
+/* 提交按钮统一蓝底白字加粗椭圆（原来是白底细描边） */
 .arf-submit {
   font: inherit;
   font-size: 14px;
-  padding: 8px 18px;
+  font-weight: 600;
+  padding: 8px 20px;
   border-radius: 999px;
-  border: 1px solid var(--color-line);
-  background: var(--color-panel);
-  color: var(--color-body);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: #ffffff;
   cursor: pointer;
 }
 .arf-submit:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: #1d4ed8;
+  color: #ffffff;
 }
 .arf-submit:disabled {
   opacity: 0.6;
