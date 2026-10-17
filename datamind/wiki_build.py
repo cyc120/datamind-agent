@@ -547,30 +547,39 @@ def _api_reachable(url=LOOPBACK_API_URL, timeout=LOOPBACK_PROBE_TIMEOUT) -> bool
 def host_is_loopback(host=None, *, probe_api=True) -> bool:
     """本机地址判定（`socket_host()` 的 worker 版：不信任任何请求头）。
 
-    三步，任一步成立即认定本机：
+    四步，任一步成立即认定本机：
 
     1. 字面量：`localhost` / `127.0.0.0/8` / `::1`；
     2. 主机名解析出的地址里有回环地址；
-    3. 回环地址上的 DataMind API 可达（`probe_api=False` 可关掉）。
+    3. **传入的就是本机主机名，且它能解析出任何一个地址** —— 直接命中；
+    4. 回环地址上的 DataMind API 可达（`probe_api=False` 可关掉）。
 
-    第 3 步是必需的：实测本机（Windows + VPN 虚拟网卡）的 `socket.gethostname()` 只解析到
-    10/172/26 段地址，一个回环都没有 —— 只看 1、2 两步会把"worker 与 API 就在同一台机器上"
-    这个事实判成假，于是本机演示身份被误禁，任务全部落成身份不可用。第 3 步证明的正是
-    "有一个回环上的 DataMind API"，也就是 API 侧 `demo_allowed()` 看到的同一个事实。
+    第 3 步是 2026-10-17 补的，修一个实测到的故障：本机（Windows + VPN 虚拟网卡）的
+    `socket.gethostname()` 只解析到 `fe80::` 段（IPv6 链路本地）和 10/172 段，
+    一个回环都没有，于是只走第 4 步 —— 而第 4 步是一次 **0.5 秒超时**的 HTTP 探针。
+    只要那一刻 API 正忙（实测：跑前端构建/截图时），探针超时，worker 就判成"不是本机"，
+    于是演示身份不可用、任务**永久落成 WIKI_WORKER_IDENTITY_UNAVAILABLE**。
+
+    第 3 步在语义上是安全的：`socket.gethostname()` 返回的是**本机**主机名，
+    它解析出的地址按定义就是本机网卡地址；这里没有任何请求头/客户端地址参与，
+    也不放松"只认本机"这一条。第 4 步保留作为兜底（主机名解析失败的机器）。
     """
+    local_hostname = socket.gethostname().lower()
     if host is not None:
         text = str(host).strip().lower()
         if text in ('localhost', '127.0.0.1', '::1', '::ffff:127.0.0.1') or text.startswith('127.'):
             return True
         try:
-            if any(info[4][0] in ('127.0.0.1', '::1')
-                   for info in socket.getaddrinfo(text, None)):
-                return True
+            infos = socket.getaddrinfo(text, None)
         except (OSError, UnicodeError):
-            pass
-        return bool(probe_api and text in (socket.gethostname().lower(), 'localhost')
-                    and _api_reachable())
-    if host_is_loopback(socket.gethostname(), probe_api=False):
+            infos = []
+        if any(info[4][0] in ('127.0.0.1', '::1') for info in infos):
+            return True
+        # 第 3 步：本机主机名解析出任何地址就认定本机（不依赖网络探针）。
+        if text == local_hostname and infos:
+            return True
+        return bool(probe_api and text in (local_hostname, 'localhost') and _api_reachable())
+    if host_is_loopback(local_hostname, probe_api=False):
         return True
     return bool(probe_api and _api_reachable())
 
