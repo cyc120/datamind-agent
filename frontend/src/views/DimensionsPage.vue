@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import SideNav from '../components/SideNav.vue'
+import AnimatedList from '../components/bits/AnimatedList/AnimatedList.vue'
 import {
   featureReviews,
   getBinding,
@@ -328,8 +329,9 @@ onMounted(() => {
         <p v-if="loading" class="dim-hint" data-testid="dim-loading">正在加载…</p>
 
         <template v-else>
-          <!-- 页首诚实声明：记录链 + 两个 authentication 事实的分工 -->
-          <section class="dim-contract" data-testid="dim-contract-note">
+          <!-- 页首诚实声明：记录链 + 两个 authentication 事实的分工。
+               框保留（用户觉得全去掉会单调），但各段落逐条淡入、段间距放大。 -->
+          <AnimatedList tag="section" class="dim-contract" data-testid="dim-contract-note">
             <p class="dim-contract-line">
               记录链：注册尺寸记录 → 绑定（必须引用一条已确认的关联复核）→ 独立使用审批 → 对照快照（可回放）。
             </p>
@@ -348,7 +350,7 @@ onMounted(() => {
             <p class="dim-contract-line dim-contract-muted">
               对照结论只有两种区间关系（落在标注区间内 / 外），它不构成公差判定、不构成制造授权。
             </p>
-          </section>
+          </AnimatedList>
 
           <div class="dim-cols">
             <!-- 左栏：两个列表 -->
@@ -662,7 +664,7 @@ onMounted(() => {
 /* 说明文字按条列出：每行一条、前面一个蓝点（与 GovernancePage 的 .gov-note、
    FieldsPage 的 .fields-note 同一套写法）。类名前缀 dim- 不会撞 Tailwind 工具类。 */
 .dim-note {
-  margin: 6px 0 0;
+  margin: 4px 0 16px;
   padding: 0;
   max-width: 1000px;
   list-style: none;
@@ -698,17 +700,19 @@ onMounted(() => {
   border-radius: 4px;
   padding: 1px 5px;
 }
+/* 去框：改成左侧 2px 橙细线分组，不加底色、不加圆角。与 CAD 页的 .cad-declare、权威页的 .auth-failclosed 同一套处理（原来这几处都是「圆角 + 浅底 + 描边」的卡片，用户反馈太丑）。这个块外面包了 Vue Bits 的 AnimatedList，各段逐条淡入。 */
 .dim-contract {
-  border: 1px solid var(--color-line);
-  border-radius: 12px;
-  background: var(--color-ink);
-  padding: 12px 14px;
-  margin-bottom: 14px;
+  border: 0;
+  border-left: 2px solid #d97706;
+  border-radius: 0;
+  background: none;
+  padding: 2px 0 2px 18px;
+  margin-bottom: 32px;
 }
 .dim-contract-line {
-  margin: 0 0 6px;
+  margin: 0 0 14px;
   font-size: 13.5px;
-  line-height: 1.75;
+  line-height: 1.85;
   color: var(--color-body);
 }
 .dim-contract-line:last-child {
