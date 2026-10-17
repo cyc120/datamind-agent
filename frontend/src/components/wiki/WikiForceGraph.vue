@@ -1467,8 +1467,8 @@ defineExpose({
         <ul v-if="warningTexts.length" class="wg-warn-list">
           <li v-for="text in warningTexts" :key="text">{{ text }}</li>
         </ul>
-        <p v-if="asOf" class="wg-card-note">数据时刻（服务端 as_of）：{{ asOf }}</p>
-        <p v-if="statusText" class="wg-card-note">{{ statusText }}</p>
+        <p v-if="asOf" class="wg-card-note wg-meta">数据时刻（服务端 as_of）：{{ asOf }}</p>
+        <p v-if="statusText" class="wg-card-note wg-meta">{{ statusText }}</p>
         <div v-if="hasMore && !limitReached" class="wg-actions">
           <button type="button" class="wg-vbtn" :disabled="loadingMore" @click="loadMore()">
             {{ loadingMore ? '加载中…' : '继续加载下一批' }}
@@ -1701,17 +1701,20 @@ defineExpose({
   color: #b91c1c;
 }
 
+/* 三栏不再等宽：「范围与边界」内容最多（八九段），等宽会把右栏挤成一屏折行；
+   「选中的词条」常常只有两行空态，给它更少的宽度。 */
 .wg-panels {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr) minmax(0, 1.35fr);
+  gap: 20px;
+  align-items: start;
 }
 
 .wg-card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px 14px;
+  gap: 12px;
+  padding: 16px 18px;
   background: var(--color-panel);
   border: 1px solid var(--color-line);
   border-radius: 12px;
@@ -1731,8 +1734,13 @@ defineExpose({
 
 .wg-card-note {
   margin: 0;
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: 13.5px;
+  line-height: 1.72;
+  color: var(--color-text);
+}
+/* 次要信息（数据时刻、布局迭代次数等）：压小一档，不与主结论抢注意力。 */
+.wg-meta {
+  font-size: 12.5px;
   color: var(--color-body);
 }
 
