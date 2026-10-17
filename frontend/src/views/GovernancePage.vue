@@ -130,11 +130,15 @@ function backToChat(): void {
       <!-- 页面上方只给一句总说明：每个板块的标题与完整说明由子页面自己提供（见文件头 (a)） -->
       <header class="gov-head">
         <h1 class="gov-title">数据治理</h1>
-        <p class="gov-note" data-testid="gov-note">
-          抽取保真、来源裁决、图纸关联、尺寸比对是同一件事的四个环节，收在这一页里用下面的分栏切换。
-          每个板块的标题、说明、刷新按钮与诚实声明仍然由它自己的页面提供，这里只负责切换。
-          旧入口（/#/fields、/#/authority、/#/cad、/#/dimensions）继续可用。
-        </p>
+        <!-- 原来是一整段长文字（"四个环节… / 每个板块的标题… / 旧入口…" 全挤在一起），
+             用户反馈太乱。改成按条列出：每条一行、前面一个蓝点，与技术细节分开。 -->
+        <ul class="gov-note" data-testid="gov-note">
+          <li>四个环节：<b>抽取保真</b> → <b>来源裁决</b> → <b>图纸关联</b> → <b>尺寸比对</b>，用下面的分栏切换。</li>
+          <li>每个板块的标题、说明与刷新按钮由它自己的页面提供，这里只负责切换。</li>
+          <li class="is-tech">
+            旧入口继续可用：<code>#/fields</code>、<code>#/authority</code>、<code>#/cad</code>、<code>#/dimensions</code>
+          </li>
+        </ul>
       </header>
 
       <!-- 页面级顶栏导航：四个板块直接铺在页面上方（不是卡片里的小控件，也不在页内再嵌侧栏）。
@@ -210,12 +214,48 @@ function backToChat(): void {
   font-weight: 600;
   color: var(--color-accent);
 }
+/* 总说明改成按条列出：每行一条、前面一个蓝点，行距拉开。
+   原来是整段连排，用户反馈"太乱"。 */
 .gov-note {
-  margin: 5px 0 0;
+  margin: 6px 0 0;
+  padding: 0;
   max-width: 1000px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
   font-size: 14px;
   line-height: 1.7;
   color: var(--color-text);
+}
+.gov-note > li {
+  position: relative;
+  padding-left: 15px;
+}
+.gov-note > li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.62em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+.gov-note b {
+  font-weight: 600;
+  color: var(--color-accent);
+}
+/* 技术细节（旧路由）压小一档，别和主说明抢注意力 */
+.gov-note .is-tech {
+  font-size: 13px;
+}
+.gov-note code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--color-ink);
 }
 
 /* 顶栏导航：整条铺满内容区，底部一条分隔线，选中项用 2px 主色下划线压在这条线上。
