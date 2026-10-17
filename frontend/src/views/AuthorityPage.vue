@@ -3,6 +3,7 @@ import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 import SideNav from '../components/SideNav.vue'
+import AnimatedList from '../components/bits/AnimatedList/AnimatedList.vue'
 import AuthorityCandidatePanel from '../components/authority/AuthorityCandidatePanel.vue'
 import AuthorityRegisterForm from '../components/authority/AuthorityRegisterForm.vue'
 import AuthorityRulesPanel from '../components/authority/AuthorityRulesPanel.vue'
@@ -128,7 +129,10 @@ onMounted(() => {
           <li>仅支持工业温度数值冲突。</li>
         </ul>
 
-        <ul class="auth-failclosed" data-testid="authority-failclosed">
+        <!-- 对比用：下面这块用 Vue Bits 的 AnimatedList（逐条淡入上浮），
+             上面那块是纯静态。两块内容与「无框 + 左侧细线」的观感一致，
+             只有入场方式不同，方便对比后统一。 -->
+        <AnimatedList tag="ul" class="auth-failclosed" data-testid="authority-failclosed">
           <li>
             <b>失败即关闭</b>：注册表里只要有一条规则登记校验不通过（
             <code>payload_valid=false</code>），运行时裁决就会整体失败，不会只跳过那一条。
@@ -138,7 +142,7 @@ onMounted(() => {
             而且<b>没有优先级</b>。
           </li>
           <li>所以「已批准」不等于运行时一定生效，更不是合格结论。</li>
-        </ul>
+        </AnimatedList>
 
         <!-- 身份：角色不够时就别让按钮看起来能用 -->
         <p v-if="identityLoading" class="auth-hint">正在读取身份…</p>
