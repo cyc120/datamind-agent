@@ -1701,12 +1701,15 @@ defineExpose({
   color: #b91c1c;
 }
 
-/* 三栏不再等宽：「范围与边界」内容最多（八九段），等宽会把右栏挤成一屏折行；
-   「选中的词条」常常只有两行空态，给它更少的宽度。 */
+/* 单栏：三张卡片依次整宽排列。
+   原来三栏（或调过权重的 1 : 0.85 : 1.35）都太窄 —— 卡片里既有大段中文说明，
+   又有原始技术字段（wev-xxx / body_sha256）和 markdown 表格原文，
+   窄栏里每 4~5 个字就折一次行，整页像一堵碎字墙。这些内容本来就需要宽度。
+   与尺寸页同样改成单栏。 */
 .wg-panels {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr) minmax(0, 1.35fr);
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
   align-items: start;
 }
 
