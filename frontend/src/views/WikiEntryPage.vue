@@ -656,11 +656,11 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
           </h1>
         </div>
 
-        <!-- 状态标签单独一行：原来它们紧贴在标题后面，把标题挤得没有呼吸空间 -->
-        <div v-if="entry?.demo_data || readingHistory || readingPinnedRevision" class="wk-tags">
-          <span v-if="entry?.demo_data" class="wk-tag wk-tag-demo" data-testid="demo-badge">
-            演示数据（demo_data=true）
-          </span>
+        <!-- 状态标签单独一行：原来它们紧贴在标题后面，把标题挤得没有呼吸空间。
+             注：「演示数据（demo_data=true）」标签按用户要求已移除 ——
+             注意这样一来本页就看不到"数据是合成演示数据"这个标记了；
+             图谱页的「范围与边界」卡片里仍有同一条声明。 -->
+        <div v-if="readingHistory || readingPinnedRevision" class="wk-tags">
           <span v-if="readingHistory" class="wk-tag" data-testid="history-badge">历史版本</span>
           <span v-else-if="readingPinnedRevision" class="wk-tag" data-testid="pinned-badge">指定版本</span>
         </div>
