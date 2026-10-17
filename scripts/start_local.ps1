@@ -83,8 +83,17 @@ if ($Stop -or $Status) {
     if ($Stop) {
         if (-not $procs) { Write-Host '没有由本脚本启动的进程在运行。'; exit 0 }
         foreach ($item in $procs) {
+            # pid 文件里记的是 venv 的启动器（.venv\Scripts\python.exe，Windows 上它会把
+            # 真实解释器作为子进程拉起来并等待）。实测本机杀启动器时子进程会跟着退出，
+            # 但那是 Windows 的行为、不该当契约依赖：子进程万一活下来就是孤儿 worker，
+            # 而且跑的是旧代码。所以这里连子进程一起收。
+            $kids = @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$($item.Id)" -ErrorAction SilentlyContinue)
+            foreach ($kid in $kids) {
+                Stop-Process -Id $kid.ProcessId -Force -ErrorAction SilentlyContinue
+            }
             Stop-Process -Id $item.Id -Force -ErrorAction SilentlyContinue
-            Write-Host "已停止 $($item.Name)（PID $($item.Id)）"
+            $kidNote = if ($kids) { "，连带子进程 PID $($kids.ProcessId -join ', ')" } else { '' }
+            Write-Host "已停止 $($item.Name)（PID $($item.Id)$kidNote）"
         }
         Remove-Item (Join-Path $CacheDir 'server.pid'), (Join-Path $CacheDir 'upload_worker.pid'), (Join-Path $CacheDir 'wiki_build_worker.pid') -Force -ErrorAction SilentlyContinue
         exit 0
