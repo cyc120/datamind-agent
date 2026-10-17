@@ -1522,6 +1522,9 @@ defineExpose({
   border-radius: 12px;
   overflow: hidden;
   touch-action: none;
+  /* 设置面板的宽度只在这里写一次：面板自己的 width 用 var() 读它，
+     空态覆盖层的右侧留白也用它 —— 两处同一个数才不会互相追着改。 */
+  --wg-settings-width: 300px;
 }
 
 .wg-svg {
@@ -1677,6 +1680,12 @@ defineExpose({
   justify-content: center;
   gap: 8px;
   padding: 24px 32px;
+  /* 空态 / 失败 / 加载文字**不许被右上角浮层盖住**：浮层是绝对定位、层级更高（z-index 3），
+     它占了右侧 --wg-settings-width，所以覆盖层在右侧让出同样的宽度再居中。
+     实测：改前 1280×900 下正文右边缘 1005px 压到浮层左边缘 973px 底下 32px，
+     1024×900 下 40% 的上限又不够、还差 10px —— 所以上限放到 50%（面板本身要 310px，
+     半屏以内都还让得出来），超过半屏才停手，那时句子已经贴着浮层左边了。 */
+  padding-right: min(calc(var(--wg-settings-width, 300px) + 30px), 50%);
   text-align: center;
   background: rgba(255, 255, 255, 0.94);
 }

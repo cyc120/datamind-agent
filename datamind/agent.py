@@ -14,6 +14,7 @@ import psycopg2
 from psycopg2.extras import Json
 
 from .catalog import Catalog
+from .display_labels import industrial_claim_text
 from .frame import frame_to_query, is_document_question, resolve_turn
 from .knowledge import KnowledgeRetriever
 from .rag_engine import PROMPT_VERSION as RAG_PROMPT_VERSION, ask_documents
@@ -727,7 +728,9 @@ class DataMindAgent:
                     if issue.get('authority'):
                         authority=issue['authority'];an=node('AuthorityRule',authority['rule_id'],authority)
                         edge(cn,an,'resolved_by');edge(vn,an,'derived_from')
-                text=f"测量 {row['measurement_id']}：工艺范围核验 {row['compliance']}；来源比较 {row['agreement']}。"
+                # 结论句里的两个枚举由 display_labels 换成中文（与 NodeDetail.vue 同一套措辞）；
+                # 未登记的取值原样留在句子里，不兜底成「未知」。
+                text=industrial_claim_text(row)
                 claim_id='claim-'+uuid.uuid4().hex[:16];claim_node=node('Claim',claim_id,{'text':text});edge(claim_node,vn,'supports')
                 cur.execute('INSERT INTO claims(claim_id,run_id,text,status,evidence_ids,confidence_level,verification) VALUES (%s,%s,%s,%s,%s,%s,%s)',
                     (claim_id,self.run_id,text,'warned' if row['compliance'] in {'needs_review','insufficient_evidence'} or row['agreement'] in {'needs_review','insufficient_evidence','unresolved'} else 'verified',

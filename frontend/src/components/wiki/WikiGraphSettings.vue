@@ -252,6 +252,11 @@ const FORCE_ROWS: Array<{
       <span class="wg-panel-head-note">四组，均可折叠</span>
     </p>
 
+    <!-- 中间是可滚动的四组；页脚固定，主操作永远在看得见的地方。
+         WHY：1440×900 下画布只有 576px 高、面板 552px，而四组标题 + 「筛选」正文本身
+         就有 638px —— 旧结构把「清除筛选 / 重新排布」放在正文末尾，等于把它们藏到折叠线以下。 -->
+    <div class="wg-groups">
+
     <!-- ── 组 1：筛选 ───────────────────────────────────────────────────── -->
     <details class="wg-group" :open="openGroups.filters" @toggle="toggleGroup('filters', $event)">
       <summary class="wg-summary">
@@ -265,7 +270,7 @@ const FORCE_ROWS: Array<{
           <li>所以「筛掉」不等于「不存在」：每次取数服务端都会回报本次实际考虑与可见的对象数。</li>
         </ul>
 
-        <label class="wg-field">
+        <label class="wg-field wg-field-inline">
           <span class="wg-label">图层</span>
           <select v-model="filters.layer" class="wg-control">
             <option v-for="option in LAYER_OPTIONS" :key="option.value" :value="option.value">
@@ -282,7 +287,7 @@ const FORCE_ROWS: Array<{
           所以它们在这一层是禁用的。
         </p>
 
-        <label class="wg-field">
+        <label class="wg-field wg-field-inline">
           <span class="wg-label">词条类型</span>
           <select v-model="filters.type" class="wg-control" :disabled="filters.layer !== 'entries'">
             <option value="">不限</option>
@@ -292,7 +297,7 @@ const FORCE_ROWS: Array<{
           </select>
         </label>
 
-        <label class="wg-field">
+        <label class="wg-field wg-field-inline">
           <span class="wg-label">分类</span>
           <input
             v-model="filters.category"
@@ -304,7 +309,7 @@ const FORCE_ROWS: Array<{
           />
         </label>
 
-        <label class="wg-field">
+        <label class="wg-field wg-field-inline">
           <span class="wg-label">知识状态</span>
           <select v-model="filters.status" class="wg-control" :disabled="filters.layer !== 'entries'">
             <option value="">不限</option>
@@ -312,13 +317,9 @@ const FORCE_ROWS: Array<{
               {{ option.label }}
             </option>
           </select>
-          <span class="wg-hint">
-            这里筛的是<strong>发布流程</strong>状态（草稿 / 待复核 / 已发布 / 已归档）。
-            核验状态与来源有效性是另外两套独立状态，不会因为这一项被筛掉或被合并。
-          </span>
         </label>
 
-        <label class="wg-field">
+        <label class="wg-field wg-field-inline">
           <span class="wg-label">关键词</span>
           <input
             v-model="filters.q"
@@ -328,18 +329,25 @@ const FORCE_ROWS: Array<{
             placeholder="标题 / 别名 / 分类"
             :disabled="filters.layer !== 'entries'"
           />
-          <span class="wg-hint">
-            关键词<strong>只匹配标题、别名与分类</strong>，不搜正文 —— 中文正文的检索方案还没定，
-            服务端会在返回结果里如实声明这次搜索覆盖了哪些字段。
-          </span>
         </label>
 
-        <div class="wg-actions">
-          <button type="button" class="wg-btn" :disabled="busy" @click="resetFilters">清除筛选</button>
-          <button type="button" class="wg-btn wg-btn-primary" :disabled="busy" @click="emit('relayout')">
-            重新排布
-          </button>
-        </div>
+        <!-- 两组字段的完整口径收进一个折叠块（默认收起）。
+             实测：这两条说明各占 132px（268px 宽时本组正文 647px 的 41%），默认摊开会把
+             下面三组的标题挤出可视区。收起后仍是一行蓝字入口，展开还是原来的
+             「无框说明块 + 蓝点列表」，措辞一个字没删。 -->
+        <details class="wg-more">
+          <summary class="wg-more-summary">口径说明：知识状态与关键词各筛什么</summary>
+          <ul class="wg-note-list">
+            <li>
+              <strong>知识状态</strong>：这里筛的是<strong>发布流程</strong>状态（草稿 / 待复核 / 已发布 / 已归档）。
+              核验状态与来源有效性是另外两套独立状态，不会因为这一项被筛掉或被合并。
+            </li>
+            <li>
+              <strong>关键词</strong>：<strong>只匹配标题、别名与分类</strong>，不搜正文 —— 中文正文的检索方案
+              还没定，服务端会在返回结果里如实声明这次搜索覆盖了哪些字段。
+            </li>
+          </ul>
+        </details>
       </div>
     </details>
 
@@ -537,6 +545,15 @@ const FORCE_ROWS: Array<{
         </p>
       </div>
     </details>
+    </div>
+
+    <!-- 页脚：与「筛选」直接相关的两个动作，四组都折叠起来时也仍然可用。 -->
+    <div class="wg-footer">
+      <button type="button" class="wg-btn" :disabled="busy" @click="resetFilters">清除筛选</button>
+      <button type="button" class="wg-btn wg-btn-primary" :disabled="busy" @click="emit('relayout')">
+        重新排布
+      </button>
+    </div>
   </div>
 </template>
 
@@ -549,16 +566,41 @@ const FORCE_ROWS: Array<{
       所以下面每个类都把需要的属性写全，不指望继承。 */
 
 .wg-panel {
-  width: 268px;
+  /* 宽度由父组件给（WikiForceGraph 用它把空态文字让开浮层），单独用时回落 300px。
+     300 而不是原来的 268：中文 13.5px 在 268px 里一行只剩 15 个字，
+     说明类句子会被折成 3~4 行；宽 32px 后同样的句子少一行。 */
+  width: var(--wg-settings-width, 300px);
   /* 100% 参照的是父容器（同时给了 top/bottom）的高度，所以面板永远不会高于画布 */
   max-height: 100%;
-  overflow-y: auto;
+  /* 外层不再滚动：头、四组、页脚三段式，只有中间那段滚（.wg-groups）。
+     否则 sticky 页脚会压在正文最后一行上（实测会盖住「口径说明」那一行）。 */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: var(--color-panel);
   border: 1px solid var(--color-line);
   border-radius: 12px;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 8px 24px rgba(15, 23, 42, 0.06);
   font-size: 13.5px;
   color: var(--color-text);
+}
+
+/* 四组的滚动容器：min-height:0 是 flex 子项能滚的前提（否则按内容撑高、永远不滚）。 */
+.wg-groups {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* 页脚：蓝色主操作常驻。与「筛选」直接相关，四组都收起时也仍然可用。 */
+.wg-footer {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--color-line);
+  background: var(--color-panel);
 }
 
 /* 面板标题与其它页统一：蓝色、15px、600（原来是 13.5px 灰黑） */
@@ -641,14 +683,37 @@ const FORCE_ROWS: Array<{
 .wg-body {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  /* 组内从 10 加到 12：控件与说明之间靠间距分组，比加框更轻（用户认可的是无框说明块）。 */
+  gap: 12px;
   padding: 2px 10px 12px 22px;
 }
 
 .wg-field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
+}
+
+/* 「筛选」的五个项走**行内**排布：标签在左、控件在右。
+   旧布局每项 54px（标签一行 + 控件一行），五项就是 270px —— 面板里最大的一块高度，
+   而标签本来就是短词，独占一行不划算。行内后每项约 30px，标签仍在可见位置
+   （不是 placeholder、也不是 tooltip：键盘与读屏器照旧读到「图层」这个 name）。 */
+.wg-field-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.wg-field-inline > .wg-label {
+  flex: 0 0 56px;
+  justify-content: flex-start;
+}
+
+/* 行内时控件自己占满剩余宽度：.wg-control 的 width:100% 在这里会把行撑破，所以覆盖掉。 */
+.wg-field-inline > .wg-control {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
 }
 
 .wg-fieldset {
@@ -748,6 +813,53 @@ const FORCE_ROWS: Array<{
 }
 .wg-note-list strong {
   color: var(--color-text);
+}
+
+/* ── 口径说明：字段级长解释的折叠块（原生 <details>，与上面四组同一套约定） ──
+   收起时只占一行；展开后里面的列表仍是「无框说明块 + 蓝点」，与用户认可过的观感一致。
+   标题用主色蓝（不是灰黑）：它是一行可点的入口，不是正文。 */
+.wg-more {
+  border-top: 1px dashed var(--color-line);
+  padding-top: 9px;
+}
+
+.wg-more-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+.wg-more-summary::-webkit-details-marker {
+  display: none;
+}
+
+.wg-more-summary::before {
+  content: '▸';
+  flex: 0 0 auto;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.wg-more[open] > .wg-more-summary::before {
+  content: '▾';
+}
+
+.wg-more-summary:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+  border-radius: 6px;
+}
+
+/* 展开后的列表与标题之间留一口气（.wg-note-list 自己 margin:0，这里要更具体的选择器） */
+.wg-more > .wg-note-list {
+  margin-top: 7px;
 }
 
 .wg-hint {

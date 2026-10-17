@@ -507,6 +507,24 @@ class EntryIdentityTest(unittest.TestCase):
         self.assertNotIn('[1]', entry['title'])
         self.assertIn('38 小时', entry['title'])
 
+    def test_the_claim_title_speaks_chinese_instead_of_leaking_enumeration_codes(self):
+        """旧运行写进库的主张文本带机器码，投影出来的**标题**必须是中文（库里的行不动）。"""
+        entry = projection.project_entry(SPACE, 'industrial-demo', 'claim',
+                                         PAYLOADS['ClaimIndustrial'], run_id=RUN,
+                                         ref_key='claim-1')
+        self.assertEqual(entry['title'],
+                         '测量 M001-1:工艺范围核验 待人工复核;来源比较 两侧仍不一致（未消解）。')
+        for code in ('needs_review', 'unresolved'):
+            self.assertNotIn(code, entry['title'])
+
+    def test_an_unknown_verdict_is_never_invented_into_chinese_in_the_title(self):
+        entry = projection.project_entry(
+            SPACE, 'industrial-demo', 'claim',
+            {'text': '测量 M001-1：工艺范围核验 brand_new_verdict；来源比较 unresolved。'},
+            run_id=RUN, ref_key='claim-1')
+        self.assertIn('brand_new_verdict', entry['title'], '未收录的取值必须原样保留')
+        self.assertNotIn('未知', entry['title'])
+
     def test_the_metric_key_is_the_sources_canonical_name_not_the_chinese_title(self):
         # WIKI_DOMAIN.md §2.2：business_key 用来源内的规范名（holding_temperature），不是中文标签
         entry = projection.project_entry(SPACE, 'industrial-demo', 'measurement',

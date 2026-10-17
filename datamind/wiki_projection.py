@@ -70,6 +70,8 @@ import uuid
 import unicodedata
 from decimal import Decimal, InvalidOperation
 
+from .display_labels import CLAIM_TEXT_ZH, localize_enum_tokens
+
 PROJECTION_VERSION = 'wiki-projection-v1'
 DERIVATION_RULE_VERSION = 'wiki-derive-v1'
 
@@ -816,7 +818,9 @@ def entry_title_for_node(node_type, payload) -> str:
     """A title drawn only from fields that exist (NodeDetail.vue's per-type lists)."""
     payload = payload if isinstance(payload, dict) else {}
     if node_type == 'claim':
-        text = _clean_title(payload.get('text'))
+        # 标题直接取主张文本。文本里的枚举词在这里换成中文：**已写进库的旧主张一个字节都不动**，
+        # 只有本次投影出来的标题是中文（未登记的取值原样保留，见 display_labels 纪律 1）。
+        text = localize_enum_tokens(_clean_title(payload.get('text')), CLAIM_TEXT_ZH)
         if text:
             return text
     for key in ('metric', 'title', 'entity_name', 'fact_id', 'conflict_id'):
