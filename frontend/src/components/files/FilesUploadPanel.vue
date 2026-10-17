@@ -214,12 +214,28 @@ function onProvenance(event: Event): void {
   font-size: 13px;
   color: var(--color-text);
 }
+/* 蓝点列表：原来只有 padding-left，没有 list-style:none + ::before 圆点，所以看起来是「缩进的裸文字」，与站内其它蓝点列表不一致。 */
 .fup-facts {
   margin: 12px 0 0;
-  padding-left: 18px;
+  padding: 0;
+  list-style: none;
   display: flex;
   flex-direction: column;
   gap: 9px;
+}
+.fup-facts > li {
+  position: relative;
+  padding-left: 14px;
+}
+.fup-facts > li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.66em;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--color-accent);
 }
 .fup-facts li {
   font-size: 13px;

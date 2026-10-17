@@ -740,24 +740,27 @@ onBeforeUnmount(() => {
   font-size: 13px;
   line-height: 1.7;
   color: var(--color-text);
+  /* 这段文案里用 \n 分段，靠 pre-line 真的换行 */
+  white-space: pre-line;
 }
 .files-retry {
   margin-top: 16px;
 }
+/* 去框：后台处理器状态原来也是「描边 + 圆角 + 浅灰底」。它的类名不含 warn/notice 之类关键词，上一轮全量扫描漏了。改成无框 + 左侧 2px 细条（正常态蓝，is-warn 橙）。 */
 .files-worker {
-  margin: 10px 0 0;
+  margin: 12px 0 0;
   font-size: 13.5px;
   line-height: 1.7;
-  padding: 8px 10px;
-  border-radius: 12px;
-  border: 1px solid var(--color-line);
-  background: var(--color-ink);
-  color: var(--color-body);
+  padding: 2px 0 2px 14px;
+  border: 0;
+  border-left: 2px solid var(--color-accent);
+  border-radius: 0;
+  background: none;
+  color: var(--color-text);
 }
 .files-worker.is-warn {
-  border-color: transparent;
-  background: #d97706;
-  color: #ffffff; font-weight: 600;
+  border-left-color: #d97706;
+  color: var(--color-text);
 }
 .files-filters {
   display: flex;

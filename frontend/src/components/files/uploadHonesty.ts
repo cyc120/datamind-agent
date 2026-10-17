@@ -171,7 +171,7 @@ export const POLL_EXHAUSTED_TEXT = '轮询已达上限，仍在处理中；请�
  *  触发不了重试 —— 上传管道只有 create/list/detail/approve 四个 HTTP 路由，
  *  retry/cancel 只存在于进程内函数，没有对外路由。 */
 export const RETRY_HONESTY_TEXT =
-  '重试会从头重新解析整个文件，没有断点或检查点；「被领取次数」只表示这个文件被处理器拿起来过几次。本界面也无法触发重试或取消，上传流程没有开放这两个动作。'
+  '重试会从头重新解析整个文件，没有断点或检查点。\n「被领取次数」只表示这个文件被处理器拿起来过几次。\n本界面无法触发重试或取消：上传流程没有开放这两个动作。'
 
 export const APPROVE_GATE_NOTE = '未复核前不会出现在可检索文档中。'
 

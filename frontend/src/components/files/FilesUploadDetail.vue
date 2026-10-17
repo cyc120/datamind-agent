@@ -369,6 +369,8 @@ const approval = computed(() => props.detail?.approval ?? null)
   font-size: 13px;
   line-height: 1.7;
   color: var(--color-text);
+  /* 这段文案里用 \n 分段，靠 pre-line 真的换行 */
+  white-space: pre-line;
 }
 .fud-link {
   font-size: 13.5px;
