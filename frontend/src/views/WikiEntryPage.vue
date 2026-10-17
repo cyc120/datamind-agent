@@ -665,22 +665,13 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
           <span v-else-if="readingPinnedRevision" class="wk-tag" data-testid="pinned-badge">指定版本</span>
         </div>
 
-        <!-- 元信息改成「标签在上 / 取值在下」的三格，不再用 · 串成一行 -->
+        <!-- 元信息只留「类型」：词条是 30 位原始 ID（地址栏里已经有了），
+             分类当前恒为「（未分类）」等于没说，两者都删。 -->
         <p class="wk-sub" data-testid="wiki-entry-id">
-          <span class="wk-sub-item">
-            <span class="wk-sub-key">词条</span>
-            <code class="wk-code">{{ entryId }}</code>
+          <span v-if="entry" class="wk-sub-item">
+            <span class="wk-sub-key">类型</span>
+            <span>{{ entryTypeText(entry.entry_type) }}</span>
           </span>
-          <template v-if="entry">
-            <span class="wk-sub-item">
-              <span class="wk-sub-key">类型</span>
-              <span>{{ entryTypeText(entry.entry_type) }}</span>
-            </span>
-            <span class="wk-sub-item">
-              <span class="wk-sub-key">分类</span>
-              <span>{{ text(entry.category, '（未分类）') }}</span>
-            </span>
-          </template>
         </p>
 
         <div class="wk-toolbar">
@@ -1280,10 +1271,12 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
 }
 
 /* 状态标签：原来紧贴标题，现在单独一行。 */
+/* 状态标签一行一个：原来两个药丸并排，长短不一、看着乱。 */
 .wk-tags {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
   margin-top: 10px;
 }
 /* 元信息：词条 / 类型 / 分类 三格横排，标签在上、取值在下，不再用 · 串成一行。 */
