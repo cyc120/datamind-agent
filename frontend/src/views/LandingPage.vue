@@ -10,7 +10,6 @@ import Folder from '../components/bits/Folder/Folder.vue'
 import StaggeredMenu from '../components/bits/StaggeredMenu/StaggeredMenu.vue'
 import ScrollStack from '../components/bits/ScrollStack/ScrollStack.vue'
 import ScrollStackItem from '../components/bits/ScrollStack/ScrollStackItem.vue'
-import FlipCard from '../components/FlipCard.vue'
 import ConstellationGraph from '../components/stargraph/ConstellationGraph.vue'
 import { useReveal } from '../composables/useReveal'
 import type { EvidenceNode, EvidenceEdge } from '../api/types'
@@ -208,28 +207,12 @@ const sampleEdges: EvidenceEdge[] = [
                   font-weight="800" color="#0b1220" :duration="0.6" :stagger="0.06" trigger="scroll" />
       </div>
 
-      <!-- 最后一轮改造：外层的圆角边框容器（.principle-box）与右栏「答案必须经得起追问」
-           （标题 + 那段「传统大模型问答像一张不透明的底片…」+「看看星图长什么样 ↓」）
-           都按用户要求整块删掉，这一节只剩标题与一张翻牌卡。
-           「看看我们」下面那四行换成 Vue Bits 的错开菜单（StaggeredMenu）。 -->
-      <div class="flip-wrap reveal">
-        <FlipCard auto-flip class="flipcard">
-          <template #front>
-            <div class="face-content front">
-              <div class="big">AI 黑箱？</div>
-              <p>一句话进去，一个答案出来——<br />中间发生了什么，没人知道。</p>
-              <span class="hint">点击翻转</span>
-            </div>
-          </template>
-          <template #back>
-            <div class="face-content back">
-              <!-- 「看看我们」已按用户要求移到区块标题后面
-                   （「答案要经得起追问——看看我们」），背面只留四行文案。 -->
-              <StaggeredMenu :items="claims" accent-color="#2563eb"
-                             font-size="clamp(1.45rem, 2.8vw, 2.5rem)" :delay="0.35" />
-            </div>
-          </template>
-        </FlipCard>
+      <!-- 用户最后的意见：不要框（翻牌卡整块去掉），四行字直接铺在页面上，
+           而且要更大。所以这一节只剩「标题 + 四行错开菜单」。
+           原来翻牌卡正面的「AI 黑箱？一句话进去…」随卡片一起去掉。 -->
+      <div class="claims-band reveal">
+        <StaggeredMenu :items="claims" accent-color="#2563eb"
+                       font-size="clamp(1.9rem, 4.2vw, 3.4rem)" :delay="0.2" />
       </div>
     </section>
 
@@ -703,10 +686,10 @@ const sampleEdges: EvidenceEdge[] = [
 /* 最后一轮改造：外层那个圆角边框容器（.principle-box）连同右栏「答案必须经得起追问」
    已按用户要求删掉，这一节只剩标题 + 一张翻牌卡。
    卡片比原来大：背面要塞下错开菜单的四行大字（原来四行是 15px 的清单）。 */
-.flip-wrap {
-  display: grid;
-  grid-template-columns: minmax(0, 760px);
-  align-items: start;
+/* 四行错开菜单：不要卡片框（用户要求），直接铺在页面上、字号更大。 */
+.claims-band {
+  margin: 28px 0 0;
+  max-width: 980px;
 }
 .flipcard {
   height: 396px;
