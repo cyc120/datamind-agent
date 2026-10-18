@@ -10,6 +10,7 @@ import Folder from '../components/bits/Folder/Folder.vue'
 import StaggeredMenu from '../components/bits/StaggeredMenu/StaggeredMenu.vue'
 import ScrollStack from '../components/bits/ScrollStack/ScrollStack.vue'
 import ScrollStackItem from '../components/bits/ScrollStack/ScrollStackItem.vue'
+import FlipCard from '../components/FlipCard.vue'
 import ConstellationGraph from '../components/stargraph/ConstellationGraph.vue'
 import { useReveal } from '../composables/useReveal'
 import type { EvidenceNode, EvidenceEdge } from '../api/types'
@@ -36,6 +37,18 @@ function scrollTo(id: string) {
  */
 function openHistory() {
   void router.push({ path: '/app', query: { panel: 'history' } })
+}
+
+/**
+ * 「一条问题，四步落地」那四张翻转卡的键盘分支。
+ * FlipCard 内部只监听 click（见 components/FlipCard.vue），键盘用户没有鼠标就用不了；
+ * 卡片在外面补了 role="button" + tabindex="0"，回车/空格时替它补一次 click。
+ * 按住不放产生的重复 keydown 要挡掉，否则会连续翻面。
+ */
+function flipByKeyboard(e: KeyboardEvent) {
+  if (e.repeat) return
+  const card = e.currentTarget as HTMLElement | null
+  card?.click()
 }
 
 /** Hero 副标题里轮换的能力词。 */
@@ -287,17 +300,30 @@ const sampleEdges: EvidenceEdge[] = [
     </section>
 
     <!-- 流程 -->
-    <section id="how" class="section soft">
+    <section id="how" class="section soft how-band">
       <div class="sec-head">
         <div class="eyebrow">How it works</div>
         <BlurText text="一条问题，四步落地" :delay="90" animate-by="words" class="blur-heading" />
       </div>
       <div class="steps">
-        <div v-for="(s, i) in steps" :key="s.n" class="step reveal" :style="{ transitionDelay: i * 90 + 'ms' }">
-          <div class="step-n">{{ s.n }}</div>
-          <h3>{{ s.t }}</h3>
-          <p>{{ s.d }}</p>
-        </div>
+        <!-- 四步卡：Vue Bits 的可翻转卡（components/FlipCard.vue），点一下翻面。
+             正面只有步骤小标题（大号克莱因蓝、居中占满），背面是步骤描述（同样大字）。
+             FlipCard 的两面都是绝对定位，卡片高度必须由 .steps .how-card 给，否则整卡塌成 0。
+             FlipCard 只监听 click，卡片自己补 role/tabindex 与回车、空格的键盘分支。 -->
+        <FlipCard v-for="(s, i) in steps" :key="s.n" class="how-card reveal"
+                  :data-testid="`how-card-${s.n}`" role="button" tabindex="0"
+                  :style="{ transitionDelay: i * 90 + 'ms' }"
+                  @keydown.enter.prevent="flipByKeyboard" @keydown.space.prevent="flipByKeyboard">
+          <template #front>
+            <span class="how-card-title">{{ s.t }}</span>
+          </template>
+          <template #back>
+            <div class="how-card-back">
+              <span class="how-card-n">{{ s.n }}</span>
+              <p class="how-card-desc">{{ s.d }}</p>
+            </div>
+          </template>
+        </FlipCard>
       </div>
     </section>
 
@@ -916,34 +942,111 @@ const sampleEdges: EvidenceEdge[] = [
   display: inline-block;
 }
 
-/* ── 流程 ── */
+/* ── 流程（How it works） ──
+   用户要求：这块的灰色长条底换成克莱因蓝（#002FA7）；四张卡改成 Vue Bits 的可翻转卡
+   （frontend/src/components/FlipCard.vue），正面是占满整个框的蓝色大字小标题，
+   背面是同样大字的描述文案。四列并排保持原样，窄屏照旧折行。
+
+   配色选择：底色已经是克莱因蓝，卡片正面若也用蓝就和背景糊成一片，所以
+     正面 = 白卡 + 克莱因蓝大字（#002FA7 on #ffffff，对比度 10.7:1），
+        「纸」是白的、字是这一节的主色，蓝色大字才最跳；
+     背面 = 克莱因蓝的浅色调（#e7edff）+ 深藏青字（#0a1f5c，对比度 13.2:1），
+        翻过去仍是同一套颜色语言，又和正面的白卡区分得开。
+   牌面类名（.flip-*）在 FlipCard 内部是 scoped 的，这里只能用 :deep 覆写。 */
+.section.soft.how-band {
+  background: #002fa7;
+}
+/* 蓝底上所有字都要能读：eyebrow 与标题原本取深灰/墨色，这里换成白与半透明白。
+   选择器带 #how 是为了压过 .eyebrow / .blur-heading 自身的 color（不是猜格式，见上文定义）。 */
+#how .eyebrow {
+  color: rgba(255, 255, 255, 0.74);
+}
+#how .blur-heading {
+  color: #ffffff;
+}
 .steps {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 22px;
 }
-.step {
-  padding: 22px;
-  border-radius: 14px;
+/* FlipCard 的两面都是 position:absolute，高度必须由外面给，否则整卡塌成 0 高度；
+   container-type 是给正面标题用的：标题字号按卡片自身宽度（cqw）取，
+   四列 / 三列 / 单列的占满比例因此一致，不会换个视口就一行变两行。 */
+.steps .how-card {
+  height: clamp(228px, 17.5vw, 258px);
+  container-type: inline-size;
+}
+.how-card :deep(.flip-face) {
+  padding: 20px 18px;
+  border-radius: 20px;
+}
+.how-card :deep(.flip-front) {
   background: #ffffff;
-  border: 1px solid var(--color-line);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 18px 36px rgba(0, 12, 60, 0.28);
 }
-.step-n {
-  font-size: 14.5px;
+.how-card :deep(.flip-back) {
+  background: #e7edff;
+  border: 1px solid rgba(0, 47, 167, 0.22);
+  box-shadow: 0 18px 36px rgba(0, 12, 60, 0.22);
+}
+/* 正面：只有一个步骤小标题，字号按卡片宽度顶格（16cqw ≈ 五个字占到卡内宽九成）。
+   前一行是给不认 cqw 的老浏览器兜底的：新写法解析失败时它还会生效。 */
+.how-card-title {
+  font-size: clamp(2rem, 3.6vw, 3.4rem);
+  font-size: clamp(2rem, 16cqw, 3.9rem);
+  font-weight: 800;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+  color: #002fa7;
+  text-wrap: balance;
+}
+/* 背面：小序号 + 描述文案；文案字号也不小，行高放到 1.7，三四行正好填满卡面 */
+.how-card-back {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  text-align: left;
+}
+.how-card-n {
+  font-size: 13px;
   font-weight: 700;
-  color: var(--color-accent);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.14em;
+  color: #002fa7;
+  opacity: 0.72;
 }
-.step h3 {
-  margin: 10px 0 8px;
-  font-size: 17px;
-  font-weight: 700;
-}
-.step p {
+.how-card-desc {
   margin: 0;
-  color: var(--color-body);
-  font-size: 15px;
-  line-height: 1.8;
+  font-size: clamp(1.15rem, 1.95vw, 1.8rem);
+  font-weight: 500;
+  line-height: 1.7;
+  letter-spacing: 0.005em;
+  color: #0a1f5c;
+}
+/* 窄屏列数变少、卡片变宽，卡面别再那么高，否则字和框差得太远 */
+@media (max-width: 900px) {
+  .steps .how-card {
+    height: 208px;
+  }
+}
+@media (max-width: 560px) {
+  .steps .how-card {
+    height: 168px;
+  }
+  /* 单列时卡面很宽、文案只有一两行，字号再抬一档才不至于空
+     （标题不用管：它按 cqw 取，卡片变宽就跟着变宽） */
+  .how-card-desc {
+    font-size: 1.3rem;
+    line-height: 1.6;
+  }
+}
+/* 翻面是动画：系统开了「减少动态效果」就直接切面，不走 3D 过渡 */
+@media (prefers-reduced-motion: reduce) {
+  .how-card :deep(.flip-inner) {
+    transition: none;
+  }
 }
 
 /* ── 底部 CTA ── */
