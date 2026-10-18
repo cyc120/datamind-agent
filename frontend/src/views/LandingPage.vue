@@ -735,10 +735,12 @@ const sampleEdges: EvidenceEdge[] = [
   justify-content: center;
   gap: 22px;
 }
+/* 字号随框宽走：原来固定 30px，塞在 1200×700 的框里显得空。 */
 .face-content .big {
-  font-size: 30px;
+  font-size: clamp(2.4rem, 4.4vw, 3.8rem);
   font-weight: 800;
   letter-spacing: -0.02em;
+  line-height: 1.15;
 }
 .face-content .big.light {
   color: var(--color-accent);
@@ -746,11 +748,11 @@ const sampleEdges: EvidenceEdge[] = [
 .face-content p {
   margin: 0;
   color: var(--color-body);
-  font-size: 15px;
-  line-height: 1.8;
+  font-size: clamp(1.05rem, 1.7vw, 1.4rem);
+  line-height: 1.75;
 }
 .face-content .hint {
-  font-size: 13.5px;
+  font-size: clamp(0.9rem, 1.1vw, 1.05rem);
   color: var(--color-muted);
 }
 
