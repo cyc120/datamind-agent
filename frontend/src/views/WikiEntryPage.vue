@@ -708,10 +708,10 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
           </button>
         </div>
 
-        <!-- 这条说明原来挂在按钮后面，看起来像"操作的一部分"。移到单独一行、压小。 -->
-        <p class="wk-hint-inline">
-          刷新页面仍停在这一词条与这一版本（版本在地址栏 <code class="wk-code">?revision=</code>）
-        </p>
+        <!-- 这条说明原来挂在按钮后面，看起来像"操作的一部分"。移到单独一行、压小。
+             括号里原本还有「版本在地址栏 ?revision=」并包了 code 框 ——
+             URL 参数名是给开发者看的实现细节，读者只需要知道"刷新不会丢当前视图"。 -->
+        <p class="wk-hint-inline">刷新页面仍停在这一词条与这一版本</p>
 
         <p v-if="requestedRevisionId && !requestedRevisionInList && !partErrors.revisions" class="wk-warn" data-testid="revision-not-in-list">
           地址栏里的版本 <code class="wk-code">{{ requestedRevisionId }}</code> 不在可见版本历史里：
