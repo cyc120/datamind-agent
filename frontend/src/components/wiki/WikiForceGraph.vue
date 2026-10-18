@@ -529,6 +529,37 @@ const renderNodes = computed<RenderNode[]>(() => {
   })
 })
 
+/** 关系类型 -> 中文。键与 wiki 词表（WIKI_DOMAIN.md 3.2 的 21 种）一一对应；未收录的类型一律显示原样代码，不猜。 */
+const RELATION_TYPE_ZH: Record<string, string> = {
+  restates: '同一主张',
+  supersedes: '取代',
+  supports: '支持',
+  conflicts: '冲突',
+  contradicts: '冲突',
+  derived_from: '由…推导',
+  retrieved_from: '取自',
+  verified_by: '经…核验',
+  repaired_from: '修复自',
+  resolved_by: '经…裁决',
+  entity_match: '同一实体',
+  version_scope: '版本范围',
+  unit_equivalent: '单位等价',
+  time_overlap: '时间重叠',
+  maps_to: '映射到',
+  measures: '度量',
+  applies_to: '适用于',
+  scoped_by: '范围由…限定',
+  threshold_of: '阈值属于',
+  about: '关于',
+  justified_by: '依据',
+}
+
+function relationTypeLabel(relation: WikiGraphRelation): string {
+  const code = relation.relation_type ? String(relation.relation_type) : ''
+  if (!code) return ''
+  return RELATION_TYPE_ZH[code] ?? code
+}
+
 interface RenderLink {
   id: string
   x1: number
@@ -539,7 +570,12 @@ interface RenderLink {
   emphasized: boolean
   dim: boolean
   arrow: boolean
+  /** 连线中点要显示的关系类型中文名；空串表示这条边不标。 */
+  label: string
 }
+
+/** 边足够少时把关系类型全标出来；边多时只标与选中项相连的（见 renderLinks）。 */
+const showAllLinkLabels = computed(() => relations.value.length <= 20)
 
 const renderLinks = computed<RenderLink[]>(() => {
   const positions = positionById.value
@@ -562,6 +598,9 @@ const renderLinks = computed<RenderLink[]>(() => {
       dim: !!focus && !incident,
       // 方向只在**选中节点**的连线上画箭头：300 条边全带箭头会变成噪声。
       arrow: incident && relation.direction !== 'undirected',
+      // 同理，关系类型的文字标签也不是每条都标：边少（<=20）时全标；
+      // 边多时只标与选中节点相连的那几条，否则整张图会被标签糊住。
+      label: showAllLinkLabels.value || incident ? relationTypeLabel(relation) : '',
     })
   }
   return out
@@ -1234,6 +1273,19 @@ defineExpose({
             :stroke-opacity="link.dim ? Math.min(appearance.linkOpacity, 0.12) : appearance.linkOpacity"
             :marker-end="link.arrow ? 'url(#wg-arrow)' : undefined"
           />
+          <!-- 关系类型标签：画在连线中点。只在小图或与选中项相连的边上出现，否则满屏文字。 -->
+          <text
+            v-for="link in renderLinks.filter((l) => l.label)"
+            :key="`label-${link.id}`"
+            class="wg-link-label"
+            :x="(link.x1 + link.x2) / 2"
+            :y="(link.y1 + link.y2) / 2"
+            :font-size="10 / view.k"
+            text-anchor="middle"
+            :opacity="link.dim ? 0.25 : 1"
+          >
+            {{ link.label }}
+          </text>
 
           <!-- 节点：圆点 + 标题；孤立节点（连接数 0）同样可点、可聚焦 -->
           <g
@@ -1560,6 +1612,12 @@ defineExpose({
 
 .wg-link {
   stroke-linecap: round;
+}
+/* 连线上的关系类型文字：压小、灰、不挡线。 */
+.wg-link-label {
+  fill: #64748b;
+  pointer-events: none;
+  user-select: none;
 }
 
 .wg-node {
