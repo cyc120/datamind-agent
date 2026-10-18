@@ -819,7 +819,7 @@ const sampleEdges: EvidenceEdge[] = [
 /* 大标题放左、描述放右：两列。窄屏自动堆成上下。 */
 .feat-card-inner {
   display: grid;
-  grid-template-columns: minmax(0, 0.42fr) minmax(0, 1fr);
+  grid-template-columns: max-content minmax(0, 1fr);
   align-items: center;
   gap: clamp(16px, 3vw, 40px);
   min-width: 0;
@@ -854,6 +854,8 @@ const sampleEdges: EvidenceEdge[] = [
   min-width: 0;
   margin: 0;
   font-size: clamp(2.6rem, 4.6vw, 4.2rem);
+  /* 标题不换行：「跨源多跳」四个字在 0.42fr 的列里会被折成两行。 */
+  white-space: nowrap;
   font-weight: 800;
   color: var(--color-text);
   letter-spacing: -0.02em;
