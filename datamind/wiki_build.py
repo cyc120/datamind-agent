@@ -35,10 +35,15 @@ WHY 长这样（逐条可在检出里核对）：
    `entry_type_hint` 命中时优先，并列时按 `entry_type` 字典序固定——确定性优先于"聪明"。
    其余候选在 `plan.skipped_candidate_entry_types` 里如实列出，不静默丢弃。
 
-5. **派生关系仍然是计划，不是行。** `plan_wiki_derived_relations()` 的 8 个 Wiki 派生关系
-   端点是 `wiki-`/`wassert-` id，由 build 步骤铸造（`wiki_projection.py:2055-2060`）；
-   本版只铸造**词条**端点，没有铸造 `wassert-` 主张端点，所以版本的 `relations` 传空，
-   派生计划挂在 `plan.deferred_derivations` 上如实报告，并写进正文的"未落库的部分"一节。
+5. **能落库的派生关系只有一种，落库的就是那一种。** `plan_wiki_derived_relations()` 的 8 个
+   Wiki 派生关系里，靠主张的那一半端点是 `wassert-` id，本版不铸造主张端点（版本的
+   `assertions` 传空），所以那批计划仍然只是计划，挂在 `plan.deferred_derivations` 上如实报告。
+   真正落成 `wiki_relations` 行的是 `restates`（`WIKI_DOMAIN.md` §3.2 #21）：两端都是**词条**，
+   判据是两个不同运行的主张在 `claims.text` 上相同
+   （`wiki_projection.plan_restates_relations()`）。`draft_relations()` 只负责把库里的字段取回来，
+   行形状与方向全部由投影层的纯函数决定，再随版本走 §5.12 的 `wiki.create_revision()`
+   —— 也就是说"词表闭集 / 端点可达 / append-only"这三条约束**仍然只有服务层一个出口**，
+   本模块不自己 INSERT `wiki_relations`（`tests/test_wiki_build_worker.py` 的静态断言同款）。
 
 6. **`template+polish` 不假装有模型。** `mode='template+polish'` 目前与 `template` 走同一条
    模板路径：`generation_method` 一律 `'template'`（021:194-198 的闭集里 `model_polish`
@@ -64,9 +69,11 @@ from .wiki_projection import (
     ProjectionError,
     allocate_id,
     canonical_json,
+    conclusion_key_parts,
     digest64,
     node_payload,
     normalize_node_type,
+    plan_restates_relations,
     plan_wiki_derived_relations,
     project_entry,
     project_evidence_ref,
@@ -258,6 +265,7 @@ class DraftPlan:
     claim_ids: dict = field(default_factory=dict)
     summary: dict = field(default_factory=dict)
     skipped_candidate_entry_types: tuple = ()
+    derived_relations: tuple = ()
     deferred_derivations: dict = field(default_factory=dict)
     node_count: int = 0
     selected_node_count: int = 0
@@ -328,7 +336,15 @@ def body_markdown(plan: DraftPlan) -> str:
         lines.append('- …另有 %d 条证据引用（见本版本的 `citations`）'
                      % (len(plan.evidence_refs) - BODY_EVIDENCE_LINES))
     lines.extend(['', '## 未落库的部分（如实记录）', ''])
-    lines.append('- Wiki 派生关系：%d 条计划，尚未落库（端点在 build 步骤铸造）。'
+    stored = {}
+    for relation in plan.derived_relations:
+        stored[relation['relation_type']] = stored.get(relation['relation_type'], 0) + 1
+    lines.append('- Wiki 派生关系：本版本落库 %d 条（%s）。'
+                 % (len(plan.derived_relations),
+                    '、'.join('`%s` %d 条' % (name, count)
+                             for name, count in sorted(stored.items())) or '无'))
+    lines.append('- 派生计划 %d 条仍然只是计划：它们的另一半端点是 `wassert-` 主张 id，'
+                 '本版不铸造主张端点。'
                  % (plan.deferred_derivations.get('deferred') or 0))
     lines.append('- 主张（`wiki_assertions`）：本版只铸造词条端点与证据引用，未铸造主张端点。')
     lines.append('- 已投影但未交付的候选词条类型：%s'
@@ -665,6 +681,54 @@ def load_edges(cur, run_id, *, limit=NODES_READ_LIMIT):
     return list(cur.fetchall())
 
 
+#: 空间内其它结论词条的主张文本。`split_part(key_part, chr(31), 2)` 取的就是 4.1 的
+#: `claim_id`（结论 `key_part` = `run_id + US + claim_id`），`claims.claim_id` 是它的唯一权威。
+#: 内连接是**故意的**：主张行没了（运行被级联删除）就没有可比较的文本，这条词条不参与推导。
+_ENTRY_CLAIM_SQL = '''SELECT e.entry_id, e.key_part, c.text
+    FROM wiki_entries e
+    JOIN claims c ON c.claim_id = split_part(e.key_part, chr(31), 2)
+   WHERE e.space_id = %s AND e.entry_type = 'conclusion' AND e.entry_id <> %s
+   ORDER BY e.entry_id'''
+
+
+def load_conclusion_claims(cur, space_id, *, entry_id, claim_id):
+    """本次整理的主张文本 + 空间内其它结论词条的主张文本。**只读** `claims` 与 `wiki_entries`。
+
+    WHY 需要这一步：`restates`（§3.2 #21）的判据是两个**不同运行**的主张文本相同，而"其它结论
+    词条"只有库里查得到 —— 投影层拿到的是本次运行的节点，看不见别的词条。两边都从
+    `claims.text` 取：`wiki_entries.title` 是被 NFKC + 截断过的**显示值**
+    （`_clean_title()`），拿它做身份会出假阳性。
+    """
+    cur.execute('SELECT text FROM claims WHERE claim_id = %s', (claim_id,))
+    row = cur.fetchone()
+    claim_text = None if row is None else row['text']
+    cur.execute(_ENTRY_CLAIM_SQL, (space_id, entry_id))
+    candidates = [{'entry_id': item['entry_id'], 'key_part': item['key_part'],
+                   'claim_text': item['text']} for item in cur.fetchall()]
+    return claim_text, candidates
+
+
+def draft_relations(plan: DraftPlan, cur, entry_id) -> list:
+    """本次整理要随版本落库的派生关系（目前只有 `restates`，见模块头 WHY 5）。
+
+    本函数只做两件事：把库里的字段取回来（`load_conclusion_claims()`）、把"这条词条是不是一个
+    结论"判掉。行形状、方向、去重全部由 `wiki_projection.plan_restates_relations()` 决定 ——
+    一行推导都不在这里重写。
+    """
+    if plan.entry.get('entry_type') != 'conclusion':
+        return []
+    run_id, claim_id = conclusion_key_parts(plan.entry.get('key_part'))
+    if claim_id is None or run_id != plan.run_id:
+        # `key_part` 里的运行段与本次任务不是同一个运行：没有可比较的依据，不推导。
+        return []
+    claim_text, candidates = load_conclusion_claims(cur, plan.space_id, entry_id=entry_id,
+                                                    claim_id=claim_id)
+    if claim_text is None:
+        return []
+    return plan_restates_relations(entry_id=entry_id, key_part=plan.entry['key_part'],
+                                   claim_text=claim_text, candidates=candidates)
+
+
 def select_queued(dsn, identity, *, limit=None, build_id=None):
     """列出可以尝试领取的任务（`status='queued'`），**不改任何状态**。
 
@@ -789,11 +853,13 @@ def revision_base_for(entry_id, dsn):
     return row['revision_id'] if row else None
 
 
-def append_plan(plan: DraftPlan, entry_id, dsn, identity, *, citations, request_id=None) -> str:
+def append_plan(plan: DraftPlan, entry_id, dsn, identity, *, citations, relations=(),
+                request_id=None) -> str:
     """把计划写成该词条的新版本（§5.12）。返回 `revision_id`。
 
     版本必须走 `wiki.create_revision()`：append-only 触发器（WIKI1）、`base_revision_id` 基线
-    校验、引用可达性校验（`_validate_evidence_refs`）都在那里，绕过它就等于绕过 §5.12。
+    校验、引用可达性校验（`_validate_evidence_refs`）、以及关系的词表闭集与**端点可达性**
+    （`wiki._validate_relation_endpoints()`）都在那里，绕过它就等于绕过 §5.12。
     `citations` 用的是**库里真实存在**的 `evidence_ref_id`（投影派生的 id 与它一致，
     但以查回来的为准 —— 引用可达性是 409/422 之外的硬约束）。
     """
@@ -804,7 +870,7 @@ def append_plan(plan: DraftPlan, entry_id, dsn, identity, *, citations, request_
          'base_revision_id': base_revision_id, 'title': plan.entry['title'],
          'body_markdown': body_markdown(plan), 'generation_method': 'template',
          'template_version': TEMPLATE_VERSION, 'citations': list(citations),
-         'assertions': [], 'relations': [],
+         'assertions': [], 'relations': list(relations or ()),
          'change_note': 'build %s from run %s (mode=%s)'
                         % (plan.build_id, plan.run_id, plan.mode)},
         dsn, identity)
@@ -832,10 +898,13 @@ def persist_draft(plan: DraftPlan, dsn, identity, *, request_id=None) -> dict:
     with wiki.connect(dsn) as conn, conn.cursor(cursor_factory=wiki.RealDictCursor) as cur:
         entry_id, reused_entry = _ensure_entry(cur, plan, identity)
         evidence_ref_ids = _ensure_evidence(cur, plan)
+        # 关系在词条之后读：端点必须已经存在（021:407-411 的端点存在性由服务层在写事务里查）。
+        relations = draft_relations(plan, cur, entry_id)
 
+    plan.derived_relations = tuple(relations)
     revision_id = append_plan(plan, entry_id, dsn, identity,
                               citations=resolved_citations(plan, evidence_ref_ids),
-                              request_id=request_id)
+                              relations=relations, request_id=request_id)
 
     with wiki.connect(dsn) as conn, conn.cursor(cursor_factory=wiki.RealDictCursor) as cur:
         for ref in plan.evidence_refs:
@@ -848,6 +917,7 @@ def persist_draft(plan: DraftPlan, dsn, identity, *, request_id=None) -> dict:
                          plan.claim_ids.get(str(ref['evidence_id'])), revision_id))
     result = result_of(plan, revision_id)
     result.update({'reused_entry': reused_entry,
+                   'relation_count': len(relations),
                    'skipped_candidate_entry_types': list(plan.skipped_candidate_entry_types)})
     return result
 
@@ -892,9 +962,11 @@ __all__ = ['BODY_EVIDENCE_LINES', 'BODY_MAX_CHARS', 'DEMO_OWNER_ID', 'DETAIL_MAX
            'LOOPBACK_API_URL', 'LOOPBACK_PROBE_TIMEOUT', 'NODES_READ_LIMIT', 'TEMPLATE_VERSION',
            'TERMINAL_STATES', 'app_dsn', 'append_plan', 'body_markdown', 'build_draft',
            'builder_for', 'claim_error_verdict', 'claim_id_of', 'claim_ids_for',
-           'current_session_token', 'demo_identity_ok', 'evidence_params', 'failure_detail',
+           'current_session_token', 'demo_identity_ok', 'draft_relations', 'evidence_params',
+           'failure_detail',
            'fingerprint', 'host_is_loopback', 'is_terminal', 'job_identity', 'jsonable',
-           'live_session_identity', 'load_edges', 'load_nodes', 'load_run', 'node_selected',
+           'live_session_identity', 'load_conclusion_claims', 'load_edges', 'load_nodes',
+           'load_run', 'node_selected',
            'normalize_error_code',
            'ordered_unique', 'persist_draft', 'plan_for_job', 'provenance_link_id', 'queued_sql',
            'resolve_identity', 'resolved_citations', 'result_of', 'revision_base_for', 'safe_slug',

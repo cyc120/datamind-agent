@@ -2243,6 +2243,121 @@ def plan_wiki_derived_relations(nodes, *, space_id=None, namespace=None, run_ids
                                        measurements + requirements + checks + claims})}
 
 
+# ================================================================ derived entry relations
+#
+# WHY 这一节存在：`plan_wiki_derived_relations()` 产出的是**计划**，而且其中靠主张的那一半端点是
+# `wassert-` 主张 id —— build 层不写 `wiki_assertions`（`wiki_build.append_plan()` 传
+# `assertions=[]`），所以那批计划在真实数据上一条也落不成行。能被**真实字段**判定的、两端都是
+# **词条**的派生关系只有一个：`restates`（3.2 #21「两次运行得到同一主张」，判定依据是 4.3 的
+# 主张比较身份）。相邻表 2.5 也把 `conclusion -> conclusion` 的可选关系限定在
+# `conflicts` / `supersedes` / `restates` / `supports` 四个词里，其中前两个是**投影**类型
+# （必须有既有边与 `raw_type`，本库这些边 0 行、结论也没有可继承的业务键），`supports` 同理，
+# 所以派生侧只剩 `restates`。
+#
+# 判据只用两个字段，逐条写清楚：
+#   ① `wiki_entries.key_part` 的第二段（`run_id + US + claim_id`，4.1 的结论身份）→ 两条结论
+#      来自**不同**运行；同一运行内的两条主张永远不是"两次运行"，哪怕文本相同。
+#   ② 两个 `claim_id` 在 `claims.text` 上经 :func:`claim_text_key()` 归一后逐字相同。
+#
+# 这里**不是**在猜：不做同义改写判定、不做相似度、不跨 `space_id`、不把一条与它自己配对。
+# 4.3 的 `comparison_key` 在结论上**不可算** —— 它要求 `entity_key` + `predicate`，而 `claims`
+# 表只有 `text`（`assertion_identity()` 遇到只有 text 的 Claim 节点会抛
+# `WIKI_ENTITY_KEY_UNRESOLVED`），所以结论主张之间可用的身份只有它自己的文本。这条限制写进
+# 每条关系的 `derivation` 里，不藏在代码注释里。
+
+#: `restates` 判据读的字段名，进 `derivation.inputs` 如实记录来源。
+RESTATES_TEXT_FIELD = 'claims.text'
+#: 文本归一的规则名（进 `derivation`，与 :func:`claim_text_key` 一一对应）。
+RESTATES_TEXT_NORMALISATION = 'NFKC + whitespace collapsed to one space'
+
+
+def claim_text_key(text) -> str:
+    """一条主张文本的**比较键**：NFKC 归一 + 空白折叠成单空格 + 去首尾。
+
+    与 :func:`_clean_title` 同一套归一（显示层与身份层一个口径），但**不截断**：截断过的文本
+    做身份会制造假阳性。空白只折叠不删除 —— ``7 日内`` 与 ``7日内`` 仍是两个比较键，
+    宁可漏配也不误配。
+    """
+    value = '' if text is None else str(text)
+    return ' '.join(unicodedata.normalize('NFKC', value).split())
+
+
+def conclusion_key_parts(key_part) -> tuple:
+    """从结论的 `key_part`（`run_id + US + claim_id`，4.1）里读出 `(run_id, claim_id)`。
+
+    形状不对返回 `(None, None)`：调用方据此跳过推导，而不是猜一段出来。
+    """
+    parts = str('' if key_part is None else key_part).split('\x1f')
+    if len(parts) != 2:
+        return None, None
+    run_id, claim_id = parts[0].strip(), parts[1].strip()
+    return (run_id or None), (claim_id or None)
+
+
+def plan_restates_relations(*, entry_id, key_part, claim_text, candidates) -> list:
+    """两条**不同运行**的结论主张文本相同时的 `restates` 关系（3.2 #21）。
+
+    `candidates` 是空间内其它结论词条的 ``{'entry_id', 'key_part', 'claim_text'}``；返回值已经
+    是 ``wiki.create_revision(..., relations=[...])`` 的载荷形状（`src` / `dst` 是词条 id，
+    `origin='wiki_derived'`，`raw_type=None`，带 `rule_version` 与 `derivation`）。
+
+    方向按 `(run_id, claim_id)` 字典序：`src` 取较小的一端（与
+    :func:`plan_wiki_derived_relations` 的 `restates` 配对同序）。这样同一条关系无论从哪一端
+    整理出来都是**同一个方向**，不会因为先建哪条词条而出现反向的两行。
+    """
+    own_text = claim_text_key(claim_text)
+    own_run, own_claim = conclusion_key_parts(key_part)
+    if not own_text or not own_run or not own_claim:
+        return []
+    plans, seen = [], set()
+    for candidate in candidates or ():
+        candidate = candidate if isinstance(candidate, dict) else {}
+        other_id = str(candidate.get('entry_id') or '')
+        other_run, other_claim = conclusion_key_parts(candidate.get('key_part'))
+        if not other_id or other_id == str(entry_id):
+            continue
+        if not other_run or not other_claim or other_run == own_run:
+            continue
+        if claim_text_key(candidate.get('claim_text')) != own_text:
+            continue
+        own_ref, other_ref = (own_run, own_claim), (other_run, other_claim)
+        src, dst = ((str(entry_id), other_id) if own_ref <= other_ref
+                    else (other_id, str(entry_id)))
+        if (src, dst) in seen:
+            continue
+        seen.add((src, dst))
+        relation = project_derived_relation(
+            'restates', src, dst,
+            inputs=[{'relation': 'restates',
+                     'field': RESTATES_TEXT_FIELD,
+                     'normalisation': RESTATES_TEXT_NORMALISATION,
+                     # 4.3 的 comparison_key 在 claims 上不可算（只有 text），如实记录。
+                     'comparison_key_available': False,
+                     'claims': [{'entry_id': str(entry_id), 'run_id': own_run,
+                                 'claim_id': own_claim},
+                                {'entry_id': other_id, 'run_id': other_run,
+                                 'claim_id': other_claim}]}],
+            basis_note='the same claim text under two different runs (3.2 #21)')
+        plans.append({
+            'src': relation['src_id'], 'dst': relation['dst_id'],
+            'relation_type': relation['relation_type'],
+            'origin': relation['origin'],
+            'raw_type': None,
+            'rule_version': relation['rule_version'],
+            'derivation': relation['derivation'],
+            'basis': {'source_tables': ['wiki_entries', 'claims'],
+                      'field': RESTATES_TEXT_FIELD,
+                      'normalisation': RESTATES_TEXT_NORMALISATION,
+                      'own': {'entry_id': str(entry_id), 'run_id': own_run,
+                              'claim_id': own_claim},
+                      'counterpart': {'entry_id': other_id, 'run_id': other_run,
+                                      'claim_id': other_claim}},
+            'basis_note': relation['basis_note'],
+            'provenance_incomplete': relation['provenance_incomplete'],
+        })
+    return plans
+
+
 def _plan_counts(plans) -> dict:
     counts = {}
     for plan in plans:
