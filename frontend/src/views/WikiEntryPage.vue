@@ -1287,25 +1287,30 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   margin-top: 10px;
 }
 /* 元信息：词条 / 类型 / 分类 三格横排，标签在上、取值在下，不再用 · 串成一行。 */
+/* 三行：每项占一行，标签在左、取值在右（原来三格横排，用户要求改成三行）。 */
 .wk-sub {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px 28px;
+  flex-direction: column;
+  gap: 4px;
   margin: 12px 0 0 0;
   font-size: 13.5px;
   color: var(--color-text);
 }
 .wk-sub-item {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: baseline;
+  gap: 10px;
   min-width: 0;
 }
+/* 标签固定一档宽度，三行的取值左边缘对齐。 */
 .wk-sub-key {
-  font-size: 12.5px;
+  flex: 0 0 auto;
+  min-width: 2.4em;
+  font-size: 13px;
   font-weight: 600;
   color: var(--color-accent);
 }
+
 
 /* 口径标签统一蓝底白字加粗椭圆（原来是灰底描边）；-demo 是警告语义色，保留 */
 .wk-tag {
