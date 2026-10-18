@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 
+import AnimatedList from '../bits/AnimatedList/AnimatedList.vue'
 import { WIKI_PAGE_LIMITS, listWikiEntries, wikiSpaceGraph } from '../../api/client'
 import type { WikiEntry, WikiGraphNode, WikiGraphRelation } from '../../api/types'
 import WikiGraphSettings from './WikiGraphSettings.vue'
@@ -1342,7 +1343,8 @@ defineExpose({
           目录按标题排序，共 {{ catalog.length }} 个<strong>已加载</strong>节点。每条依次是：词条类型、
           三套状态、已加载连接数，以及状态标识（文字，不是颜色）。
         </p>
-        <ul v-if="catalog.length" class="wg-catalog">
+        <!-- 词条目录每条去框改橙条后，再逐条淡入（Vue Bits 的 AnimatedList）。 -->
+        <AnimatedList v-if="catalog.length" tag="ul" class="wg-catalog">
           <li v-for="item in catalog" :key="item.id">
             <button
               type="button"
@@ -1366,7 +1368,7 @@ defineExpose({
               </span>
             </button>
           </li>
-        </ul>
+        </AnimatedList>
         <p v-else class="wg-card-note">当前授权范围内没有已加载的节点，目录为空。</p>
       </section>
 
@@ -1798,15 +1800,17 @@ defineExpose({
   list-style: none;
 }
 
+/* 去框：词条目录每条原来是「浅灰底 + 圆角」的卡片，改成左侧橙色细条。橙色沿用本页「边界 / 需注意」的语义。 */
 .wg-catalog-btn {
   display: flex;
   flex-direction: column;
   gap: 2px;
   width: 100%;
-  padding: 6px 8px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: var(--color-ink);
+  padding: 6px 8px 6px 14px;
+  border: 0;
+  border-left: 2px solid #d97706;
+  border-radius: 0;
+  background: none;
   color: var(--color-text);
   font-family: inherit;
   text-align: left;
@@ -1814,7 +1818,8 @@ defineExpose({
 }
 
 .wg-catalog-btn:hover {
-  border-color: rgba(37, 99, 235, 0.35);
+  border-left-color: #b45309;
+  background: rgba(217, 119, 6, 0.05);
 }
 
 .wg-catalog-btn:focus-visible {
@@ -1822,9 +1827,10 @@ defineExpose({
   outline-offset: 1px;
 }
 
+/* 选中项：左条换成蓝色并加浅蓝底 —— 去框之后需要一个和默认橙条不同的记号。 */
 .wg-catalog-btn-active {
-  border-color: var(--color-accent);
-  background: rgba(37, 99, 235, 0.08);
+  border-left-color: var(--color-accent);
+  background: rgba(37, 99, 235, 0.07);
 }
 
 .wg-catalog-title {
