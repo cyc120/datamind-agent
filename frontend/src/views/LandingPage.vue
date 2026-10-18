@@ -943,18 +943,18 @@ const sampleEdges: EvidenceEdge[] = [
 }
 
 /* ── 流程（How it works） ──
-   用户要求：这块的灰色长条底换成克莱因蓝（#002FA7）；四张卡改成 Vue Bits 的可翻转卡
+   用户要求：这块的灰色长条底换成克莱因蓝（var(--color-accent)）；四张卡改成 Vue Bits 的可翻转卡
    （frontend/src/components/FlipCard.vue），正面是占满整个框的蓝色大字小标题，
    背面是同样大字的描述文案。四列并排保持原样，窄屏照旧折行。
 
    配色选择：底色已经是克莱因蓝，卡片正面若也用蓝就和背景糊成一片，所以
-     正面 = 白卡 + 克莱因蓝大字（#002FA7 on #ffffff，对比度 10.7:1），
+     正面 = 白卡 + 克莱因蓝大字（var(--color-accent) on #ffffff，对比度 10.7:1），
         「纸」是白的、字是这一节的主色，蓝色大字才最跳；
      背面 = 克莱因蓝的浅色调（#e7edff）+ 深藏青字（#0a1f5c，对比度 13.2:1），
         翻过去仍是同一套颜色语言，又和正面的白卡区分得开。
    牌面类名（.flip-*）在 FlipCard 内部是 scoped 的，这里只能用 :deep 覆写。 */
 .section.soft.how-band {
-  background: #002fa7;
+  background: var(--color-accent);
 }
 /* 蓝底上所有字都要能读：eyebrow 与标题原本取深灰/墨色，这里换成白与半透明白。
    选择器带 #how 是为了压过 .eyebrow / .blur-heading 自身的 color（不是猜格式，见上文定义）。 */
@@ -998,7 +998,7 @@ const sampleEdges: EvidenceEdge[] = [
   font-weight: 800;
   line-height: 1.12;
   letter-spacing: -0.02em;
-  color: #002fa7;
+  color: var(--color-accent);
   text-wrap: balance;
 }
 /* 背面：小序号 + 描述文案；文案字号也不小，行高放到 1.7，三四行正好填满卡面 */
@@ -1014,7 +1014,7 @@ const sampleEdges: EvidenceEdge[] = [
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.14em;
-  color: #002fa7;
+  color: var(--color-accent);
   opacity: 0.72;
 }
 .how-card-desc {

@@ -255,7 +255,8 @@ watch(
   display: inline-flex;
   align-items: flex-start;
   gap: 0.4em;
-  font-weight: 700;
+  /* 上游是 700；用户要求这四行细一点，改成 500（常规偏细，仍够醒目）。 */
+  font-weight: 500;
   line-height: 1.04;
   letter-spacing: -0.02em;
   /* 上游写死 uppercase：中文无影响，拉丁字母会全大写（参考图就是大写字） */
