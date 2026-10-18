@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-import WarpText from '../components/bits/WarpText/WarpText.vue'
 import FoldText from '../components/bits/FoldText/FoldText.vue'
 import BlurText from '../components/bits/BlurText/BlurText.vue'
 import FallingText from '../components/bits/FallingText/FallingText.vue'
@@ -8,9 +7,9 @@ import RotatingText from '../components/bits/RotatingText/RotatingText.vue'
 import TrueFocus from '../components/bits/TrueFocus/TrueFocus.vue'
 import PixelSwap from '../components/bits/PixelSwap/PixelSwap.vue'
 import Folder from '../components/bits/Folder/Folder.vue'
-import Topography from '../components/bits/Topography/Topography.vue'
-import GlassSurface from '../components/bits/GlassSurface/GlassSurface.vue'
-import SpecularButton from '../components/bits/SpecularButton/SpecularButton.vue'
+import StaggeredMenu from '../components/bits/StaggeredMenu/StaggeredMenu.vue'
+import ScrollStack from '../components/bits/ScrollStack/ScrollStack.vue'
+import ScrollStackItem from '../components/bits/ScrollStack/ScrollStackItem.vue'
 import FlipCard from '../components/FlipCard.vue'
 import ConstellationGraph from '../components/stargraph/ConstellationGraph.vue'
 import { useReveal } from '../composables/useReveal'
@@ -64,6 +63,18 @@ const topFeatures = ['多模态数据驱动', '可解释', '可溯源']
 
 /** 关键词条：TrueFocus 会逐个聚焦。 */
 const keywords = '可解释 可溯源 跨源核验 图文对照 冲突并陈'
+
+/**
+ * 「看看我们」下面那四条 —— 现在交给 Vue Bits 的错开菜单（StaggeredMenu）渲染。
+ * 序号 01–04 由组件内的 CSS 计数器生成，这里只给文案。
+ * 文案与改造前逐字一致；原来行首的 ✓ 是列表符号，改由序号承担，文字本身没动。
+ */
+const claims = [
+  { label: 'SQL 全文可见' },
+  { label: '检索片段可点回原文' },
+  { label: '冲突来源并陈' },
+  { label: '推理链路可回放' },
+]
 
 const features = [
   {
@@ -182,17 +193,11 @@ const sampleEdges: EvidenceEdge[] = [
       </div>
     </section>
 
-    <!-- 关键词条：真正的专注 + 曲速展示带 -->
+    <!-- 关键词条：真正的专注 -->
     <section class="keyword-strip">
       <TrueFocus :sentence="keywords" :blur-amount="4" border-color="#2563eb"
                   glow-color="rgba(37, 99, 235, 0.35)" :animation-duration="0.45"
                   :pause-between-animations="0.9" />
-    </section>
-
-    <section class="warp-band">
-      <WarpText text="看得见的推理" color="#0b1220" :font-size="'clamp(1.7rem, 4.6vw, 3.4rem)'"
-                :font-weight="800" :letter-spacing="'-0.04em'" :speed="0.45"
-                :warp-strength="0.05" :pointer-influence="0.35" />
     </section>
 
     <!-- 原理：翻牌卡 + 折叠文字 -->
@@ -203,125 +208,57 @@ const sampleEdges: EvidenceEdge[] = [
                   font-weight="800" color="#0b1220" :duration="0.6" :stagger="0.06" trigger="scroll" />
       </div>
 
-      <!-- 参考 Dify 那版：标题在上，下面一个大圆角边框容器装住两栏内容 -->
-      <div class="principle-box reveal">
-        <div class="flip-wrap">
-          <FlipCard auto-flip class="flipcard">
-            <template #front>
-              <div class="face-content">
-                <div class="big">AI 黑箱？</div>
-                <p>一句话进去，一个答案出来——<br />中间发生了什么，没人知道。</p>
-                <span class="hint">点击翻转</span>
-              </div>
-            </template>
-            <template #back>
-              <div class="face-content">
-                <div class="big light">看看我们</div>
-                <ul class="checks">
-                  <li>✓ SQL 全文可见</li>
-                  <li>✓ 检索片段可点回原文</li>
-                  <li>✓ 冲突来源并陈</li>
-                  <li>✓ 推理链路可回放</li>
-                </ul>
-              </div>
-            </template>
-          </FlipCard>
-
-          <div class="principle-text">
-            <h3>答案，必须经得起追问</h3>
-            <p>
-              传统大模型问答像一张不透明的底片；DataMind 把它显影成一幅星图：SQL、检索、核验、冲突，
-              每一步都摆上台面，每一条证据都可点击、可回溯。
-            </p>
-            <a class="link" href="#starmap" @click.prevent="scrollTo('starmap')">看看星图长什么样 ↓</a>
-          </div>
-        </div>
+      <!-- 最后一轮改造：外层的圆角边框容器（.principle-box）与右栏「答案必须经得起追问」
+           （标题 + 那段「传统大模型问答像一张不透明的底片…」+「看看星图长什么样 ↓」）
+           都按用户要求整块删掉，这一节只剩标题与一张翻牌卡。
+           「看看我们」下面那四行换成 Vue Bits 的错开菜单（StaggeredMenu）。 -->
+      <div class="flip-wrap reveal">
+        <FlipCard auto-flip class="flipcard">
+          <template #front>
+            <div class="face-content front">
+              <div class="big">AI 黑箱？</div>
+              <p>一句话进去，一个答案出来——<br />中间发生了什么，没人知道。</p>
+              <span class="hint">点击翻转</span>
+            </div>
+          </template>
+          <template #back>
+            <div class="face-content back">
+              <div class="big light">看看我们</div>
+              <!-- 四条文案逐字未改，只换呈现：大号粗体 + 右上角 01–04 + 逐行错开升起。
+                   翻牌要 0.9s，所以入场排在 0.35s 之后，别让文字在看不见的背面演完。 -->
+              <StaggeredMenu :items="claims" accent-color="#2563eb"
+                             font-size="clamp(1.45rem, 2.8vw, 2.5rem)" :delay="0.35" />
+            </div>
+          </template>
+        </FlipCard>
       </div>
     </section>
 
-    <!-- 能力：等高线通栏背景 + 玻璃表面 + 三个镜面按钮卡
-         背景 Vue Bits Topography（等高线，浅蓝），卡片 = Vue Bits GlassSurface（液态玻璃）
-         + SpecularButton（镜面高光描边）。 -->
+    <!-- 能力：三个关键词 = Vue Bits 的卷轴堆栈（ScrollStack），竖向居中排列。
+         等高线背景（Topography）已按用户要求整块删掉；原来叠在卡片下面的液态玻璃
+         （GlassSurface）与镜面高光（SpecularButton）也一并撤掉 —— 卷轴堆栈会把每张卡
+         整体 scale + translate，WebGL 玻璃层跟着 transform 缩放会发糊，多层描边叠起来
+         也不成形。三个板块的图标、标题、说明一字未改，只换呈现方式。 -->
     <section id="features" class="feat-band">
-      <!-- 通栏背景层：宽度锁到 100vw 并居中，从网页最左蔓延到最右，形成一条横带 -->
-      <div class="feat-bleed" aria-hidden="true">
-        <div class="feat-bg">
-          <!-- bands 越小等高线越疏（密了像等高线地瓜图） -->
-          <Topography
-            :bands="1.15"
-            :thickness="0.0075"
-            :scale="1.2"
-            :glow="0.2"
-            :opacity="0.8"
-            :speed="0.26"
-            :morph-amount="2.2"
-            :mouse-strength="0.3"
-            low-color="#7fb2e5"
-            mid-color="#5b93cd"
-            high-color="#bcd9f2"
-          />
-        </div>
-        <!-- 两团淡蓝径向色：玻璃背后要有东西可折射，纯白背景上玻璃跟白纸没区别 -->
-        <div class="feat-wash"></div>
-      </div>
-
       <div class="feat-inner">
-        <div class="sec-head">
+        <div class="sec-head center">
           <div class="eyebrow">Capabilities</div>
           <BlurText text="三个关键词" :delay="120" animate-by="words" direction="top"
                     class="blur-heading" />
         </div>
-        <div class="feat-grid">
-          <div
-            v-for="(f, i) in features"
-            :key="f.title"
-            class="feat-card reveal"
-            :style="{ transitionDelay: i * 90 + 'ms' }"
-          >
-            <!-- 液态玻璃底：边缘做真实折射。
-                 distortionScale 是位移量（负值向外扩），-180 会拉出很重的彩色撕裂，
-                 这里收到 -55；三通道 offset 控制色散，10/20 会出现明显虹边，收到 4/8。
-                 brightness/opacity 决定玻璃「内在的雾面厚度」，太高会把背景糊掉。 -->
-            <GlassSurface
-              class="feat-glass"
-              :border-radius="18"
-              :border-width="0.06"
-              :brightness="92"
-              :opacity="0.85"
-              :blur="9"
-              :displace="0.5"
-              :background-opacity="0.58"
-              :saturation="1.5"
-              :glass-blur="18"
-              :distortion-scale="-60"
-              :red-offset="0"
-              :green-offset="4"
-              :blue-offset="8"
-            />
-            <!-- 镜面高光层：透明底，只画边框反光；鼠标靠近亮起、亮部随指针移动 -->
-            <SpecularButton
-              as="div"
-              size="lg"
-              align="start"
-              :radius="18"
-              :tint-opacity="0"
-              :blur="0"
-              :text-color="'#0b1220'"
-              line-color="#1e293b"
-              base-color="#93b4d6"
-              :intensity="1.5"
-              :shine-size="14"
-              :shine-fade="36"
-              :auto-animate="true"
-              :proximity="300"
-              class="feat-btn"
-            >
+
+        <!-- item-distance 是卡片之间的滚动距离，item-stack-distance 是堆起来时错开的像素：
+             两者一起决定「钉住 → 叠成一摞」要滚多长。 -->
+        <ScrollStack class="feat-stack" :item-distance="112" :item-stack-distance="42"
+                     :base-scale="0.87" :item-scale="0.02" :blur-amount="0.5">
+          <ScrollStackItem v-for="f in features" :key="f.title">
+            <div class="feat-card-inner">
               <span class="feat-icon" aria-hidden="true">{{ f.icon }}</span>
-              <span class="feat-title">{{ f.title }}</span>
-              <span class="feat-desc">{{ f.desc }}</span>
-            </SpecularButton>
-          </div>
-        </div>
+              <h3 class="feat-title">{{ f.title }}</h3>
+              <p class="feat-desc">{{ f.desc }}</p>
+            </div>
+          </ScrollStackItem>
+        </ScrollStack>
       </div>
     </section>
     <!-- 星图：落差文字做小字说明 -->
@@ -403,7 +340,7 @@ const sampleEdges: EvidenceEdge[] = [
   overflow-x: hidden;
 }
 
-/* 仅给读屏与搜索引擎，视觉上隐藏（曲速文本是 canvas，需要有语义标题兜底） */
+/* 仅给读屏与搜索引擎，视觉上隐藏（大标题是逐字分片渲染的，要有语义标题兜底） */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -716,25 +653,6 @@ const sampleEdges: EvidenceEdge[] = [
   color: var(--color-text);
 }
 
-/* 曲速展示带：WarpText 是 WebGL 画布，必须给它一个有高度的容器。
-   注意组件自带 min-h-55（220px），所以这里的 min-height 只是兜底。
-   另外它把文字画在画布正中、没有对齐参数，所以这里把画布收进同一条黄金分割列，
-   让它在左侧区域内居中，而不是飘在整页正中。 */
-.warp-band {
-  padding: 4px 40px 0;
-  max-width: 1360px;
-  margin: 0 auto;
-  min-height: 118px;
-}
-.warp-band > * {
-  width: 61.8%;
-  max-width: 900px;
-}
-/* 画布本身留白较多，紧跟其后的区块收紧上边距，避免出现一大段空档 */
-.warp-band + .section {
-  padding-top: 54px;
-}
-
 /* ── 通用区块 ── */
 .section {
   padding: 92px 40px;
@@ -783,33 +701,44 @@ const sampleEdges: EvidenceEdge[] = [
 }
 
 /* ── 原理 ── */
-/* 参考 Dify 那版：标题在上，下面一个大的圆角边框容器，里面分两栏。 */
-.principle-box {
-  border: 1px solid var(--color-line);
-  border-radius: 20px;
-  background: #ffffff;
-  padding: 44px 40px;
-}
+/* 最后一轮改造：外层那个圆角边框容器（.principle-box）连同右栏「答案必须经得起追问」
+   已按用户要求删掉，这一节只剩标题 + 一张翻牌卡。
+   卡片比原来大：背面要塞下错开菜单的四行大字（原来四行是 15px 的清单）。 */
 .flip-wrap {
   display: grid;
-  grid-template-columns: minmax(280px, 380px) 1fr;
-  gap: 48px;
-  align-items: center;
+  grid-template-columns: minmax(0, 760px);
+  align-items: start;
 }
 .flipcard {
-  height: 260px;
+  height: 396px;
 }
 .face-content {
-  padding: 26px;
+  padding: 34px 40px 36px;
+  width: 100%;
   height: 100%;
+  align-self: stretch;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 10px;
+  gap: 12px;
+  /* FlipCard 的两面都是居中的；背面要装左对齐的菜单，所以基础值改成左对齐 */
+  align-items: flex-start;
+  text-align: left;
+}
+/* 正面「AI 黑箱？」是提问，仍居中，翻过来才有明显变化 */
+.face-content.front {
+  align-items: center;
+  text-align: center;
+}
+/* 背面：标题在上、菜单在下，整体垂直居中 */
+.face-content.back {
+  justify-content: center;
+  gap: 22px;
 }
 .face-content .big {
-  font-size: 26px;
+  font-size: 30px;
   font-weight: 800;
+  letter-spacing: -0.02em;
 }
 .face-content .big.light {
   color: var(--color-accent);
@@ -824,34 +753,10 @@ const sampleEdges: EvidenceEdge[] = [
   font-size: 13.5px;
   color: var(--color-muted);
 }
-.checks {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  color: var(--color-body);
-  font-size: 15px;
-  line-height: 2;
-}
-.principle-text h3 {
-  margin: 0 0 12px;
-  font-size: 22px;
-  font-weight: 700;
-}
-.principle-text p {
-  margin: 0 0 14px;
-  color: var(--color-body);
-  font-size: 16px;
-  line-height: 1.9;
-}
-.link {
-  color: var(--color-accent);
-  text-decoration: none;
-  font-size: 15px;
-  font-weight: 500;
-}
 
-/* ── 能力区：等高线通栏背景 + 玻璃表面 + 镜面按钮卡 ──
-   这一节自己铺背景，所以不再用 .soft 的灰底：改成很淡的冷蓝渐变，等高线透得出来。 */
+/* ── 能力区：三个关键词 = 卷轴堆栈（ScrollStack） ──
+   这一节自己铺背景，所以不再用 .soft 的灰底：留一层很淡的冷蓝渐变做底。
+   等高线画布（Topography）已按用户要求删掉，所以不再需要通栏背景层与径向补光。 */
 .feat-band {
   position: relative;
   /* 通栏：宽度锁到视口宽再居中，左右两侧就没有内边距把它夹住 */
@@ -859,97 +764,51 @@ const sampleEdges: EvidenceEdge[] = [
   margin-left: calc(50% - 50vw);
   padding: 84px 0 92px;
   overflow: hidden;
-  background: linear-gradient(180deg, #ffffff 0%, #f2f7fd 48%, #e9f1fb 100%);
-}
-/* 通栏背景层：绝对定位铺满这一节，不参与内容宽度约束 */
-.feat-bleed {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-}
-/* 等高线层：只做视觉，别抢鼠标（下面还有卡片要交互） */
-.feat-bg {
-  position: absolute;
-  /* 超出 20px 是为了盖住 100vw 在带滚动条时可能差的那几像素，避免右侧露白边 */
-  inset: 0 -20px;
-}
-/* 两团淡蓝径向色：玻璃背后要有东西可折射，纯白背景上玻璃跟白纸没区别 */
-.feat-wash {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  background:
-    radial-gradient(760px 340px at 10% 6%, rgba(59, 130, 246, 0.13), transparent 70%),
-    radial-gradient(620px 320px at 90% 94%, rgba(14, 165, 233, 0.12), transparent 72%);
+  background: linear-gradient(180deg, #ffffff 0%, #f4f8fd 46%, #e9f1fb 100%);
 }
 .feat-inner {
   position: relative;
-  z-index: 2;
+  z-index: 1;
   max-width: 1360px;
   margin: 0 auto;
   padding: 0 40px;
 }
-.feat-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(288px, 1fr));
-  gap: 26px;
-  /* 镜面高光层比卡片大 20px，靠内边距让它在节内不被裁 */
-  padding: 8px 0;
+/* 堆叠卡片竖向居中：这一节的标题也跟着居中（其余区块仍是左对齐） */
+.sec-head.center {
+  max-width: none;
+  text-align: center;
+  margin-bottom: 40px;
 }
-/* 卡片：外层只管布局与圆角；玻璃底与镜面高光是两张叠起来的层。
-   ⚠ 必须显式写 display: flex —— 组件里是 inline-flex，外层 grid 的 stretch 不会
-   把 inline-level 盒子拉满宽，内容也就不会换行（实测卡片被压成 90px 高的一条）。 */
-.feat-card {
-  position: relative;
+.sec-head.center .blur-heading {
+  justify-content: center;
+}
+.feat-stack {
+  max-width: 700px;
+  margin: 0 auto;
+}
+/* 卡片内容：图标 / 标题 / 说明，居中排布。
+   min-width: 0 是必需的：flex 子项默认 min-width:auto，长中文段会把卡片撑破。 */
+.feat-card-inner {
   display: flex;
   flex-direction: column;
-  width: 100%;
-  min-height: 172px;
-  border-radius: 18px;
-  /* 玻璃边缘的位移会把内容推出圆角，裁掉才不会在卡片外露出彩边 */
-  overflow: hidden;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  text-align: center;
 }
-/* GlassSurface 铺满整张卡；内部由自己决定 padding */
-.feat-glass {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  border-radius: inherit;
-}
-/* 镜面高光层：透明底（tint 0 / blur 0），玻璃交给下面的 GlassSurface */
-.feat-btn {
-  position: relative;
-  z-index: 1;
-  flex: 1;
-  width: 100%;
-  padding: 26px 26px 28px;
-  border-radius: 18px;
-  background: transparent;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  box-shadow: none;
-}
-.feat-btn:active {
-  transform: none;
-}
-/* 组件里 .sb-content 是 block，会连带把里面的行内元素也变成块级；
-   这里显式声明，保证「图标 / 标题 / 说明」三行是自己控制的。
-   min-width: 0 是必需的：flex 子项默认 min-width:auto，长中文段会把卡片撑破
-   （实测 1000px 视口下卡片内容溢出 20px）。 */
 .feat-icon {
   display: block;
   min-width: 0;
-  font-size: 24px;
+  font-size: 26px;
   line-height: 1;
   color: var(--color-accent);
-  margin-bottom: 2px;
 }
 .feat-title {
   display: block;
   min-width: 0;
-  font-size: 19px;
-  font-weight: 700;
+  margin: 2px 0 0;
+  font-size: 22px;
+  font-weight: 800;
   color: var(--color-text);
   letter-spacing: -0.01em;
   line-height: 1.3;
@@ -959,14 +818,10 @@ const sampleEdges: EvidenceEdge[] = [
   min-width: 0;
   margin: 0;
   color: var(--color-body);
-  font-size: 15.5px;
-  line-height: 1.9;
+  font-size: 16px;
+  line-height: 1.85;
   font-weight: 400;
   overflow-wrap: anywhere;
-}
-/* 卡片内容也是 flex 子项，同样要能收缩 */
-.feat-btn > :deep(.sb-content) {
-  min-width: 0;
 }
 
 /* ── 星图 ── */
@@ -1098,7 +953,13 @@ const sampleEdges: EvidenceEdge[] = [
 @media (max-width: 900px) {
   .flip-wrap {
     grid-template-columns: 1fr;
-    gap: 28px;
+  }
+  /* 窄屏卡片要放得下四条错开菜单，纵向拉高一点（但别拉成一整屏空白） */
+  .flipcard {
+    height: 368px;
+  }
+  .face-content {
+    padding: 26px 24px 28px;
   }
   .nav {
     padding: 14px 20px;
@@ -1119,10 +980,13 @@ const sampleEdges: EvidenceEdge[] = [
     padding-left: 20px;
     padding-right: 20px;
   }
-  .keyword-strip,
-  .warp-band {
+  .keyword-strip {
     padding-left: 20px;
     padding-right: 20px;
+  }
+  /* 堆栈卡片在小屏上不再收窄，跟着内容走 */
+  .feat-stack {
+    max-width: none;
   }
   .foot {
     padding: 22px 20px;
