@@ -203,13 +203,21 @@ const sampleEdges: EvidenceEdge[] = [
     <section id="principle" class="section">
       <div class="sec-head reveal">
         <div class="eyebrow">Why DataMind</div>
-        <FoldText text="答案要经得起追问——看看我们" split-by="word" hinge="top" font-size="clamp(1.8rem, 4vw, 3rem)"
-                  font-weight="800" color="#0b1220" :duration="0.6" :stagger="0.06" trigger="scroll" />
+        <!-- 「看看我们」从 FoldText 里拆出来单独一段，好让它单独上蓝色；
+             前半句仍走 FoldText 的翻折入场。 -->
+        <div class="principle-title">
+          <FoldText text="答案要经得起追问——" split-by="word" hinge="top" font-size="clamp(1.8rem, 4vw, 3rem)"
+                    font-weight="800" color="#0b1220" :duration="0.6" :stagger="0.06" trigger="scroll" />
+          <span class="principle-see-us">看看我们</span>
+        </div>
+        <!-- 原来是翻牌卡正面的「AI 黑箱？」，卡片去掉后这段按用户要求留在这里当小字注解。 -->
+        <p class="principle-note">
+          AI 黑箱？一句话进去，一个答案出来——中间发生了什么，没人知道。
+        </p>
       </div>
 
       <!-- 用户最后的意见：不要框（翻牌卡整块去掉），四行字直接铺在页面上，
-           而且要更大。所以这一节只剩「标题 + 四行错开菜单」。
-           原来翻牌卡正面的「AI 黑箱？一句话进去…」随卡片一起去掉。 -->
+           而且要更大。所以这一节只剩「标题 + 小字注解 + 四行错开菜单」。 -->
       <div class="claims-band reveal">
         <StaggeredMenu :items="claims" accent-color="#2563eb"
                        font-size="clamp(1.9rem, 4.2vw, 3.4rem)" :delay="0.2" />
@@ -687,6 +695,27 @@ const sampleEdges: EvidenceEdge[] = [
    已按用户要求删掉，这一节只剩标题 + 一张翻牌卡。
    卡片比原来大：背面要塞下错开菜单的四行大字（原来四行是 15px 的清单）。 */
 /* 四行错开菜单：不要卡片框（用户要求），直接铺在页面上、字号更大。 */
+/* 标题行：「答案要经得起追问——」走 FoldText，「看看我们」单独取蓝色。 */
+.principle-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 4px;
+}
+.principle-see-us {
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--color-accent);
+}
+/* 原翻牌卡正面的「AI 黑箱？」：卡片去掉后按用户要求做标题下的小字注解。 */
+.principle-note {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--color-muted);
+}
+
 .claims-band {
   margin: 28px 0 0;
   max-width: 980px;
