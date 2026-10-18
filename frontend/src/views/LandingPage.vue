@@ -269,7 +269,7 @@ const steps = [
         <div class="eyebrow">Wiki &amp; Reasoning</div>
         <BlurText text="图谱看结构，卡片看依据" :delay="90" animate-by="words" class="blur-heading" />
         <p class="sec-note">
-          一张是当前授权范围图：节点是词条，连线是词条之间已保存的关系。另一张是其中一条词条的推理卡片：主张、概览、证据引用与原文出处都写在同一张卡上。
+          一张是当前授权范围图：节点是词条，连线是词条之间已保存的关系。另一张是一次问答的证据轨迹：一条答案主张、它的来源文档与检索片段，连线表示推导关系。
         </p>
       </div>
 
@@ -286,10 +286,10 @@ const steps = [
         <figure class="showcase-item">
           <div class="showcase-frame">
             <img class="showcase-img" :src="reasoningCardShot"
-                 alt="推理卡片：词条正文、概览与证据引用"
+                 alt="证据轨迹：答案主张、来源文档与检索片段连成的推理链"
                  loading="lazy" decoding="async" />
           </div>
-          <figcaption class="showcase-cap">推理卡片 · 词条正文与证据引用</figcaption>
+          <figcaption class="showcase-cap">证据轨迹 · 推理链与检索片段</figcaption>
         </figure>
       </div>
     </section>
