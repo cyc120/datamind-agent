@@ -853,7 +853,7 @@ const sampleEdges: EvidenceEdge[] = [
   display: block;
   min-width: 0;
   margin: 0;
-  font-size: clamp(2rem, 3.4vw, 3rem);
+  font-size: clamp(2.6rem, 4.6vw, 4.2rem);
   font-weight: 800;
   color: var(--color-text);
   letter-spacing: -0.02em;
@@ -865,7 +865,7 @@ const sampleEdges: EvidenceEdge[] = [
   min-width: 0;
   margin: 0;
   color: var(--color-body);
-  font-size: clamp(1.05rem, 1.5vw, 1.35rem);
+  font-size: clamp(1.3rem, 2vw, 1.75rem);
   line-height: 1.8;
   font-weight: 400;
   overflow-wrap: anywhere;
