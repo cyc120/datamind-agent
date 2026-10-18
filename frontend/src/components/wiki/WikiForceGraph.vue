@@ -248,10 +248,17 @@ interface LegendItem {
 function colorForNode(node: WikiGraphNode | undefined): string {
   if (!node) return '#9ca3af'
   if (!colors.value.enabled) {
-    // 初始：**深浅灰**（契约 §9.2）。连接多的用深一档、孤立节点用浅一档，
-    // 只是为了在灰阶里还能看出结构，不承载任何语义。
+    // 初始：**深浅蓝阶**（用户要求：都蓝色但深深浅浅，比原来的灰阶好看）。
+    // 按"已加载连接数"分四档：连得越多越深、孤立节点最浅。
+    //
+    // 这仍然**不是语义色**（不表示好坏、不代表结论），只是让结构在视觉上分层；
+    // 状态依旧靠文字标识（契约 §9.2：状态标识是文字、不是颜色）。
+    // 最浅一档取 blue-200 而不是更浅 —— 节点只有几像素，浅到看不见就白画了。
     const degree = positionById.value.get(nodeIdOf(node))?.degree ?? 0
-    return degree > 0 ? '#c3cad6' : '#e5e7eb'
+    if (degree === 0) return '#bfdbfe'
+    if (degree <= 2) return '#93c5fd'
+    if (degree <= 5) return '#60a5fa'
+    return '#3b82f6'
   }
   if (colors.value.by === 'type' && isEntryNode(node)) {
     return TYPE_COLORS[String(node.entry?.entry_type)] ?? '#9ca3af'
