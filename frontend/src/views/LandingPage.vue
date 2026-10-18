@@ -2,7 +2,6 @@
 import { useRouter } from 'vue-router'
 import FoldText from '../components/bits/FoldText/FoldText.vue'
 import BlurText from '../components/bits/BlurText/BlurText.vue'
-import FallingText from '../components/bits/FallingText/FallingText.vue'
 import RotatingText from '../components/bits/RotatingText/RotatingText.vue'
 import TrueFocus from '../components/bits/TrueFocus/TrueFocus.vue'
 import PixelSwap from '../components/bits/PixelSwap/PixelSwap.vue'
@@ -11,9 +10,11 @@ import StaggeredMenu from '../components/bits/StaggeredMenu/StaggeredMenu.vue'
 import ScrollStack from '../components/bits/ScrollStack/ScrollStack.vue'
 import ScrollStackItem from '../components/bits/ScrollStack/ScrollStackItem.vue'
 import FlipCard from '../components/FlipCard.vue'
-import ConstellationGraph from '../components/stargraph/ConstellationGraph.vue'
+/* 「知识图谱 / 推理卡片」那两张展示图：从本机跑着的应用里截的真图，
+   放在 assets/landing/ 下，由 Vite 按 import 生成带 hash 的 URL。 */
+import wikiGraphShot from '../assets/landing/wiki-graph.webp'
+import reasoningCardShot from '../assets/landing/reasoning-card.webp'
 import { useReveal } from '../composables/useReveal'
-import type { EvidenceNode, EvidenceEdge } from '../api/types'
 
 const router = useRouter()
 useReveal()
@@ -109,31 +110,24 @@ const features = [
   },
 ]
 
+/**
+ * 「一条问题，四步落地」四张翻转卡的背面文案。
+ *
+ * d 现在是一行一句的短语数组，不再是带标点的整句：用户要求卡面里不要任何标点、
+ * 文字居中、一行一行分开。数组就是把原来那句按标点（，、/）断开的，
+ * **文字本身与改造前逐字一致**——只删了标点、换成换行，没有改写、增删任何一个词。
+ * 例：`解析意图，判断该查库、查文档，还是两者联合` → 四行。
+ */
 const steps = [
-  { n: '01', t: '理解问题', d: '解析意图，判断该查库、查文档，还是两者联合' },
-  { n: '02', t: '路由与规划', d: '选择数据源，生成带预算的执行计划' },
-  { n: '03', t: '执行与验证', d: '生成 SQL / 检索片段，逐条校验数字与引用' },
-  { n: '04', t: '答案 + 证据', d: '输出可点击的证据图，冲突如实呈现' },
+  { n: '01', t: '理解问题', d: ['解析意图', '判断该查库', '查文档', '还是两者联合'] },
+  { n: '02', t: '路由与规划', d: ['选择数据源', '生成带预算的执行计划'] },
+  { n: '03', t: '执行与验证', d: ['生成 SQL', '检索片段', '逐条校验数字与引用'] },
+  { n: '04', t: '答案 + 证据', d: ['输出可点击的证据图', '冲突如实呈现'] },
 ]
 
-// 落地页静态演示用的证据星图（非交互，仅展示）
-const sampleNodes: EvidenceNode[] = [
-  { evidence_id: 'n-claim', run_id: 'demo', node_type: 'Claim', ref_key: 'claim-1', payload: { text: '答案主张' } },
-  { evidence_id: 'n-verify', run_id: 'demo', node_type: 'VerificationCheck', ref_key: 'v-1', payload: { measurement_id: 'M-1', compliance: 'ok' } },
-  { evidence_id: 'n-row', run_id: 'demo', node_type: 'SQLRow', ref_key: 'row-1', payload: { columns: ['产品', '销售额'], rows: [['产品 A', '¥82.1万']] } },
-  { evidence_id: 'n-chunk', run_id: 'demo', node_type: 'Chunk', ref_key: 'chunk-1', payload: { text: '……' } },
-  { evidence_id: 'n-sql', run_id: 'demo', node_type: 'SQLQuery', ref_key: 'sql-1', payload: { sql: 'SELECT … ORDER BY … LIMIT 3' } },
-  { evidence_id: 'n-doc', run_id: 'demo', node_type: 'Document', ref_key: 'doc-1', payload: { title: '产品分析报告' } },
-  { evidence_id: 'n-conflict', run_id: 'demo', node_type: 'ConflictRecord', ref_key: 'conf-1', payload: { conflict_type: 'value_conflict' } },
-]
-const sampleEdges: EvidenceEdge[] = [
-  { src_evidence_id: 'n-verify', dst_evidence_id: 'n-row', edge_type: 'derived_from' },
-  { src_evidence_id: 'n-row', dst_evidence_id: 'n-sql', edge_type: 'derived_from' },
-  { src_evidence_id: 'n-claim', dst_evidence_id: 'n-verify', edge_type: 'supports' },
-  { src_evidence_id: 'n-claim', dst_evidence_id: 'n-chunk', edge_type: 'supports' },
-  { src_evidence_id: 'n-chunk', dst_evidence_id: 'n-doc', edge_type: 'retrieved_from' },
-  { src_evidence_id: 'n-conflict', dst_evidence_id: 'n-verify', edge_type: 'derived_from' },
-]
+// 原来这里有一份「证据星图」的静态演示数据（sampleNodes / sampleEdges）。这一节改成
+// 两张真实截图后，画布与那份数据一并删掉（ConstellationGraph.vue 组件本身保留，
+// 工作台的问答页仍在用它）。
 </script>
 
 <template>
@@ -269,33 +263,34 @@ const sampleEdges: EvidenceEdge[] = [
         </ScrollStack>
       </div>
     </section>
-    <!-- 星图：落差文字做小字说明 -->
+    <!-- 知识图谱与推理卡片：两张真实截图并排（这一节不再有画布，也不再讲星图） -->
     <section id="starmap" class="section">
       <div class="sec-head">
-        <div class="eyebrow">Evidence Constellation</div>
-        <BlurText text="每一颗星，都是一条证据" :delay="90" animate-by="words" class="blur-heading" />
-        <p class="sec-note">答案是中心的恒星，证据是环绕的星点，连线是推导关系。</p>
+        <div class="eyebrow">Wiki &amp; Reasoning</div>
+        <BlurText text="图谱看结构，卡片看依据" :delay="90" animate-by="words" class="blur-heading" />
+        <p class="sec-note">
+          一张是当前授权范围图：节点是词条，连线是词条之间已保存的关系。另一张是其中一条词条的推理卡片：主张、概览、证据引用与原文出处都写在同一张卡上。
+        </p>
       </div>
 
-      <div class="starmap glass reveal">
-        <!-- 画布比例贴近内容的实际包围盒：径向布局按较短边铺开，
-             太高会在上下留出大片空白 -->
-        <ConstellationGraph :nodes="sampleNodes" :edges="sampleEdges" :interactive="false" :width="620" :height="430" />
-      </div>
+      <div class="showcase reveal">
+        <figure class="showcase-item">
+          <div class="showcase-frame">
+            <img class="showcase-img" :src="wikiGraphShot"
+                 alt="知识图谱：当前授权范围内的词条与它们之间的关系"
+                 loading="lazy" decoding="async" />
+          </div>
+          <figcaption class="showcase-cap">知识图谱 · 当前授权范围图</figcaption>
+        </figure>
 
-      <!-- 落差文字：小字 -->
-      <div class="falling-slot reveal">
-        <FallingText text="点开任意一颗星，回到证据诞生的地方" trigger="scroll" :gravity="0.9"
-                     :mouse-constraint-stiffness="0.12" font-size="1.05rem" />
-      </div>
-
-      <div class="legend reveal">
-        <span><i style="background:#d97706"></i>答案主张</span>
-        <span><i style="background:#0284c7"></i>SQL</span>
-        <span><i style="background:#4f46e5"></i>检索片段</span>
-        <span><i style="background:#7c3aed"></i>文档</span>
-        <span><i style="background:#16a34a"></i>核验</span>
-        <span><i style="background:#e11d48"></i>冲突</span>
+        <figure class="showcase-item">
+          <div class="showcase-frame">
+            <img class="showcase-img" :src="reasoningCardShot"
+                 alt="推理卡片：词条正文、概览与证据引用"
+                 loading="lazy" decoding="async" />
+          </div>
+          <figcaption class="showcase-cap">推理卡片 · 词条正文与证据引用</figcaption>
+        </figure>
       </div>
     </section>
 
@@ -320,7 +315,10 @@ const sampleEdges: EvidenceEdge[] = [
           <template #back>
             <div class="how-card-back">
               <span class="how-card-n">{{ s.n }}</span>
-              <p class="how-card-desc">{{ s.d }}</p>
+              <!-- 一句一行：s.d 是按标点断开后的短语数组，逐条占一行、居中 -->
+              <p class="how-card-desc">
+                <span v-for="line in s.d" :key="line" class="how-card-line">{{ line }}</span>
+              </p>
             </div>
           </template>
         </FlipCard>
@@ -899,47 +897,48 @@ const sampleEdges: EvidenceEdge[] = [
   overflow-wrap: anywhere;
 }
 
-/* ── 星图 ── */
-.starmap {
-  border-radius: 16px;
-  padding: 18px;
-  /* 与下方落差文字块同宽，避免右边缘参差 */
-  max-width: 760px;
+/* ── 知识图谱 / 推理卡片 ──
+   这一节现在是两张真实截图：画布、落差文字与图例都已删掉，不再有 canvas。
+   两个框等宽并排、整体居中；窄屏（≤900）上下堆叠。
+   类名统一 showcase- 前缀：Tailwind v4 的工具类里没有这个前缀，不会出现
+   「只声明了部分属性、其余被工具类接管」的撞名（本仓库已出过三次）。 */
+.showcase {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  align-items: start;
+}
+.showcase-item {
   margin: 0;
-  display: flex;
-  justify-content: center;
+  min-width: 0;
+}
+/* 框：白底 + 细描边 + 很轻的投影 + 圆角，和这一页其它白卡是同一套语言。
+   aspect-ratio 取两张截图自身的比例（934×576），图片按 cover 铺满，不拉伸不变形。 */
+.showcase-frame {
+  border: 1px solid var(--color-line);
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.07);
   overflow: hidden;
+  aspect-ratio: 934 / 576;
 }
-/* 落差文字需要父容器给定高度 */
-.falling-slot {
-  height: 190px;
-  margin: 20px 0 0;
-  max-width: 760px;
-  border-radius: 14px;
-  border: 1px dashed var(--color-line);
-  background: var(--color-ink);
-  overflow: hidden;
-  color: var(--color-body);
+.showcase-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
 }
-.legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 20px;
-  justify-content: flex-start;
-  margin-top: 20px;
-  color: var(--color-body);
-  font-size: 14.5px;
+.showcase-cap {
+  margin: 12px 2px 0;
+  color: var(--color-muted);
+  font-size: 14px;
 }
-.legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-}
-.legend i {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  display: inline-block;
+@media (max-width: 900px) {
+  .showcase {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
 }
 
 /* ── 流程（How it works） ──
@@ -1001,14 +1000,21 @@ const sampleEdges: EvidenceEdge[] = [
   color: var(--color-accent);
   text-wrap: balance;
 }
-/* 背面：小序号 + 描述文案；文案字号也不小，行高放到 1.7，三四行正好填满卡面 */
+/* 背面：小序号 + 一行一句的说明文案。
+   用户要求「卡面里不要标点、文字居中、一行一行分开」，所以 s.d 是按原标点断开的
+   短语数组，这里逐条 display:block 排成独立的行，序号与正文一起居中。
+   四行（01 那张）必须装进 clamp(228px, 17.5vw, 258px) 的卡面：字号比原来收一号、
+   行高收到 1.55；.flip-face 是 overflow: hidden，装不下会被直接裁掉，
+   所以字号不能只按「看起来够大」定（1440 下四行 134px + 序号 26px，卡内高 212px）。 */
 .how-card-back {
   width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: center;
   gap: 8px;
-  text-align: left;
+  text-align: center;
 }
 .how-card-n {
   font-size: 13px;
@@ -1019,11 +1025,16 @@ const sampleEdges: EvidenceEdge[] = [
 }
 .how-card-desc {
   margin: 0;
-  font-size: clamp(1.15rem, 1.95vw, 1.8rem);
+  font-size: clamp(1.02rem, 1.5vw, 1.35rem);
   font-weight: 500;
-  line-height: 1.7;
+  line-height: 1.55;
   letter-spacing: 0.005em;
   color: #0a1f5c;
+}
+/* 一句一行：短语自己绝不折行，否则 01 那张的四行会被挤成五六行 */
+.how-card-line {
+  display: block;
+  white-space: nowrap;
 }
 /* 窄屏列数变少、卡片变宽，卡面别再那么高，否则字和框差得太远 */
 @media (max-width: 900px) {
@@ -1035,11 +1046,10 @@ const sampleEdges: EvidenceEdge[] = [
   .steps .how-card {
     height: 168px;
   }
-  /* 单列时卡面很宽、文案只有一两行，字号再抬一档才不至于空
-     （标题不用管：它按 cqw 取，卡片变宽就跟着变宽） */
+  /* 单列时卡面变宽、但高度只有 168px：字号收一档，四行 + 序号才装得下 */
   .how-card-desc {
-    font-size: 1.3rem;
-    line-height: 1.6;
+    font-size: 1rem;
+    line-height: 1.5;
   }
 }
 /* 翻面是动画：系统开了「减少动态效果」就直接切面，不走 3D 过渡 */
