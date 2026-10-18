@@ -772,7 +772,11 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
             </button>
           </nav>
 
-          <div class="wk-cols" :class="{ 'is-split': !narrow }">
+          <!-- 始终单栏：原来宽屏会走 .is-split 变成「46% | 1fr」两栏，
+               结果左边关系图被压窄、图谱设置的浮层还压在图上，
+               右边的「三套状态」「词条正文」又都是长文字，挤在半宽里很挤。
+               这页各块内容量都不小，单栏依次排列更好读。（与尺寸页、图谱页同样的处理。） -->
+          <div class="wk-cols">
             <!-- ══ 关系图一步 ══ -->
             <section v-if="showGraph" class="wk-col" data-testid="graph-column">
               <h2 class="wk-col-title">当前授权范围图</h2>
