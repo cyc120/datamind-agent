@@ -653,7 +653,8 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
             ← 关系图
           </a>
           <h1 class="wk-title" data-testid="wiki-entry-title">
-            {{ entry?.title || (loading ? '词条读取中…' : '词条') }}
+            {{ entry?.title || (loading ? '词条读取中…' : '词条')
+            }}<span v-if="entry?.demo_data" class="wk-title-note" data-testid="demo-badge">（数据合成）</span>
           </h1>
         </div>
 
@@ -1285,6 +1286,12 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   font-size: 15px;
   font-weight: 600;
   color: var(--color-accent);
+}
+/* 标题后的「（数据合成）」括注：只在本词条 demo_data 为真时出现，颜色跟标题同色但降一档字重与字号，不抢标题。 */
+.wk-title-note {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--color-body);
 }
 
 /* 状态标签：原来紧贴标题，现在单独一行。 */
