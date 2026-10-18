@@ -1069,24 +1069,17 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
                     tabindex="-1"
                   >
                     <p class="wk-list-head">
-                      <span class="wk-mono">{{ item.evidence_ref_id }}</span>
+                      <span class="wk-ev-kind">{{ text(item.source_kind) }}</span>
                       <span class="wk-list-sub">
-                        {{ text(item.source_kind) }} · 有效性 {{ statusLabel(item.source_validity) }} ·
-                        {{ item.supported ? '已支持' : '未支持（原值保留）' }}
+                        有效性 {{ statusLabel(item.source_validity) }}
+                        <template v-if="!item.supported"> · 未支持的类型（原值保留）</template>
                       </span>
                     </p>
                     <p class="wk-note">
                       来源 <span class="wk-mono">{{ text(item.source_ref) }}</span>
-                      <template v-if="item.source_version">
-                        · 版本 <span class="wk-mono">{{ prettyJson(item.source_version) }}</span>
-                      </template>
                     </p>
                     <p class="wk-note">定位：{{ locatorText(item) }}</p>
-                    <p class="wk-note">
-                      内容摘要 <span class="wk-mono">{{ shortHash(item.content_sha256) || '（字段缺失）' }}</span>
-                      · 指纹 <span class="wk-mono">{{ shortHash(item.fingerprint) || '（字段缺失）' }}</span>
-                    </p>
-                    <blockquote v-if="item.excerpt" class="wk-quote">{{ item.excerpt }}</blockquote>
+                    <div v-if="item.excerpt" class="wk-quote wk-md wk-md-quote" v-html="renderMarkdown(item.excerpt)" />
                     <p v-else-if="item.excerpt_withheld" class="wk-note">
                       原文被授权策略扣留：<strong>有</strong>原文，但这一次不给。这与「没有可引用原文」是两件事。
                     </p>
@@ -1096,6 +1089,23 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
                     <p v-if="item.provenance_incomplete?.applies" class="wk-warn wk-warn-tight">
                       这条引用的溯源不完整，详见下方「声明与提示」里的说明。
                     </p>
+                    <!-- 技术信息收进折叠区：引用 id、来源版本 JSON、两个哈希。
+                         这些是给排查用的，不该占在正文主流程里（原来是一大坨 JSON 摊在句子里）。 -->
+                    <details class="wk-ev-tech">
+                      <summary>技术信息（引用 id / 来源版本 / 哈希）</summary>
+                      <dl class="wk-kv">
+                        <dt>引用 id</dt>
+                        <dd class="wk-mono">{{ item.evidence_ref_id }}</dd>
+                        <dt>内容摘要</dt>
+                        <dd class="wk-mono">{{ item.content_sha256 || '（字段缺失）' }}</dd>
+                        <dt>指纹</dt>
+                        <dd class="wk-mono">{{ item.fingerprint || '（字段缺失）' }}</dd>
+                        <template v-if="item.source_version">
+                          <dt>来源版本</dt>
+                          <dd class="wk-mono">{{ prettyJson(item.source_version) }}</dd>
+                        </template>
+                      </dl>
+                    </details>
                   </li>
                 </ul>
               </section>
@@ -1913,6 +1923,32 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   font-size: 12.5px;
   font-weight: 400;
   color: var(--color-text);
+}
+
+/* 证据条目：种类标签压小、技术信息折叠区。 */
+.wk-ev-kind {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-accent);
+}
+.wk-ev-tech {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--color-body);
+}
+.wk-ev-tech > summary {
+  cursor: pointer;
+  color: var(--color-accent);
+}
+.wk-ev-tech .wk-kv {
+  margin-top: 6px;
+  word-break: break-all;
+}
+/* 引用原文用 Markdown 渲染后，外边距由这里接管（原来是 <blockquote> 的默认缩进）。 */
+.wk-md-quote {
+  margin: 6px 0 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--color-line);
 }
 
 .wk-quote {
