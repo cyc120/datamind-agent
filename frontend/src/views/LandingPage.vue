@@ -78,16 +78,19 @@ const claims = [
 const features = [
   {
     icon: '◉',
+    bg: '#e8f1ff',
     title: '可解释',
     desc: '答案不是终点。从自然语言到 SQL、检索、验证的完整推理链路，全程可回放。',
   },
   {
     icon: '⌖',
+    bg: '#cfe0ff',
     title: '可溯源',
     desc: '每条证据都定位到原文页码、数据库行、字段。点开星点，回到它诞生的地方。',
   },
   {
     icon: '✦',
+    bg: '#b3ccff',
     title: '跨源多跳',
     desc: '结构化数据库与非结构化文档自动路由、联合核验，冲突来源并陈、保留双方原值。',
   },
@@ -241,10 +244,13 @@ const sampleEdges: EvidenceEdge[] = [
              两者一起决定「钉住 → 叠成一摞」要滚多长。 -->
         <ScrollStack class="feat-stack" :item-distance="112" :item-stack-distance="42"
                      :base-scale="0.87" :item-scale="0.02" :blur-amount="0.5">
-          <ScrollStackItem v-for="f in features" :key="f.title">
+          <ScrollStackItem v-for="f in features" :key="f.title" :style="{ '--feat-bg': f.bg }">
             <div class="feat-card-inner">
-              <span class="feat-icon" aria-hidden="true">{{ f.icon }}</span>
-              <h3 class="feat-title">{{ f.title }}</h3>
+              <!-- 左列：图标 + 大标题成一组；右列：描述。两列才不会各占一格。 -->
+              <div class="feat-lead">
+                <span class="feat-icon" aria-hidden="true">{{ f.icon }}</span>
+                <h3 class="feat-title">{{ f.title }}</h3>
+              </div>
               <p class="feat-desc">{{ f.desc }}</p>
             </div>
           </ScrollStackItem>
@@ -795,20 +801,47 @@ const sampleEdges: EvidenceEdge[] = [
 .sec-head.center .blur-heading {
   justify-content: center;
 }
+/* 卡片放大到 4:3（横 4 纵 3），容器也跟着放宽。 */
 .feat-stack {
-  max-width: 700px;
+  max-width: 940px;
   margin: 0 auto;
+}
+/* 卡片本体由 ScrollStackItem 提供，这里覆盖它的几何与底色：
+   4:3 比例、底色取调用方给的 --feat-bg（三张由浅到深的蓝）。 */
+.feat-stack :deep(.ss-card) {
+  aspect-ratio: 4 / 3;
+  min-height: 0;
+  padding: clamp(28px, 4vw, 56px);
+  background: var(--feat-bg, #ffffff);
+  border-color: rgba(37, 99, 235, 0.14);
 }
 /* 卡片内容：图标 / 标题 / 说明，居中排布。
    min-width: 0 是必需的：flex 子项默认 min-width:auto，长中文段会把卡片撑破。 */
+/* 大标题放左、描述放右：两列。窄屏自动堆成上下。 */
 .feat-card-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 0.42fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(16px, 3vw, 40px);
+  min-width: 0;
+  height: 100%;
+  text-align: left;
+}
+@media (max-width: 720px) {
+  .feat-card-inner {
+    grid-template-columns: minmax(0, 1fr);
+    align-content: center;
+    gap: 10px;
+  }
+}
+/* 左列那一组：图标在上、标题在下，整体在列内垂直居中。 */
+.feat-lead {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
-  text-align: center;
 }
+
 .feat-icon {
   display: block;
   min-width: 0;
