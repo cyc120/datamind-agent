@@ -32,6 +32,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import SideNav from '../components/SideNav.vue'
 import WikiForceGraph from '../components/wiki/WikiForceGraph.vue'
+import { renderMarkdown } from '../components/wiki/markdown'
 import { wikiEntryExportUrl, wikiEntryGraph, wikiEntryProvenance } from '../api/client'
 import type {
   WikiAssertion,
@@ -343,6 +344,12 @@ let loadToken = 0
 
 const entry = computed<WikiEntry | null>(() => detail.value?.entry ?? null)
 const revision = computed<WikiRevision | null>(() => detail.value?.revision ?? null)
+/* 正文：`body_markdown` 是**服务端模板生成的 Markdown**，不是 HTML。
+   以前这里直接把它塞进 <pre>，于是 `#` / `>` / 反引号 / 表格的 `|---|` 全裸着，
+   还带着等宽字体——看着像代码而不是文档。现在交给 `components/wiki/markdown.ts`
+   渲染：那个模块先把源文本**全部转义**再补标签，所以 `v-html` 拿到的是本仓库自己
+   写出来的标签（为什么不用 marked 见该文件头部的 WHY）。 */
+const bodyHtml = computed(() => renderMarkdown(revision.value?.body_markdown))
 const headRevisionId = computed(() => entry.value?.head_revision_id ?? '')
 /** 读的是不是历史版本：只看"请求的版本 vs 词条头"，**不**把当前状态贴到历史版本上（§5.5）。
  *  词条还没有发布头时（`head_revision_id` 为空）不能叫"历史版本" —— 那时只是"指定版本"，否则
@@ -844,7 +851,13 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
                 </p>
 
                 <template v-else>
-                  <pre class="wk-md" data-testid="body-markdown">{{ revision.body_markdown || '（本版本正文为空字符串）' }}</pre>
+                  <!-- 渲染后的正文。`data-testid` 留在容器上（渲染前后同一个测试点）；
+                       样式在下方 `.wk-md`（标题蓝色加粗、正文黑色、行距 1.75、表格有边框、
+                       行内 code 等宽浅底）。 -->
+                  <div v-if="bodyHtml" class="wk-md" data-testid="body-markdown" v-html="bodyHtml"></div>
+                  <p v-else class="wk-note" data-testid="body-markdown">
+                    （本版本正文为空字符串）
+                  </p>
 
                   <dl class="wk-kv">
                     <dt>revision_id</dt><dd class="wk-mono" data-testid="revision-id">{{ revision.revision_id }}</dd>
@@ -1679,21 +1692,144 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   word-break: break-word;
 }
 
-/* 正文按原文呈现：不渲染 Markdown（不引依赖、也不做 HTML 注入），保留换行 */
+/* 正文：渲染后的 Markdown（`components/wiki/markdown.ts` 产出的受控 HTML）。
+   原来是 <pre> + 等宽字体 —— 那让 `#`、`>`、反引号、`|---|` 全裸着，看着像代码。
+   现在按本站的排版走：标题蓝色加粗、正文黑色、行距 1.75、表格有边框、
+   行内 code 用等宽浅底。不再用等宽字体、不再 white-space: pre-wrap，
+   也不再加 max-height 内部滚动（一份文档应该有文档的样子，而不是一个代码框）。
+
+   **所有后代选择器都要走 `:deep()`**：这个 <style> 是 scoped，而 scoped 的实现是给
+   模板里的元素加 `data-v-…` 属性；`v-html` 注入的节点**不带**那个属性，于是
+   `.wk-md h3` 会被编译成 `.wk-md h3[data-v-…]` 而一条都匹配不上 —— 实测第一版就是
+   这样：文字换行对了，但标题不蓝、表格没边框、列表没圆点。`:deep()` 让后代不受
+   scope 约束，而容器 `.wk-md` 本身仍然受（不会外溢到别处）。 */
 .wk-md {
+  margin: 0 0 2px;
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.75;
+  word-break: break-word;
+}
+
+.wk-md :deep(h3),
+.wk-md :deep(h4),
+.wk-md :deep(h5) {
+  margin: 18px 0 8px;
+  color: var(--color-accent);
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.wk-md :deep(> :first-child) {
+  margin-top: 0;
+}
+
+.wk-md :deep(h3) {
+  font-size: 17px;
+}
+
+.wk-md :deep(h4) {
+  font-size: 15px;
+}
+
+.wk-md :deep(h5) {
+  font-size: 14px;
+}
+
+.wk-md :deep(p) {
+  margin: 0 0 10px;
+  color: var(--color-text);
+  line-height: 1.75;
+}
+
+.wk-md :deep(ul),
+.wk-md :deep(ol) {
+  margin: 0 0 10px;
+  padding-left: 22px;
+}
+
+.wk-md :deep(ul) {
+  list-style: disc;
+}
+
+.wk-md :deep(ol) {
+  list-style: decimal;
+}
+
+.wk-md :deep(li) {
+  margin: 2px 0;
+  color: var(--color-text);
+  line-height: 1.75;
+}
+
+/* 列表项里的嵌套块（正文把表格挂在证据项下面）。 */
+.wk-md :deep(.wkm-li-child > :first-child) {
+  margin-top: 6px;
+}
+
+.wk-md :deep(.wkm-li-child > :last-child) {
+  margin-bottom: 0;
+}
+
+.wk-md :deep(blockquote) {
+  margin: 0 0 12px;
+  padding: 2px 0 2px 12px;
+  border-left: 2px solid var(--color-line);
+  color: var(--color-muted);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+.wk-md :deep(blockquote p) {
   margin: 0;
-  max-height: 420px;
-  overflow: auto;
-  padding: 10px 12px;
+  color: var(--color-muted);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+.wk-md :deep(code) {
+  padding: 0 4px;
   border: 1px solid var(--color-line);
-  border-radius: 12px;
+  border-radius: 4px;
   background: var(--color-ink);
   color: var(--color-text);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+}
+
+.wk-md :deep(table) {
+  margin: 4px 0 12px;
+  border-collapse: collapse;
+  border: 1px solid var(--color-line);
   font-size: 13px;
-  line-height: 1.75;
-  white-space: pre-wrap;
-  word-break: break-word;
+}
+
+.wk-md :deep(th),
+.wk-md :deep(td) {
+  padding: 5px 12px;
+  border: 1px solid var(--color-line);
+  text-align: left;
+  vertical-align: top;
+  line-height: 1.7;
+}
+
+.wk-md :deep(thead th) {
+  background: var(--color-ink);
+  color: var(--color-text);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.wk-md :deep(strong) {
+  font-weight: 700;
+}
+
+/* 正文里的引用编号 [1]（与下方 citations 是同一套编号）：只上色，不做成链接，
+   因为它不是锚点（hash 路由下锚点会跳到不存在的路由，本页已经踩过）。 */
+.wk-md :deep(.wkm-marker) {
+  color: var(--color-accent);
+  font-variant-numeric: tabular-nums;
 }
 
 .wk-cite-list {

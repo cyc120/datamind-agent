@@ -1,4 +1,4 @@
-"""后端枚举 → 中文措辞的唯一映射（主张句子与词条标题都从这里取词）。
+"""后端枚举 → 中文措辞的唯一映射（主张句子、词条标题与词条正文都从这里取词）。
 
 WHY 需要这个模块
 ----------------
@@ -58,6 +58,47 @@ RESOLUTION_STATUS_ZH = {
     'unresolved': '未消解',
 }
 
+# ---------------------------------------------------------------- 词条正文用到的词表
+
+#: ``wiki_entries.entry_type``（四类词条，`WIKI_DOMAIN.md` §2）。与 ``WikiEntryPage.vue``
+#: 的 ``ENTRY_TYPE_LABEL`` 逐字一致 —— 同一条词条在正文与列表页不能说两种话。
+ENTRY_TYPE_ZH = {
+    'business_entity': '业务实体',
+    'metric': '指标',
+    'norm': '规范',
+    'conclusion': '分析结论',
+}
+
+#: ``wiki_entries.confirmation``（业务键的人工确认）。``pending`` 不等于"已确认"，
+#: 所以两个取值各自有一句话，不能合并成「已处理」这种和稀泥的说法。
+CONFIRMATION_ZH = {
+    'pending': '待人工确认',
+    'confirmed': '已确认',
+}
+
+#: ``evidence_nodes.node_type``：正文里的"这是哪一类证据"。
+#:
+#: 键同时收**库里真实的 raw 值**（``Chunk`` / ``Claim`` …，实测 2760 行全是这九种）与
+#: ``wiki_projection.NODE_TYPE_NORMALIZATION`` 认的闭集写法（``doc_block`` …），
+#: 因为正文拿到的是 ``evidence_ref['raw_node_type']``，两种拼写都可能出现。
+#: 未收录的类型原样露出（纪律 1）：编一个"未知类型"会让读者以为我们见过它。
+NODE_TYPE_ZH = {
+    'Claim': '主张', 'Chunk': '文档片段', 'Document': '文档', 'DocumentFact': '文档事实',
+    'VerificationCheck': '核验记录', 'ConflictRecord': '冲突记录',
+    'AuthorityRule': '权威规则', 'SQLQuery': '查询语句', 'SQLRow': '查询结果行',
+    'claim': '主张', 'doc_block': '文档片段', 'document': '文档',
+    'document_fact': '文档事实', 'measurement': '测量记录', 'verification_check': '核验记录',
+    'conflict_record': '冲突记录', 'authority_rule': '权威规则', 'spec_clause': '规范条款',
+    'sql_query': '查询语句', 'sql_row': '查询结果行',
+}
+
+#: 正文会点名的关系类型。本版能落库的只有 ``restates``（``wiki_build`` 模块头 WHY 5），
+#: 其余类型在正文里原样保留 —— 中文取自 ``WikiForceGraph.vue`` 的 ``RELATION_TYPE_ZH``，
+#: 不另立一套说法。
+RELATION_TYPE_ZH = {
+    'restates': '同一主张',
+}
+
 #: 主张句子（``industrial_claim_text()``）里的枚举词表：这句话只有「工艺范围核验 + 来源比较」
 #: 两个槽，所以 ``agreement`` 的 ``unresolved`` 覆盖 ``resolution_status`` 的 —— 在这句话里它
 #: 一定是来源比较的结论。``resolved_by_authority`` 只可能来自裁决，单独补进来免得出英文。
@@ -88,6 +129,22 @@ def agreement_label(value) -> str:
 
 def resolution_label(value) -> str:
     return label(value, RESOLUTION_STATUS_ZH)
+
+
+def entry_type_label(value) -> str:
+    return label(value, ENTRY_TYPE_ZH)
+
+
+def confirmation_label(value) -> str:
+    return label(value, CONFIRMATION_ZH)
+
+
+def node_type_label(value) -> str:
+    return label(value, NODE_TYPE_ZH)
+
+
+def relation_type_label(value) -> str:
+    return label(value, RELATION_TYPE_ZH)
 
 
 #: 正文里的"词"：ASCII 字母开头的标识符（``out_of_range`` / ``M001`` / ``A102`` 都算一个词）。

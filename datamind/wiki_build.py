@@ -62,9 +62,16 @@ import hashlib
 import os
 import re
 import socket
+import unicodedata
 from typing import Callable, Iterable
 
 from . import wiki
+from .display_labels import (
+    confirmation_label,
+    entry_type_label,
+    node_type_label,
+    relation_type_label,
+)
 from .wiki_projection import (
     ProjectionError,
     allocate_id,
@@ -88,6 +95,11 @@ TEMPLATE_VERSION = 'wiki-build-template-v1'
 BODY_EVIDENCE_LINES = 50
 #: 正文体量上限（021:209 是 262144 字节）。按字符再收紧一档，留出多字节余量。
 BODY_MAX_CHARS = 20000
+#: 一张表格摘录最多展开多少行（不含表头）。超出的部分如实写成「另有 N 行」，
+#: 不静默截断 —— 完整的原文在版本 `citations` 指向的来源证据里。
+TABLE_PREVIEW_ROWS = 40
+#: 摘录短到这个长度就以「类型：原文」写在一行里，否则单独成引用块（否则一句话被拉成十几行）。
+INLINE_EXCERPT_CHARS = 120
 
 #: 一个运行的节点读取上限。实时库里 `evidence_nodes` 共 2760 行、单个运行最多几十行，
 #: 所以这个上限只在异常数据上生效，并且**如实报告**被截断（不静默丢弃）。
@@ -288,70 +300,346 @@ class DraftPlan:
                 for index, ref in enumerate(self.evidence_refs)}
 
 
-def body_markdown(plan: DraftPlan) -> str:
-    """模板正文（`generation_method='template'`）。
+# ---------------------------------------------------------------------------
+# 1b. 正文渲染：写给人的技术文档（`body_markdown()` 的积木）
+# ---------------------------------------------------------------------------
+#
+# WHY 单独一节：旧模板把计划里的字段逐个 dump 到页面上，读者看到的是
+#   「词条类型：`conclusion`」「身份确认：`confirmed`」
+#   「业务键：`default` / `conclusion` / `run-… claim-…`」
+#   「投影：支持节点 7 / 不支持节点 0；证据引用 7（其中 run-scoped 1）」
+# 而且 `_clip()` 会把空白折叠掉，`Chunk` 原文里的表格于是被拍成一行
+#   「|项目|参数| |---|---| |蓝牙版本|5.3| …」
+# —— 那不是"技术文档"，那是把内部数据结构原样贴到读者面前。这一节只做四件事：
+#
+#   1. 枚举一律走 `display_labels`（唯一词表）：`conclusion` → 「分析结论」、
+#      `confirmed` → 「已确认」、`Chunk` → 「文档片段」。未收录的取值**原样保留**。
+#   2. 内部 id 只在段末的小字注释（引用块）里出现；句子用章节、页码、条数说事。
+#   3. 原文里的 GitHub 表格按列渲染成**多行**表格（表头 + 分隔行 + 每行一行）。
+#   4. 没有引文的证据合并成一句，不每条各占一行。
 
-    只写能从计划里读到的真话：运行号、节点数、词条身份、按节点分组的证据。
-    证据一行一条（最多 `BODY_EVIDENCE_LINES` 行），每条带 `[n]` marker —— marker 指向 revisions
-    的 `citations`，所以正文编号与引用编号是同一套。没有可投影的证据时正文如实写"没有"，
-    而不是编一段摘要（`WIKI_API.md` §11.4 的纪律）。
+#: 单元格里不能出现的字符：`|` 会切断列，换行会切断行。
+_CELL_BREAK = re.compile(r'[|\r\n]+')
+#: GitHub 表格的分隔行：`|---|---|` / `|:--|--:|`。
+_TABLE_SEPARATOR = re.compile(r'\|[\s:|-]+\|')
+
+
+def _display_width(text) -> int:
+    """按东亚字符宽度算长度（全角字符算两列）。**只**用来对齐源码里的竖线。"""
+    return sum(2 if unicodedata.east_asian_width(char) in ('W', 'F') else 1
+               for char in str(text))
+
+
+def _pad(text, width) -> str:
+    return str(text) + ' ' * max(0, width - _display_width(text))
+
+
+def _cell_text(value) -> str:
+    return _CELL_BREAK.sub(' ', str('' if value is None else value)).strip()
+
+
+def markdown_table(rows, *, limit=TABLE_PREVIEW_ROWS) -> list:
+    """二维单元格 → **多行** Markdown 表格（表头 + 分隔行 + 每行一行）。
+
+    WHY 不是一行：`|项目|参数| |---|---| |蓝牙版本|5.3| …` 这种"表格"要读者自己数竖线
+    才知道哪格属于哪列。真正的表格是每行一行、竖线按列对齐（列宽按东亚字符宽度补齐，
+    所以源码里也是齐的）。超过 `limit` 行时补一句「另有 N 行」，不静默丢行。
     """
-    entry = plan.entry
+    cleaned = [[_cell_text(cell) for cell in row] for row in list(rows or ()) if row]
+    if not cleaned:
+        return []
+    width = max(len(row) for row in cleaned)
+    cleaned = [row + [''] * (width - len(row)) for row in cleaned]
+    head, body = cleaned[0], cleaned[1:limit + 1]
+    widths = [max(2, *(_display_width(row[index]) for row in cleaned[:limit + 1]))
+              for index in range(width)]
+    lines = ['| ' + ' | '.join(_pad(cell, widths[index]) for index, cell in enumerate(head)) + ' |',
+             '| ' + ' | '.join('-' * widths[index] for index in range(width)) + ' |']
+    lines.extend('| ' + ' | '.join(_pad(cell, widths[index]) for index, cell in enumerate(row)) + ' |'
+                 for row in body)
+    dropped = len(cleaned) - 1 - len(body)
+    if dropped > 0:
+        lines.extend(['', '（表里另有 %d 行没有展开；完整原文见本页下方「来源证据」。）' % dropped])
+    return lines
+
+
+def _table_cells(line) -> list:
+    return [_cell_text(cell) for cell in str(line).strip().strip('|').split('|')]
+
+
+def excerpt_table(excerpt):
+    """原文如果是一张 GitHub 表格就返回它的单元格，否则 None。
+
+    `Chunk` 的 `excerpt` **保留换行**（`wiki_projection.excerpt_of()` 原样返回引文），
+    所以结构看得见 —— 旧实现先 `_clip()` 折叠空白，表格就是这样被拍成一行的。
+    列数对不上的"表格"一律按普通文字处理：硬凑成表格等于编一个原文没有的结构。
+    """
+    lines = [str(line).strip() for line in str(excerpt or '').replace('\r\n', '\n').split('\n')]
+    lines = [line for line in lines if line]
+    if len(lines) < 3:
+        return None
+    if not all(line.startswith('|') and line.endswith('|') for line in lines):
+        return None
+    if '-' not in lines[1] or not _TABLE_SEPARATOR.fullmatch(lines[1]):
+        return None
+    rows = [_table_cells(lines[0])]
+    for line in lines[2:]:
+        cells = _table_cells(line)
+        if len(cells) != len(rows[0]):
+            return None
+        rows.append(cells)
+    return rows
+
+
+def evidence_where(ref) -> str:
+    """一条证据的出处短句（章节 · 页码），**不含任何 id**。
+
+    id 在段末的小字注释里；这句话回答的是"这份证据取自哪一段"。
+    """
+    locator = ref.get('locator') if isinstance(ref.get('locator'), dict) else {}
+    parts = []
+    section = locator.get('section_path')
+    if isinstance(section, (list, tuple)) and len(section) > 1:
+        tail = [str(part).strip() for part in section[1:] if str(part).strip()]
+        if tail:
+            parts.append('「%s」' % ' · '.join(tail))
+    page = locator.get('page_no')
+    if page in (None, ''):
+        page = locator.get('page_start')
+    if page not in (None, ''):
+        parts.append('第 %s 页' % page)
+    return '，'.join(parts)
+
+
+def compact_markers(markers) -> str:
+    """`['[1]', '[2]', '[3]', '[5]']` → `[1]–[3]、[5]`（连续编号收成区间，少占地方）。"""
+    numbers = sorted({int(digits) for digits in
+                      (re.sub(r'\D', '', str(marker)) for marker in markers) if digits})
+    if not numbers:
+        return ''
+    groups, low, high = [], numbers[0], numbers[0]
+    for number in numbers[1:]:
+        if number == high + 1:
+            high = number
+            continue
+        groups.append((low, high))
+        low = high = number
+    groups.append((low, high))
+    return '、'.join('[%d]' % start if start == end else '[%d]–[%d]' % (start, end)
+                    for start, end in groups)
+
+
+def source_label(ref) -> str:
+    """出处的一句话：文档 / 运行 / 数据源 + id。只用在段末小字注释里。"""
+    source_ref = str(ref.get('source_ref') or '').strip()
+    if not source_ref:
+        return '出处未标注'
+    if source_ref.startswith('doc-'):
+        return '文档 %s' % source_ref
+    if source_ref.startswith('run-'):
+        return '运行 %s' % source_ref
+    if ref.get('source_kind') == 'sql':
+        return '数据源 %s' % source_ref
+    return source_ref
+
+
+def mode_text(mode) -> str:
+    """生成模式的一句话（`template+polish` 目前与 `template` 走同一条模板路径，见模块头 WHY 6）。"""
+    value = str(mode or 'template')
+    if value == 'template':
+        return '只套模板，没有模型参与'
+    if value == 'template+polish':
+        return '按 template+polish 提交，但本版仍然只套模板，没有模型参与'
+    return '模式取值为 %s（未登记的取值，原样保留）' % value
+
+
+def _number(value) -> str:
+    return '（字段缺失）' if value is None else str(value)
+
+
+def _evidence_item(marker, ref, excerpt) -> list:
+    """一条**有原文**的证据：一行「编号 + 类型 + 出处」，表格摘录单独成表。"""
+    head = '%s %s' % (marker, node_type_label(ref.get('raw_node_type')))
+    where = evidence_where(ref)
+    if where:
+        head += '（%s）' % where
+    rows = excerpt_table(excerpt)
+    if rows:
+        table = markdown_table(rows)
+        return ['- %s，原文是一张表：' % head, ''] + [
+            ('  ' + line) if line else '' for line in table]
+    text = ' '.join(str(excerpt).split())
+    if len(text) <= INLINE_EXCERPT_CHARS and '\n' not in str(excerpt).strip():
+        return ['- %s：%s' % (head, text)]
+    quote = [line.strip() for line in str(excerpt).replace('\r\n', '\n').split('\n') if line.strip()]
+    return ['- %s，原文：' % head, ''] + ['  > %s' % line for line in quote]
+
+
+def _bare_evidence_sentence(bare) -> str:
+    """没有引文的证据合并成一句（旧实现每条一行「（无引文）」，四条就重复四遍）。"""
+    groups = {}
+    for marker, ref in bare:
+        groups.setdefault(source_label(ref), []).append(marker)
+    if len(groups) == 1:
+        where = '、'.join(groups)
+    else:
+        where = '、'.join('%s（%d 条）' % (source, len(group))
+                          for source, group in sorted(groups.items()))
+    return '另有 %d 条证据（%s）没有可引用的原文，只记录了出处：%s。' % (
+        len(bare), compact_markers([marker for marker, _ in bare]), where)
+
+
+def _evidence_footnote(quoted) -> list:
+    """段末小字注释：引用编号与出处 id 挪到这里，句子留给读者读。"""
+    if not quoted:
+        return []
+    groups = {}
+    for marker, ref, _ in quoted:
+        groups.setdefault(source_label(ref), []).append(marker)
+    pairs = '、'.join('%s → %s' % (compact_markers(group), source)
+                      for source, group in sorted(groups.items()))
+    lines = ['> 编号与本版本 `citations` 里的引用一一对应；每条引用的 id、定位与'
+             '完整原文，见本页下方「来源证据」。']
+    if pairs:
+        lines.append('> 出处：%s。' % pairs)
+    return lines
+
+
+def _evidence_lines(plan) -> tuple:
+    """`## 证据` 一节 → `(清单行, 段末小字注释)`。"""
     markers = plan.citations_by_evidence_id
-    business_key = entry.get('business_key') or {}
-    lines = ['# %s' % entry.get('title') or '# （无标题）', '']
-    lines.append('> 由运行 `%s` 模板生成（`%s`，mode=`%s`）。草稿：核验状态与实体绑定均未人工确认。'
-                 % (plan.run_id, TEMPLATE_VERSION, plan.mode))
-    lines.append('')
-    lines.append('- 词条类型：`%s`' % entry.get('entry_type'))
-    lines.append('- 业务键：`%s` / `%s` / `%s`'
-                 % (business_key.get('namespace'), business_key.get('entry_type'),
-                    _clip(business_key.get('key_part'), 120)))
-    lines.append('- 身份确认：`%s`' % entry.get('confirmation'))
-    lines.append('- 证据引用：%d 条（运行 %d 个节点，本次整理 %d 个）'
-                 % (len(plan.evidence_refs), plan.node_count, plan.selected_node_count))
+    refs = list(plan.evidence_refs)
+    if not refs:
+        return ['本次整理没有可投影的证据引用：这个运行没有任何可用证据节点。'], []
+    quoted, bare = [], []
+    for ref in refs[:BODY_EVIDENCE_LINES]:
+        marker = markers.get(str(ref.get('evidence_id')), '[-]')
+        excerpt = str(ref.get('excerpt') or '')
+        if excerpt.strip():
+            quoted.append((marker, ref, excerpt))
+        else:
+            bare.append((marker, ref))
+    lines = []
+    for marker, ref, excerpt in quoted:
+        lines.extend(_evidence_item(marker, ref, excerpt))
+    if bare:
+        lines.append('- %s' % _bare_evidence_sentence(bare))
+    overflow = len(refs) - BODY_EVIDENCE_LINES
+    if overflow > 0:
+        lines.append('- 另有 %d 条证据引用（编号在本版本的 `citations` 里，正文不再展开）。'
+                     % overflow)
+    return lines, _evidence_footnote(quoted)
+
+
+def _overview_lines(plan) -> list:
+    """概览：这是什么、身份确认到哪一步、有多少证据、引用能不能换运行复用。"""
+    entry = plan.entry or {}
+    summary = plan.summary or {}
+    lines = ['- 词条类型：%s，身份绑定：%s'
+             % (entry_type_label(entry.get('entry_type')),
+                confirmation_label(entry.get('confirmation'))),
+             '- 证据：%d 条证据引用，来自这个运行的 %d 个证据节点（本次整理了 %d 个）'
+             % (len(plan.evidence_refs), plan.node_count, plan.selected_node_count)]
     if plan.truncated:
-        lines.append('- **注意**：本运行的节点数超过读取上限 %d，本次只整理了前 %d 个。'
+        lines.append('- **注意**：本运行的证据节点超过读取上限 %d 个，本次只整理了前 %d 个。'
                      % (NODES_READ_LIMIT, plan.selected_node_count))
-    if plan.summary:
-        lines.append('- 投影：支持节点 %s / 不支持节点 %s；证据引用 %s（其中 run-scoped %s）'
-                     % (plan.summary.get('supported_node_count'),
-                        plan.summary.get('unsupported_node_count'),
-                        plan.summary.get('evidence_ref_count'),
-                        plan.summary.get('run_scoped_evidence_ref_count')))
+    supported = summary.get('supported_node_count')
+    unsupported = summary.get('unsupported_node_count')
+    if supported is not None or unsupported is not None:
+        line = '- 节点识别：%s 个证据节点能被词条识别' % _number(supported)
+        if unsupported:
+            unknown = summary.get('unsupported_node_types') or []
+            line += '；另有 %s 个节点的类型不在词表里%s，原值保留、不参与关系推导' % (
+                _number(unsupported),
+                '（%s）' % '、'.join(str(value) for value in unknown) if unknown else '')
+        else:
+            line += '，没有类型未知的节点'
+        lines.append(line)
+    scoped = summary.get('run_scoped_evidence_ref_count')
+    if scoped:
+        lines.append('- 引用复用：其中 %s 条只在本次运行内有效 —— 没有源文件快照，'
+                     '换一次运行不能复用同一条引用。' % _number(scoped))
+    return lines
+
+
+def _boundary_lines(plan) -> list:
+    """本次没有落库的部分：如实说清楚，不静默省略（这仍然是"还没做的账"）。"""
+    stored = {}
+    for relation in plan.derived_relations or ():
+        stored[relation['relation_type']] = stored.get(relation['relation_type'], 0) + 1
+    lines = ['## 本次未落库的部分', '']
+    if stored:
+        lines.append('- 词条之间的关系：本版本落库 %d 条（%s）。'
+                     % (sum(stored.values()),
+                        '、'.join('%s %d 条' % (relation_type_label(name), count)
+                                 for name, count in sorted(stored.items()))))
+    else:
+        lines.append('- 词条之间的关系：本版本一条也没有落库。')
+    deferred = plan.deferred_derivations.get('deferred') or 0
+    lines.append('- 派生计划：%s'
+                 % ('%d 条仍然只是计划 —— 它们的另一半端点要挂到主张上，本版不铸造主张端点。'
+                    % deferred if deferred else '本版没有等待铸造的派生关系（不铸造主张端点）。'))
+    lines.append('- 主张条目（`wiki_assertions`）：本版只写了词条端点与证据引用，'
+                 '没有写主张条目。')
+    lines.append('- 已经投影出来、但本次没有交付的候选词条类型：%s'
+                 % ('、'.join(entry_type_label(value) for value in plan.skipped_candidate_entry_types)
+                    or '无'))
+    return lines
+
+
+def _trace_lines(plan, business_key) -> list:
+    """段末的追溯信息：内部标识符只在这里出现（读者要追溯时才看）。"""
+    lines = ['', '## 生成与追溯', '']
+    lines.append('- 生成：模板 `%s`（mode=`%s`）—— %s；来源运行 `%s`。'
+                 % (TEMPLATE_VERSION, plan.mode, mode_text(plan.mode), plan.run_id))
+    if business_key:
+        key_part = ' · '.join(str(business_key.get('key_part') or '').split('\x1f'))
+        lines.append('- 业务键：`%s` / `%s` / `%s`（依次是命名空间、词条类型、实体键；'
+                     '实体键由运行号与主张 id 拼成）。'
+                     % (_clip(business_key.get('namespace'), 60),
+                        _clip(business_key.get('entry_type'), 60), _clip(key_part, 120)))
+    return lines
+
+
+def body_markdown(plan: DraftPlan) -> str:
+    """模板正文（`generation_method='template'`）：一份写给人的技术文档。
+
+    只写能从计划里读到的真话，但换掉旧模板的三种写法（旧输出可以逐条对照）：
+
+    1. **不裸露枚举**：`conclusion` / `confirmed` / `Chunk` 走 `display_labels` 的中文
+       措辞；未收录的取值原样保留（不猜、不兜底成"未知"）。
+    2. **不堆内部 id**：`run-…` / `claim-…` / `doc-…` 只在段末的小字注释（引用块）里
+       出现一次；句子用章节、页码、条数这些读者能核对的东西说事。
+    3. **不把表格拍成一行**：`Chunk` 原文里的 GitHub 表格按列渲染成多行表格；
+       没有引文的证据合并成一句，不各占一行。
+
+    **事实一条不删**：证据条数、节点数、模板版本、生成模式、身份确认、支持/不支持
+    计数、没有落库的部分，全部还在，只是换了说法。
+
+    证据一行一条（最多 `BODY_EVIDENCE_LINES` 条），每条带 `[n]` marker —— marker 指向
+    revisions 的 `citations`，所以正文编号与引用编号是同一套。没有可投影的证据时正文
+    如实写"没有"，而不是编一段摘要（`WIKI_API.md` §11.4 的纪律）。
+    """
+    entry = plan.entry or {}
+    lines = ['# %s' % (entry.get('title') or '（无标题）'), '']
+    lines.append('本页正文由整理模板自动生成，还没有经过人工复核：主张的核验状态与实体绑定都待确认。')
+    lines.extend(['', '## 概览', ''])
+    lines.extend(_overview_lines(plan))
     lines.append('')
     if entry.get('summary'):
-        lines.extend(['## 摘要', '', entry['summary'], ''])
+        lines.extend(['## 摘要', '', _clip(entry['summary'], 2000), ''])
+    items, footnote = _evidence_lines(plan)
     lines.extend(['## 证据', ''])
-    if not plan.evidence_refs:
-        lines.append('本次整理没有可投影的证据引用（`evidence_nodes` 里该运行没有可用节点）。')
-    for index, ref in enumerate(plan.evidence_refs):
-        if index >= BODY_EVIDENCE_LINES:
-            break
-        excerpt = _clip(ref['excerpt'], 160) if ref['excerpt'] else '（无引文）'
-        lines.append('- %s `%s` %s —— %s'
-                     % (markers.get(str(ref['evidence_id']), '[-]'), ref['raw_node_type'], excerpt,
-                        _clip(ref['source_ref'], 80)))
-    if len(plan.evidence_refs) > BODY_EVIDENCE_LINES:
-        lines.append('- …另有 %d 条证据引用（见本版本的 `citations`）'
-                     % (len(plan.evidence_refs) - BODY_EVIDENCE_LINES))
-    lines.extend(['', '## 未落库的部分（如实记录）', ''])
-    stored = {}
-    for relation in plan.derived_relations:
-        stored[relation['relation_type']] = stored.get(relation['relation_type'], 0) + 1
-    lines.append('- Wiki 派生关系：本版本落库 %d 条（%s）。'
-                 % (len(plan.derived_relations),
-                    '、'.join('`%s` %d 条' % (name, count)
-                             for name, count in sorted(stored.items())) or '无'))
-    lines.append('- 派生计划 %d 条仍然只是计划：它们的另一半端点是 `wassert-` 主张 id，'
-                 '本版不铸造主张端点。'
-                 % (plan.deferred_derivations.get('deferred') or 0))
-    lines.append('- 主张（`wiki_assertions`）：本版只铸造词条端点与证据引用，未铸造主张端点。')
-    lines.append('- 已投影但未交付的候选词条类型：%s'
-                 % (', '.join('`%s`' % value for value in plan.skipped_candidate_entry_types)
-                    or '无'))
+    lines.extend(items)
+    lines.append('')
+    if footnote:
+        lines.extend(footnote)
+        lines.append('')
+    lines.extend(_boundary_lines(plan))
+    lines.extend(_trace_lines(plan, entry.get('business_key') or {}))
     body = '\n'.join(lines)
     return body if len(body) <= BODY_MAX_CHARS else body[:BODY_MAX_CHARS - 1] + '…'
+
 
 
 def plan_for_job(job, nodes, *, edges=()) -> DraftPlan:
@@ -958,16 +1246,20 @@ def builder_for(dsn, identity=None, *, request_id=None) -> Callable:
 
 __all__ = ['BODY_EVIDENCE_LINES', 'BODY_MAX_CHARS', 'DEMO_OWNER_ID', 'DETAIL_MAX', 'DraftPlan',
            'ERROR_CODE_ALIASES', 'ERROR_IDENTITY_UNAVAILABLE', 'ERROR_INTERRUPTED', 'EXIT_ERROR',
-           'EXIT_OK', 'EXIT_USAGE', 'FATAL_CLAIM_CODES', 'IdentityUnavailable',
-           'LOOPBACK_API_URL', 'LOOPBACK_PROBE_TIMEOUT', 'NODES_READ_LIMIT', 'TEMPLATE_VERSION',
+           'EXIT_OK', 'EXIT_USAGE', 'FATAL_CLAIM_CODES', 'INLINE_EXCERPT_CHARS',
+           'IdentityUnavailable',
+           'LOOPBACK_API_URL', 'LOOPBACK_PROBE_TIMEOUT', 'NODES_READ_LIMIT',
+           'TABLE_PREVIEW_ROWS', 'TEMPLATE_VERSION',
            'TERMINAL_STATES', 'app_dsn', 'append_plan', 'body_markdown', 'build_draft',
            'builder_for', 'claim_error_verdict', 'claim_id_of', 'claim_ids_for',
-           'current_session_token', 'demo_identity_ok', 'draft_relations', 'evidence_params',
+           'compact_markers', 'current_session_token', 'demo_identity_ok', 'draft_relations',
+           'evidence_params', 'evidence_where', 'excerpt_table',
            'failure_detail',
            'fingerprint', 'host_is_loopback', 'is_terminal', 'job_identity', 'jsonable',
            'live_session_identity', 'load_conclusion_claims', 'load_edges', 'load_nodes',
-           'load_run', 'node_selected',
+           'load_run', 'markdown_table', 'mode_text', 'node_selected',
            'normalize_error_code',
            'ordered_unique', 'persist_draft', 'plan_for_job', 'provenance_link_id', 'queued_sql',
-           'resolve_identity', 'resolved_citations', 'result_of', 'revision_base_for', 'safe_slug',
+           'resolve_identity', 'resolved_citations', 'result_of', 'revision_base_for',
+           'safe_slug', 'source_label',
            'select_candidate', 'select_queued', 'selection_filter', 'token_hash', 'worker_name']
