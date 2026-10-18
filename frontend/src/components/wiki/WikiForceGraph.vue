@@ -1832,6 +1832,10 @@ defineExpose({
   border-left-color: var(--color-accent);
   background: rgba(37, 99, 235, 0.07);
 }
+/* 选中项底色变浅蓝之后，里面的橙色状态标识会显得脏 —— 跟着一起换蓝。 */
+.wg-catalog-btn-active .wg-catalog-marks {
+  color: var(--color-accent);
+}
 
 .wg-catalog-title {
   font-size: 14px;
