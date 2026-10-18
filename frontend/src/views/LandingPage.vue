@@ -248,7 +248,6 @@ const sampleEdges: EvidenceEdge[] = [
             <div class="feat-card-inner">
               <!-- 左列：图标 + 大标题成一组；右列：描述。两列才不会各占一格。 -->
               <div class="feat-lead">
-                <span class="feat-icon" aria-hidden="true">{{ f.icon }}</span>
                 <h3 class="feat-title">{{ f.title }}</h3>
               </div>
               <p class="feat-desc">{{ f.desc }}</p>
@@ -849,23 +848,25 @@ const sampleEdges: EvidenceEdge[] = [
   line-height: 1;
   color: var(--color-accent);
 }
+/* 标题放大：22px -> clamp(2rem, 3.4vw, 3rem)，跟 4:3 的大卡片相称。 */
 .feat-title {
   display: block;
   min-width: 0;
-  margin: 2px 0 0;
-  font-size: 22px;
+  margin: 0;
+  font-size: clamp(2rem, 3.4vw, 3rem);
   font-weight: 800;
   color: var(--color-text);
-  letter-spacing: -0.01em;
-  line-height: 1.3;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
 }
+/* 描述同步放大：16px -> clamp(1.05rem, 1.5vw, 1.35rem)。 */
 .feat-desc {
   display: block;
   min-width: 0;
   margin: 0;
   color: var(--color-body);
-  font-size: 16px;
-  line-height: 1.85;
+  font-size: clamp(1.05rem, 1.5vw, 1.35rem);
+  line-height: 1.8;
   font-weight: 400;
   overflow-wrap: anywhere;
 }
