@@ -204,7 +204,7 @@ const sampleEdges: EvidenceEdge[] = [
     <section id="principle" class="section">
       <div class="sec-head reveal">
         <div class="eyebrow">Why DataMind</div>
-        <FoldText text="答案要经得起追问" split-by="word" hinge="top" font-size="clamp(1.8rem, 4vw, 3rem)"
+        <FoldText text="答案要经得起追问——看看我们" split-by="word" hinge="top" font-size="clamp(1.8rem, 4vw, 3rem)"
                   font-weight="800" color="#0b1220" :duration="0.6" :stagger="0.06" trigger="scroll" />
       </div>
 
@@ -223,9 +223,8 @@ const sampleEdges: EvidenceEdge[] = [
           </template>
           <template #back>
             <div class="face-content back">
-              <div class="big light">看看我们</div>
-              <!-- 四条文案逐字未改，只换呈现：大号粗体 + 右上角 01–04 + 逐行错开升起。
-                   翻牌要 0.9s，所以入场排在 0.35s 之后，别让文字在看不见的背面演完。 -->
+              <!-- 「看看我们」已按用户要求移到区块标题后面
+                   （「答案要经得起追问——看看我们」），背面只留四行文案。 -->
               <StaggeredMenu :items="claims" accent-color="#2563eb"
                              font-size="clamp(1.45rem, 2.8vw, 2.5rem)" :delay="0.35" />
             </div>
