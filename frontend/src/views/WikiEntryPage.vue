@@ -253,10 +253,13 @@ const ENTRY_TYPE_LABEL: Record<string, string> = {
   conclusion: '分析结论',
 }
 
+/* 类型：只显示中文。原来会在后面补一个英文原值（分析结论（conclusion）），
+   但另外两行（词条 ID、分类）都没有英文，三行放一起格式不统一，所以去掉。
+   未收录的取值仍然原样露出并注明，不猜。 */
 function entryTypeText(value: unknown): string {
   if (value == null || value === '') return '（字段缺失）'
   const key = String(value)
-  return ENTRY_TYPE_LABEL[key] ? `${ENTRY_TYPE_LABEL[key]}（${key}）` : `${key}（未在词表中：原值保留）`
+  return ENTRY_TYPE_LABEL[key] ? ENTRY_TYPE_LABEL[key] : `${key}（未在词表中：原值保留）`
 }
 
 function statusLabel(value: unknown, fallback = '（字段缺失）'): string {
@@ -665,20 +668,21 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
           <span class="wk-tag" data-testid="history-badge">历史版本</span>
         </div>
 
-        <!-- 元信息改成「标签在上 / 取值在下」的三格，不再用 · 串成一行 -->
+        <!-- 三行，格式统一：都是纯文本、都不带英文括号。
+             原来：词条是 code 框、类型带（conclusion）、分类整个值是（未分类）—— 三行三种样子。 -->
         <p class="wk-sub" data-testid="wiki-entry-id">
           <span class="wk-sub-item">
             <span class="wk-sub-key">词条</span>
-            <code class="wk-code">{{ entryId }}</code>
+            <span class="wk-sub-val">{{ entryId }}</span>
           </span>
           <template v-if="entry">
             <span class="wk-sub-item">
               <span class="wk-sub-key">类型</span>
-              <span>{{ entryTypeText(entry.entry_type) }}</span>
+              <span class="wk-sub-val">{{ entryTypeText(entry.entry_type) }}</span>
             </span>
             <span class="wk-sub-item">
               <span class="wk-sub-key">分类</span>
-              <span>{{ text(entry.category, '（未分类）') }}</span>
+              <span class="wk-sub-val">{{ text(entry.category, '未分类') }}</span>
             </span>
           </template>
         </p>
@@ -1309,6 +1313,12 @@ const events = computed<WikiTraceEventSummary[]>(() => provenance.value?.events 
   font-size: 13px;
   font-weight: 600;
   color: var(--color-accent);
+}
+/* 三行取值统一成同一种样式：都是正文字体、黑色、可换行。原来词条那行是 code 框（浅底 + 等宽），另两行是纯文本。 */
+.wk-sub-val {
+  min-width: 0;
+  word-break: break-all;
+  font-variant-numeric: tabular-nums;
 }
 
 
