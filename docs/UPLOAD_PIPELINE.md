@@ -350,6 +350,9 @@ R05 的症状。
 - `adapter`：产生该结果的适配器名。取值来源优先级：`ParseResult.manifest.adapter`，
   否则按后缀取
   `dxf-native|measurement-json|pdf-native|docx-native|pptx-native|xlsx-native`。
+- `plugin`（本版新增）：声明该后缀的**插件名**，按注册表声明扫描而非启用状态查询，所以
+  插件停用后已有记录仍如实归因；没有声明时为 `null`。它来自声明，`adapter` 来自解析结果，
+  两者是不同字段（内置插件按适配器同名，通常取值相同）。
 - `blocks`：写入统一契约存储（`document_contract_blocks`）的块数。
 - `locators_written`：**已验证定位**的块数（当前等于 `blocks`，因为契约要求每个块都带
   合法 locator）。
@@ -621,9 +624,7 @@ python -m ingestion.upload_worker --watch --interval 5 --workers 2 --deadline 60
   该模式没有停止脚本，停止请 `kill -TERM "$(cat .cache/api/upload_worker.pid)"`。
 - `--sql-only`：不启动 worker（该部署没有上传管道）。
 - 手动：`.venv/bin/python -m ingestion.upload_worker --watch`。若任务停在 `queued` 且
-  `worker.alive=false`，先启动它。
-
-### `run_parse` 的建索引边界
+  `worker.alive=false`，先启动
 
 - 解析事务**提交之后**，`run_parse` 调用 `ingestion/upload_index.py::index_document` 建索引
   （切片 + 向量）。它**不在**解析事务内：Qdrant 无法与 PG 同事务，且嵌入调用不能持有该 job 的

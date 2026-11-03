@@ -83,7 +83,6 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
-import json
 import os
 import re
 import secrets
@@ -97,11 +96,14 @@ from fastapi import HTTPException
 import psycopg2
 from psycopg2.extras import Json, RealDictCursor
 
-from datamind import parse_contract, task_budget
+from datamind import task_budget
 from datamind.auth import lock_identity
 from datamind.knowledge import ROOT
+from datamind.plugin.invocation import invoke_plugin
+from datamind.plugin.manifest import PARSE_ADAPTER_UNSUPPORTED, ManifestError
 
 from . import contract_store
+from .plugins import default_context, ensure_loaded
 
 QUEUE_JOB_TYPE = 'upload_parse'
 ORIGIN = 'upload'
@@ -146,20 +148,7 @@ WORKER_HEARTBEAT_ENV = 'DATAMIND_UPLOAD_WORKER_HEARTBEAT_SECONDS'
 MIN_WORKER_ALIVE_SECONDS = 1.0
 MAX_WORKER_ALIVE_SECONDS = 3600.0
 
-#: Extension -> media type. `.dwg` is deliberately absent: it is reported with its own
-#: "no converter" code instead of the generic unsupported one.
-MEDIA_TYPES = {'.dxf': parse_contract.DXF_MEDIA_TYPE, '.json': 'application/json',
-               '.pdf': 'application/pdf',
-               '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-               '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-               '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}
-ADAPTERS = {'.dxf': 'dxf-native', '.json': 'measurement-json', '.pdf': 'pdf-native',
-            '.docx': 'docx-native', '.pptx': 'pptx-native', '.xlsx': 'xlsx-native'}
-#: The vector index state of an upload. These are **index** facts, a different thing from
-#: the derived `index_state` (retrievability) below:
-#:   * `embedded` — the parse wave wrote this document's chunks and Qdrant points;
-#:   * `failed`   — indexing was attempted and did not complete, so no index exists;
-#:   * `deferred` — there was nothing to index (no text, no chunks).
+
 VECTOR_INDEX = 'deferred'
 VECTOR_INDEX_NOTE = ('上传管道在解析波次内建立切片与向量（ingestion/upload_index.py），'
                      '与知识库摄取共用同一发布顺序协议；未建立时如实报告 deferred/failed。')
@@ -255,8 +244,51 @@ def job_id_for(upload_id):
     return 'job-' + upload_id[4:]
 
 
+def _manifest_for(suffix):
+    """The plugin declaring ``suffix``, enabled or not - a disabled one stays reportable.
+
+    The scan is over :meth:`ParserRegistry.list` rather than a lookup so a record already
+    stored under a since-disabled plugin keeps naming it instead of going blank.
+    """
+    for manifest in default_context().parser.list():
+        if suffix in manifest.extensions:
+            return manifest
+    return None
+
+
+def _media_type_for(suffix):
+    manifest = _manifest_for(suffix)
+    return manifest.media_types[0] if manifest is not None else None
+
+
+def _adapter_for(suffix):
+    manifest = _manifest_for(suffix)
+    return manifest.name if manifest is not None else None
+
+
+def _served_manifest(suffix):
+    """The enabled manifest serving ``suffix``, or the one 415 body every gate emits.
+
+    Admission (`target`), enqueue and the parse child all ask the same question, so the
+    refusal shape - including the ``plugin_disabled`` details - is defined once instead of
+    three times.
+    """
+    try:
+        return default_context().parser.lookup_by_extension(suffix)
+    except ManifestError as error:
+        if error.error_code == PARSE_ADAPTER_UNSUPPORTED:
+            fail('UNSUPPORTED_MEDIA_TYPE', 415, suffix=suffix or None,
+                 reason='plugin_disabled', plugin=error.details.get('plugin'))
+        fail('UNSUPPORTED_MEDIA_TYPE', 415, suffix=suffix or None)
+
+
 def target(filename):
-    """Validate the requested name and return its suffix, before any byte is read."""
+    """Validate the requested name and return its suffix, before any byte is read.
+
+    The suffix is an admission gate answered by the parser registry: an extension no
+    enabled plugin declares is refused here, while what the staged bytes really are is
+    still decided by signature sniffing at parse time (G3).
+    """
     if (not isinstance(filename, str) or not filename or len(filename) > 200
             or Path(filename).name != filename or '\\' in filename
             or any(ord(c) < 32 for c in filename)):
@@ -265,8 +297,10 @@ def target(filename):
     if suffix == '.dwg':
         # This repository ships no DWG converter; the frozen interface pins the exact body.
         fail(DWG_ERROR_CODE, 415)
-    if suffix not in MEDIA_TYPES:
-        fail('UNSUPPORTED_MEDIA_TYPE', 415, suffix=suffix or None)
+    # Config and discovery failures are startup errors and stay outside the routing try.
+    ensure_loaded()
+    _sync_parsers()
+    _served_manifest(suffix)
     return suffix
 
 
@@ -316,7 +350,10 @@ def enqueue(staged, provenance, dsn, identity):
       generation (`attempt+1` + a fresh token).
     """
     suffix = staged['suffix']
-    media_type = MEDIA_TYPES[suffix]
+    ensure_loaded()
+    # The suffix passed `target`; it can only have lost its plugin since then, and a
+    # disabled plugin must be refused here rather than queued into a failing parse.
+    media_type = _served_manifest(suffix).media_types[0]
     ids = identities(staged['source_sha256'])
     # `document_assets.object_uri` follows the repository-wide convention of an **absolute**
     # path (every other row, e.g. the knowledge base, stores an absolute path). The old
@@ -362,7 +399,7 @@ def _upload_meta(asset):
     ids = identities(asset['sha256'])
     suffix = '.' + str(asset.get('file_type') or '').lower()
     return {'upload_id': ids['upload_id'], 'job_id': ids['job_id'],
-            'filename': asset.get('title'), 'media_type': MEDIA_TYPES.get(suffix),
+            'filename': asset.get('title'), 'media_type': _media_type_for(suffix),
             'provenance': None, 'source_path': asset.get('object_uri'),
             'source_sha256': asset['sha256'], 'bytes': None}
 
@@ -459,12 +496,19 @@ def _item(job, asset, counts):
 
 
 def _analysis(job, asset):
-    """The stored parse analysis, or an honest "not parsed yet" placeholder."""
+    """The stored parse analysis, or an honest "not parsed yet" placeholder.
+
+    The placeholder mirrors the *current* stored shape, ``adapter``/``plugin`` pair
+    included, so a client reads one shape whether the upload was parsed or not. ``plugin``
+    is additive: analyses stored before it was recorded are returned as they are and may
+    lack the key.
+    """
     stored = (asset.get('quality_detail') or {}).get('analysis')
     if isinstance(stored, dict):
         return stored
     suffix = '.' + str(asset.get('file_type') or '').lower()
-    return {'parse_status': job['status'], 'adapter': ADAPTERS.get(suffix), 'blocks': 0,
+    adapter = _adapter_for(suffix)
+    return {'parse_status': job['status'], 'adapter': adapter, 'plugin': adapter, 'blocks': 0,
             'locators_written': 0, 'relations': 0, 'block_types': {},
             'unsupported_features': [], 'quality_findings': []}
 
@@ -654,7 +698,7 @@ def _claim(cur, upload_id=None):
             'claim_token': token, 'attempt': attempt,
             'source_path': asset['object_uri'], 'source_sha256': asset['sha256'],
             'filename': upload.get('filename') or asset['title'], 'suffix': suffix,
-            'media_type': upload.get('media_type') or MEDIA_TYPES.get(suffix),
+            'media_type': upload.get('media_type') or _media_type_for(suffix),
             'provenance': upload.get('provenance'),
             'upload': {key: upload[key] for key in
                        ('upload_id', 'job_id', 'filename', 'media_type', 'provenance',
@@ -693,6 +737,11 @@ def _record_wave_timeout(dsn, claim):
     table), so it survives a reclaim and is reset naturally when the upload is re-queued.
     It is a claim-dependent write: a generation that already lost the row increments
     nothing and reports `None` instead of overwriting the newer generation's metadata.
+
+    The same metadata names the plugin that owns the suffix (`upload['plugin']`), read from
+    the registry's declarations rather than from an enabled lookup: a wave that timed out
+    because a plugin was disabled mid-flight must still say which plugin it was, and the
+    manifest is the only record that survives the disable.
     """
     with psycopg2.connect(dsn) as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
         if not _lock_live_claim(cur, claim):
@@ -704,6 +753,7 @@ def _record_wave_timeout(dsn, claim):
         upload = dict(quality.get('upload') or {})
         attempts = int(upload.get('wave_timeouts') or 0) + 1
         upload['wave_timeouts'] = attempts
+        upload['plugin'] = _adapter_for(claim['suffix'])
         quality['upload'] = upload
         cur.execute('UPDATE document_assets SET quality_detail=%s WHERE document_id=%s',
                     (Json(quality), claim['document_id']))
@@ -1097,106 +1147,51 @@ def _staged_path(claim):
     return path
 
 
-def _parse_dxf(path, claim):
-    from . import cad_adapter
-    try:
-        result = cad_adapter.parse(path, document_id=claim['document_id'],
-                                   source_version=claim['source_sha256'],
-                                   provenance=claim['provenance'])
-    except HTTPException as error:
-        detail = error.detail if isinstance(error.detail, dict) else {}
-        # The adapter may not accept `provenance` after a future profile revision; the
-        # documented entry point stays `parse(path, document_id=, source_version=)`.
-        if (detail.get('details') or {}).get('reason') != 'handler_signature':
-            raise
-        result = cad_adapter.parse(path, document_id=claim['document_id'],
-                                   source_version=claim['source_sha256'])
-    payload = result.payload
-    layers = sorted({block['locator'].get('layer') for block in payload['blocks']
-                     if isinstance(block.get('locator'), dict)
-                     and block['locator'].get('locator_kind') == 'cad_entity'
-                     and block['locator'].get('layer')})
-    entities = sum(1 for block in payload['blocks'] if block['block_type'] != 'dimension')
-    dimensions = sum(1 for block in payload['blocks'] if block['block_type'] == 'dimension')
-    return result, {'layers': len(layers), 'layer_names': layers, 'entities': entities,
-                    'dimensions': dimensions}
+#: Extension -> parser entry point, derived from the parser registry. A plain dict because
+#: callers patch a single entry; `_sync_parsers` only fills missing keys, so a patched entry
+#: survives the mid-life re-sync in `run_parse`. The table supplies the callable only:
+#: whether a suffix is served at all is decided by a registry lookup on every dispatch, so an
+#: extension disabled after import is refused even though its stale entry is still here.
+PARSERS = {}
 
 
-def _parse_office(path, claim):
-    from . import office
-    result = office.parse(path, document_id=claim['document_id'],
-                          source_version=claim['source_sha256'])
-    return result, {}
+def _plugin_parser(manifest):
+    """A ``parse(path, claim)`` entry point for ``manifest``, loader resolved per call.
 
-
-def _parse_pdf(path, claim):
-    from . import ingest
-    blocks, page_count, detail = ingest.parse_pdf(path, claim['document_id'], include_quality=True)
-    import pymupdf
-    document = pymupdf.open(path)
-    try:
-        page_sizes = {index + 1: (float(page.rect.width), float(page.rect.height))
-                      for index, page in enumerate(document)}
-    finally:
-        document.close()
-    ingest._ensure_pdf_adapter()
-    result = parse_contract.dispatch('application/pdf', pdf_path=path,
-                                     doc_id=claim['document_id'], blocks=blocks,
-                                     page_sizes=page_sizes, detail=detail,
-                                     parser_version=ingest.PARSER_VERSION)
-    return result, {'pages': page_count}
-
-
-def _measurement_id(data):
-    """Read the measurement identity the JSON declares; the parser re-validates it."""
-    try:
-        raw = json.loads(data.decode('utf-8'))
-        first = raw['measurements'][0]
-        measurement_id, version = first['measurement_id'], raw['record_version']
-        if not isinstance(measurement_id, str) or isinstance(version, bool) \
-                or not isinstance(version, int):
-            raise ValueError('identity')
-        return measurement_id, version
-    except (ValueError, TypeError, KeyError, IndexError, UnicodeDecodeError,
-            json.JSONDecodeError):
-        fail('UPLOAD_MEASUREMENT_SOURCE_INVALID', 422)
-
-
-def _parse_json(path, claim):
-    """Measurement JSON: the existing parser, with the honest no-locator gap declared.
-
-    `cad_dimensions.measurement_from_bytes` is the parser behind the existing
-    `file_jobs` measurement target. A measurement record has no page/region geometry, so
-    the contract cannot carry a block-level locator for it; rather than inventing one,
-    the result declares `unsupported_features=['locator_unavailable']` exactly as the
-    OHR-Bench JSON branch of `ingestion/ingest.py` does. The record itself is validated,
-    not merely decoded.
+    Resolution stays inside the call because the loader is an import reference (G7) and
+    because a patched plugin function must be picked up by the next parse. The invocation
+    itself goes through ``invoke_plugin``, so every handler failure is attributed to this
+    plugin (``PARSE_ADAPTER_UNSUPPORTED`` with ``library_missing``/``handler_failed``)
+    instead of surfacing as whatever exception the third-party library raised. A resolution
+    failure keeps its own stable code (``PARSE_RESULT_INVALID``/``unresolvable_loader``)
+    instead of falling through to the generic parse-failed outcome.
     """
-    from datamind import cad_dimensions
-    data = path.read_bytes()
-    measurement_id, version = _measurement_id(data)
-    record = cad_dimensions.measurement_from_bytes(data, measurement_id, version,
-                                                   claim['provenance'])
-    payload = {
-        'classification': {'detected_media_type': MEDIA_TYPES['.json'],
-                           'source_name': claim['filename']},
-        'adapter_capabilities': ['measurement_json'],
-        'blocks': [], 'relations': [], 'parsed_scope': [],
-        'failed_scope': [{'kind': 'object', 'ref': claim['document_id'],
-                          'status': 'unsupported', 'detail': 'locator_unavailable'}],
-        'quality_findings': [], 'unsupported_features': ['locator_unavailable'],
-        'artifact_refs': [],
-        'manifest': {'parser_version': 'cad-measurement-adapter-v1',
-                     'adapter': ADAPTERS['.json'], 'measurement_id': measurement_id,
-                     'record_version': record['source']['record_version']},
-        'parse_status': 'unsupported'}
-    return parse_contract.validate_parse_result(payload), {
-        'measurement_id': measurement_id, 'record_version': record['source']['record_version'],
-        'measurements': len(record.get('measurements') or [])}
+    def parse(path, claim):
+        try:
+            loader = manifest.resolve()
+        except ManifestError as error:
+            raise HTTPException(422, detail=error.as_detail()) from error
+        return invoke_plugin(manifest, loader, path, claim['document_id'],
+                             claim['source_sha256'], claim)
+
+    return parse
 
 
-PARSERS = {'.dxf': _parse_dxf, '.json': _parse_json, '.pdf': _parse_pdf,
-           '.docx': _parse_office, '.pptx': _parse_office, '.xlsx': _parse_office}
+def _sync_parsers():
+    """Fill `PARSERS` from the enabled extensions the registry reports, never overwriting.
+
+    A key is never replaced (G6): a patched entry survives a re-sync, and so does the
+    closure an extension was filled with before its manifest was replaced. The table is
+    only the entry-point cache, not the dispatch decision - `run_parse` asks the registry
+    first on every call, so a manifest disabled after import cannot keep parsing through
+    the stale closure this function left behind.
+    """
+    parser = default_context().parser
+    for extension in parser.known_extensions(include_disabled=False):
+        PARSERS.setdefault(extension, _plugin_parser(parser.lookup_by_extension(extension)))
+
+
+_sync_parsers()
 
 
 def run_parse(claim, dsn):
@@ -1206,8 +1201,10 @@ def run_parse(claim, dsn):
     `pymupdf_layout` on stdout the first time it runs layout analysis). In the bounded
     child the runner writes its one JSON result to stdout, so any library chatter would
     corrupt that channel and be reported as `TASK_RESULT_INVALID` even though the parse and
-    the contract write succeeded. The parse therefore runs with stdout redirected to
-    stderr: diagnostics survive, the result channel stays exactly one JSON object.
+    the contract write succeeded. Both steps therefore run with stdout redirected to
+    stderr: bootstrap (``ensure_loaded`` imports every configured external plugin module,
+    which may print at import time) and the parse itself. Diagnostics survive; the result
+    channel stays exactly one JSON object.
 
     **Claim generation (R04).** The parse itself runs outside any transaction (it can take
     the whole wave budget). Only afterwards — in **one** transaction — is the claim locked
@@ -1216,9 +1213,20 @@ def run_parse(claim, dsn):
     was superseded while the parse ran commits nothing at all: no blocks, no locators, no
     quality detail, no terminal state — it returns `claim_lost` instead.
     """
+    # The parsing child owns its own process, so the table is bootstrapped here too (G8).
+    # Redirected: discovery imports plugin modules, and a module-level print() would
+    # otherwise land in the result channel this child writes its one JSON answer to.
+    with contextlib.redirect_stdout(sys.stderr):
+        ensure_loaded()
+        _sync_parsers()
+    # The registry, not `PARSERS`, decides whether the suffix is served: a plugin disabled
+    # after import keeps its entry point in the table and must be refused here instead.
+    manifest = _served_manifest(claim['suffix'])
+    # A patched entry still wins for an enabled extension; the lookup above only gates.
+    parser_entry = PARSERS.get(claim['suffix']) or _plugin_parser(manifest)
     path = _staged_path(claim)
     with contextlib.redirect_stdout(sys.stderr):
-        result, extra = PARSERS[claim['suffix']](path, claim)
+        result, extra = parser_entry(path, claim)
     payload = result.payload
     parse_status = payload['parse_status']
     terminal = ('succeeded' if parse_status == 'parsed'
@@ -1310,14 +1318,22 @@ def _analysis_of(claim, payload, stored, extra):
     block_types = {}
     for block in payload['blocks']:
         block_types[block['block_type']] = block_types.get(block['block_type'], 0) + 1
+    # The plugin that served the suffix, resolved from the declarations rather than from an
+    # enabled lookup, so a record parsed before a plugin was disabled keeps naming it.
+    manifest = _manifest_for(claim['suffix'])
+    owner = manifest.name if manifest is not None else None
     analysis = {'parse_status': payload['parse_status'],
-                'adapter': payload['manifest'].get('adapter') or ADAPTERS.get(claim['suffix']),
+                'adapter': payload['manifest'].get('adapter') or owner,
+                'plugin': owner,
                 'blocks': stored['blocks'], 'locators_written': stored['locators'],
                 'relations': stored['relations'], 'block_types': block_types,
                 'unsupported_features': list(payload['unsupported_features']),
                 'quality_findings': payload['quality_findings'],
                 'contract_version': payload['contract_version']}
-    analysis.update(extra)
+    # Plugin extras add analysis counters; they never replace a field the contract itself
+    # attributed, or a plugin could rename its own adapter in the stored record.
+    for key, value in extra.items():
+        analysis.setdefault(key, value)
     return analysis
 
 
